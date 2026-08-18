@@ -1,0 +1,265 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3 Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Auth tokens NEVER contain custom claims. We check roles via users doc or exists()
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        dbHasAdmin(request.auth.uid) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin')
+      );
+    }
+
+    function dbHasAdmin(uid) {
+      return exists(/databases/$(database)/documents/admins/$(uid));
+    }
+
+    // Entity validator: Users
+    function isValidUser(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 100))
+        && (!('childName' in data) || (data.childName is string && data.childName.size() <= 100))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 2000))
+        && (!('childAge' in data) || ((data.childAge is int || data.childAge is float) && data.childAge >= 0 && data.childAge <= 16))
+        && (!('childGender' in data) || (data.childGender in ['Boy', 'Girl', 'Other']))
+        && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 50))
+        && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 100))
+        && (!('locationSharing' in data) || (data.locationSharing in ['PRECISE', 'APPROXIMATE', 'HIDDEN']))
+        && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED']))
+        && (!('userRole' in data) || (data.userRole in ['Parent', 'Event Organizer', 'Portfolio Professional', 'Admin']))
+        && (!('interests' in data) || (data.interests is list && data.interests.size() <= 20))
+        && (!('availableDays' in data) || (data.availableDays is list && data.availableDays.size() <= 7))
+        && (!('availableTimes' in data) || (data.availableTimes is list && data.availableTimes.size() <= 3))
+        && (!('aadhaarNumber' in data) || (data.aadhaarNumber is string && data.aadhaarNumber.size() <= 30))
+        && (!('aadhaarVerified' in data) || (data.aadhaarVerified is bool))
+        && (!('attendedEventsCount' in data) || (data.attendedEventsCount is int))
+        && (!('checkedInEvents' in data) || (data.checkedInEvents is list));
+    }
+
+    // Entity validator: Playdate
+    function isValidPlaydate(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.hostId is string
+        && data.hostId.size() <= 128
+        && data.guestId is string
+        && data.guestId.size() <= 128
+        && data.date is string
+        && data.status in ['Pending', 'Accepted', 'Declined', 'Completed']
+        && (!('title' in data) || (data.title is string && data.title.size() <= 150))
+        && (!('time' in data) || (data.time is string && data.time.size() <= 50))
+        && (!('location' in data) || (data.location is string && data.location.size() <= 200))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    // Entity validator: Message
+    function isValidMessage(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.chatId is string
+        && data.chatId.size() <= 128
+        && data.senderId is string
+        && data.senderId.size() <= 128
+        && data.content is string
+        && data.content.size() <= 5000
+        && data.timestamp is string;
+    }
+
+    // Entity validator: Booking
+    function isValidBooking(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.itemId is string
+        && data.type in ['EventTicket', 'SpecialistAppointment']
+        && data.buyerEmail is string
+        && data.status in ['Paid', 'Refunded'];
+    }
+
+    // Entity validator: CustomRole
+    function isValidCustomRole(data) {
+      return data.name is string
+        && data.name.size() <= 128
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && data.capabilities is list
+        && data.capabilities.size() <= 30;
+    }
+
+    // Entity validator: PushNotification
+    function isValidPushNotification(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.title is string
+        && data.title.size() <= 200
+        && data.body is string
+        && data.body.size() <= 4000
+        && (data.createdAt is int || data.createdAt is float)
+        && (!('imageUrl' in data) || data.imageUrl is string)
+        && (!('senderName' in data) || data.senderName is string)
+        && (!('senderId' in data) || data.senderId is string);
+    }
+
+    // Entity validator: CustomEventCategory
+    function isValidCustomEventCategory(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.name is string
+        && data.name.size() <= 100
+        && data.value is string
+        && data.value.size() <= 100;
+    }
+
+    // Entity validator: CustomSpecialistCategory
+    function isValidCustomSpecialistCategory(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.name is string
+        && data.name.size() <= 100
+        && data.value is string
+        && data.value.size() <= 100;
+    }
+
+    // Entity validator: CustomProfileField
+    function isValidCustomProfileField(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.fieldName is string
+        && data.fieldName.size() <= 100
+        && data.placeholder is string
+        && data.placeholder.size() <= 200;
+    }
+
+    // ----------------- COLLECTIONS -----------------
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && (
+        !('userRole' in incoming()) || incoming().userRole != 'Admin' // Deny self-assigned Admin role
+      );
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
+        // Protect roles and critical fields
+        incoming().id == existing().id &&
+        (!('userRole' in incoming()) || !('userRole' in existing()) || incoming().userRole == existing().userRole || isAdmin()) &&
+        (!('verificationStatus' in incoming()) || !('verificationStatus' in existing()) || incoming().verificationStatus == existing().verificationStatus || isAdmin())
+      );
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Playdates Collection
+    match /playdates/{playdateId} {
+      allow read: if isSignedIn() && (
+        resource.data.hostId == request.auth.uid ||
+        resource.data.guestId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidPlaydate(incoming()) && (
+        incoming().hostId == request.auth.uid ||
+        incoming().guestId == request.auth.uid
+      );
+      allow update: if isSignedIn() && isValidPlaydate(incoming()) && (
+        // Action splits and participant validation
+        existing().hostId == request.auth.uid ||
+        existing().guestId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        existing().hostId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Chats Collection Subcollection Messages
+    match /chats/{chatId}/messages/{messageId} {
+      // ChatId is usually "userId1_userId2" - check that either matches current auth UID
+      function isChatParticipant(cid) {
+        return cid.indexOf(request.auth.uid) >= 0;
+      }
+
+      allow read, list: if isSignedIn() && (isChatParticipant(chatId) || isAdmin());
+      allow create: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && incoming().senderId == request.auth.uid;
+      allow update: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && existing().senderId == request.auth.uid;
+      allow delete: if isSignedIn() && isChatParticipant(chatId) && (existing().senderId == request.auth.uid || isAdmin());
+    }
+
+    // Bookings Collection
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && (resource.data.buyerEmail == request.auth.token.email || isAdmin());
+      allow create: if isSignedIn() && isValidBooking(incoming()) && incoming().buyerEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Custom Roles Collection
+    match /custom_roles/{roleId} {
+      allow read: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidCustomRole(incoming()) && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+      allow delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+
+    // Banners & Promotional Ads Collection
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow create, update, delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+
+    // Push Notifications Collection
+    match /push_notifications/{notificationId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidPushNotification(incoming()) && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+      allow delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+
+    // Custom Event Categories Collection
+    match /custom_event_categories/{id} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidCustomEventCategory(incoming()) && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+      allow delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+
+    // Custom Specialist Categories Collection
+    match /custom_specialist_categories/{id} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidCustomSpecialistCategory(incoming()) && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+      allow delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+
+    // Custom Profile Fields Collection
+    match /custom_profile_fields/{id} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidCustomProfileField(incoming()) && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+      allow delete: if isSignedIn() && (isAdmin() || (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.userRole == 'Admin'));
+    }
+  }
+}

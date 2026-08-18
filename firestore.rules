@@ -1,0 +1,306 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global safety net catch-all: Default Deny All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3 Global Security Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    // Zero-Trust Admin Check: verifies against dedicated /admins collection or verified root admin email
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        ((request.auth.token.email in ['arjunmpgupta@gmail.com', 'ardha@vernunt.com']) && isEmailVerified())
+      );
+    }
+
+    // Entity validator: Users
+    function isValidUser(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 100))
+        && (!('childName' in data) || (data.childName is string && data.childName.size() <= 100))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 2000))
+        && (!('childAge' in data) || ((data.childAge is int || data.childAge is float) && data.childAge >= 0 && data.childAge <= 16))
+        && (!('childGender' in data) || (data.childGender in ['Boy', 'Girl', 'Other']))
+        && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 50))
+        && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 100))
+        && (!('locationSharing' in data) || (data.locationSharing in ['PRECISE', 'APPROXIMATE', 'HIDDEN']))
+        && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED']))
+        && (!('userRole' in data) || (data.userRole in ['Parent', 'Event Organizer', 'Portfolio Professional', 'Admin']))
+        && (!('interests' in data) || (data.interests is list && data.interests.size() <= 20))
+        && (!('availableDays' in data) || (data.availableDays is list && data.availableDays.size() <= 7))
+        && (!('availableTimes' in data) || (data.availableTimes is list && data.availableTimes.size() <= 3))
+        && (!('aadhaarNumber' in data) || (data.aadhaarNumber is string && data.aadhaarNumber.size() <= 30))
+        && (!('aadhaarVerified' in data) || (data.aadhaarVerified is bool))
+        && (!('attendedEventsCount' in data) || (data.attendedEventsCount is int))
+        && (!('checkedInEvents' in data) || (data.checkedInEvents is list));
+    }
+
+    // Entity validator: Security Logs
+    function isValidSecurityLog(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.timestamp is string
+        && data.timestamp.size() <= 60
+        && data.eventType is string
+        && data.eventType.size() <= 100
+        && data.severity in ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+        && data.description is string
+        && data.description.size() <= 2000;
+    }
+
+    // Entity validator: Playdate
+    function isValidPlaydate(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.hostId is string
+        && data.hostId.size() <= 128
+        && data.guestId is string
+        && data.guestId.size() <= 128
+        && data.date is string
+        && data.status in ['Pending', 'Accepted', 'Declined', 'Completed']
+        && (!('title' in data) || (data.title is string && data.title.size() <= 150))
+        && (!('time' in data) || (data.time is string && data.time.size() <= 50))
+        && (!('location' in data) || (data.location is string && data.location.size() <= 200))
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 1000));
+    }
+
+    // Entity validator: Message
+    function isValidMessage(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.chatId is string
+        && data.chatId.size() <= 128
+        && data.senderId is string
+        && data.senderId.size() <= 128
+        && data.content is string
+        && data.content.size() <= 5000
+        && data.timestamp is string;
+    }
+
+    // Entity validator: Booking
+    function isValidBooking(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.itemId is string
+        && data.type in ['EventTicket', 'SpecialistAppointment']
+        && data.buyerEmail is string
+        && data.status in ['Paid', 'Refunded'];
+    }
+
+    // Entity validator: CustomRole
+    function isValidCustomRole(data) {
+      return data.name is string
+        && data.name.size() <= 128
+        && (!('description' in data) || (data.description is string && data.description.size() <= 1000))
+        && data.capabilities is list
+        && data.capabilities.size() <= 30;
+    }
+
+    // Entity validator: PushNotification
+    function isValidPushNotification(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.title is string
+        && data.title.size() <= 200
+        && data.body is string
+        && data.body.size() <= 4000
+        && (data.createdAt is int || data.createdAt is float)
+        && (!('imageUrl' in data) || data.imageUrl is string)
+        && (!('senderName' in data) || data.senderName is string)
+        && (!('senderId' in data) || data.senderId is string);
+    }
+
+    // Entity validator: CustomEventCategory
+    function isValidCustomEventCategory(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.name is string
+        && data.name.size() <= 100
+        && data.value is string
+        && data.value.size() <= 100;
+    }
+
+    // Entity validator: CustomSpecialistCategory
+    function isValidCustomSpecialistCategory(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.name is string
+        && data.name.size() <= 100
+        && data.value is string
+        && data.value.size() <= 100;
+    }
+
+    // Entity validator: CustomProfileField
+    function isValidCustomProfileField(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.fieldName is string
+        && data.fieldName.size() <= 100
+        && data.placeholder is string
+        && data.placeholder.size() <= 200;
+    }
+
+    // ----------------- COLLECTIONS -----------------
+
+    // System Admins Collection: Read only by verified Admin; Write completely disabled from client
+    match /admins/{adminId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // Security Audit & Intrusion Logs: Append-only for clients, Read-only for admins, No updates/deletions (tamper-proof)
+    match /security_logs/{logId} {
+      allow read, list: if isAdmin();
+      allow create: if isSignedIn() && isValidSecurityLog(incoming());
+      allow update, delete: if false;
+    }
+
+    // System Configuration & Tab Placement: Public Read, Admin Write
+    match /system_config/{configId} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Subscription Pricing & Plans Configuration: Public Read, Admin Write
+    match /subscription_config/{configId} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // User Private Contacts Directory (Owner-only / Admin-only access)
+    match /user_contacts/{contactId} {
+      allow read, list: if isSignedIn() && (request.auth.uid == contactId || isAdmin());
+      allow create, update: if isSignedIn() && request.auth.uid == contactId;
+      allow delete: if isSignedIn() && (request.auth.uid == contactId || isAdmin());
+    }
+
+    // Users Collection: Anti-Escalation & Privilege Locking
+    match /users/{userId} {
+      allow read, list: if isSignedIn();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && (
+        (!('userRole' in incoming()) || incoming().userRole != 'Admin') &&
+        (!('isBlocked' in incoming()) || incoming().isBlocked == false) &&
+        (!('isLocked' in incoming()) || incoming().isLocked == false) &&
+        (!('aadhaarVerified' in incoming()) || incoming().aadhaarVerified == false)
+      );
+      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
+        incoming().id == existing().id &&
+        // Non-admins CANNOT elevate role or tamper with security flags
+        (isAdmin() || (
+          (!('userRole' in incoming()) || incoming().userRole == existing().userRole) &&
+          (!('verificationStatus' in incoming()) || incoming().verificationStatus == existing().verificationStatus) &&
+          (!('aadhaarVerified' in incoming()) || incoming().aadhaarVerified == existing().aadhaarVerified) &&
+          (!('isBlocked' in incoming()) || incoming().isBlocked == existing().isBlocked) &&
+          (!('isLocked' in incoming()) || incoming().isLocked == existing().isLocked)
+        ))
+      );
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // Playdates Collection
+    match /playdates/{playdateId} {
+      allow read, list: if isSignedIn() && (
+        resource.data.hostId == request.auth.uid ||
+        resource.data.guestId == request.auth.uid ||
+        isAdmin()
+      );
+      allow create: if isSignedIn() && isValidPlaydate(incoming()) && (
+        incoming().hostId == request.auth.uid ||
+        incoming().guestId == request.auth.uid
+      );
+      allow update: if isSignedIn() && isValidPlaydate(incoming()) && (
+        existing().hostId == request.auth.uid ||
+        existing().guestId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        existing().hostId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Chats Collection Subcollection Messages
+    match /chats/{chatId}/messages/{messageId} {
+      function isChatParticipant(cid) {
+        return cid.indexOf(request.auth.uid) >= 0;
+      }
+
+      allow read, list: if isSignedIn() && (isChatParticipant(chatId) || isAdmin());
+      allow create: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && incoming().senderId == request.auth.uid;
+      allow update: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && existing().senderId == request.auth.uid;
+      allow delete: if isSignedIn() && isChatParticipant(chatId) && (existing().senderId == request.auth.uid || isAdmin());
+    }
+
+    // Bookings Collection
+    match /bookings/{bookingId} {
+      allow read, list: if isSignedIn() && (resource.data.buyerEmail == request.auth.token.email || isAdmin());
+      allow create: if isSignedIn() && isValidBooking(incoming()) && incoming().buyerEmail == request.auth.token.email;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Custom Roles Collection: Admin Only Write
+    match /custom_roles/{roleId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Banners & Promotional Ads Collection: Public Read & List, Admin Only Write
+    match /banners/{bannerId} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Push Notifications Collection: Admin Only Write
+    match /push_notifications/{notificationId} {
+      allow read, list: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Custom Event Categories Collection: Public Read, Admin Write
+    match /custom_event_categories/{id} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Custom Specialist Categories Collection: Public Read, Admin Write
+    match /custom_specialist_categories/{id} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Custom Profile Fields Collection: Public Read, Admin Write
+    match /custom_profile_fields/{id} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
+    }
+  }
+}

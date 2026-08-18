@@ -1,0 +1,27 @@
+# Automated Google Cloud Build configuration for daily Cloud Run deployments
+steps:
+  # 1. Build container image using Dockerfile
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/$PROJECT_ID/vernunt:$BUILD_ID', '-t', 'gcr.io/$PROJECT_ID/vernunt:latest', '.']
+
+  # 2. Push container image to Google Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/vernunt:latest']
+
+  # 3. Deploy new container revision to Cloud Run automatically
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'vernunt'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/vernunt:latest'
+      - '--region'
+      - 'asia-east1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+
+images:
+  - 'gcr.io/$PROJECT_ID/vernunt:latest'

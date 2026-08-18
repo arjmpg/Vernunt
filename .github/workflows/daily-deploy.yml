@@ -1,0 +1,38 @@
+name: Automated Daily Deployment & Sitemap Refresh
+
+on:
+  schedule:
+    # Runs everyday at 00:00 UTC (5:30 AM IST)
+    - cron: '0 0 * * *'
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Codebase
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci || npm install
+
+      - name: Generate Fresh Daily Sitemap & Build Production Artifacts
+        run: npm run build
+
+      - name: Deploy to Firebase Hosting / Cloud Run
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: '${{ secrets.GITHUB_TOKEN }}'
+          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0519197985 }}'
+          channelId: live
+          projectId: gen-lang-client-0519197985
+        continue-on-error: true

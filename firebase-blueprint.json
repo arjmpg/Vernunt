@@ -1,0 +1,266 @@
+{
+  "entities": {
+    "ChildProfile": {
+      "title": "ChildProfile",
+      "description": "Demographic parent-child profiles mapped inside the radar network",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "parentName": { "type": "string" },
+        "childName": { "type": "string" },
+        "childAge": { "type": "integer" },
+        "childGender": { "type": "string", "enum": ["Boy", "Girl", "Other"] },
+        "gradeLevel": { "type": "string" },
+        "playStyle": { "type": "string" },
+        "bio": { "type": "string" },
+        "location": { "type": "object" },
+        "locationSharing": { "type": "string", "enum": ["PRECISE", "APPROXIMATE", "HIDDEN"] },
+        "verificationStatus": { "type": "string", "enum": ["UNVERIFIED", "PENDING", "VERIFIED"] },
+        "interests": { "type": "array" },
+        "photoUrl": { "type": "string" },
+        "parentProfession": { "type": "string" },
+        "religion": { "type": "string" },
+        "motherTongue": { "type": "string" },
+        "languagesKnown": { "type": "array" },
+        "aadhaarNumber": { "type": "string" },
+        "aadhaarVerified": { "type": "boolean" },
+        "attendedEventsCount": { "type": "integer" },
+        "checkedInEvents": { "type": "array" },
+        "userRole": { "type": "string", "enum": ["Parent", "Event Organizer", "Portfolio Professional", "Admin"] },
+        "availableDays": { "type": "array" },
+        "availableTimes": { "type": "array" }
+      },
+      "required": ["id", "parentName", "childName"]
+    },
+    "Playdate": {
+      "title": "Playdate",
+      "description": "Structured scheduling record between two match guardians",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "hostId": { "type": "string" },
+        "guestId": { "type": "string" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Accepted", "Declined", "Completed"] },
+        "notes": { "type": "string" },
+        "isGroup": { "type": "boolean" }
+      },
+      "required": ["id", "hostId", "guestId", "date", "status"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Safe P2P chat messages",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "chatId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "content": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["id", "chatId", "senderId", "content", "timestamp"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Platform registration or specialist appointment purchase",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "itemId": { "type": "string" },
+        "itemTitle": { "type": "string" },
+        "type": { "type": "string", "enum": ["EventTicket", "SpecialistAppointment"] },
+        "buyerName": { "type": "string" },
+        "buyerEmail": { "type": "string" },
+        "amountPaid": { "type": "number" },
+        "commissionPercentage": { "type": "number" },
+        "commissionEarned": { "type": "number" },
+        "hostEarned": { "type": "number" },
+        "dateStr": { "type": "string" },
+        "timeSelected": { "type": "string" },
+        "razorpayPaymentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["Paid", "Refunded"] }
+      },
+      "required": ["id", "itemId", "type", "buyerEmail", "amountPaid", "status"]
+    },
+    "CustomRole": {
+      "title": "CustomRole",
+      "description": "Custom authorization level configured under the system control panel",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "capabilities": { "type": "array" }
+      },
+      "required": ["name", "capabilities"]
+    },
+    "Banner": {
+      "title": "Banner",
+      "description": "Dynamic promotional advertisements or announcements published by admin users",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "linkUrl": { "type": "string" },
+        "placement": { "type": "string", "enum": ["home", "app_top", "app_sidebar"] },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "imageUrl", "placement"]
+    },
+    "PushNotification": {
+      "title": "PushNotification",
+      "description": "App-wide security and broadcast announcements dispatched by admin operators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "number" },
+        "senderName": { "type": "string" },
+        "senderId": { "type": "string" }
+      },
+      "required": ["id", "title", "body", "createdAt"]
+    },
+    "CustomEventCategory": {
+      "title": "CustomEventCategory",
+      "description": "Dynamic custom activity or gathering categories managed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["id", "name", "value"]
+    },
+    "CustomSpecialistCategory": {
+      "title": "CustomSpecialistCategory",
+      "description": "Dynamic custom specialist classifications managed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["id", "name", "value"]
+    },
+    "CustomProfileField": {
+      "title": "CustomProfileField",
+      "description": "Dynamic additional metadata fields for matching parents managed by administrators",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "fieldName": { "type": "string" },
+        "placeholder": { "type": "string" }
+      },
+      "required": ["id", "fieldName", "placeholder"]
+    },
+    "SecurityLog": {
+      "title": "SecurityLog",
+      "description": "Tamper-proof immutable audit events and threat detection logs",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "eventType": { "type": "string", "enum": ["UNAUTHORIZED_ACCESS_ATTEMPT", "ADMIN_PANEL_BLOCKED", "RATE_LIMIT_EXCEEDED", "ROLE_ESCALATION_ATTEMPT", "DATA_EXPORT_AUDIT", "LOCKDOWN_TOGGLED", "SECURITY_SCAN"] },
+        "severity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"] },
+        "actorUid": { "type": "string" },
+        "actorEmail": { "type": "string" },
+        "description": { "type": "string" },
+        "ipAddress": { "type": "string" },
+        "blocked": { "type": "boolean" }
+      },
+      "required": ["id", "timestamp", "eventType", "severity", "description"]
+    },
+    "SystemConfig": {
+      "title": "SystemConfig",
+      "description": "System-wide security lockdown parameters and tab placements",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "emergencyLockdown": { "type": "boolean" },
+        "placements": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      }
+    },
+    "UserContact": {
+      "title": "UserContact",
+      "description": "Protected private contact card for family privacy controls",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "parentName": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "email": { "type": "string" },
+        "privacyLevel": { "type": "string", "enum": ["hidden", "visible", "connected"] }
+      },
+      "required": ["userId"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "ChildProfile",
+      "description": "Contains user registration profiles matching their Auth UID"
+    },
+    "/admins/{adminId}": {
+      "schema": "ChildProfile",
+      "description": "Strictly restricted database of authorized platform system administrators"
+    },
+    "/security_logs/{logId}": {
+      "schema": "SecurityLog",
+      "description": "Immutable tamper-proof platform audit & intrusion logs"
+    },
+    "/system_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Global security settings, tab configurations, and emergency lockdown states"
+    },
+    "/subscription_config/{configId}": {
+      "schema": "SystemConfig",
+      "description": "Master subscription pricing, tiers, and capabilities"
+    },
+    "/user_contacts/{contactId}": {
+      "schema": "UserContact",
+      "description": "Private contact directory cards with owner-only access controls"
+    },
+    "/playdates/{playdateId}": {
+      "schema": "Playdate",
+      "description": "Stores booked playdate coordination documents"
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Platform commercial acquisitions logs for events/appointments"
+    },
+    "/chats/{chatId}/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Subcollection storing real messaging transactions between matched parents"
+    },
+    "/custom_roles/{roleId}": {
+      "schema": "CustomRole",
+      "description": "Secure security access level records created dynamically by supervisors"
+    },
+    "/banners/{bannerId}": {
+      "schema": "Banner",
+      "description": "Dynamic promotional advertisements or announcements published by admin users"
+    },
+    "/push_notifications/{notificationId}": {
+      "schema": "PushNotification",
+      "description": "App-wide general alerts periodically broadcasted"
+    },
+    "/custom_event_categories/{id}": {
+      "schema": "CustomEventCategory",
+      "description": "Stores custom dynamic event types defined by platform supervisors"
+    },
+    "/custom_specialist_categories/{id}": {
+      "schema": "CustomSpecialistCategory",
+      "description": "Stores custom professional categories defined by supervisors"
+    },
+    "/custom_profile_fields/{id}": {
+      "schema": "CustomProfileField",
+      "description": "Stores custom registration profile fields injected dynamically"
+    }
+  }
+}
