@@ -3,10 +3,10 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 # Copy package files
-COPY package*.json ./
+COPY package.json ./
 
 # Install dependencies including devDependencies for build step
-RUN npm ci || npm install
+RUN npm install --no-audit --no-fund
 
 # Copy source code
 COPY . .
@@ -23,8 +23,8 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 # Copy package files and install production dependencies only
-COPY package*.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
+COPY package.json ./
+RUN npm install --omit=dev --no-audit --no-fund
 
 # Copy build artifacts from builder
 COPY --from=builder /app/dist ./dist
