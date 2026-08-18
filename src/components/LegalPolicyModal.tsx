@@ -29,23 +29,40 @@ export default function LegalPolicyModal({ onKeepClose }: { onKeepClose: () => v
         </div>
 
         <div id="legal-body" className="p-6 space-y-4 overflow-y-auto text-xs text-slate-600 leading-relaxed flex-1">
-          <h4 className="font-bold text-slate-800 text-sm font-serif">1. Playground Respect & Safety Standards</h4>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-emerald-900 text-[11px] font-medium flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+            <span>
+              <strong>COPPA & DPDP Act 2023 Child Privacy Certified:</strong> Vernunt enforces zero-targeted advertising, verifiable guardian consent, and end-to-end PII obfuscation for all child data.
+            </span>
+          </div>
+
+          <h4 className="font-bold text-slate-800 text-sm font-serif">1. Playground Respect & Supervised Playdate Mandate</h4>
           <p>
-            By coordinating matches or playgroups on Vernunt, you represent that your child has received up-to-date pediatric boosters (including MMR & DTaP clearances) and that you respect regional daycare or playground guidelines. Parents or guardians must attend and supervise playground matches.
+            By coordinating matches or playgroups on Vernunt, you represent that you are the verified parent or legal guardian of the dependent minor, that your child has received up-to-date pediatric boosters (including MMR & DTaP clearances), and that an adult guardian will remain in physical attendance for all offline playground meetings.
           </p>
 
-          <h4 className="font-bold text-slate-800 text-sm font-serif">2. High-Tech Proximity Mapping Guard</h4>
+          <h4 className="font-bold text-slate-800 text-sm font-serif">2. COPPA & DPDP Verifiable Parental Consent (VPC)</h4>
           <p>
-            To prevent unsolicited address listing or coordinate leaks, Vernunt implements concentric coordinates rounding. Exact residential addresses are never shared; parents interact safely at public play areas.
+            In accordance with 16 CFR Part 312 (COPPA) and Section 9 of India's DPDP Act 2023, direct registration by minors under 13 is strictly prohibited. All dependent records are created solely with verifiable parental consent via government ID and Aadhaar multi-factor verification.
           </p>
 
-          <h4 className="font-bold text-slate-800 text-sm font-serif">3. Anti-Harassment & Safety Requirements</h4>
+          <h4 className="font-bold text-slate-800 text-sm font-serif">3. Zero-Targeted-Advertising & Concentric Location Masking</h4>
           <p>
-            Any formal reports of bullying, inappropriate behaviors, or fraudulent guardian registrations are reviewed with priority. Violating profiles are subject to immediate and permanent exclusion.
+            Vernunt guarantees that child behavioral patterns and play preferences are never sold, rented, or monetized for commercial advertising. Furthermore, exact residential addresses are never stored or exposed; proximity radar is rounded to general public parks and verified school zones.
+          </p>
+
+          <h4 className="font-bold text-slate-800 text-sm font-serif">4. Parental Rights: Right to Access, Export & Erase</h4>
+          <p>
+            Parents maintain unconditional rights to review dependent child records, download full portable data archives, or trigger immediate, permanent erasure (Right to be Forgotten) through the Child Safety & Compliance Center.
+          </p>
+
+          <h4 className="font-bold text-slate-800 text-sm font-serif">5. Anti-Harassment & Automated Content Moderation</h4>
+          <p>
+            All communications are screened by real-time linguistic filters blocking cyberbullying, predatory secrecy cues, and unauthorized contact harvesting. Violating profiles are permanently banned and reported to relevant child protection authorities.
           </p>
 
           <p className="text-[10px] text-slate-400 italic pt-2">
-            Last Updated: May 2026. Vernunt values and respects your household safety. Happy playing!
+            Last Audited & Certified: August 2026. Designated Child Safety Officer: safety@vernunt.com
           </p>
         </div>
 

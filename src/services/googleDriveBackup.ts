@@ -127,18 +127,7 @@ export async function getValidDriveAccessToken(interactive = true): Promise<stri
     throw new Error('Google Drive is not connected. Please connect your Google Account.');
   }
 
-  // 1. Try Firebase Google Sign-In with Drive scope
-  try {
-    const user = await triggerGoogleSignIn();
-    const token = getGoogleAccessToken();
-    if (token) {
-      return token;
-    }
-  } catch (err) {
-    console.warn('Firebase Drive popup sign-in note, attempting token client fallback:', err);
-  }
-
-  // 2. Fallback: Google Identity Services token client
+  // Use Google Identity Services token client for incremental Drive scope
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !(window as any).google?.accounts?.oauth2) {
       // If GIS script is not present, inject it dynamically

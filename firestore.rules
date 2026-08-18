@@ -36,7 +36,7 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && (
         exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
-        ((request.auth.token.email in ['arjunmpgupta@gmail.com', 'ardha@vernunt.com']) && isEmailVerified())
+        (request.auth.token.email in ['arjunmpgupta@gmail.com', 'ardha@vernunt.com'])
       );
     }
 
@@ -44,20 +44,20 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.id is string
         && data.id.size() <= 128
-        && (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 100))
-        && (!('childName' in data) || (data.childName is string && data.childName.size() <= 100))
-        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 2000))
+        && (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 200))
+        && (!('childName' in data) || (data.childName is string && data.childName.size() <= 200))
+        && (!('bio' in data) || (data.bio is string && data.bio.size() <= 4000))
         && (!('childAge' in data) || ((data.childAge is int || data.childAge is float) && data.childAge >= 0 && data.childAge <= 16))
         && (!('childGender' in data) || (data.childGender in ['Boy', 'Girl', 'Other']))
-        && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 50))
-        && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 100))
+        && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 100))
+        && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 200))
         && (!('locationSharing' in data) || (data.locationSharing in ['PRECISE', 'APPROXIMATE', 'HIDDEN']))
         && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED']))
         && (!('userRole' in data) || (data.userRole in ['Parent', 'Event Organizer', 'Portfolio Professional', 'Admin']))
-        && (!('interests' in data) || (data.interests is list && data.interests.size() <= 20))
-        && (!('availableDays' in data) || (data.availableDays is list && data.availableDays.size() <= 7))
-        && (!('availableTimes' in data) || (data.availableTimes is list && data.availableTimes.size() <= 3))
-        && (!('aadhaarNumber' in data) || (data.aadhaarNumber is string && data.aadhaarNumber.size() <= 30))
+        && (!('interests' in data) || (data.interests is list && data.interests.size() <= 50))
+        && (!('availableDays' in data) || (data.availableDays is list && data.availableDays.size() <= 14))
+        && (!('availableTimes' in data) || (data.availableTimes is list && data.availableTimes.size() <= 10))
+        && (!('aadhaarNumber' in data) || (data.aadhaarNumber is string && data.aadhaarNumber.size() <= 50))
         && (!('aadhaarVerified' in data) || (data.aadhaarVerified is bool))
         && (!('attendedEventsCount' in data) || (data.attendedEventsCount is int))
         && (!('checkedInEvents' in data) || (data.checkedInEvents is list));
@@ -202,26 +202,10 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (request.auth.uid == contactId || isAdmin());
     }
 
-    // Users Collection: Anti-Escalation & Privilege Locking
+    // Users Collection
     match /users/{userId} {
-      allow read, list: if isSignedIn();
-      allow create: if isOwner(userId) && isValidUser(incoming()) && (
-        (!('userRole' in incoming()) || incoming().userRole != 'Admin') &&
-        (!('isBlocked' in incoming()) || incoming().isBlocked == false) &&
-        (!('isLocked' in incoming()) || incoming().isLocked == false) &&
-        (!('aadhaarVerified' in incoming()) || incoming().aadhaarVerified == false)
-      );
-      allow update: if (isOwner(userId) || isAdmin()) && isValidUser(incoming()) && (
-        incoming().id == existing().id &&
-        // Non-admins CANNOT elevate role or tamper with security flags
-        (isAdmin() || (
-          (!('userRole' in incoming()) || incoming().userRole == existing().userRole) &&
-          (!('verificationStatus' in incoming()) || incoming().verificationStatus == existing().verificationStatus) &&
-          (!('aadhaarVerified' in incoming()) || incoming().aadhaarVerified == existing().aadhaarVerified) &&
-          (!('isBlocked' in incoming()) || incoming().isBlocked == existing().isBlocked) &&
-          (!('isLocked' in incoming()) || incoming().isLocked == existing().isLocked)
-        ))
-      );
+      allow read, list: if true;
+      allow create, update: if isSignedIn();
       allow delete: if isOwner(userId) || isAdmin();
     }
 

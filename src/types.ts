@@ -29,6 +29,8 @@ export interface ChildProfile {
   verificationStatus: VerificationStatus;
   interests: string[];
   photoUrl: string;
+  parentPhotoUrl?: string; // Parent/Guardian photo (MANDATORY for trust & safety)
+  childPhotoUrl?: string; // Child photo (OPTIONAL for child COPPA/DPDP privacy)
   ageUnit?: 'years' | 'months';
   parentsIncome?: string; // Hidden in frontend
   caste?: string;
@@ -104,6 +106,93 @@ export interface ChildProfile {
 
   // Mobile Phone Contacts Privacy & Visibility Settings
   contactsPrivacy?: UserContactsPrivacy;
+
+  // WooCommerce Affiliate Model Settings & Stats
+  isAffiliate?: boolean;
+  affiliateStatus?: 'active' | 'pending' | 'rejected' | 'inactive';
+  affiliateCode?: string; // Custom affiliate referral slug e.g. "SARAH-KIDS"
+  affiliateCommissionRate?: number; // Custom commission percentage (e.g. 15%)
+  affiliateTier?: 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Ambassador';
+  affiliateEarningsTotal?: number; // Total INR earned through referral bookings
+  affiliateEarningsPaid?: number; // Total INR paid out to affiliate
+  affiliateEarningsUnpaid?: number; // Unpaid/pending balance in INR
+  affiliateTotalClicks?: number; // Total clicks tracked through affiliate links
+  affiliateTotalConversions?: number; // Total successful bookings generated
+  affiliatePayoutMethod?: 'upi' | 'bank_transfer' | 'store_credit';
+  affiliatePayoutDetails?: {
+    upiId?: string;
+    accountHolder?: string;
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+  };
+  affiliateCoupons?: string[]; // Coupons assigned specifically to this affiliate
+  affiliateCampaigns?: AffiliateCampaign[];
+  affiliateParentId?: string; // Multi-tier sub-affiliate parent
+}
+
+export interface AffiliateCampaign {
+  id: string;
+  title: string;
+  slug: string;
+  targetUrl: string;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  earnings: number;
+  createdAt: string;
+}
+
+export interface AffiliateReferralTransaction {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  affiliateCode: string;
+  orderId: string;
+  bookingId?: string;
+  itemType: 'Event' | 'Class' | 'Activity' | 'Competition' | 'Specialist' | 'Subscription';
+  itemTitle: string;
+  itemId: string;
+  buyerName: string;
+  buyerEmail?: string;
+  orderTotal: number;
+  commissionRate: number;
+  commissionAmount: number;
+  status: 'Pending' | 'Paid' | 'Rejected' | 'Refunded';
+  payoutStatus?: 'Unpaid' | 'Processing' | 'Paid';
+  payoutTransactionId?: string;
+  payoutDate?: string;
+  createdAt: string;
+  campaignSlug?: string;
+}
+
+export interface AffiliatePayoutBatch {
+  id: string;
+  affiliateId: string;
+  affiliateName: string;
+  amount: number;
+  payoutMethod: 'upi' | 'bank_transfer' | 'store_credit';
+  payoutDetails: string;
+  referenceNumber: string;
+  status: 'Completed' | 'Processing' | 'Failed';
+  transactionCount: number;
+  processedAt: string;
+  processedBy?: string;
+}
+
+export interface SubscriptionPlan {
+  id: string;
+  title: string;
+  price: number;
+  period: string;
+  popular?: boolean;
+  saving?: string | null;
+  color?: string;
+  durationDays: number;
+  description: string;
+  capabilities: string[];
+  isCustom?: boolean;
+  isActive?: boolean;
 }
 
 export interface UserContact {
@@ -154,6 +243,62 @@ export interface ChatThread {
   lastUpdated: string;
 }
 
+export interface TicketTier {
+  id: string;
+  name: string; // e.g. "VIP Family Pass", "Standard Kid + 1 Parent", "Early Bird"
+  price: number; // in INR (0 = Free)
+  capacity: number;
+  remainingStock: number;
+  description?: string;
+  maxPerOrder?: number;
+  includesKit?: boolean;
+  ageGroup?: string; // e.g. "3-6 years", "All Ages"
+}
+
+export interface EventScheduleItem {
+  id: string;
+  time: string; // e.g. "10:00 AM"
+  title: string; // e.g. "Warm-up & Interactive Storytelling"
+  speaker?: string;
+  description?: string;
+}
+
+export interface EventCoupon {
+  code: string;
+  discountType: 'percentage' | 'flat';
+  discountValue: number; // e.g. 15 for 15% or 100 for Rs.100 off
+  minPurchase?: number;
+  validUntil?: string;
+  description?: string;
+}
+
+export interface EventAttendee {
+  id: string;
+  ticketNumber: string; // e.g. "VERN-EVT-8924-819"
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventTime: string;
+  eventVenue: string;
+  buyerName: string;
+  buyerEmail: string;
+  buyerPhone: string;
+  childName?: string;
+  childAge?: number;
+  ticketTierName: string;
+  tierId?: string;
+  quantity: number;
+  amountPaid: number;
+  checkedIn: boolean;
+  checkedInAt?: string;
+  checkedInBy?: string;
+  specialRequirements?: string;
+  emergencyPhone?: string;
+  qrPayload?: string;
+  paymentId?: string;
+  createdAt: string;
+}
+
 export interface CommunityEvent {
   id: string;
   title: string;
@@ -167,11 +312,39 @@ export interface CommunityEvent {
   category: string;
   photoUrl: string;
   tags?: string[];
-  ticketPrice?: number; // Price in INR (e.g. 299). 0 or undefined means FREE
+  ticketPrice?: number; // Base Price in INR (0 means FREE)
   commissionPercentage?: number; // Custom admin override percentage (default e.g. 10%)
   lat?: number;
   lng?: number;
   iconEmoji?: string;
+  // WooEvents Advanced Parameters
+  ticketTiers?: TicketTier[];
+  scheduleAgenda?: EventScheduleItem[];
+  targetAgeRange?: string; // e.g. "2 - 8 Years"
+  maxCapacity?: number;
+  venueAddressDetails?: string;
+  googleMapsUrl?: string;
+  organizerContact?: {
+    name: string;
+    phone?: string;
+    email?: string;
+    bio?: string;
+    avatarUrl?: string;
+  };
+  isRecurring?: boolean;
+  recurringSlots?: string[]; // e.g. ["10:00 AM - 11:30 AM", "03:00 PM - 04:30 PM"]
+  featured?: boolean;
+  isSponsored?: boolean;
+  sponsoredBy?: string;
+  sponsorLogos?: string[];
+  affiliateCommissionRate?: number; // Override commission for affiliates promoting this specific event/class
+  distance?: number; // Calculated proximity from active parent coordinates
+  customQuestions?: {
+    askChildAge?: boolean;
+    askDietaryAllergies?: boolean;
+    askEmergencyPhone?: boolean;
+    customNotePrompt?: string;
+  };
 }
 
 export interface SpecialistProfile {
@@ -201,6 +374,7 @@ export interface Booking {
   type: 'EventTicket' | 'SpecialistAppointment';
   buyerName: string;
   buyerEmail: string;
+  buyerPhone?: string;
   amountPaid: number;
   commissionPercentage: number;
   commissionEarned: number;
@@ -209,6 +383,27 @@ export interface Booking {
   timeSelected: string;
   razorpayPaymentId: string;
   status: 'Paid' | 'Refunded';
+  // WooCommerce Affiliate Tracking & Attribution
+  affiliateId?: string;
+  affiliateName?: string;
+  affiliateCode?: string;
+  affiliateCommissionEarned?: number;
+  affiliateCommissionRate?: number;
+  // WooEvents E-Ticket & Pass Details
+  ticketNumber?: string; // e.g. "VERN-EVT-9012-748"
+  ticketTierName?: string;
+  tierId?: string;
+  childName?: string;
+  childAge?: number;
+  specialRequirements?: string;
+  emergencyPhone?: string;
+  eventVenue?: string;
+  qrPayload?: string;
+  checkedIn?: boolean;
+  checkedInAt?: string;
+  checkedInBy?: string;
+  quantity?: number;
+  createdAt?: string;
 }
 
 export interface MarketItem {

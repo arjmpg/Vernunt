@@ -22,7 +22,8 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
   const [phonePrivacyOption, setPhonePrivacyOption] = useState(currentProfile.phonePrivacyOption || 'show_after_acceptance');
   const [interestsStr, setInterestsStr] = useState((currentProfile.interests || []).join(', '));
   const [preferredActivities, setPreferredActivities] = useState<string[]>(currentProfile.preferredActivities || []);
-  const [photoUrl, setPhotoUrl] = useState(currentProfile.photoUrl || '');
+  const [parentPhotoUrl, setParentPhotoUrl] = useState(currentProfile.parentPhotoUrl || currentProfile.photoUrl || '');
+  const [childPhotoUrl, setChildPhotoUrl] = useState(currentProfile.childPhotoUrl || '');
   const [parentProfession, setParentProfession] = useState(currentProfile.parentProfession || '');
   const [motherTongue, setMotherTongue] = useState(currentProfile.motherTongue || '');
   const [languagesStr, setLanguagesStr] = useState((currentProfile.languagesKnown || ['English']).join(', '));
@@ -53,6 +54,11 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
       return;
     }
 
+    if (!parentPhotoUrl.trim()) {
+      setErrorMsg("Parent/Guardian portrait photo is mandatory for verified identity and child safety.");
+      return;
+    }
+
     const updated: ChildProfile = {
       ...currentProfile,
       parentName: parentName.trim(),
@@ -63,7 +69,9 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
       bio: bio.trim(),
       interests: interestsStr.split(',').map(i => i.trim()).filter(Boolean),
       preferredActivities: preferredActivities,
-      photoUrl: photoUrl.trim() || (currentProfile.childGender === 'Boy'
+      parentPhotoUrl: parentPhotoUrl.trim(),
+      childPhotoUrl: childPhotoUrl.trim() || undefined,
+      photoUrl: parentPhotoUrl.trim() || childPhotoUrl.trim() || (currentProfile.childGender === 'Boy'
         ? 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400'
         : 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400'),
       parentProfession: parentProfession.trim(),
@@ -136,19 +144,61 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
             </span>
           </div>
 
-          {/* Picture Selector row - High Fidelity Image Upload */}
-          <div className="bg-slate-55 p-4 rounded-2xl border border-slate-100 space-y-2">
-            <AestheticImageUploader
-              id="edit-profile-avatar"
-              label="Profile Photo & Avatar"
-              value={photoUrl}
-              onChange={setPhotoUrl}
-              presetSuggestions={[
-                { name: 'Warm Boy Avatar', url: 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400' },
-                { name: 'Cheerful Girl Avatar', url: 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400' },
-                { name: 'Creative Playmate', url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=400' }
-              ]}
-            />
+          {/* Dual Photo Upload: Parent (Mandatory) & Child (Optional) */}
+          <div className="space-y-4">
+            {/* Parent Portrait Photo - MANDATORY */}
+            <div className="bg-amber-50/50 p-4 rounded-2xl border border-amber-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase text-amber-900 flex items-center gap-1.5 tracking-wide">
+                  <User className="w-3.5 h-3.5 text-amber-700" />
+                  Parent / Guardian Portrait Photo *
+                </span>
+                <span className="bg-amber-200/70 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
+                  Mandatory Verified Adult
+                </span>
+              </div>
+              <AestheticImageUploader
+                id="edit-profile-parent-photo"
+                label=""
+                value={parentPhotoUrl}
+                onChange={setParentPhotoUrl}
+                presetSuggestions={[
+                  { name: 'Mother Portrait', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400' },
+                  { name: 'Father Portrait', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400' },
+                  { name: 'Guardian Headshot', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400' }
+                ]}
+              />
+              <p className="text-[10px] text-amber-800 font-medium leading-relaxed">
+                * Parent photo is required to guarantee verified adult presence and child safety.
+              </p>
+            </div>
+
+            {/* Child Profile Photo - OPTIONAL */}
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-black uppercase text-slate-800 flex items-center gap-1.5 tracking-wide">
+                  <Camera className="w-3.5 h-3.5 text-rose-600" />
+                  Child's Profile Photo
+                </span>
+                <span className="bg-slate-200 text-slate-700 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
+                  Optional (Child Privacy)
+                </span>
+              </div>
+              <AestheticImageUploader
+                id="edit-profile-child-photo"
+                label=""
+                value={childPhotoUrl}
+                onChange={setChildPhotoUrl}
+                presetSuggestions={[
+                  { name: 'Warm Boy Avatar', url: 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400' },
+                  { name: 'Cheerful Girl Avatar', url: 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400' },
+                  { name: 'Creative Playmate', url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=400' }
+                ]}
+              />
+              <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                Optional under COPPA & DPDP Child Privacy guidelines. If left blank, your child's visual identity remains protected and unshared.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">

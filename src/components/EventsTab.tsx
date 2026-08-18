@@ -1,11 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { CommunityEvent, Booking } from '../types.ts';
-import { CalendarRange, MapPin, PersonStanding, Check, Search, X, Map as MapIcon, List, Compass, Star, Calendar, Plus, Award, Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink } from 'lucide-react';
+import { 
+  CalendarRange, MapPin, PersonStanding, Check, Search, X, 
+  Map as MapIcon, List, Compass, Star, Calendar, Plus, Award, 
+  Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
+  Ticket, QrCode, UserCheck, CalendarDays, Wallet, Clock, ArrowRight, ShieldCheck,
+  Navigation, Flame, CheckCircle2, ArrowUpDown
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
+import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import CommunityEventCheckIn from './CommunityEventCheckIn.tsx';
+import EventTicketPassModal from './events/EventTicketPassModal.tsx';
+import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.tsx';
+import EventBookingModal from './events/EventBookingModal.tsx';
+import EventInteractiveCalendar from './events/EventInteractiveCalendar.tsx';
+import CreateEventWizardModal from './events/CreateEventWizardModal.tsx';
+import { sendEventBookingNotifications } from '../utils/notifications.ts';
+import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 
 interface EventsTabProps {
   userProfile: any;
@@ -28,8 +42,109 @@ export default function EventsTab({
 }: EventsTabProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'calendar'>('list');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(eventsList[0]?.id || null);
+
+  // WooEvents state
+  const [activeTicketModalBooking, setActiveTicketModalBooking] = useState<Booking | null>(null);
+  const [activeTicketEvent, setActiveTicketEvent] = useState<CommunityEvent | null>(null);
+  const [checkInStationEvent, setCheckInStationEvent] = useState<CommunityEvent | null>(null);
+  const [bookingModalEvent, setBookingModalEvent] = useState<CommunityEvent | null>(null);
+  const [showCreateWizard, setShowCreateWizard] = useState<boolean>(false);
+  const [myTickets, setMyTickets] = useState<Booking[]>([]);
+  const [showMyTicketsDrawer, setShowMyTicketsDrawer] = useState<boolean>(false);
+  const [organizerRoleAlertEvent, setOrganizerRoleAlertEvent] = useState<CommunityEvent | null>(null);
+  const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('featured_nearby');
+  const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
+  const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
+
+  // Parent GPS coordinates (default to userProfile or Mumbai/Central location)
+  const userLat = userProfile?.lat || 19.0760;
+  const userLng = userProfile?.lng || 72.8777;
+
+  // Check if current user is authorized to operate the Gate Desk & QR Scanner
+  const isAuthorizedOrganizer = (evt?: CommunityEvent) => {
+    const role = userProfile?.userRole;
+    if (role === 'Event Organizer' || role === 'Admin') return true;
+    if (evt && userProfile?.parentName && evt.hostName && 
+        userProfile.parentName.toLowerCase().trim() === evt.hostName.toLowerCase().trim()) {
+      return true;
+    }
+    return false;
+  };
+
+  const handleOpenGateDesk = (evt: CommunityEvent) => {
+    if (isAuthorizedOrganizer(evt)) {
+      setCheckInStationEvent(evt);
+    } else {
+      setOrganizerRoleAlertEvent(evt);
+    }
+  };
+
+  // Load saved user tickets from local persistence
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_user_event_tickets');
+      if (saved) {
+        setMyTickets(JSON.parse(saved));
+      } else if (eventsList.length > 0) {
+        // Provide 1 initial demo pass for instant testing
+        const demoPass: Booking = {
+          id: 'booking-demo-01',
+          itemId: eventsList[0].id,
+          itemTitle: eventsList[0].title,
+          type: 'EventTicket',
+          buyerName: userProfile?.parentName || 'Priya Sharma',
+          buyerEmail: userProfile?.email || 'priya@vernunt.com',
+          buyerPhone: '+91 98765 43210',
+          amountPaid: eventsList[0].ticketPrice || 199,
+          commissionPercentage: 10,
+          commissionEarned: 20,
+          hostEarned: 179,
+          dateStr: eventsList[0].date,
+          timeSelected: eventsList[0].time,
+          razorpayPaymentId: 'pay_demo_pass_123',
+          status: 'Paid',
+          ticketNumber: `VERN-EVT-7721-${Math.floor(100 + Math.random() * 900)}`,
+          ticketTierName: 'VIP Family Pass',
+          childName: userProfile?.childName || 'Aarav',
+          childAge: userProfile?.childAge || 5,
+          eventVenue: eventsList[0].location,
+          checkedIn: false,
+          quantity: 1,
+          createdAt: new Date().toISOString()
+        };
+        setMyTickets([demoPass]);
+        localStorage.setItem('vernunt_user_event_tickets', JSON.stringify([demoPass]));
+      }
+    } catch (err) {
+      console.error('Error loading tickets:', err);
+    }
+  }, [eventsList]);
+
+  const handleSaveNewTicket = (booking: Booking) => {
+    const updated = [booking, ...myTickets];
+    setMyTickets(updated);
+    localStorage.setItem('vernunt_user_event_tickets', JSON.stringify(updated));
+
+    // Also call global app onAddBooking
+    onAddBooking(booking);
+
+    // Update event attended status
+    setEventsList(prev => prev.map(e => {
+      if (e.id === booking.itemId) {
+        return { ...e, joined: true, attendeesCount: e.attendeesCount + (booking.quantity || 1) };
+      }
+      return e;
+    }));
+
+    // Find the associated event and pop open the E-Ticket Pass Modal with QR code!
+    const evt = eventsList.find(e => e.id === booking.itemId);
+    if (evt) {
+      setActiveTicketEvent(evt);
+      setActiveTicketModalBooking(booking);
+    }
+  };
 
   // Razorpay event ticket purchase state
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
@@ -508,27 +623,66 @@ export default function EventsTab({
     });
   };
 
-  // Filter events by selected category & query keywords (title, description, host, location, tags)
-  const filteredEvents = eventsList.filter(evt => {
-    // 1. Category check
-    if (categoryFilter !== 'All' && evt.category !== categoryFilter) {
-      return false;
-    }
+  // Filter and Sort events:
+  // 1. Calculate proximity distance from current user coordinates
+  // 2. Filter by category, query keywords, and optional radius
+  // 3. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
+  const filteredEvents = eventsList
+    .map(evt => {
+      const evtLat = evt.lat || 19.0760;
+      const evtLng = evt.lng || 72.8777;
+      const dist = getHaversineDistance(userLat, userLng, evtLat, evtLng);
+      return {
+        ...evt,
+        distance: dist
+      };
+    })
+    .filter(evt => {
+      // 1. Category check
+      if (categoryFilter !== 'All' && evt.category !== categoryFilter) {
+        return false;
+      }
 
-    // 2. Query check
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
+      // 2. Proximity radius check if onlyNearbyFilter is on
+      if (onlyNearbyFilter && evt.distance > maxDistanceRadiusKm) {
+        return false;
+      }
 
-    const matchesTag = evt.tags && evt.tags.some(tag => tag.toLowerCase().includes(query));
+      // 3. Query check
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
 
-    return (
-      evt.title.toLowerCase().includes(query) ||
-      evt.description.toLowerCase().includes(query) ||
-      evt.hostName.toLowerCase().includes(query) ||
-      evt.location.toLowerCase().includes(query) ||
-      matchesTag
-    );
-  });
+      const matchesTag = evt.tags && evt.tags.some(tag => tag.toLowerCase().includes(query));
+
+      return (
+        evt.title.toLowerCase().includes(query) ||
+        evt.description.toLowerCase().includes(query) ||
+        evt.hostName.toLowerCase().includes(query) ||
+        evt.location.toLowerCase().includes(query) ||
+        (evt.sponsoredBy && evt.sponsoredBy.toLowerCase().includes(query)) ||
+        matchesTag
+      );
+    })
+    .sort((a, b) => {
+      if (sortMode === 'featured_nearby') {
+        // Top Priority: Featured or Sponsored events
+        const aPromo = (a.featured || a.isSponsored) ? 1 : 0;
+        const bPromo = (b.featured || b.isSponsored) ? 1 : 0;
+        if (aPromo !== bPromo) {
+          return bPromo - aPromo; // Featured/sponsored events bubble to top
+        }
+        // Secondary Priority: Distance (closest first)
+        return a.distance - b.distance;
+      } else if (sortMode === 'nearby_only') {
+        // Pure distance sort
+        return a.distance - b.distance;
+      } else if (sortMode === 'date') {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      } else if (sortMode === 'price_low') {
+        return (a.ticketPrice || 0) - (b.ticketPrice || 0);
+      }
+      return 0;
+    });
 
   // Map representation positions with extra backup locations to avoid overlaps
   const getEventPosition = (id: string, index: number) => {
@@ -579,23 +733,29 @@ export default function EventsTab({
   };
 
   const handleShareEvent = async (evt: CommunityEvent) => {
-    const origin = typeof window !== 'undefined' && window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://app.vernunt.com';
-    const path = typeof window !== 'undefined' ? window.location.pathname : '/';
-    const deepLink = `${origin}${path}?tab=events&eventId=${encodeURIComponent(evt.id)}`;
+    const affiliateCode = userProfile?.affiliateCode || userProfile?.referralCode || undefined;
+    const deepLink = generateAffiliateShareUrl({
+      affiliateCode,
+      tab: 'events',
+      itemId: evt.id,
+      itemType: 'event'
+    });
     
     const entryFeeText = evt.ticketPrice && evt.ticketPrice > 0 ? `₹${evt.ticketPrice}.00` : 'FREE Entry';
     const tagsText = evt.tags && evt.tags.length > 0 ? `\n🏷️ Tags: ${evt.tags.map(t => '#' + t).join(' ')}` : '';
+    const affiliateBadge = affiliateCode ? `\n🎁 Partner Referral: ${affiliateCode} (Verified Partner Link)` : '';
     
     const shareMessage = `🌟 ${evt.title} 🌟
+📂 Category: ${evt.category}
 📅 Date & Time: ${evt.date} at ${evt.time}
 📍 Location: ${evt.location}
 👤 Organizer: ${evt.hostName}
 🎟️ Admission: ${entryFeeText}
-👥 ${evt.attendeesCount} families RSVP'd
+👥 ${evt.attendeesCount} families RSVP'd${affiliateBadge}
 
 ${evt.description}${tagsText}
 
-🔗 View event details & RSVP on Vernunt Playdates:
+🔗 View event details & book passes on Vernunt Playdates:
 ${deepLink}`;
 
     try {
@@ -623,6 +783,32 @@ ${deepLink}`;
     } catch (err) {
       console.error('Failed to copy event details to clipboard:', err);
     }
+  };
+
+  const handleWhatsAppShareEvent = (evt: CommunityEvent) => {
+    const affiliateCode = userProfile?.affiliateCode || userProfile?.referralCode || undefined;
+    const deepLink = generateAffiliateShareUrl({
+      affiliateCode,
+      tab: 'events',
+      itemId: evt.id,
+      itemType: 'event'
+    });
+
+    const shareText = generateWhatsAppShareText({
+      title: evt.title,
+      category: evt.category,
+      date: evt.date,
+      time: evt.time,
+      location: evt.location,
+      price: evt.ticketPrice,
+      description: evt.description,
+      hostName: evt.hostName,
+      affiliateCode,
+      shareUrl: deepLink,
+      isAffiliate: !!affiliateCode
+    });
+
+    openWhatsAppShare(shareText);
   };
 
   return (
@@ -662,9 +848,9 @@ ${deepLink}`;
           </p>
         </div>
 
-        {/* View Mode Switching Segments + Search Box */}
+        {/* View Mode Switching Segments + My Passes & Search Box */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Segmented Control */}
+          {/* Segmented Control with Calendar */}
           <div className="flex p-0.5 bg-slate-100 rounded-xl" id="events-view-switcher">
             <button
               id="btn-events-view-list"
@@ -680,6 +866,19 @@ ${deepLink}`;
               <span>List Grid</span>
             </button>
             <button
+              id="btn-events-view-calendar"
+              type="button"
+              onClick={() => setViewMode('calendar')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                viewMode === 'calendar'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5 text-orange-500" />
+              <span>Calendar</span>
+            </button>
+            <button
               id="btn-events-view-map"
               type="button"
               onClick={() => setViewMode('map')}
@@ -690,19 +889,35 @@ ${deepLink}`;
               }`}
             >
               <MapIcon className="w-3.5 h-3.5" />
-              <span>Events Map</span>
+              <span>Map</span>
             </button>
           </div>
 
+          {/* My Passes & Tickets Wallet Button */}
+          <button
+            id="btn-my-event-passes"
+            type="button"
+            onClick={() => setShowMyTicketsDrawer(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+          >
+            <Wallet className="w-3.5 h-3.5 text-orange-400" />
+            <span>My Passes</span>
+            {myTickets.length > 0 && (
+              <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                {myTickets.length}
+              </span>
+            )}
+          </button>
+
           {/* Dynamic Search Input Bar */}
-          <div className="relative w-full sm:w-64">
+          <div className="relative w-full sm:w-56">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
               <Search className="w-4 h-4" />
             </div>
             <input
               id="event-search-input"
               type="text"
-              placeholder="Search by title, host, area..."
+              placeholder="Search title, host, venue..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-9 py-1.5 bg-white hover:bg-slate-50/50 focus:bg-white text-xs border border-slate-200 focus:border-orange-300 rounded-xl outline-none focus:ring-4 focus:ring-orange-100 transition shadow-xs placeholder-slate-400 text-slate-700"
@@ -766,12 +981,116 @@ ${deepLink}`;
         <button
           id="btn-trigger-propose-event"
           type="button"
-          onClick={() => { setFormError(''); setShowAddModal(true); }}
+          onClick={() => setShowCreateWizard(true)}
           className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 self-start md:self-auto cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Host / Propose Event</span>
+          <span>Publish WooEvent</span>
         </button>
+      </div>
+
+      {/* Proximity & Sorting Control Bar for Parents */}
+      <div id="events-proximity-sort-bar" className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-500 font-bold pr-2 border-r border-slate-200">
+            <ArrowUpDown className="w-3.5 h-3.5 text-orange-500" />
+            <span className="text-[11px] uppercase tracking-wider text-slate-400">Sort By:</span>
+          </div>
+
+          <button
+            type="button"
+            id="btn-sort-featured-nearby"
+            onClick={() => setSortMode('featured_nearby')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              sortMode === 'featured_nearby'
+                ? 'bg-orange-500 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Featured & Nearby</span>
+            <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-mono">Recommended</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-sort-nearby-only"
+            onClick={() => setSortMode('nearby_only')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              sortMode === 'nearby_only'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Navigation className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Closest Distance First</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-sort-date"
+            onClick={() => setSortMode('date')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              sortMode === 'date'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5 text-blue-400" />
+            <span>Upcoming Date</span>
+          </button>
+
+          <button
+            type="button"
+            id="btn-sort-price"
+            onClick={() => setSortMode('price_low')}
+            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              sortMode === 'price_low'
+                ? 'bg-slate-900 text-white shadow-xs'
+                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+            }`}
+          >
+            <Ticket className="w-3.5 h-3.5 text-amber-500" />
+            <span>Price: Low to High</span>
+          </button>
+        </div>
+
+        {/* Nearby Distance Radius Filter */}
+        <div className="flex items-center gap-3 self-end lg:self-center">
+          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              id="chk-only-nearby"
+              checked={onlyNearbyFilter}
+              onChange={(e) => setOnlyNearbyFilter(e.target.checked)}
+              className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+            />
+            <span className="flex items-center gap-1 text-slate-700">
+              <MapPin className="w-3.5 h-3.5 text-rose-500" />
+              <span>Only Within</span>
+            </span>
+          </label>
+
+          {onlyNearbyFilter && (
+            <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl text-xs font-bold animate-fadeIn">
+              <input
+                type="range"
+                min="1"
+                max="25"
+                step="1"
+                value={maxDistanceRadiusKm}
+                onChange={(e) => setMaxDistanceRadiusKm(Number(e.target.value))}
+                className="w-20 accent-orange-500 cursor-pointer"
+              />
+              <span className="text-orange-600 font-extrabold w-12 text-right">{maxDistanceRadiusKm} km</span>
+            </div>
+          )}
+
+          <div className="text-[11px] text-slate-400 pl-2 border-l border-slate-200 flex items-center gap-1">
+            <span>📍 Your Location:</span>
+            <span className="font-bold text-slate-700">{userProfile?.location || 'Central Area (19.07, 72.87)'}</span>
+          </div>
+        </div>
       </div>
 
       {searchQuery && (
@@ -781,144 +1100,242 @@ ${deepLink}`;
       )}
 
       {/* View Switch Dispatch */}
-      {viewMode === 'list' ? (
+      {viewMode === 'calendar' ? (
+        /* WooEvents Interactive Calendar View */
+        <EventInteractiveCalendar
+          events={filteredEvents}
+          onSelectEvent={(evt) => {
+            setSelectedEventId(evt.id);
+            setViewMode('list');
+          }}
+          onBookEvent={(evt) => setBookingModalEvent(evt)}
+        />
+      ) : viewMode === 'list' ? (
         /* List / Grid View layout */
         filteredEvents.length > 0 ? (
           <div id="events-grids-container" className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {filteredEvents.map((evt) => (
-              <div id={`event-card-${evt.id}`} key={evt.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
-                {/* Image banner */}
-                <div id="event-pic" className="h-44 bg-slate-100 relative">
-                  <img src={evt.photoUrl} alt={evt.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  
-                  {/* Category badge */}
-                  <div 
-                    id="event-tag" 
-                    className={`absolute top-3 right-3 text-[10px] font-black uppercase tracking-widest py-1.5 px-3 rounded-xl border ${getCategoryBadgeStyles(evt.category)}`}
-                  >
-                    {getCategoryLabel(evt.category)}
-                  </div>
+            {filteredEvents.map((evt) => {
+              // Find if current user has an issued ticket for this event
+              const userTicket = myTickets.find(t => t.itemId === evt.id);
+              const isEventJoined = evt.joined || !!userTicket;
 
-                  {/* Quick Share floating icon button */}
-                  <button
-                    id={`btn-quick-share-${evt.id}`}
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleShareEvent(evt);
-                    }}
-                    className="absolute top-3 left-3 w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md hover:bg-white text-slate-700 shadow-md flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/40"
-                    title="Share event details & deep link"
-                  >
-                    {copiedEventId === evt.id ? (
-                      <Check className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <Share2 className="w-4 h-4 text-slate-700" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Event Info Details */}
-                <div id="event-body" className="p-5 flex-1 flex flex-col space-y-3">
-                  <h4 id={`event-title-${evt.id}`} className="font-bold text-slate-800 font-serif text-sm leading-snug">{evt.title}</h4>
-                  <p id={`event-desc-${evt.id}`} className="text-[11px] text-slate-600 leading-relaxed line-clamp-3">
-                    {evt.description}
-                  </p>
-
-                  {/* Sub-categories or tags to improve searchability */}
-                  {evt.tags && evt.tags.length > 0 && (
-                    <div id={`event-tags-list-${evt.id}`} className="flex flex-wrap gap-1 pt-1 opacity-95">
-                      {evt.tags.map((tag, tagIndex) => (
-                        <button
-                          key={tagIndex}
-                          id={`btn-tag-${evt.id}-${tagIndex}`}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSearchQuery(tag);
-                          }}
-                          className="bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border border-orange-100/30 transition-colors cursor-pointer"
-                          title={`Click to filter by tag: #${tag}`}
-                        >
-                          #{tag}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Event stats (time/address) */}
-                  <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate text-slate-700">{evt.location}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="text-slate-700">{evt.date} at {evt.time}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <PersonStanding className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="text-slate-700">Organizer: <strong className="text-slate-800 font-semibold">{evt.hostName}</strong></span>
-                    </div>
-                  </div>
-
-                  {/* Roster attendance & Actions */}
-                  <div className="flex justify-between items-center pt-2.5 mt-auto border-t border-slate-100/80 gap-2">
-                    <span className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
-                      🧒 {evt.attendeesCount} RSVP'd
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      {/* Share Button */}
-                      <button
-                        id={`btn-share-event-${evt.id}`}
-                        type="button"
-                        onClick={() => handleShareEvent(evt)}
-                        className={`py-1.5 px-3 rounded-xl text-[10px] font-bold transition flex items-center gap-1.5 border cursor-pointer ${
-                          copiedEventId === evt.id
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700 border-slate-200/60'
-                        }`}
-                        title="Copy event details and deep link to clipboard"
-                      >
-                        {copiedEventId === evt.id ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Share2 className="w-3.5 h-3.5 text-slate-600" />
-                            <span>Share</span>
-                          </>
+              return (
+                <div id={`event-card-${evt.id}`} key={evt.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
+                  {/* Image banner */}
+                  <div id="event-pic" className="h-44 bg-slate-100 relative">
+                    <img src={evt.photoUrl} alt={evt.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                    
+                    {/* Featured / Sponsored Promoted Badge */}
+                    {(evt.featured || evt.isSponsored) && (
+                      <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
+                        {evt.featured && (
+                          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg border border-amber-300/40 flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-white fill-white animate-pulse" />
+                            <span>Featured</span>
+                          </div>
                         )}
+                        {evt.isSponsored && (
+                          <div className="bg-slate-900/90 backdrop-blur-md text-amber-300 px-2 py-0.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider border border-amber-400/30 flex items-center gap-1 shadow-md">
+                            <Flame className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                            <span>Sponsored</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Price Badge */}
+                    <div className="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur-md text-white px-2.5 py-1 rounded-xl text-xs font-black shadow-md border border-white/20 flex items-center gap-1">
+                      <Ticket className="w-3.5 h-3.5 text-orange-400" />
+                      <span>{evt.ticketPrice && evt.ticketPrice > 0 ? `₹${evt.ticketPrice}` : 'FREE Entry'}</span>
+                    </div>
+
+                    {/* Distance Proximity Pill on Image */}
+                    {evt.distance !== undefined && (
+                      <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-800 px-2 py-0.5 rounded-xl text-[10px] font-extrabold shadow-md border border-slate-200 flex items-center gap-1">
+                        <Navigation className="w-2.5 h-2.5 text-emerald-600" />
+                        <span>{evt.distance < 1 ? '< 1 km away' : `${evt.distance.toFixed(1)} km away`}</span>
+                      </div>
+                    )}
+
+                    {/* Category badge */}
+                    <div 
+                      id="event-tag" 
+                      className={`absolute top-3 right-3 text-[10px] font-black uppercase tracking-widest py-1.5 px-3 rounded-xl border ${getCategoryBadgeStyles(evt.category)}`}
+                    >
+                      {getCategoryLabel(evt.category)}
+                    </div>
+
+                    {/* Quick Share floating icon buttons: WhatsApp & Copy Link */}
+                    <div className="absolute top-12 left-3 flex flex-col gap-1.5 z-10">
+                      <button
+                        id={`btn-quick-whatsapp-${evt.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleWhatsAppShareEvent(evt);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white shadow-md flex items-center justify-center transition active:scale-90 cursor-pointer border border-emerald-600"
+                        title="Share on WhatsApp with affiliate referral link"
+                      >
+                        <Share2 className="w-4 h-4" />
                       </button>
 
-                      {/* RSVP / Join / Attending Button */}
-                      {evt.joined ? (
+                      <button
+                        id={`btn-quick-share-${evt.id}`}
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShareEvent(evt);
+                        }}
+                        className="w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md hover:bg-white text-slate-700 shadow-md flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/40"
+                        title="Copy event details & affiliate link"
+                      >
+                        {copiedEventId === evt.id ? (
+                          <Check className="w-4 h-4 text-emerald-600" />
+                        ) : (
+                          <Copy className="w-4 h-4 text-slate-700" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Event Info Details */}
+                  <div id="event-body" className="p-5 flex-1 flex flex-col space-y-3">
+                    {/* Sponsored Subheader */}
+                    {evt.sponsoredBy && (
+                      <div className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg w-max flex items-center gap-1">
+                        <Sparkles className="w-3 h-3 text-amber-600" />
+                        <span>Presented by: <strong className="text-amber-900">{evt.sponsoredBy}</strong></span>
+                      </div>
+                    )}
+
+                    <h4 id={`event-title-${evt.id}`} className="font-bold text-slate-800 font-serif text-sm leading-snug">{evt.title}</h4>
+                    <p id={`event-desc-${evt.id}`} className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
+                      {evt.description}
+                    </p>
+
+                    {/* Ticket Tiers preview if present */}
+                    {evt.ticketTiers && evt.ticketTiers.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {evt.ticketTiers.map(tier => (
+                          <span key={tier.id} className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
+                            {tier.name} (₹{tier.price})
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Sub-categories or tags */}
+                    {evt.tags && evt.tags.length > 0 && (
+                      <div id={`event-tags-list-${evt.id}`} className="flex flex-wrap gap-1 pt-0.5 opacity-95">
+                        {evt.tags.map((tag, tagIndex) => (
+                          <button
+                            key={tagIndex}
+                            id={`btn-tag-${evt.id}-${tagIndex}`}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSearchQuery(tag);
+                            }}
+                            className="bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border border-orange-100/30 transition-colors cursor-pointer"
+                            title={`Click to filter by tag: #${tag}`}
+                          >
+                            #{tag}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Event stats (time/address) */}
+                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
+                      <div className="flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate text-slate-700">{evt.location}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="text-slate-700">{evt.date} at {evt.time}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <PersonStanding className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          <span className="text-slate-700">Host: <strong className="text-slate-800 font-semibold">{evt.hostName}</strong></span>
+                        </div>
                         <button
-                          id={`btn-event-joined-${evt.id}`}
-                          onClick={() => handleToggleJoinEvent(evt.id, false)}
                           type="button"
-                          className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wide transition flex items-center gap-1 border border-emerald-100 cursor-pointer"
+                          onClick={() => handleOpenGateDesk(evt)}
+                          className="text-[10px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2 py-0.5 rounded-md flex items-center gap-1 border border-orange-200/60"
+                          title="Open Gate Check-In & Scanner Station (Event Organizers only)"
                         >
-                          <Check className="w-3.5 h-3.5 text-emerald-600" /> Attending
+                          <UserCheck className="w-3 h-3" />
+                          <span>Gate Desk</span>
                         </button>
-                      ) : (
+                      </div>
+                    </div>
+
+                    {/* Roster attendance & Actions */}
+                    <div className="flex justify-between items-center pt-2.5 mt-auto border-t border-slate-100/80 gap-2">
+                      <span className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
+                        🧒 {evt.attendeesCount} RSVP'd
+                      </span>
+
+                      <div className="flex items-center gap-1.5">
+                        {/* If attendee already has ticket, provide E-Ticket Pass Modal trigger */}
+                        {isEventJoined && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const pass = userTicket || {
+                                id: `booking-${evt.id}`,
+                                itemId: evt.id,
+                                itemTitle: evt.title,
+                                type: 'EventTicket',
+                                buyerName: userProfile?.parentName || 'Parent Attendee',
+                                buyerEmail: userProfile?.email || 'parent@vernunt.com',
+                                buyerPhone: userProfile?.phoneNumber || '+91 98765 43210',
+                                amountPaid: evt.ticketPrice || 0,
+                                commissionPercentage: 10,
+                                commissionEarned: 0,
+                                hostEarned: 0,
+                                dateStr: evt.date,
+                                timeSelected: evt.time,
+                                status: 'Paid',
+                                ticketNumber: `VERN-EVT-7721-${evt.id.slice(-3).toUpperCase()}`,
+                                ticketTierName: evt.ticketTiers?.[0]?.name || 'General Admission',
+                                childName: userProfile?.childName || 'Aarav',
+                                childAge: userProfile?.childAge || 5,
+                                eventVenue: evt.location,
+                                checkedIn: false,
+                                quantity: 1,
+                                createdAt: new Date().toISOString()
+                              };
+                              setActiveTicketEvent(evt);
+                              setActiveTicketModalBooking(pass);
+                            }}
+                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 border border-emerald-200 cursor-pointer shadow-xs"
+                            title="View QR Code E-Ticket"
+                          >
+                            <QrCode className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>E-Pass</span>
+                          </button>
+                        )}
+
+                        {/* WooEvents Multi-Tier Ticket Booking Modal */}
                         <button
-                          id={`btn-event-join-${evt.id}`}
-                          onClick={() => handleToggleJoinEvent(evt.id, true)}
+                          id={`btn-event-book-${evt.id}`}
+                          onClick={() => setBookingModalEvent(evt)}
                           type="button"
-                          className="bg-slate-900 hover:bg-slate-800 text-white py-1.5 px-3.5 rounded-xl text-[10px] font-bold uppercase tracking-wide transition shadow-sm active:scale-95 cursor-pointer"
+                          className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-xl text-[10px] font-bold transition shadow-xs flex items-center gap-1 active:scale-95 cursor-pointer"
                         >
-                          RSVP Join
+                          <Ticket className="w-3 h-3" />
+                          <span>{isEventJoined ? 'Book More' : 'Book Pass'}</span>
                         </button>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <div id="events-empty-state" className="bg-white rounded-3xl p-12 border border-slate-100 shadow-xs text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto">
@@ -1634,7 +2051,7 @@ ${deepLink}`;
                       const hostEarned = price - commissionEarned;
 
                       // Trigger Booking transaction
-                      onAddBooking({
+                      const newBookingRecord: Booking = {
                         id: `booking-${Date.now()}`,
                         itemId: checkoutEvent.id,
                         itemTitle: checkoutEvent.title,
@@ -1648,8 +2065,24 @@ ${deepLink}`;
                         dateStr: checkoutEvent.date,
                         timeSelected: checkoutEvent.time,
                         razorpayPaymentId: payId,
-                        status: 'Paid'
-                      });
+                        status: 'Paid',
+                        ticketNumber: `VERN-EVT-${Date.now().toString().slice(-6)}`,
+                        eventVenue: checkoutEvent.location,
+                        quantity: 1,
+                        createdAt: new Date().toISOString()
+                      };
+
+                      onAddBooking(newBookingRecord);
+
+                      // Dispatch instant Email & SMS notifications
+                      sendEventBookingNotifications({
+                        toEmail: buyerEmail,
+                        toPhone: userProfile?.phoneNumber,
+                        recipientName: buyerName,
+                        booking: newBookingRecord,
+                        event: checkoutEvent,
+                        type: 'booking_confirmed'
+                      }).catch((err) => console.warn('Notification dispatch error:', err));
 
                       // Join event state update
                       setEventsList(prev => prev.map(e => {
@@ -1703,6 +2136,18 @@ ${deepLink}`;
                   </div>
                 </div>
 
+                {/* Email and SMS Confirmation Notice */}
+                <div className="bg-emerald-50/80 border border-emerald-200/90 rounded-2xl p-3.5 text-xs text-left space-y-1.5">
+                  <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Notifications Dispatched:
+                  </span>
+                  <div className="text-[11px] text-slate-600 space-y-0.5">
+                    <div>📧 E-Ticket Pass &amp; QR Code sent to <strong>{buyerEmail}</strong></div>
+                    <div>📱 Booking SMS confirmation sent to registered number</div>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1717,6 +2162,220 @@ ${deepLink}`;
               </div>
             )}
 
+            </div>
+
+          </div>
+        </div>
+      )}
+
+      {/* WooEvents E-Ticket Pass Modal (QR Code & Pass Download) */}
+      {activeTicketModalBooking && activeTicketEvent && (
+        <EventTicketPassModal
+          booking={activeTicketModalBooking}
+          event={activeTicketEvent}
+          onClose={() => {
+            setActiveTicketModalBooking(null);
+            setActiveTicketEvent(null);
+          }}
+        />
+      )}
+
+      {/* WooEvents Organizer Check-In Station Modal (Camera QR Scanner & Roster) */}
+      {checkInStationEvent && (
+        <EventOrganizerCheckInStation
+          event={checkInStationEvent}
+          userProfile={userProfile}
+          onClose={() => setCheckInStationEvent(null)}
+        />
+      )}
+
+      {/* Organizer Role Required Modal */}
+      {organizerRoleAlertEvent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fadeIn">
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 space-y-5 text-center">
+            <div className="w-14 h-14 rounded-3xl bg-orange-100 text-orange-600 flex items-center justify-center mx-auto shadow-inner">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[10px] font-black uppercase tracking-widest bg-orange-100 text-orange-800 px-2.5 py-1 rounded-full">
+                Event Organizer Access Only
+              </span>
+              <h3 className="text-lg font-bold text-slate-900 font-serif">
+                Gate Check-In & Ticket Scanner Desk
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                The Gate Desk scanner and live attendee check-in roster for <strong>"{organizerRoleAlertEvent.title}"</strong> is restricted to registered <strong>Event Organizers</strong>, <strong>Administrators</strong>, or the event host (<em>{organizerRoleAlertEvent.hostName}</em>).
+              </p>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-left space-y-2 text-xs">
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Current Account:</span>
+                <strong className="text-slate-800">{userProfile?.parentName || 'Parent User'}</strong>
+              </div>
+              <div className="flex justify-between items-center text-slate-500">
+                <span>Current Role:</span>
+                <span className="px-2 py-0.5 rounded bg-slate-200 text-slate-700 font-bold">
+                  {userProfile?.userRole || 'Parent'}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateRole('Event Organizer');
+                  setCheckInStationEvent(organizerRoleAlertEvent);
+                  setOrganizerRoleAlertEvent(null);
+                }}
+                className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+              >
+                <UserCheck className="w-4 h-4" />
+                <span>Switch to Event Organizer Role & Open Desk</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrganizerRoleAlertEvent(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WooEvents Multi-Tier Ticket Booking & Razorpay Checkout Modal */}
+      {bookingModalEvent && (
+        <EventBookingModal
+          event={bookingModalEvent}
+          userProfile={userProfile}
+          globalCommissionRate={globalCommissionRate}
+          onClose={() => setBookingModalEvent(null)}
+          onBookingSuccess={(newBooking) => {
+            handleSaveNewTicket(newBooking);
+            setBookingModalEvent(null);
+          }}
+        />
+      )}
+
+      {/* WooEvents Event Creation Wizard Modal */}
+      {showCreateWizard && (
+        <CreateEventWizardModal
+          userProfile={userProfile}
+          customCategories={customCats}
+          onClose={() => setShowCreateWizard(false)}
+          onAddEvent={(newEvent) => {
+            setEventsList(prev => [newEvent, ...prev]);
+            setSelectedEventId(newEvent.id);
+            setShowCreateWizard(false);
+          }}
+        />
+      )}
+
+      {/* My Passes & Tickets Drawer */}
+      {showMyTicketsDrawer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fadeIn">
+          <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[85vh]">
+            
+            {/* Header */}
+            <div className="bg-slate-900 text-white p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/30">
+                  <Wallet className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">My E-Ticket Wallet</h3>
+                  <p className="text-xs text-slate-400">All purchased event passes and entry QR codes</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowMyTicketsDrawer(false)}
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Passes List */}
+            <div className="p-5 flex-1 overflow-y-auto space-y-3">
+              {myTickets.length === 0 ? (
+                <div className="p-10 text-center bg-slate-50 rounded-2xl border border-dashed-2 border-slate-200">
+                  <Ticket className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-700">No active tickets</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Browse the event grid and book passes to see your admission QR codes here.
+                  </p>
+                </div>
+              ) : (
+                myTickets.map((pass) => {
+                  const matchingEvt = eventsList.find(e => e.id === pass.itemId) || {
+                    id: pass.itemId,
+                    title: pass.itemTitle,
+                    description: '',
+                    category: 'Event',
+                    date: pass.dateStr,
+                    time: pass.timeSelected,
+                    location: pass.eventVenue || 'Venue Location',
+                    hostName: 'Organizer',
+                    attendeesCount: 1,
+                    joined: true,
+                    photoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=600&q=80',
+                    ticketPrice: pass.amountPaid
+                  };
+
+                  return (
+                    <div
+                      key={pass.id}
+                      className="p-4 bg-slate-50 hover:bg-orange-50/40 border border-slate-200 hover:border-orange-300 rounded-2xl transition-all flex items-center justify-between gap-3 shadow-xs"
+                    >
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
+                            {pass.ticketTierName || 'General Pass'}
+                          </span>
+                          <span className="font-mono text-[11px] text-slate-600 font-bold">
+                            {pass.ticketNumber}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-xs text-slate-900 truncate">
+                          {pass.itemTitle}
+                        </h4>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                          <span>📅 {pass.dateStr} at {pass.timeSelected}</span>
+                          <span>🧒 {pass.childName || pass.buyerName}</span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setActiveTicketEvent(matchingEvt);
+                          setActiveTicketModalBooking(pass);
+                          setShowMyTicketsDrawer(false);
+                        }}
+                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 flex-shrink-0 shadow-xs"
+                      >
+                        <QrCode className="w-3.5 h-3.5 text-orange-400" />
+                        <span>View Pass</span>
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
+              <span className="text-slate-500">{myTickets.length} ticket(s) in wallet</span>
+              <button
+                onClick={() => setShowMyTicketsDrawer(false)}
+                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition-colors"
+              >
+                Close Wallet
+              </button>
             </div>
 
           </div>

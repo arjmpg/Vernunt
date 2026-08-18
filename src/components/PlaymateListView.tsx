@@ -98,15 +98,20 @@ export function PlaymateListView({
               {/* Top Accent Stripe / Badges */}
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <img 
-                      src={p.photoUrl} 
-                      alt={p.childName} 
+                      src={p.parentPhotoUrl || p.photoUrl} 
+                      alt={`Parent: ${p.parentName}`} 
                       className="w-14 h-14 rounded-2xl object-cover border border-slate-200/80 shadow-xs group-hover:scale-105 transition duration-200"
                       referrerPolicy="no-referrer"
                     />
+                    {p.childPhotoUrl && (
+                      <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full overflow-hidden border-2 border-white shadow-xs bg-slate-100" title={`Child: ${p.childName}`}>
+                        <img src={p.childPhotoUrl} alt={p.childName} className="w-full h-full object-cover" />
+                      </div>
+                    )}
                     {p.verificationStatus === VerificationStatus.VERIFIED && (
-                      <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border border-white shadow-xs" title="Aadhaar Verified">
+                      <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border border-white shadow-xs" title="Aadhaar Verified Guardian">
                         <ShieldCheck className="w-3.5 h-3.5" />
                       </span>
                     )}

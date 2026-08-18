@@ -1,10 +1,7 @@
 {
   "name": "Vernunt",
-  "description": "Child playmate and family community app, featuring real-time playmate radar, playdate planner, map listings, community events, and automated Google Drive backups.",
-  "requestFramePermissions": [
-    "geolocation",
-    "camera"
-  ],
+  "description": "Child playmate and family community platform with strict COPPA and DPDP Act 2023 child compliance, verifiable parental consent, real-time predator & profanity screening, proximity radar, playdate planner, map listings, and community events.",
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

@@ -605,8 +605,20 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     try {
       const { amount, planId, notes } = req.body;
       
-      if (!amount || amount <= 0) {
+      if (amount === undefined || amount === null || isNaN(Number(amount)) || Number(amount) < 0) {
         return res.status(400).json({ success: false, error: "Valid checkout amount is required." });
+      }
+
+      if (Number(amount) === 0) {
+        return res.json({
+          success: true,
+          free: true,
+          keyId: "free_plan_direct",
+          orderId: `free_${planId || 'sub'}_${Date.now()}`,
+          amount: 0,
+          currency: "INR",
+          message: "Zero-cost subscription activated directly without payment processing."
+        });
       }
 
       const rzpInstance = await getRazorpayInstance();

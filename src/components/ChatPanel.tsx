@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChildProfile, Message } from '../types.ts';
-import { Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { evaluateChildSafetyText } from '../utils/childSafetyFilter.ts';
 
 interface ChatPanelProps {
   playmates: ChildProfile[];
@@ -56,6 +57,7 @@ export default function ChatPanel({
 
   const [inputText, setInputText] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [safetyAlert, setSafetyAlert] = useState<{ message: string; severity: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Sync with active companion choice from radar/parent prop changes
@@ -74,12 +76,32 @@ export default function ChatPanel({
     e.preventDefault();
     if (!inputText.trim()) return;
 
+    // Run Child Safety & Inappropriate Content Evaluation
+    const safetyCheck = evaluateChildSafetyText(inputText.trim(), userProfile?.userRole || 'Parent');
+    
+    if (safetyCheck.severity === 'CRITICAL') {
+      setSafetyAlert({
+        message: safetyCheck.reason || 'Message blocked: Potential predatory cue or violation of child safety policies.',
+        severity: 'CRITICAL'
+      });
+      return;
+    }
+
+    if (!safetyCheck.isSafe && safetyCheck.severity === 'MEDIUM') {
+      setSafetyAlert({
+        message: safetyCheck.reason || 'Notice: For child physical safety, direct residential details or phone harvesting are blocked.',
+        severity: 'MEDIUM'
+      });
+      return;
+    }
+
+    setSafetyAlert(null);
     const companionId = selectedCompanion.id;
     const userMsg: Message = {
       id: `user-msg-${Date.now()}`,
       chatId: companionId,
       senderId: 'user',
-      content: inputText.trim(),
+      content: safetyCheck.sanitizedText,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
@@ -315,8 +337,8 @@ export default function ChatPanel({
               </div>
               
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold uppercase py-1 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-150 rounded-xl hidden sm:inline-block">
-                  🔒 Private Parent Session
+                <span className="text-[9px] font-bold uppercase py-1 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hidden sm:flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" /> Guardian Supervised & COPPA Safe
                 </span>
                 {onBackToRadar && (
                   <button
@@ -330,6 +352,26 @@ export default function ChatPanel({
                 )}
               </div>
             </div>
+
+            {/* In-chat safety alert banner if inappropriate text attempted */}
+            {safetyAlert && (
+              <div className={`px-4 py-2 text-xs flex items-center justify-between border-b ${
+                safetyAlert.severity === 'CRITICAL' 
+                  ? 'bg-rose-100 text-rose-900 border-rose-200 font-bold' 
+                  : 'bg-amber-100 text-amber-900 border-amber-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+                  <span>{safetyAlert.message}</span>
+                </div>
+                <button 
+                  onClick={() => setSafetyAlert(null)}
+                  className="text-xs font-bold hover:underline cursor-pointer ml-2"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
 
             {/* Message Log Output viewport */}
             <div id="chat-messages-viewport" className="flex-1 overflow-y-auto p-6 space-y-4 max-h-[400px]">

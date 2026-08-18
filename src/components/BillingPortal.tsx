@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Check, CreditCard, ShieldCheck, Gift, Calendar, User, Zap, Hourglass } from 'lucide-react';
-import { ChildProfile } from '../types';
+import { ChildProfile, SubscriptionPlan } from '../types.ts';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../utils/firebase.ts';
 import confetti from 'canvas-confetti';
@@ -29,7 +29,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const defaultPlans = [
+  const defaultPlans: SubscriptionPlan[] = [
     {
       id: 'monthly',
       title: 'Monthly Pass',
@@ -37,7 +37,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
       period: '1 Month',
       popular: false,
       saving: null,
-      color: 'border-slate-205',
+      color: 'border-slate-200',
       durationDays: 30,
       description: 'Perfect for temporary stays or trying out the network.',
       capabilities: [
@@ -100,7 +100,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
     }
   ];
 
-  const [plans, setPlans] = useState<any[]>(() => {
+  const [plans, setPlans] = useState<SubscriptionPlan[]>(() => {
     const cached = localStorage.getItem('vernunt_sub_plans');
     return cached ? JSON.parse(cached) : defaultPlans;
   });
@@ -111,7 +111,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
       unsub = onSnapshot(doc(db, 'subscription_config', 'plans'), (docSnap) => {
         if (docSnap.exists()) {
           const data = docSnap.data();
-          if (data && Array.isArray(data.plans)) {
+          if (data && Array.isArray(data.plans) && data.plans.length > 0) {
             setPlans(data.plans);
             localStorage.setItem('vernunt_sub_plans', JSON.stringify(data.plans));
           }
@@ -128,16 +128,77 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
   }, []);
 
   const handleSubscribe = async (plan: any) => {
-    if (!userProfile) {
-      alert("Please sign in or complete registration first before purchasing.");
-      return;
-    }
-
     setLoadingPlan(plan.id);
     setErrorMessage(null);
 
     try {
-      // 1. Create Razorpay order on our server backend
+      // 1. If Plan is Free (₹0 or promotional zero-cost set by admin), activate instantly without Razorpay
+      if (!plan.price || Number(plan.price) <= 0) {
+        const today = new Date();
+        const expiryDate = new Date(today);
+        expiryDate.setDate(today.getDate() + (plan.durationDays || 30));
+
+        const bonusCredits = Math.max(1, Math.round(((plan.durationDays || 30) / 30) * 5));
+
+        const baseProfile: ChildProfile = userProfile ? { ...userProfile } : {
+          id: auth.currentUser?.uid || 'user-parent-me',
+          parentName: auth.currentUser?.displayName || 'Parent Member',
+          childName: 'My Child',
+          childAge: 5,
+          interests: ['Outdoor Play', 'Art & Crafts', 'Social Games'],
+          playStyle: 'Social & Active',
+          gradeLevel: 'Kindergarten',
+          location: 'Bangalore, India',
+          photoUrl: auth.currentUser?.photoURL || 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=150&auto=format&fit=crop&q=80',
+          aadhaarVerified: true,
+          verificationStatus: 'verified',
+          email: auth.currentUser?.email || 'parent@vernunt.com',
+          phoneNumber: '+91 98765 43210'
+        };
+
+        const updatedProfile: ChildProfile = {
+          ...baseProfile,
+          subscriptionActive: true,
+          subscriptionPlan: plan.id as any,
+          subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
+          contactViewCredits: (baseProfile.contactViewCredits || 0) + bonusCredits,
+        };
+
+        // Persist locally in React state
+        onUpdateUserProfile(updatedProfile);
+        try {
+          localStorage.setItem('vernunt_user_profile', JSON.stringify(updatedProfile));
+        } catch (e) {
+          console.warn("Storage note:", e);
+        }
+
+        // Persist in Firestore
+        if (auth.currentUser) {
+          try {
+            const userRef = doc(db, 'users', auth.currentUser.uid);
+            await setDoc(userRef, updatedProfile, { merge: true });
+          } catch (dbErr) {
+            console.warn("Firestore user sync note:", dbErr);
+          }
+        }
+
+        // Fire celebration confetti!
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
+        });
+
+        alert(`🎉 Free Subscription Activated!\n\nWelcome to Kids Connect Club.\nYour ${plan.title} (${plan.period}) is now ACTIVE until ${expiryDate.toLocaleDateString('en-IN')}.\n\n✓ You can now send connect requests to parents\n✓ You have ${updatedProfile.contactViewCredits} decrypt credits\n✓ Access all community events and specialist portfolios!`);
+        return;
+      }
+
+      if (!userProfile) {
+        alert("Please sign in or complete registration first before purchasing.");
+        return;
+      }
+
+      // 2. Paid Plan (price > 0): Create Razorpay order on our server backend
       const orderResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -153,13 +214,13 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
         throw new Error(orderData.error || "Failed order creation.");
       }
 
-      // 2. Load the Razorpay Checkout JavaScript library
+      // 3. Load the Razorpay Checkout JavaScript library
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
         throw new Error("Failed to load Razorpay checkout script. Check Web connection.");
       }
 
-      // 3. Mount Razorpay Modal options
+      // 4. Mount Razorpay Modal options
       const options = {
         key: orderData.keyId || "rzp_test_simulated_key_123456",
         amount: orderData.amount,
@@ -186,7 +247,9 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
               // Successfully verified payment! Celebrate and update profile state
               const today = new Date();
               const expiryDate = new Date(today);
-              expiryDate.setDate(today.getDate() + plan.durationDays);
+              expiryDate.setDate(today.getDate() + (plan.durationDays || 30));
+
+              const bonusCredits = Math.max(1, Math.round(((plan.durationDays || 30) / 30) * 5));
 
               const updatedProfile: ChildProfile = {
                 ...userProfile,
@@ -194,7 +257,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
                 subscriptionPlan: plan.id as any,
                 subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
                 // reward with bonus contact credits as a subscription thank you
-                contactViewCredits: (userProfile.contactViewCredits || 0) + (plan.durationDays / 30) * 5,
+                contactViewCredits: (userProfile.contactViewCredits || 0) + bonusCredits,
               };
 
               // Persist locally in React states
@@ -223,9 +286,9 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
           }
         },
         prefill: {
-          name: userProfile.parentName || "",
-          email: userProfile.email || "parent@vernunt.com",
-          contact: userProfile.phoneNumber || ""
+          name: userProfile?.parentName || "",
+          email: userProfile?.email || "parent@vernunt.com",
+          contact: userProfile?.phoneNumber || ""
         },
         theme: {
           color: "#f59e0b" // beautiful amber standard theme
@@ -241,8 +304,8 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
       const razorpayInstance = new (window as any).Razorpay(options);
       razorpayInstance.open();
     } catch (err: any) {
-      console.error("Razorpay workflow failed:", err);
-      setErrorMessage(err.message || "An unexpected error occurred during Checkout initialization.");
+      console.error("Subscription workflow failed:", err);
+      setErrorMessage(err.message || "An unexpected error occurred during subscription activation.");
     } finally {
       setLoadingPlan(null);
     }
@@ -319,14 +382,14 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
           <p className="text-xs text-slate-500 mt-1">Payments are hosted securely with Razorpay India API. Major cards, UPI, and netbanking accepted.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {plans.map((plan) => {
             const isActivePlan = userProfile?.subscriptionActive && userProfile?.subscriptionPlan === plan.id && remainingDays() > 0;
             return (
               <div
                 key={plan.id}
                 className={`bg-white rounded-3xl p-6 border-2 relative flex flex-col justify-between transition-all duration-300 shadow-sm hover:shadow-lg ${
-                  plan.popular ? 'ring-2 ring-orange-500 border-orange-500/20' : plan.color
+                  plan.popular ? 'ring-2 ring-orange-500 border-orange-500/20' : (plan.color || 'border-slate-200')
                 } ${isActivePlan ? 'bg-amber-50/20 border-amber-400' : ''}`}
               >
                 {plan.popular && (
@@ -346,7 +409,11 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
                     <span className="text-3xl font-black font-serif text-slate-900">₹{plan.price}</span>
                     <span className="text-xs text-slate-500 ml-1">/ {plan.period}</span>
                   </div>
-                  <p className="text-[10px] text-slate-400 mt-1">Equivalent to ₹{Math.round(plan.price / (plan.durationDays / 30))}/month</p>
+                  {plan.durationDays >= 30 ? (
+                    <p className="text-[10px] text-slate-400 mt-1">Equivalent to ₹{Math.round(plan.price / (plan.durationDays / 30))}/month</p>
+                  ) : (
+                    <p className="text-[10px] text-slate-400 mt-1">₹{Math.round(plan.price / (plan.durationDays || 1))}/day flexible pass</p>
+                  )}
                   {plan.description && (
                     <p className="text-[10.5px] text-slate-500 italic mt-2 bg-slate-50/65 p-2 rounded-xl leading-relaxed border border-slate-100/50">{plan.description}</p>
                   )}
@@ -375,7 +442,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
                         </div>
                         <div className="flex items-start gap-2">
                           <Check className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
-                          <span className="text-[11px] text-slate-650 font-medium">🥇 Bonus: **{ (plan.durationDays / 30) * 5 }** Decrypt Credits included</span>
+                          <span className="text-[11px] text-slate-650 font-medium">🥇 Bonus: **{ Math.max(1, Math.round(((plan.durationDays || 30) / 30) * 5)) }** Decrypt Credits included</span>
                         </div>
                       </>
                     )}
@@ -384,9 +451,28 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
 
                 <div className="mt-8 pt-4">
                   {isActivePlan ? (
-                    <div className="w-full py-2.5 bg-amber-100/70 border border-amber-300 text-amber-800 text-xs font-black rounded-2xl text-center select-none">
-                      🔒 Active Plan
+                    <div className="w-full py-2.5 bg-emerald-100/70 border border-emerald-300 text-emerald-800 text-xs font-black rounded-2xl text-center select-none flex items-center justify-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Active Plan
                     </div>
+                  ) : Number(plan.price) <= 0 ? (
+                    <button
+                      id={`pay-btn-${plan.id}`}
+                      onClick={() => handleSubscribe(plan)}
+                      disabled={loadingPlan !== null}
+                      className="w-full py-2.5 rounded-2xl font-black text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-500/20 active:scale-95 disabled:opacity-50"
+                    >
+                      {loadingPlan === plan.id ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                          Activating...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="w-3.5 h-3.5 fill-current text-amber-200" />
+                          ⚡ Claim Free Plan (₹0)
+                        </>
+                      )}
+                    </button>
                   ) : (
                     <button
                       id={`pay-btn-${plan.id}`}

@@ -151,12 +151,18 @@ export default function PlaymateCard({
   onBlockProfile
 }: PlaymateCardProps) {
   const [liked, setLiked] = useState(isInterestSent || isConnected);
+  const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
 
   const isProfileUnlocked = isConnected || !!currentUserProfile?.subscriptionActive;
   const uLat = currentUserLat || 19.0760;
   const uLng = currentUserLng || 72.8777;
   const distKm = getHaversineDistance(uLat, uLng, profile.location.lat, profile.location.lng);
   const proxBadge = getProximityBadge(distKm);
+
+  const parentPhoto = profile.parentPhotoUrl || profile.photoUrl;
+  const childPhoto = profile.childPhotoUrl;
+  const hasChildPhoto = !!childPhoto && childPhoto.trim().length > 0;
+  const currentDisplayPhoto = activePhotoTab === 'parent' ? parentPhoto : (hasChildPhoto ? childPhoto : parentPhoto);
 
   return (
     <div id={`playmate-card-${profile.id}`} className="bg-white rounded-2xl border border-rose-100/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full overflow-hidden hover:border-rose-300">
@@ -173,15 +179,52 @@ export default function PlaymateCard({
         )}
       </div>
 
-      {/* Photo Header */}
-      <div id="card-photo-wrapper" className="relative h-48 bg-slate-100 overflow-hidden group">
-        <img 
-          src={profile.photoUrl} 
-          alt={isProfileUnlocked ? profile.childName : "[🔒 Child Identity Securely Locked]"} 
-          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isProfileUnlocked ? 'blur-xl saturate-[0.15] brightness-75 select-none' : ''}`} 
-          referrerPolicy="no-referrer"
-        />
-        {!isProfileUnlocked && (
+      {/* Photo Header with Dual Parent (Mandatory) & Child (Optional) Toggle */}
+      <div id="card-photo-wrapper" className="relative h-52 bg-slate-900 overflow-hidden group">
+        {activePhotoTab === 'parent' ? (
+          // Parent Photo Display (MANDATORY VERIFIED)
+          <img 
+            src={parentPhoto} 
+            alt={`Parent/Guardian: ${profile.parentName}`} 
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          // Child Photo Display (OPTIONAL UNDER PRIVACY POLICY)
+          hasChildPhoto ? (
+            <img 
+              src={childPhoto} 
+              alt={isProfileUnlocked ? profile.childName : "[🔒 Child Identity Securely Locked]"} 
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isProfileUnlocked ? 'blur-xl saturate-[0.15] brightness-75 select-none' : ''}`} 
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="w-full h-full bg-gradient-to-br from-slate-900 via-rose-950/80 to-slate-900 flex flex-col items-center justify-center p-4 text-center select-none text-white space-y-2">
+              <div className="w-12 h-12 rounded-full bg-rose-500/20 border border-rose-400/40 flex items-center justify-center text-rose-300">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div className="space-y-0.5 max-w-[220px]">
+                <span className="text-[11px] font-black uppercase tracking-wider text-rose-200 block">Child Photo Protected</span>
+                <p className="text-[9.5px] text-slate-300 leading-snug">
+                  Child photo is optional for privacy. Verified parent photo is active.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActivePhotoTab('parent');
+                }}
+                className="px-2.5 py-1 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-lg text-[9px] font-bold transition"
+              >
+                View Parent Photo 👤
+              </button>
+            </div>
+          )
+        )}
+
+        {/* Lock mask for child photo when profile is locked */}
+        {activePhotoTab === 'child' && hasChildPhoto && !isProfileUnlocked && (
           <div className="absolute inset-0 bg-slate-950/45 flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
             <Lock className="w-6 h-6 text-amber-400 mb-1.5 animate-pulse" />
             <span className="text-[10px] text-white uppercase font-black tracking-widest font-mono">Pediatric Security Mask</span>
@@ -189,7 +232,7 @@ export default function PlaymateCard({
           </div>
         )}
 
-        {/* Color-Coded Proximity Badge Overlay (Green for <1km, Amber for <5km) */}
+        {/* Top-Left: Color-Coded Proximity Badge Overlay */}
         <div 
           id={`proximity-pill-overlay-${profile.id}`} 
           className={`absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs ${proxBadge.badgeOverlayClass}`}
@@ -198,6 +241,42 @@ export default function PlaymateCard({
           <span className={`w-2 h-2 rounded-full ${proxBadge.dotColor} animate-pulse shrink-0`} />
           <span className="font-mono">{proxBadge.distanceText}</span>
           <span className="text-[8.5px] font-black opacity-90 tracking-normal">({proxBadge.label})</span>
+        </div>
+
+        {/* Top Photo Switcher Pills: Parent (Mandatory) & Child (Optional) */}
+        <div className="absolute top-11 left-3 z-20 flex items-center bg-slate-950/80 backdrop-blur-md p-0.5 rounded-xl border border-white/20 shadow-md">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePhotoTab('parent');
+            }}
+            className={`px-2 py-1 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition flex items-center gap-1 cursor-pointer ${
+              activePhotoTab === 'parent' 
+                ? 'bg-amber-400 text-slate-950 shadow-xs' 
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+            title="Parent Photo (Mandatory Verified Adult)"
+          >
+            <User className="w-3 h-3" />
+            <span>Parent*</span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setActivePhotoTab('child');
+            }}
+            className={`px-2 py-1 rounded-lg text-[9.5px] font-black uppercase tracking-wider transition flex items-center gap-1 cursor-pointer ${
+              activePhotoTab === 'child' 
+                ? 'bg-rose-500 text-white shadow-xs' 
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+            title={hasChildPhoto ? "Child Photo (Optional)" : "Child Photo (Optional - Protected)"}
+          >
+            <Heart className="w-3 h-3" />
+            <span>Child {hasChildPhoto ? '' : '(Optional)'}</span>
+          </button>
         </div>
 
         {/* Action Buttons: Save & Favorite */}
@@ -233,16 +312,51 @@ export default function PlaymateCard({
           </button>
         </div>
 
-        {/* Owner Name Tag */}
-        <div id="owner-tag" className="absolute bottom-3 left-3 flex items-center gap-1 bg-rose-950/80 backdrop-blur-xs text-white text-xs px-2.5 py-1 rounded-lg border border-rose-800/50">
-          <User className="w-3 h-3 text-amber-300" />
-          <span>Guardian: <strong>{profile.parentName}</strong></span>
+        {/* Photo View Tag in Bottom Left */}
+        <div id="owner-tag" className="absolute bottom-3 left-3 flex items-center gap-1.5 bg-rose-950/85 backdrop-blur-xs text-white text-xs px-2.5 py-1 rounded-lg border border-rose-800/50 shadow-sm z-20">
+          {activePhotoTab === 'parent' ? (
+            <>
+              <User className="w-3.5 h-3.5 text-amber-300" />
+              <span>Parent: <strong>{profile.parentName}</strong> <span className="text-[9px] text-amber-300 uppercase font-black tracking-wider ml-1">[Mandatory]</span></span>
+            </>
+          ) : (
+            <>
+              <Heart className="w-3.5 h-3.5 text-rose-300" />
+              <span>Child: <strong>{isProfileUnlocked ? profile.childName : '🔒 Child'}</strong> <span className="text-[9px] text-rose-200 uppercase font-bold tracking-wider ml-1">{hasChildPhoto ? '[Optional]' : '[Protected]'}</span></span>
+            </>
+          )}
         </div>
+
+        {/* Dual Thumbnail Picture-in-Picture Button to easily swap between Parent and Child */}
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActivePhotoTab(activePhotoTab === 'parent' ? 'child' : 'parent');
+          }}
+          className="absolute bottom-3 right-3 z-20 flex items-center gap-1 bg-slate-900/90 hover:bg-slate-900 text-white p-1 rounded-xl border border-white/30 shadow-md transition-all hover:scale-105 cursor-pointer"
+          title={`Switch to view ${activePhotoTab === 'parent' ? 'Child Photo (Optional)' : 'Parent Photo (Mandatory)'}`}
+        >
+          <div className="w-6 h-6 rounded-lg overflow-hidden border border-white/40 bg-slate-800 flex items-center justify-center shrink-0">
+            {activePhotoTab === 'parent' ? (
+              hasChildPhoto ? (
+                <img src={childPhoto} alt="Child Mini" className="w-full h-full object-cover" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-300" />
+              )
+            ) : (
+              <img src={parentPhoto} alt="Parent Mini" className="w-full h-full object-cover" />
+            )}
+          </div>
+          <span className="text-[9px] font-black uppercase pr-1 text-amber-300">
+            {activePhotoTab === 'parent' ? 'Child 🧒' : 'Parent 👤'}
+          </span>
+        </button>
 
         {/* Immediate Playdate Hunt Overlay Badge */}
         {profile.lookingForImmediatePlaydate && (
-          <div id={`immediate-hunt-badge-${profile.id}`} className="absolute bottom-3 right-3 flex items-center gap-1.5 bg-gradient-to-r from-rose-600 to-red-700 text-white text-[9.5px] uppercase tracking-widest font-black px-3 py-1 rounded-lg shadow-lg border border-rose-400/20 animate-pulse z-20">
-            <Zap className="w-3.5 h-3.5 fill-amber-300 text-amber-300 shrink-0" />
+          <div id={`immediate-hunt-badge-${profile.id}`} className="absolute top-11 right-3 flex items-center gap-1 bg-gradient-to-r from-rose-600 to-red-700 text-white text-[9px] uppercase tracking-widest font-black px-2.5 py-0.5 rounded-lg shadow-lg border border-rose-400/20 animate-pulse z-20">
+            <Zap className="w-3 h-3 fill-amber-300 text-amber-300 shrink-0" />
             <span>Instant Playdate</span>
           </div>
         )}

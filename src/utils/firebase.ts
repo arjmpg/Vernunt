@@ -1,21 +1,31 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize core Firebase elements
-const app = initializeApp(firebaseConfig);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// CRITICAL: Prevent passing undefined to getFirestore, fallback to default database
-const dbId = (firebaseConfig as any).firestoreDatabaseId;
-export const db = dbId ? getFirestore(app, dbId) : getFirestore(app);
+// Initialize Firestore with robust connection settings (auto-detect long-polling for iframe/proxy environments)
+let firestoreInstance;
+try {
+  firestoreInstance = initializeFirestore(app, {
+    experimentalAutoDetectLongPolling: true,
+  });
+} catch (e) {
+  // Fallback to standard getFirestore if already initialized
+  const dbId = (firebaseConfig as any).firestoreDatabaseId;
+  firestoreInstance = dbId ? getFirestore(app, dbId) : getFirestore(app);
+}
+
+export const db = firestoreInstance;
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
-// Configure scopes required for Workspace / Google Chat & Google Drive integration
-googleProvider.addScope('https://www.googleapis.com/auth/chat.spaces');
-googleProvider.addScope('https://www.googleapis.com/auth/chat.messages');
-googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+// Standard Google Authentication Provider for Login & Identity
+export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account'
+});
 
 // In-memory & local cache for Google OAuth Access Token
 let cachedAccessToken: string | null = null;
@@ -49,22 +59,47 @@ auth.onAuthStateChanged((user) => {
   }
 });
 
-// Standard login popup trigger
+// Standard login popup trigger with fallback handling and clean provider initialization
 export async function triggerGoogleSignIn() {
   try {
-    const result = await signInWithPopup(auth, googleProvider);
+    // Create dedicated provider instance with prompt to ensure Google Account selector displays
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      prompt: 'select_account'
+    });
+
+    const result = await signInWithPopup(auth, provider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (credential?.accessToken) {
       cachedAccessToken = credential.accessToken;
+      setGoogleAccessToken(credential.accessToken);
     }
     return result.user;
   } catch (error: any) {
-    console.error('Google Sign-In failed:', error);
-    
     const errorCode = error?.code || '';
     const errorMessage = error?.message || '';
     const currentDomain = typeof window !== 'undefined' ? window.location.hostname : 'localhost';
     
+    // User closed popup deliberately or cancelled - return null gracefully without displaying error
+    if (
+      errorCode === 'auth/popup-closed-by-user' || 
+      errorCode === 'auth/cancelled-popup-request' ||
+      errorMessage.includes('popup-closed-by-user') ||
+      errorMessage.includes('cancelled')
+    ) {
+      console.log('Google login window closed or cancelled by user.');
+      return null;
+    }
+
+    console.error('Google Sign-In error:', error);
+
+    // Popup blocked by browser popup blocker
+    if (errorCode === 'auth/popup-blocked' || errorMessage.includes('popup-blocked')) {
+      const popupBlockErr = new Error('The Google login popup was blocked by your browser. Please allow popups for this site or open in a new tab.');
+      (popupBlockErr as any).code = 'auth/popup-blocked';
+      throw popupBlockErr;
+    }
+
     // Explicitly identify and handle unauthorized domain errors (for popups, reCAPTCHA, and general auth)
     if (
       errorCode === 'auth/unauthorized-domain' ||
@@ -73,60 +108,50 @@ export async function triggerGoogleSignIn() {
       errorMessage.includes('auth/unauthorized-domain')
     ) {
       const detailedDiagnostic = `
-🚨 FIREBASE AUTHENTICATION ERROR: UNAUTHORIZED DOMAIN DETECTED 🚨
+🚨 FIREBASE AUTHENTICATION: UNAUTHORIZED DOMAIN DETECTED 🚨
 ------------------------------------------------------------------
-The current domain "${currentDomain}" has not been authorized in your Firebase Project Console.
+The current domain "${currentDomain}" has not been added to your Authorized Domains in Firebase Authentication.
 
-TO FIX THIS ERROR:
+TO FIX IN 1 MINUTE:
 1. Open the Firebase Console (https://console.firebase.google.com).
-2. Select your project (with Project ID: "${firebaseConfig.projectId}").
-3. Go to "Authentication" in the left sidebar menu.
-4. Click on the "Settings" tab at the top.
-5. In the left sub-menu, click "Authorized Domains".
-6. Click the "Add domain" button.
-7. Enter this exact domain name:
+2. Select your project: "${firebaseConfig.projectId}".
+3. Go to "Authentication" in the left sidebar menu -> Click the "Settings" tab at the top.
+4. In the left sub-menu, click "Authorized Domains".
+5. Click "Add domain" and enter:
    👉   ${currentDomain}
-8. Click "Add" to save your selection.
-
-Note: The primary default application URL is https://app.vernunt.com (app.vernunat.com) deployed on the Asia East (asia-east1) primary region (Asia South deleted/deprecated). Ensure app.vernunt.com and active hostnames are added to your Authorized Domains list!
+6. Also make sure "app.vernunt.com" and "vernunt.com" are listed.
+7. Click "Add" to save.
 ------------------------------------------------------------------
 `;
       console.error(detailedDiagnostic);
-      throw new Error(detailedDiagnostic);
+      const domainErr = new Error(`Domain "${currentDomain}" is not in Firebase Authorized Domains. Add "${currentDomain}" to Firebase Console -> Authentication -> Settings -> Authorized Domains.`);
+      (domainErr as any).code = 'auth/unauthorized-domain';
+      (domainErr as any).diagnostic = detailedDiagnostic;
+      throw domainErr;
     }
 
     // Handle standard initialization/operation-not-allowed mismatch errors
     if (errorCode === 'auth/operation-not-allowed' || errorMessage.includes('operation-not-allowed')) {
       const providerDiagnostic = `
-🚨 FIREBASE AUTHENTICATION ERROR: PROVIDER NOT ENABLED 🚨
+🚨 FIREBASE AUTHENTICATION: GOOGLE PROVIDER NOT ENABLED 🚨
 ------------------------------------------------------------------
-Google Sign-In or Phone/Email Provider is not enabled in your Firebase Project configuration.
+Google Sign-In is not enabled in your Firebase Project configuration.
 
-TO FIX THIS ERROR:
-1. Open the Firebase Console.
-2. Go to "Authentication" -> "Sign-in method" tab.
-3. Enable the "Google" provider (and "Phone"/"Email" if utilized) under the Native providers list.
-4. Save the configuration changes.
+TO FIX:
+1. Open Firebase Console -> "Authentication" -> "Sign-in method" tab.
+2. Click on "Google" under Sign-in providers.
+3. Toggle "Enable", configure project support email, and click Save.
 ------------------------------------------------------------------
 `;
       console.error(providerDiagnostic);
-      throw new Error(providerDiagnostic);
+      const opErr = new Error('Google Sign-In is not enabled in your Firebase Project Console. Please enable "Google" under Authentication -> Sign-in method.');
+      (opErr as any).code = 'auth/operation-not-allowed';
+      throw opErr;
     }
     
     throw error;
   }
 }
-
-// Connection test on boot:
-async function testConnection() {
-  try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error: any) {
-    const errorMsg = error?.message || String(error);
-    console.warn("Firebase Connection check warning (expected in offline sandbox):", errorMsg);
-  }
-}
-testConnection();
 
 // Error structures
 export enum OperationType {

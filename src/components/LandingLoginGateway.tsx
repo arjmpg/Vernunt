@@ -40,6 +40,7 @@ interface LandingLoginGatewayProps {
   onQuickStart: () => void;
   onGoogleSignIn: () => void;
   isAuthenticating?: boolean;
+  externalAuthError?: string;
   language?: LanguageCode;
   banners?: any[];
 }
@@ -52,6 +53,7 @@ export default function LandingLoginGateway({
   onQuickStart,
   onGoogleSignIn,
   isAuthenticating = false,
+  externalAuthError = '',
   language = 'en',
   banners = []
 }: LandingLoginGatewayProps) {
@@ -59,6 +61,25 @@ export default function LandingLoginGateway({
   const [activeTab, setActiveTab ] = useState<AuthTab>('google');
   const [emailMode, setEmailMode] = useState<EmailSubMode>('password');
   const [activeReferral, setActiveReferral] = useState<string | null>(null);
+
+  // Sync external auth error
+  useEffect(() => {
+    if (externalAuthError) {
+      const lower = externalAuthError.toLowerCase();
+      if (
+        lower.includes('popup-closed-by-user') ||
+        lower.includes('cancelled') ||
+        lower.includes('window was closed')
+      ) {
+        // Silently ignore user closing the window
+        setErrorMsg('');
+      } else {
+        setErrorMsg(externalAuthError);
+      }
+    } else {
+      setErrorMsg('');
+    }
+  }, [externalAuthError]);
 
   // Modal for role selection on unregistered user verification
   const [showRoleSelectModal, setShowRoleSelectModal] = useState(false);
@@ -94,9 +115,15 @@ export default function LandingLoginGateway({
 
   // Status message states
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState(externalAuthError || '');
   const [infoMsg, setInfoMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (externalAuthError) {
+      setErrorMsg(externalAuthError);
+    }
+  }, [externalAuthError]);
 
   // Active Banners Auto Rotation Carousel
   const homeBanners = banners.filter(b => b.active && (b.placement === 'home' || !b.placement));
@@ -138,7 +165,7 @@ export default function LandingLoginGateway({
     setInfoMsg('');
 
     try {
-      const isSystemAdmin = email.trim().toLowerCase() === 'ardha@vernunt.com';
+      const isSystemAdmin = email.trim().toLowerCase() === 'ardha@vernunt.com' || email.trim().toLowerCase() === 'arjunmpgupta@gmail.com';
       if (isSystemAdmin) {
         if (password !== 'Hayana@2025') {
           throw new Error('Incorrect secure credential for System Administration. Please enter valid password details.');
@@ -685,10 +712,20 @@ export default function LandingLoginGateway({
                 </div>
               )}
               {errorMsg && (
-                <div className="p-3.5 bg-red-50 text-red-900 border border-red-250 text-xs font-semibold rounded-xl flex items-start gap-2 animate-fade-in leading-relaxed">
+                <div className="p-3.5 bg-red-50 text-red-900 border border-red-200 text-xs font-semibold rounded-xl flex items-start gap-2 animate-fade-in leading-relaxed">
                   <span className="text-red-500 shrink-0 font-extrabold text-sm">⚠️</span>
                   <div className="flex-1 space-y-1">
-                    <span className="font-bold text-red-950 block">Verification Notice</span>
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-red-950 block">Authentication Notice</span>
+                      <button
+                        type="button"
+                        onClick={() => setErrorMsg('')}
+                        className="text-red-400 hover:text-red-700 text-sm font-bold leading-none p-0.5 cursor-pointer"
+                        title="Dismiss"
+                      >
+                        ×
+                      </button>
+                    </div>
                     <p className="text-red-800 text-[11px] leading-normal">{errorMsg}</p>
                   </div>
                 </div>
@@ -704,7 +741,7 @@ export default function LandingLoginGateway({
               {activeTab === 'google' && (
                 <div className="space-y-4 animate-fade-in text-center py-2" id="form-google-content">
                   <p className="text-xs text-slate-500">
-                    Sign in with Google workspace instance instantly. We automatically retrieve your email handle securely context.
+                    Sign in with your Google Account instantly. You will be authenticated and connected to your verified workspace profile.
                   </p>
                   
                   <button
@@ -716,7 +753,7 @@ export default function LandingLoginGateway({
                     <svg className="w-4 h-4 bg-white rounded-full p-0.5 fill-current shrink-0" viewBox="0 0 24 24">
                       <path d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.859-3.578-7.859-8s3.53-8 7.859-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1c-6.075 0-11 4.925-11 11s4.925 11 11 11c6.34 0 10.55-4.437 10.55-10.714 0-.72-.08-1.265-.175-1.714H12.24z"/>
                     </svg>
-                    {isAuthenticating ? 'Redirecting to Google Auth...' : t.continueSecureGoogle}
+                    {isAuthenticating ? 'Opening Google Sign-In Window...' : t.continueSecureGoogle}
                   </button>
 
                   <p className="text-[10px] text-slate-400 italic">

@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { SpecialistProfile, Booking, ChildProfile } from '../types.ts';
-import { Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, CreditCard } from 'lucide-react';
+import { Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, CreditCard, Share2, Send, Copy } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
+import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare, attributeAffiliateBooking } from '../utils/affiliate.ts';
 
 interface SpecialistsTabProps {
   currentProfile: ChildProfile | null;
@@ -72,6 +73,60 @@ export default function SpecialistsTab({
   const [razorpayStep, setRazorpayStep] = useState<'details' | 'processing' | 'otp' | 'success'>('details');
   const [otpInput, setOtpInput] = useState('');
   const [productionPaymentId, setProductionPaymentId] = useState('');
+  const [copiedSpecId, setCopiedSpecId] = useState<string | null>(null);
+
+  const handleShareSpecialist = (spec: SpecialistProfile) => {
+    const affiliateCode = currentProfile?.affiliateCode || currentProfile?.referralCode || undefined;
+    const deepLink = generateAffiliateShareUrl({
+      affiliateCode,
+      tab: 'specialists',
+      itemId: spec.id,
+      itemType: 'specialist'
+    });
+
+    const shareText = `🌟 ${spec.name} (${spec.title}) 🌟
+🧬 Category: ${spec.category}
+⭐ Rating: ${spec.rating} (${spec.reviewsCount} reviews)
+💼 Experience: ${spec.experienceYears} Years
+💰 Session Fee: ₹${spec.sessionFee} / hour
+📍 Location: ${spec.location}
+
+${spec.bio}
+
+🔗 Book a consultation slot on Vernunt Playdates:
+${deepLink}`;
+
+    navigator.clipboard.writeText(shareText);
+    setCopiedSpecId(spec.id);
+    setTimeout(() => setCopiedSpecId(null), 2000);
+    confettiDefault({ particleCount: 30, spread: 50 });
+  };
+
+  const handleWhatsAppShareSpecialist = (spec: SpecialistProfile) => {
+    const affiliateCode = currentProfile?.affiliateCode || currentProfile?.referralCode || undefined;
+    const deepLink = generateAffiliateShareUrl({
+      affiliateCode,
+      tab: 'specialists',
+      itemId: spec.id,
+      itemType: 'specialist'
+    });
+
+    const shareText = `🌟 *Consultation with ${spec.name}* 🌟
+🩺 *Specialty:* ${spec.title} (${spec.category})
+⭐ *Rating:* ${spec.rating} / 5 (${spec.reviewsCount} reviews)
+💼 *Experience:* ${spec.experienceYears} Years Prof
+💰 *Fee:* ₹${spec.sessionFee} / hr
+📍 *Location:* ${spec.location}
+
+${spec.bio.slice(0, 160)}...
+
+👉 *Book consultation slot directly:*
+${deepLink}
+
+${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : ''}`;
+
+    openWhatsAppShare(shareText);
+  };
   const [buyerName, setBuyerName] = useState(currentProfile?.parentName || '');
   const [buyerEmail, setBuyerEmail] = useState('guardian@vernunt.org');
 
@@ -439,6 +494,11 @@ export default function SpecialistsTab({
 
               onAddBooking(newBooking);
 
+              // Attribute affiliate referral commission if buyer came via partner link
+              attributeAffiliateBooking(newBooking, `Consultation with ${selectedSpecialist.name}`).catch((err) => {
+                console.warn('Specialist affiliate attribution note:', err);
+              });
+
               confettiDefault({
                 particleCount: 120,
                 spread: 75,
@@ -631,14 +691,36 @@ export default function SpecialistsTab({
                 </div>
               </div>
 
-              <button
-                id={`btn-book-session-${spec.id}`}
-                onClick={() => startBooking(spec)}
-                type="button"
-                className="w-full mt-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                <Briefcase className="w-3.5 h-3.5" /> Book Consultation Slot
-              </button>
+              <div className="mt-4 flex items-center gap-2">
+                <button
+                  id={`btn-book-session-${spec.id}`}
+                  onClick={() => startBooking(spec)}
+                  type="button"
+                  className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Briefcase className="w-3.5 h-3.5" /> Book Slot
+                </button>
+
+                <button
+                  id={`btn-share-spec-whatsapp-${spec.id}`}
+                  type="button"
+                  onClick={() => handleWhatsAppShareSpecialist(spec)}
+                  className="p-2 bg-[#25D366] hover:bg-[#20ba59] active:scale-90 text-white rounded-xl shadow-xs transition cursor-pointer"
+                  title="Share consultant on WhatsApp with affiliate referral code"
+                >
+                  <Share2 className="w-4 h-4" />
+                </button>
+
+                <button
+                  id={`btn-copy-spec-link-${spec.id}`}
+                  type="button"
+                  onClick={() => handleShareSpecialist(spec)}
+                  className="p-2 bg-slate-100 hover:bg-slate-200 active:scale-90 text-slate-600 rounded-xl transition cursor-pointer"
+                  title="Copy affiliate referral details"
+                >
+                  {copiedSpecId === spec.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
           </div>
         ))}
