@@ -38,6 +38,8 @@ interface RegistrationHubProps {
   initialRole?: 'Parent' | 'Event Organizer' | 'Portfolio Professional';
   initialPhone?: string;
   initialEmail?: string;
+  initialParentName?: string;
+  initialPhotoUrl?: string;
   initialPhoneVerified?: boolean;
 }
 
@@ -96,6 +98,8 @@ export default function RegistrationHub({
   initialRole,
   initialPhone = '',
   initialEmail = '',
+  initialParentName = '',
+  initialPhotoUrl = '',
   initialPhoneVerified = false
 }: RegistrationHubProps) {
   const t = DICTIONARY[language];
@@ -145,7 +149,7 @@ export default function RegistrationHub({
   const [address, setAddress] = useState('');
 
   // --- PARENT / CHILD CHANNELS STATES ---
-  const [parentName, setParentName] = useState('');
+  const [parentName, setParentName] = useState(initialParentName || '');
   const [childName, setChildName] = useState('');
   const [gradeLevel, setGradeLevel] = useState('Kindergarten');
   const [childAge, setChildAge] = useState<number>(5);
@@ -156,7 +160,7 @@ export default function RegistrationHub({
   const [bio, setBio] = useState('');
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [selectedPreferredActivities, setSelectedPreferredActivities] = useState<string[]>([]);
-  const [photoUrl, setPhotoUrl] = useState('');
+  const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl || '');
   const [childPhotoUrl, setChildPhotoUrl] = useState('');
   const [compressingImage, setCompressingImage] = useState(false);
   const [compressionProgress, setCompressionProgress] = useState('');
@@ -193,7 +197,7 @@ export default function RegistrationHub({
   };
 
   // --- FACE-TO-SELFIE STATES & HANDLERS ---
-  const [parentProfilePhoto, setParentProfilePhoto] = useState('');
+  const [parentProfilePhoto, setParentProfilePhoto] = useState(initialPhotoUrl || '');
   const [liveSelfiePhoto, setLiveSelfiePhoto] = useState('');
   const [faceVerificationStatus, setFaceVerificationStatus] = useState<'none' | 'verified' | 'failed' | 'pending_admin'>('none');
   const [faceVerificationScore, setFaceVerificationScore] = useState<number>(0);

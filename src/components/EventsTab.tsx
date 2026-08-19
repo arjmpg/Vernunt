@@ -59,8 +59,16 @@ export default function EventsTab({
   const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
 
   // Parent GPS coordinates (default to userProfile or Mumbai/Central location)
-  const userLat = userProfile?.lat || 19.0760;
-  const userLng = userProfile?.lng || 72.8777;
+  const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
+    ? Number(userProfile.location.lat)
+    : (typeof userProfile?.lat === 'number' ? userProfile.lat : 19.0760);
+  const userLng = typeof userProfile?.location === 'object' && userProfile?.location?.lng !== undefined
+    ? Number(userProfile.location.lng)
+    : (typeof userProfile?.lng === 'number' ? userProfile.lng : 72.8777);
+
+  const userLocationDisplay = typeof userProfile?.location === 'object' && userProfile?.location?.address
+    ? userProfile.location.address
+    : (typeof userProfile?.location === 'string' ? userProfile.location : 'Central Area (19.07, 72.87)');
 
   // Check if current user is authorized to operate the Gate Desk & QR Scanner
   const isAuthorizedOrganizer = (evt?: CommunityEvent) => {
@@ -1088,7 +1096,7 @@ ${deepLink}`;
 
           <div className="text-[11px] text-slate-400 pl-2 border-l border-slate-200 flex items-center gap-1">
             <span>📍 Your Location:</span>
-            <span className="font-bold text-slate-700">{userProfile?.location || 'Central Area (19.07, 72.87)'}</span>
+            <span className="font-bold text-slate-700 truncate max-w-[180px]" title={userLocationDisplay}>{userLocationDisplay}</span>
           </div>
         </div>
       </div>

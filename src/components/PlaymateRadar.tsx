@@ -79,8 +79,8 @@ export default function PlaymateRadar({
   };
 
   // Center coordinates based on user profile or default
-  const centerLat = userProfile?.location.lat || 19.0760;
-  const centerLng = userProfile?.location.lng || 72.8777;
+  const centerLat = userProfile?.location?.lat || userProfile?.lat || 19.0760;
+  const centerLng = userProfile?.location?.lng || userProfile?.lng || 72.8777;
 
   // Effective visible distance range calculated with current zoom
   const effectiveScanRadiusKm = (maxDistanceKm / zoomLevel).toFixed(1);

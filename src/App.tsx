@@ -149,11 +149,19 @@ export default function App() {
 
   // Role selection popup state for unregistered users post-verification
   const [showRoleSelectModal, setShowRoleSelectModal] = useState<boolean>(false);
-  const [pendingAuthUser, setPendingAuthUser] = useState<{ email?: string; phone?: string; uid?: string } | null>(null);
+  const [pendingAuthUser, setPendingAuthUser] = useState<{ 
+    email?: string; 
+    phone?: string; 
+    uid?: string;
+    displayName?: string;
+    photoURL?: string;
+  } | null>(null);
   const [pendingRegisterDetails, setPendingRegisterDetails] = useState<{
     phone?: string;
     email?: string;
     phoneVerified?: boolean;
+    parentName?: string;
+    photoUrl?: string;
   }>({});
 
   // Track the current application mode using a reference to avoid stale closures in Auth synchronize effect.
@@ -370,45 +378,27 @@ export default function App() {
                 setActiveTab('radar');
               }
           } else {
-            // New or unregistered Google / Firebase user -> auto-provision default verified profile and transition directly to dashboard
-            const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : 'Vernunt Parent');
-            const newProfile: ChildProfile = {
-              id: firebaseUser.uid,
-              parentName: fallbackName,
-              childName: 'Aarav',
-              childAge: 5,
-              childGender: 'Boy',
-              gradeLevel: 'Class 1',
-              playStyle: 'Active & Social',
-              bio: `Verified parent on Vernunt community. Google Email: ${emailLower}`,
-              location: {
-                lat: 19.0760,
-                lng: 72.8777,
-                address: 'Vernunt Community, Bandra West, Mumbai, Maharashtra, India'
-              },
-              locationSharing: LocationSharing.PRECISE,
-              verificationStatus: VerificationStatus.VERIFIED,
-              interests: ['Playground Games', 'Art & Craft', 'Community Building'],
-              photoUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-              userRole: 'Parent',
-              email: emailLower,
-              phoneNumber: firebaseUser.phoneNumber || '9876543210',
-              phoneVerified: true,
-              aadhaarVerified: true
-            };
-
-            setUserProfile(newProfile);
-            setUserRole('Parent');
-            setAppMode('dashboard');
-            setActiveTab('radar');
-            try {
-              localStorage.setItem('vernunt_cached_profile_' + firebaseUser.uid, JSON.stringify(newProfile));
-            } catch (cacheErr) {
-              console.debug("New user cache write note:", cacheErr);
-            }
-            setDoc(userDocRef, newProfile, { merge: true }).catch(err => {
-              console.warn("New user profile cloud sync note:", err);
+            // Unregistered Google / Firebase user -> prompt registration popup with pre-verified credentials
+            const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
+            const cleanPhone = firebaseUser.phoneNumber ? firebaseUser.phoneNumber.replace('+91', '').trim() : '';
+            
+            setPendingRegisterDetails({
+              email: emailLower || undefined,
+              phone: cleanPhone || undefined,
+              phoneVerified: Boolean(cleanPhone),
+              parentName: fallbackName || undefined,
+              photoUrl: firebaseUser.photoURL || undefined
             });
+            setPendingAuthUser({
+              email: emailLower || undefined,
+              phone: cleanPhone || undefined,
+              uid: firebaseUser.uid,
+              displayName: fallbackName || undefined,
+              photoURL: firebaseUser.photoURL || undefined
+            });
+            setIsLoading(false);
+            setIsAuthenticating(false);
+            setShowRoleSelectModal(true);
           }
           }
         } catch (error) {
@@ -572,73 +562,126 @@ export default function App() {
 
   const handleSelectGoogleAccount = async (account: { email: string; displayName: string; photoURL?: string; role?: string }) => {
     setIsLoading(true);
-    setLoadingTitle(`Signing in as ${account.displayName}...`);
+    setLoadingTitle(`Checking registration for ${account.displayName}...`);
     setShowGoogleAccountModal(false);
     setAuthErrorMessage('');
 
     const emailLower = account.email.toLowerCase().trim();
     const isSystemAdmin = emailLower === 'ardha@vernunt.com' || emailLower === 'arjunmpgupta@gmail.com';
-    const targetRole = isSystemAdmin ? 'Admin' : ((account.role as any) || 'Parent');
     const assignedUid = 'google-user-' + emailLower.replace(/[^a-zA-Z0-9]/g, '-');
 
-    const profile: ChildProfile = {
-      id: assignedUid,
-      parentName: account.displayName,
-      childName: isSystemAdmin ? 'Ayaan' : 'Aarav',
-      childAge: isSystemAdmin ? 6 : 5,
-      childGender: 'Boy',
-      gradeLevel: 'Class 1',
-      playStyle: 'Active & Social',
-      bio: isSystemAdmin 
-        ? 'Vernunt System Admin Panel and Child Safety Coordinator.' 
-        : `Verified Google Account holder: ${emailLower}. Connected parent and community member.`,
-      location: {
-        lat: 19.0760,
-        lng: 72.8777,
-        address: 'Vernunt HQ, Bandra West, Mumbai, Maharashtra, India'
-      },
-      locationSharing: LocationSharing.PRECISE,
-      verificationStatus: VerificationStatus.VERIFIED,
-      interests: isSystemAdmin 
-        ? ['Platform Auditing', 'Community Building'] 
-        : ['Playground Games', 'Creative Arts', 'Community Safety'],
-      photoUrl: account.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
-      userRole: targetRole,
-      email: emailLower,
-      phoneNumber: '8073749074',
-      phoneVerified: true,
-      aadhaarVerified: true,
-      aadhaarNumber: '111122223333'
-    };
+    if (isSystemAdmin) {
+      const adminProfile: ChildProfile = {
+        id: assignedUid,
+        parentName: account.displayName || 'Arjun Gupta (Admin)',
+        childName: 'Ayaan',
+        childAge: 6,
+        childGender: 'Boy',
+        gradeLevel: 'Class 1',
+        playStyle: 'Active & Social',
+        bio: 'Vernunt System Admin Panel and Child Safety Coordinator.',
+        location: {
+          lat: 19.0760,
+          lng: 72.8777,
+          address: 'Vernunt HQ, Bandra West, Mumbai, Maharashtra, India'
+        },
+        locationSharing: LocationSharing.PRECISE,
+        verificationStatus: VerificationStatus.VERIFIED,
+        interests: ['Platform Auditing', 'Community Building'],
+        photoUrl: account.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        userRole: 'Admin',
+        email: emailLower,
+        phoneNumber: '8073749074',
+        aadhaarVerified: true,
+        aadhaarNumber: '111122223333'
+      };
 
-    setUserProfile(profile);
-    setUserRole(targetRole);
-    setAppMode('dashboard');
-    if (targetRole === 'Event Organizer') {
-      setActiveTab('business');
-    } else if (targetRole === 'Portfolio Professional') {
-      setActiveTab('portfolio');
-    } else {
+      setUserProfile(adminProfile);
+      setUserRole('Admin');
+      setAppMode('dashboard');
       setActiveTab('radar');
+      try {
+        localStorage.setItem('vernunt_cached_profile_' + assignedUid, JSON.stringify(adminProfile));
+        localStorage.setItem('vernunt_last_logged_in_user', assignedUid);
+      } catch (e) {
+        console.debug('Admin storage write note:', e);
+      }
+      setIsLoading(false);
+      setIsAuthenticating(false);
+      return;
     }
 
+    // Check if user already exists in Firestore database
+    let existingProfile: ChildProfile | null = null;
     try {
-      localStorage.setItem('vernunt_cached_profile_' + assignedUid, JSON.stringify(profile));
-      localStorage.setItem('vernunt_last_logged_in_user', assignedUid);
+      const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
+      const directDoc = await getDoc(doc(db, 'users', assignedUid));
+      if (directDoc.exists()) {
+        existingProfile = directDoc.data() as ChildProfile;
+      } else {
+        const qEmail = query(collection(db, 'users'), where('email', '==', emailLower));
+        const snapEmail = await getDocs(qEmail);
+        if (!snapEmail.empty) {
+          existingProfile = snapEmail.docs[0].data() as ChildProfile;
+        }
+      }
     } catch (e) {
-      console.debug('Profile storage note:', e);
+      console.warn('Firestore user check note:', e);
     }
 
-    try {
-      setDoc(doc(db, 'users', assignedUid), profile, { merge: true }).catch(err => {
-        console.warn('Background profile cloud sync note:', err);
+    // Check local storage
+    if (!existingProfile) {
+      const cached = localStorage.getItem('vernunt_cached_profile_' + assignedUid);
+      if (cached) {
+        try {
+          existingProfile = JSON.parse(cached);
+        } catch (e) {
+          console.debug('Cached profile parse note:', e);
+        }
+      }
+    }
+
+    if (existingProfile) {
+      // Existing registered user -> Go directly to dashboard
+      setUserProfile(existingProfile);
+      const targetRole = existingProfile.userRole || 'Parent';
+      setUserRole(targetRole);
+      setAppMode('dashboard');
+      if (targetRole === 'Event Organizer') {
+        setActiveTab('business');
+      } else if (targetRole === 'Portfolio Professional') {
+        setActiveTab('portfolio');
+      } else {
+        setActiveTab('radar');
+      }
+      try {
+        localStorage.setItem('vernunt_cached_profile_' + assignedUid, JSON.stringify(existingProfile));
+        localStorage.setItem('vernunt_last_logged_in_user', assignedUid);
+      } catch (e) {
+        console.debug('Profile storage note:', e);
+      }
+      setIsLoading(false);
+      setIsAuthenticating(false);
+    } else {
+      // Unregistered user -> Trigger Role Selection / Registration popup with pre-verified Google details
+      const regDetails = {
+        email: emailLower,
+        phone: '',
+        phoneVerified: false,
+        parentName: account.displayName,
+        photoUrl: account.photoURL
+      };
+      setPendingRegisterDetails(regDetails);
+      setPendingAuthUser({
+        email: emailLower,
+        uid: assignedUid,
+        displayName: account.displayName,
+        photoURL: account.photoURL
       });
-    } catch (e) {
-      console.warn('Firestore doc creation note:', e);
+      setIsLoading(false);
+      setIsAuthenticating(false);
+      setShowRoleSelectModal(true);
     }
-
-    setIsLoading(false);
-    setIsAuthenticating(false);
   };
 
   const handleGoogleSignIn = async () => {
@@ -1157,7 +1200,7 @@ export default function App() {
   // Handle Sign Up with optional pre-verified details
   const handleStartSignUp = (
     role: 'Parent' | 'Event Organizer' | 'Portfolio Professional',
-    details?: { phone?: string; email?: string; phoneVerified?: boolean }
+    details?: { phone?: string; email?: string; phoneVerified?: boolean; parentName?: string; photoUrl?: string }
   ) => {
     setIsLoading(true);
     setLoadingTitle(
@@ -1169,7 +1212,7 @@ export default function App() {
     );
     setSuggestedRegisterRole(role);
     if (details) {
-      setPendingRegisterDetails(details);
+      setPendingRegisterDetails(prev => ({ ...prev, ...details }));
     }
     setShowRoleSelectModal(false);
     setAppMode('register');
@@ -1940,6 +1983,8 @@ export default function App() {
               initialRole={suggestedRegisterRole}
               initialPhone={pendingRegisterDetails.phone}
               initialEmail={pendingRegisterDetails.email}
+              initialParentName={pendingRegisterDetails.parentName}
+              initialPhotoUrl={pendingRegisterDetails.photoUrl}
               initialPhoneVerified={pendingRegisterDetails.phoneVerified}
             />
           </div>
@@ -3651,7 +3696,11 @@ export default function App() {
       <RoleSelectionModal
         isOpen={showRoleSelectModal}
         onSelectRole={(role) => handleStartSignUp(role, pendingRegisterDetails)}
-        onClose={() => setShowRoleSelectModal(false)}
+        onClose={() => {
+          setShowRoleSelectModal(false);
+          setIsLoading(false);
+          setIsAuthenticating(false);
+        }}
         verifiedEmail={pendingAuthUser?.email}
         verifiedPhone={pendingAuthUser?.phone}
         language={language}
