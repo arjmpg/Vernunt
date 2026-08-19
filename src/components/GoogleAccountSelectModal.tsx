@@ -20,6 +20,14 @@ interface GoogleAccountSelectModalProps {
 
 const PRESET_ACCOUNTS = [
   {
+    email: 'hayanadharshik@gmail.com',
+    displayName: 'Hayan Adharshik',
+    badge: 'Parent & Kid Profile',
+    role: 'Parent',
+    photoURL: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+    admin: false
+  },
+  {
     email: 'arjunmpgupta@gmail.com',
     displayName: 'Arjun Gupta',
     badge: 'System Administrator (Superuser)',

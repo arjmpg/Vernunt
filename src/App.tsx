@@ -1967,6 +1967,7 @@ export default function App() {
             onStartSignUp={handleStartSignUp} 
             onQuickStart={handleQuickStartPlayground} 
             onGoogleSignIn={handleGoogleSignIn}
+            onSelectGoogleAccount={handleSelectGoogleAccount}
             isAuthenticating={isAuthenticating}
             externalAuthError={authErrorMessage}
             language={language}
