@@ -30,7 +30,7 @@ async function getRazorpayInstance() {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Enable JSON request body reading with 50mb limit for high-resolution Aadhaar document & PDF uploads
   app.use(express.json({ limit: "50mb" }));

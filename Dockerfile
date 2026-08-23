@@ -20,7 +20,7 @@ FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
 # Copy package files and install production dependencies only
 COPY package.json ./
@@ -34,6 +34,6 @@ COPY --from=builder /app/index.html ./index.html
 COPY --from=builder /app/firebase-blueprint.json ./firebase-blueprint.json
 COPY --from=builder /app/firestore.rules ./firestore.rules
 
-EXPOSE 3000
+EXPOSE 8080 3000
 
 CMD ["node", "dist/server.cjs"]
