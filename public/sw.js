@@ -13,6 +13,13 @@ const PRECACHE_ASSETS = [
   '/index.html'
 ];
 
+// Listen for skip waiting messages from client
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
 // Installation phase - warm up static precache & immediately take control
 self.addEventListener('install', (event) => {
   self.skipWaiting();

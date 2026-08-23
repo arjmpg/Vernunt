@@ -58,6 +58,14 @@ if (pathname === '/sitemap.xml') {
         });
       }
     } else {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then((registration) => {
@@ -70,6 +78,9 @@ if (pathname === '/sitemap.xml') {
                 installingWorker.onstatechange = () => {
                   if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
                     console.log('⚡ New Vernunt version installed! Reloading to apply updates...');
+                    if (installingWorker.postMessage) {
+                      installingWorker.postMessage({ type: 'SKIP_WAITING' });
+                    }
                   }
                 };
               }
