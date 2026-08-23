@@ -1,24 +1,24 @@
 /*
   Vernunt Service Worker
-  Provides lightning-fast startup by serving cached static assets stale-while-revalidate 
-  and fallback cache support for dynamic assets.
+  Provides lightning-fast startup with Network-First strategy for application shell
+  to guarantee the latest deployed version is always served immediately.
 */
 
-const CACHE_NAME = 'vernunt-static-cache-v3';
-const DYNAMIC_CACHE_NAME = 'vernunt-dynamic-cache-v3';
+const CACHE_NAME = 'vernunt-static-cache-v4';
+const DYNAMIC_CACHE_NAME = 'vernunt-dynamic-cache-v4';
 
-// Pre-cache core structural assets to guarantee instant shell boot
+// Pre-cache core structural assets
 const PRECACHE_ASSETS = [
   '/',
   '/index.html'
 ];
 
-// Installation phase - warm up static precache
+// Installation phase - warm up static precache & immediately take control
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('[Service Worker] Pre-caching application shell...');
+      console.log('[Service Worker] Pre-caching application shell v4...');
       return cache.addAll(PRECACHE_ASSETS).catch((err) => {
         console.warn('[Service Worker] Pre-cache warning:', err);
       });
@@ -26,7 +26,7 @@ self.addEventListener('install', (event) => {
   );
 });
 
-// Activation phase - cleanup all old caches
+// Activation phase - purge all old caches immediately
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -78,8 +78,9 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Always bypass Service Worker for sitemap.xml, robots.txt, and backend API routes
+  // Always bypass Service Worker for sitemap.xml, robots.txt, sw.js and backend API routes
   if (
+    url.pathname === '/sw.js' ||
     url.pathname === '/sitemap.xml' ||
     url.pathname === '/robots.txt' ||
     url.pathname.endsWith('.xml') ||
@@ -90,7 +91,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 1: Google Web Fonts & Static Assets via Unsplash (Cache-First, fast layout rendering)
+  // Strategy 1: Google Web Fonts & Static Assets via Unsplash (Cache-First)
   if (
     url.hostname.includes('fonts.googleapis.com') ||
     url.hostname.includes('fonts.gstatic.com') ||
@@ -99,12 +100,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.match(request).then((cachedResponse) => {
         if (cachedResponse) {
-          // Serve immediately, spawn background update
           fetch(request).then((networkResponse) => {
             if (networkResponse.status === 200) {
               caches.open(DYNAMIC_CACHE_NAME).then((cache) => cache.put(request, networkResponse));
             }
-          }).catch(() => {/* ignore background update failures when offline */});
+          }).catch(() => {});
           return cachedResponse;
         }
 
@@ -115,7 +115,6 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         }).catch(() => {
-          // Offline fallback for unsplash images - yield a beautiful placeholder symbol
           if (url.hostname.includes('images.unsplash.com')) {
             return new Response(
               `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
@@ -131,19 +130,33 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Strategy 2: Stale-While-Revalidate for application assets (JS, CSS, HTML, local icons)
+  // Strategy 2: Navigation & HTML requests (Network-First to always deliver the newest deployed version)
+  if (request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(
+      fetch(request).then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const cacheCopy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, cacheCopy));
+        }
+        return networkResponse;
+      }).catch(() => {
+        return caches.match('/index.html').then((cached) => cached || caches.match('/'));
+      })
+    );
+    return;
+  }
+
+  // Strategy 3: Versioned Hashed Static Assets (Stale-While-Revalidate with quick cache fallback)
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       const networkFetch = fetch(request).then((networkResponse) => {
-        // Cache successful responses
         if (networkResponse && networkResponse.status === 200) {
           const cacheCopy = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, cacheCopy));
         }
         return networkResponse;
       }).catch((fetchErr) => {
-        console.log('[Service Worker] Dynamic cache fetch fallback triggered offline:', request.url, fetchErr);
-        // Fallback for navigation requests to parent document shell index.html
+        console.log('[Service Worker] Offline asset fallback:', request.url);
         if (request.mode === 'navigate') {
           return caches.match('/');
         }

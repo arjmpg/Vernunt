@@ -61,11 +61,23 @@ if (pathname === '/sitemap.xml') {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('/sw.js')
           .then((registration) => {
+            // Check for updates on every page load
             registration.update().catch(() => {});
-            console.log('🤖 PWA Active: ServiceWorker successfully registered with scope:', registration.scope);
+
+            registration.onupdatefound = () => {
+              const installingWorker = registration.installing;
+              if (installingWorker) {
+                installingWorker.onstatechange = () => {
+                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                    console.log('⚡ New Vernunt version installed! Reloading to apply updates...');
+                  }
+                };
+              }
+            };
+            console.log('🤖 PWA Active: ServiceWorker registered:', registration.scope);
           })
           .catch((error) => {
-            console.error('❌ ServiceWorker registration failed:', error);
+            console.error('❌ ServiceWorker registration error:', error);
           });
       });
     }
