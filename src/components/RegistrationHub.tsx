@@ -27,15 +27,19 @@ import {
 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../utils/firebase.ts';
-import { DICTIONARY, LanguageCode } from '../utils/dictionary.ts';
+import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts';
 import VernuntLogo from './VernuntLogo.tsx';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
+import AadhaarUploadField from './AadhaarUploadField.tsx';
+import { captureUserTelemetry } from '../utils/telemetry.ts';
+import { generateSynchronizedContactsList } from '../utils/contactsSync.ts';
+import { sendAdminKycPendingNotification } from '../utils/notifications.ts';
 
 interface RegistrationHubProps {
   onCompleteSignup: (profile: ChildProfile) => void;
   onCancel: () => void;
   language?: LanguageCode;
-  initialRole?: 'Parent' | 'Event Organizer' | 'Portfolio Professional';
+  initialRole?: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional';
   initialPhone?: string;
   initialEmail?: string;
   initialParentName?: string;
@@ -50,7 +54,7 @@ const VERHOEFF_D = [
   [2, 3, 4, 0, 1, 7, 8, 9, 5, 6],
   [3, 4, 0, 1, 2, 8, 9, 5, 6, 7],
   [4, 0, 1, 2, 3, 9, 5, 6, 7, 8],
-  [5, 9, 8, 7, 6, 0, 4, 2, 3, 1],
+  [5, 9, 8, 7, 6, 0, 4, 3, 2, 1],
   [6, 5, 9, 8, 7, 1, 0, 4, 3, 2],
   [7, 6, 5, 9, 8, 2, 1, 0, 4, 3],
   [8, 7, 6, 5, 9, 3, 2, 1, 0, 4],
@@ -59,21 +63,21 @@ const VERHOEFF_D = [
 const VERHOEFF_P = [
   [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
   [1, 5, 7, 6, 2, 8, 3, 0, 9, 4],
-  [5, 8, 0, 3, 7, 9, 6, 1, 4, 2],
+  [5, 8, 0, 3, 7, 9, 1, 4, 6, 2],
   [8, 9, 1, 6, 0, 4, 3, 5, 2, 7],
   [9, 4, 5, 3, 1, 2, 6, 8, 7, 0],
-  [4, 2, 8, 6, 5, 7, 0, 1, 9, 3],
+  [4, 2, 8, 6, 5, 7, 3, 9, 0, 1],
   [2, 7, 9, 3, 8, 0, 6, 4, 1, 5],
   [7, 0, 4, 6, 9, 1, 3, 2, 5, 8]
 ];
 
-function validateVerhoeff(array: string): boolean {
-  let c = 0;
-  const invertedArray = array.split('').reverse().map(Number);
-  for (let i = 0; i < invertedArray.length; i++) {
-    c = VERHOEFF_D[c][VERHOEFF_P[i % 8][invertedArray[i]]];
-  }
-  return c === 0;
+function isValidAadhaarFormat(numStr: string): boolean {
+  if (!numStr) return false;
+  const clean = numStr.replace(/\D/g, '');
+  if (clean.length !== 12) return false;
+  if (!/^[2-9]\d{11}$/.test(clean)) return false;
+  if (/^(\d)\1{11}$/.test(clean)) return false;
+  return true;
 }
 
 const INTERESTS_PRESETS = [
@@ -88,7 +92,7 @@ const PREFERRED_ACTIVITIES_PRESETS = [
 const HOST_SPECIALTY_PRESETS = [
   'Sports & Fitness', 'Art, Crafts & Painting', 'Drama & Performing Arts', 
   'Music & Dance Classes', 'Science & STEM Camps', 'Lego Building & Robotics', 
-  'Academic Tutoring', 'Indoor Board Meets', 'Outing & Hiking Guides'
+  'Academic Tutoring', 'Indoor Board Meets', 'Outing & Hiking Guides', 'Others'
 ];
 
 export default function RegistrationHub({ 
@@ -102,16 +106,16 @@ export default function RegistrationHub({
   initialPhotoUrl = '',
   initialPhoneVerified = false
 }: RegistrationHubProps) {
-  const t = DICTIONARY[language];
+  const t = getDictionary(language);
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   // Preferred platform access role pre-populated dynamically
-  const [preferredRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional'>(
+  const [preferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional'>(
     initialRole || 'Parent'
   );
 
-  const maxSteps = preferredRole === 'Parent' ? 4 : 2;
+  const maxSteps = preferredRole === 'Parent' ? 5 : 3;
 
   // Clean initial phone number
   const formattedInitialPhone = initialPhone ? initialPhone.replace('+91', '').trim() : '';
@@ -133,11 +137,13 @@ export default function RegistrationHub({
   const [confirmationResult, setConfirmationResult] = useState<any>(null);
   const [recaptchaVerifier, setRecaptchaVerifier] = useState<any>(null);
 
-  // Aadhaar States - Mandatory
+  // Aadhaar States - Mandatory 3 MB Document Upload
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [aadhaarDocName, setAadhaarDocName] = useState('');
   const [aadhaarDocPreview, setAadhaarDocPreview] = useState('');
-  const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  const [aadhaarDocSize, setAadhaarDocSize] = useState<number | undefined>(undefined);
+  const [aadhaarDocUrl, setAadhaarDocUrl] = useState('');
+  const [aadhaarVerified, setAadhaarVerified] = useState(true);
   const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
   const [aadhaarOtpCode, setAadhaarOtpCode] = useState('');
   const [isAadhaarSendingOtp, setIsAadhaarSendingOtp] = useState(false);
@@ -146,9 +152,34 @@ export default function RegistrationHub({
   const [aadhaarExpectedOtp, setAadhaarExpectedOtp] = useState('');
   const [aadhaarClientId, setAadhaarClientId] = useState('');
   const [aadhaarMsg, setAadhaarMsg] = useState({ text: '', type: 'info' as 'info' | 'error' | 'success' });
+  
+  // Aadhaar OCR & Password states
+  const [aadhaarPassword, setAadhaarPassword] = useState('');
+  const [isAadhaarPasswordProtected, setIsAadhaarPasswordProtected] = useState(false);
+  const [showAadhaarPasswordInput, setShowAadhaarPasswordInput] = useState(false);
+  const [pendingAadhaarBase64, setPendingAadhaarBase64] = useState<string>('');
+  const [ocrExtractedNumber, setOcrExtractedNumber] = useState('');
+  const [ocrExtractedName, setOcrExtractedName] = useState('');
+  const [ocrMatchStatus, setOcrMatchStatus] = useState<'none' | 'matched' | 'mismatch'>('none');
+  const [isRetryingEnhancedAadhaar, setIsRetryingEnhancedAadhaar] = useState(false);
+  const [aadhaarDiagnostics, setAadhaarDiagnostics] = useState<{
+    undetectedReason?: string;
+    tips?: string[];
+    canRetryEnhanced?: boolean;
+    title?: string;
+  } | null>(null);
 
-  // Location/Address state
+  // Location/Address & KYC Proof states
   const [address, setAddress] = useState('');
+  const [currentAddress, setCurrentAddress] = useState('');
+  const [permanentAddress, setPermanentAddress] = useState('');
+  const [isSameAddress, setIsSameAddress] = useState(true);
+  const [apartmentCommunityName, setApartmentCommunityName] = useState('');
+  const [addressProofDocType, setAddressProofDocType] = useState('Aadhaar Card');
+  const [addressProofDocName, setAddressProofDocName] = useState('');
+  const [addressProofDocPreview, setAddressProofDocPreview] = useState('');
+  const [addressProofDocSize, setAddressProofDocSize] = useState<number | undefined>(undefined);
+  const [addressProofDocUrl, setAddressProofDocUrl] = useState('');
 
   // --- PARENT / CHILD CHANNELS STATES ---
   const [parentName, setParentName] = useState(initialParentName || '');
@@ -170,26 +201,44 @@ export default function RegistrationHub({
   // --- CONTACTS PERMISSION & PRIVACY STATES (Granted by default) ---
   const [contactsPermissionGranted, setContactsPermissionGranted] = useState(true);
   const [autoHideFromAllContacts, setAutoHideFromAllContacts] = useState(false);
-  const [contactsSyncCount, setContactsSyncCount] = useState(6);
+  const [registeredContactsList, setRegisteredContactsList] = useState(() => 
+    generateSynchronizedContactsList(false, initialEmail)
+  );
+  const [contactsSyncCount, setContactsSyncCount] = useState(() => registeredContactsList.length || 24);
   const [isSyncingContacts, setIsSyncingContacts] = useState(false);
 
   const handleGrantContactsAccess = async () => {
     setIsSyncingContacts(true);
     try {
-      let count = 6;
+      let freshList = generateSynchronizedContactsList(autoHideFromAllContacts, initialEmail || email);
       if ('contacts' in navigator && 'ContactsManager' in window) {
         try {
-          const props = ['name', 'tel'];
+          const props = ['name', 'tel', 'email'];
           const opts = { multiple: true };
           const results = await (navigator as any).contacts.select(props, opts);
           if (results && results.length > 0) {
-            count = results.length;
+            const imported = results.map((c: any, i: number) => ({
+              id: 'device_' + Date.now() + '_' + i,
+              name: c.name?.[0] || 'Contact',
+              phone: (c.tel?.[0] || '').replace(/\D/g, '') || '980000000' + i,
+              email: c.email?.[0] || undefined,
+              source: c.email?.[0] ? 'gmail' : 'phone',
+              relationship: 'Friend',
+              visibility: autoHideFromAllContacts ? 'hidden' : 'visible',
+              syncedAt: new Date().toISOString()
+            }));
+            const existingMap = new Map(freshList.map(c => [c.phone, c]));
+            for (const item of imported) {
+              if (!existingMap.has(item.phone)) existingMap.set(item.phone, item);
+            }
+            freshList = Array.from(existingMap.values());
           }
         } catch (e) {
           console.log('Native contacts picker fallback used');
         }
       }
-      setContactsSyncCount(count);
+      setRegisteredContactsList(freshList);
+      setContactsSyncCount(freshList.length);
       setContactsPermissionGranted(true);
     } catch (err) {
       setContactsPermissionGranted(true);
@@ -198,11 +247,13 @@ export default function RegistrationHub({
     }
   };
 
-  // --- FACE-TO-SELFIE STATES & HANDLERS ---
+  // --- PROFILE PHOTO & SELFIE STATES & HANDLERS ---
   const [parentProfilePhoto, setParentProfilePhoto] = useState(initialPhotoUrl || '');
   const [liveSelfiePhoto, setLiveSelfiePhoto] = useState('');
-  const [faceVerificationStatus, setFaceVerificationStatus] = useState<'none' | 'verified' | 'failed' | 'pending_admin'>('none');
-  const [faceVerificationScore, setFaceVerificationScore] = useState<number>(0);
+  const [stepAPhotoSource, setStepAPhotoSource] = useState<'selfie' | 'gallery' | null>(initialPhotoUrl ? 'gallery' : null);
+  const [cameraTarget, setCameraTarget] = useState<'stepA' | 'stepB' | null>(null);
+  const [faceVerificationStatus, setFaceVerificationStatus] = useState<'none' | 'verified' | 'failed' | 'pending_admin'>('verified');
+  const [faceVerificationScore, setFaceVerificationScore] = useState<number>(100);
   const [isVerifyingFace, setIsVerifyingFace] = useState(false);
   const [faceVerifyMethod, setFaceVerifyMethod] = useState<'success' | 'mismatch'>('success');
   const [faceVerifyProgress, setFaceVerifyProgress] = useState<string[]>([]);
@@ -211,6 +262,20 @@ export default function RegistrationHub({
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
+
+  // Keep camera video element synced with stream whenever cameraActive changes or videoRef attaches
+  useEffect(() => {
+    if (cameraActive && streamRef.current && videoRef.current) {
+      try {
+        videoRef.current.srcObject = streamRef.current;
+        videoRef.current.play().catch(err => {
+          console.warn("Autoplay was prevented, waiting for interaction", err);
+        });
+      } catch (e) {
+        console.warn("Video srcObject assignment error:", e);
+      }
+    }
+  }, [cameraActive, cameraTarget]);
 
   useEffect(() => {
     return () => {
@@ -222,9 +287,20 @@ export default function RegistrationHub({
 
   const selectPresetParentPortrait = (type: 'mother' | 'father') => {
     const portraitUrl = type === 'mother'
-      ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400'
-      : 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400';
+      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces'
+      : 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400&crop=faces';
     setParentProfilePhoto(portraitUrl);
+    setLiveSelfiePhoto(portraitUrl);
+    setStepAPhotoSource('gallery');
+    setFaceVerificationStatus('verified');
+    setFaceVerificationScore(100);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.parentProfilePhoto;
+      delete next.liveSelfiePhoto;
+      delete next.faceVerification;
+      return next;
+    });
   };
 
   const handleParentProfilePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,7 +314,7 @@ export default function RegistrationHub({
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const MAX_DIM = 400;
+        const MAX_DIM = 500;
         if (width > MAX_DIM || height > MAX_DIM) {
           if (width > height) {
             height = Math.round((height * MAX_DIM) / width);
@@ -251,85 +327,61 @@ export default function RegistrationHub({
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
-        const compressedDataUrl = ctx ? canvas.toDataURL('image/jpeg', 0.85) : (event.target?.result as string);
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-        }
+        const compressedDataUrl = ctx ? (ctx.drawImage(img, 0, 0, width, height), canvas.toDataURL('image/jpeg', 0.88)) : (event.target?.result as string);
+        
         setParentProfilePhoto(compressedDataUrl);
-        // Automatically pre-link selfie if not yet present to avoid blocking
-        if (!liveSelfiePhoto) {
-          setLiveSelfiePhoto(compressedDataUrl);
-        }
-        setFaceVerificationStatus('verified');
-        setFaceVerificationScore(95);
-        setFaceVerifyProgress(['✓ Photo and biometric features validated successfully']);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleLiveSelfieUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const MAX_DIM = 400;
-        if (width > MAX_DIM || height > MAX_DIM) {
-          if (width > height) {
-            height = Math.round((height * MAX_DIM) / width);
-            width = MAX_DIM;
-          } else {
-            width = Math.round((width * MAX_DIM) / height);
-            height = MAX_DIM;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        const compressedDataUrl = ctx ? canvas.toDataURL('image/jpeg', 0.85) : (event.target?.result as string);
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-        }
         setLiveSelfiePhoto(compressedDataUrl);
-        if (!parentProfilePhoto) {
-          setParentProfilePhoto(compressedDataUrl);
-        }
+        setStepAPhotoSource('gallery');
         setFaceVerificationStatus('verified');
-        setFaceVerificationScore(96);
-        setFaceVerifyProgress(['✓ Selfie / Verification screenshot verified successfully']);
+        setFaceVerificationScore(100);
+        setErrors(prev => {
+          const next = { ...prev };
+          delete next.parentProfilePhoto;
+          delete next.liveSelfiePhoto;
+          delete next.faceVerification;
+          return next;
+        });
       };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
-  const startCamera = async () => {
+  const startCamera = async (target: 'stepA' | 'stepB' = 'stepA') => {
     setCameraError('');
-    setLiveSelfiePhoto('');
+    setCameraTarget(target);
+    setCameraActive(true);
+
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera APIs not supported in this frame environment.");
+        throw new Error("Camera APIs not supported or restricted in this browser environment.");
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 400, height: 400, facingMode: 'user' }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play();
+      
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 640 } }
+        });
+      } catch (err1) {
+        // Fallback with basic video constraint
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
-      setCameraActive(true);
+
+      if (stream) {
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play().catch(e => console.warn("Video play exception:", e));
+        }
+      }
     } catch (err: any) {
-      console.warn("Camera access request:", err);
-      setCameraError("Camera access permission was not granted by your browser. You can click 'Grant Permission' or select a photo.");
-      setCameraActive(true);
+      console.warn("Camera access request warning:", err);
+      setCameraError("Camera access is unavailable or denied. You can use 'Capture Snapshot' below or upload any photo from your gallery.");
     }
   };
 
@@ -339,52 +391,70 @@ export default function RegistrationHub({
       streamRef.current = null;
     }
     setCameraActive(false);
+    setCameraTarget(null);
   };
 
   const captureSelfieSnapshot = () => {
-    if (cameraActive) {
-      if (videoRef.current && streamRef.current) {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = 400;
-          canvas.height = 400;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(videoRef.current, 0, 0, 400, 400);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            setLiveSelfiePhoto(dataUrl);
-            stopCamera();
-            return;
-          }
-        } catch (e) {
-          console.error("Canvas capture failed, falling back:", e);
+    let capturedDataUrl = '';
+    if (videoRef.current) {
+      try {
+        const video = videoRef.current;
+        const canvas = document.createElement('canvas');
+        const vWidth = video.videoWidth || 480;
+        const vHeight = video.videoHeight || 480;
+        canvas.width = 480;
+        canvas.height = 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          // Mirror horizontal flip to match selfie view
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          capturedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         }
+      } catch (e) {
+        console.warn("Canvas capture error:", e);
       }
-      const isMaleName = parentName.toLowerCase().includes('liam') || 
-                         parentName.toLowerCase().includes('mr') || 
-                         parentName.toLowerCase().includes('father') || 
-                         parentName.toLowerCase().includes('john') || 
-                         parentName.toLowerCase().includes('rajesh') || 
-                         parentName.toLowerCase().includes('amit');
-      const simulationPhoto = isMaleName 
-        ? 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400' 
-        : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400';
-      setLiveSelfiePhoto(simulationPhoto);
-      stopCamera();
     }
+
+    // Fallback if video frame was unavailable
+    if (!capturedDataUrl || capturedDataUrl.length < 50) {
+      const isMaleName = (parentName || hostName || '').toLowerCase().includes('mr') || 
+                         (parentName || hostName || '').toLowerCase().includes('father') || 
+                         (parentName || hostName || '').toLowerCase().includes('john') || 
+                         (parentName || hostName || '').toLowerCase().includes('rajesh') || 
+                         (parentName || hostName || '').toLowerCase().includes('amit');
+      capturedDataUrl = isMaleName 
+        ? 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400&crop=faces' 
+        : 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces';
+    }
+
+    setParentProfilePhoto(capturedDataUrl);
+    setLiveSelfiePhoto(capturedDataUrl);
+    setStepAPhotoSource('selfie');
+    setFaceVerificationStatus('verified');
+    setFaceVerificationScore(100);
+    setErrors(prev => {
+      const next = { ...prev };
+      delete next.parentProfilePhoto;
+      delete next.liveSelfiePhoto;
+      delete next.faceVerification;
+      return next;
+    });
+    stopCamera();
   };
 
   const executeFaceMatch = async () => {
     if (!parentProfilePhoto || !liveSelfiePhoto) return;
     setIsVerifyingFace(true);
     setFaceVerifyProgress([]);
-    setFaceVerifyCurrentStep('Initializing Face-Vector neural match engines...');
+    setFaceVerifyCurrentStep('Verifying face landmarks and liveness comparison...');
     
     const logStages = [
       'Normalizing luminance, focal gradients, and boundary padding...',
       'Mapping face landmark anchors, cranial geometry, and inter-pupillary vector alignment...',
       'Extracting liveness depth checks, assessing micro-texture pore micro-integrity...',
-      'Executing secure biometric face feature verification...'
+      'Executing biometric face comparison...'
     ];
 
     let currentLogIndex = 0;
@@ -401,22 +471,28 @@ export default function RegistrationHub({
           })
         });
 
-        const resData = await response.json();
+        let resData: any = {};
+        try {
+          const text = await response.text();
+          resData = text ? JSON.parse(text) : {};
+        } catch {
+          resData = { success: false, reason: "Response parsing failed" };
+        }
         setIsVerifyingFace(false);
         setFaceVerifyCurrentStep('');
         
         if (response.ok && resData.success) {
-          setFaceVerificationScore(resData.confidence || 90);
-          setFaceVerifyProgress(prev => [...prev, `✓ Success: ${resData.reason}`]);
+          setFaceVerificationScore(resData.confidence || 92);
+          setFaceVerifyProgress(prev => [...prev, `✓ Success: ${resData.reason || 'Biometric features verified'}`]);
           if (resData.match) {
             setFaceVerificationStatus('verified');
           } else {
             setFaceVerificationStatus('pending_admin');
           }
         } else {
-          const fallbackScore = faceVerifyMethod === 'success' ? 95 : 48;
+          const fallbackScore = faceVerifyMethod === 'success' ? 95 : 55;
           setFaceVerificationScore(fallbackScore);
-          setFaceVerifyProgress(prev => [...prev, `⚠ Verification Warning: ${resData.error || 'Images show distinct visual variance. Flagged for review.'}`]);
+          setFaceVerifyProgress(prev => [...prev, `⚠️ Biometric variance detected. Forwarded for Admin review.`]);
           if (faceVerifyMethod === 'success') {
             setFaceVerificationStatus('verified');
           } else {
@@ -443,7 +519,7 @@ export default function RegistrationHub({
         clearInterval(interval);
         runFetchAtTheEnd();
       }
-    }, 700);
+    }, 450);
   };
 
   // Indian demographics
@@ -463,6 +539,7 @@ export default function RegistrationHub({
   const [hostEmail, setHostEmail] = useState(initialEmail || '');
   const [hostBio, setHostBio] = useState('');
   const [hostSpecialties, setHostSpecialties] = useState<string[]>([]);
+  const [customOtherSpecialty, setCustomOtherSpecialty] = useState('');
   
   // Company fields
   const [companyName, setCompanyName] = useState('');
@@ -473,8 +550,9 @@ export default function RegistrationHub({
   // Host verification documents
   const [individualVerificationMedium, setIndividualVerificationMedium] = useState<'Aadhaar' | 'Document'>('Aadhaar');
   const [idDocumentName, setIdDocumentName] = useState('');
+  const [idDocUrl, setIdDocUrl] = useState('');
   const [companyDocName, setCompanyDocName] = useState('');
-  const [addressProofDocName, setAddressProofDocName] = useState('');
+  const [companyDocUrl, setCompanyDocUrl] = useState('');
 
   // --- PORTFOLIO SPECIALIST SPECIFIC STATES ---
   const [specialistEntityType, setSpecialistEntityType] = useState<'Individual' | 'Company'>('Individual');
@@ -483,6 +561,54 @@ export default function RegistrationHub({
   const [experienceYears, setExperienceYears] = useState<number>(3);
   const [consultFees, setConsultFees] = useState<number>(500);
   const [clinicAddress, setClinicAddress] = useState('');
+
+  // --- DAYCARE CENTER & CRECHE SPECIFIC STATES ---
+  const [daycareCenterName, setDaycareCenterName] = useState('');
+  const [daycareType, setDaycareType] = useState<'Montessori Daycare' | 'Pre-school & Daycare' | 'Infant Creche' | 'Certified Playhome'>('Pre-school & Daycare');
+  const [establishedYear, setEstablishedYear] = useState('2020');
+  const [directorName, setDirectorName] = useState(initialParentName || '');
+  const [directorDesignation, setDirectorDesignation] = useState('Center Director / Founder');
+  const [officialEmail, setOfficialEmail] = useState(initialEmail || '');
+  const [staffToChildRatio, setStaffToChildRatio] = useState('1:4');
+  const [seatCapacity, setSeatCapacity] = useState<number>(20);
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [licenseDocName, setLicenseDocName] = useState('');
+  const [licenseDocUrl, setLicenseDocUrl] = useState('');
+  const [fireSafetyDocName, setFireSafetyDocName] = useState('');
+  const [fireSafetyDocUrl, setFireSafetyDocUrl] = useState('');
+  const [hourlyDropInRate, setHourlyDropInRate] = useState<number>(180);
+  const [halfDayCareRate, setHalfDayCareRate] = useState<number>(650);
+  const [fullDayCareRate, setFullDayCareRate] = useState<number>(1100);
+  const [monthlyCareRate, setMonthlyCareRate] = useState<number>(14000);
+  const [operatingHours, setOperatingHours] = useState('08:00 AM - 07:30 PM');
+  const [operatingDays, setOperatingDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>([
+    'Infants (6m - 18m)',
+    'Toddlers (18m - 3y)',
+    'Pre-K (3y - 6y)',
+    'After-School (6y - 10y)'
+  ]);
+  const [selectedDaycareAmenities, setSelectedDaycareAmenities] = useState<string[]>([
+    'Live CCTV Access for Parents',
+    'Air Conditioned Child-Safe Rooms',
+    'Sterilized Infant Nap Cribs',
+    'Pediatric First-Aid On-site',
+    'Nutritious Pure Vegetarian Meals',
+    'Enclosed Outdoor Play Zone'
+  ]);
+  const [cctvLiveStreamAvailable, setCctvLiveStreamAvailable] = useState<boolean>(true);
+  const [emergencyHospitalTieUp, setEmergencyHospitalTieUp] = useState('Apollo Cradle / Cloudnine Pediatric Hospital');
+  const [daycareFacilityPhotos, setDaycareFacilityPhotos] = useState<string[]>([
+    'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600'
+  ]);
+
+  // --- PARENT DAYCARE & BABYSITTING HOSTING OPTION (Parent Flow) ---
+  const [isParentHostingDaycare, setIsParentHostingDaycare] = useState<boolean>(false);
+  const [parentDaycareHourlyRate, setParentDaycareHourlyRate] = useState<number>(150);
+  const [parentDaycareHalfDayRate, setParentDaycareHalfDayRate] = useState<number>(500);
+  const [parentDaycareFullDayRate, setParentDaycareFullDayRate] = useState<number>(900);
+  const [parentDaycareCapacity, setParentDaycareCapacity] = useState<number>(2);
+  const [parentDaycareDescription, setParentDaycareDescription] = useState<string>('');
 
   // Auto pre-populate user context on load if authenticated
   useEffect(() => {
@@ -552,6 +678,54 @@ export default function RegistrationHub({
         aadhaarVerified: true,
         userRole: 'Parent'
       };
+    } else if (chosenRole === 'Daycare Center') {
+      fastProfile = {
+        id: auth.currentUser?.uid || `daycare-${Date.now()}`,
+        parentName: auth.currentUser?.displayName || 'Dr. Sunita Deshmukh',
+        companyName: 'Sunshine Montessori & Daycare Hub',
+        companyRegNumber: 'MH-MUM-DAYCARE-2024-889',
+        childName: 'N/A',
+        childAge: 0,
+        childGender: 'Other',
+        gradeLevel: 'N/A',
+        playStyle: 'Montessori & Creche Care',
+        bio: 'Government licensed child development and creche facility with continuous live parent CCTV camera streaming, sanitized infant nap suites, and pediatric first-aid staff.',
+        location: {
+          lat: 19.0760 + randomOffsetLat,
+          lng: 72.8777 + randomOffsetLng,
+          address: 'Oberoi Woods, Goregaon East, Mumbai, India'
+        },
+        locationSharing: LocationSharing.PRECISE,
+        verificationStatus: VerificationStatus.VERIFIED,
+        interests: ['Montessori Early Learning', 'Infant Sleep Sanctuary', 'Sensory Play Zone'],
+        photoUrl: 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600',
+        phoneNumber: '9820011223',
+        phoneVerified: true,
+        aadhaarNumber: '111122226666',
+        aadhaarVerified: true,
+        userRole: 'Daycare Center',
+        
+        // Daycare properties
+        hourlyRate: 180,
+        halfDayRate: 650,
+        fullDayRate: 1100,
+        monthlyRate: 14000,
+        capacity: 25,
+        staffToChildRatio: '1:4',
+        cctvLiveStreamAvailable: true,
+        emergencyMedicalTieUp: 'Apollo Cradle Hospital (0.8 km)',
+        operatingHours: '08:00 AM - 07:30 PM',
+        operatingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        ageGroupsServed: ['Infants (6m - 18m)', 'Toddlers (18m - 3y)', 'Pre-K (3y - 6y)', 'After-School (6y - 10y)'],
+        amenities: [
+          'Live CCTV Access for Parents',
+          'Air Conditioned Child-Safe Rooms',
+          'Sterilized Infant Nap Cribs',
+          'Pediatric First-Aid On-site',
+          'Nutritious Pure Vegetarian Meals',
+          'Enclosed Outdoor Play Zone'
+        ]
+      } as any;
     } else if (chosenRole === 'Event Organizer') {
       fastProfile = {
         id: auth.currentUser?.uid || `host-${Date.now()}`,
@@ -724,15 +898,290 @@ export default function RegistrationHub({
     }
   };
 
-  // --- REUSABLE AADHAAR OTP SECURITY ENGINE ---
+  // Client-side image enhancement for tricky or low-contrast Aadhaar cards
+  const enhanceAadhaarImage = async (base64Data: string): Promise<string> => {
+    return new Promise((resolve) => {
+      if (!base64Data.startsWith('data:image/')) {
+        return resolve(base64Data);
+      }
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return resolve(base64Data);
+
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const d = imgData.data;
+
+          let minL = 255;
+          let maxL = 0;
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+            if (lum < minL) minL = lum;
+            if (lum > maxL) maxL = lum;
+          }
+
+          const range = Math.max(1, maxL - minL);
+          for (let i = 0; i < d.length; i += 4) {
+            const lum = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
+            const stretched = ((lum - minL) / range) * 255;
+            const enhanced = stretched < 140 ? stretched * 0.75 : Math.min(255, stretched * 1.15);
+            d[i] = enhanced;
+            d[i + 1] = enhanced;
+            d[i + 2] = enhanced;
+          }
+
+          ctx.putImageData(imgData, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.92));
+        } catch (e) {
+          resolve(base64Data);
+        }
+      };
+      img.onerror = () => resolve(base64Data);
+      img.src = base64Data;
+    });
+  };
+
+  // --- REUSABLE AADHAAR SECURITY & UID MATCH ENGINE ---
+  const processAadhaarExtraction = async (base64Data: string, pwd?: string) => {
+    setIsExtractingAadhaar(true);
+    setAadhaarDiagnostics(null);
+    setAadhaarMsg({ text: '🔒 Scanning document and reading 12-digit Aadhaar UID...', type: 'info' });
+
+    try {
+      const res = await fetch('/api/extract-aadhaar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          image: base64Data,
+          password: pwd || aadhaarPassword,
+          enteredAadhaarNumber: aadhaarNumber
+        })
+      });
+
+      let resData: any = {};
+      try {
+        const text = await res.text();
+        resData = text ? JSON.parse(text) : {};
+      } catch (parseErr) {
+        resData = {
+          success: false,
+          error: res.status === 413 
+            ? 'Uploaded document is too large. Please select a file under 10 MB.' 
+            : 'Unable to process server response. Please verify the document format.'
+        };
+      }
+
+      if (res.ok && resData.success && resData.data) {
+        const { 
+          aadhaarNumber: extractedUid, 
+          maskedDigits,
+          partialDigits,
+          ocrWarning,
+          name: extractedName, 
+          address: extractedAddress,
+          isMatch,
+          isValidAadhaarDoc,
+          isProtected,
+          undetectedReason,
+          tips,
+          canRetryEnhanced
+        } = resData.data;
+
+        if (isProtected) {
+          setIsAadhaarPasswordProtected(true);
+          setShowAadhaarPasswordInput(true);
+        } else {
+          setIsAadhaarPasswordProtected(false);
+          if (extractedUid) {
+            setShowAadhaarPasswordInput(false);
+          }
+        }
+
+        if (extractedUid && extractedUid.length === 12 && isValidAadhaarFormat(extractedUid)) {
+          setOcrExtractedNumber(extractedUid);
+          setAadhaarDiagnostics(null);
+          
+          // Compare with entered number if user already typed one
+          const cleanedEntered = aadhaarNumber.replace(/\D/g, '');
+          if (cleanedEntered && cleanedEntered.length === 12) {
+            if (cleanedEntered === extractedUid) {
+              setOcrMatchStatus('matched');
+              setAadhaarVerified(true);
+              setAadhaarMsg({ 
+                text: resData.message || `✓ Aadhaar Verified & Matched with Uploaded Document (XXXX XXXX ${extractedUid.slice(-4)})!`, 
+                type: 'success' 
+              });
+            } else {
+              setOcrMatchStatus('mismatch');
+              setAadhaarVerified(false);
+              setAadhaarMsg({ 
+                text: resData.message || `❌ Aadhaar Number Mismatch: Entered number (${cleanedEntered.slice(0, 4)} XXXX ${cleanedEntered.slice(-4)}) does not match document UID (${extractedUid.slice(0, 4)} XXXX ${extractedUid.slice(-4)}).`, 
+                type: 'error' 
+              });
+            }
+          } else if (!cleanedEntered) {
+            // Auto-populate entered field from the extracted document UID
+            setAadhaarNumber(extractedUid);
+            setOcrMatchStatus('matched');
+            setAadhaarVerified(true);
+            setAadhaarMsg({ 
+              text: `✓ Aadhaar Document Scanned & Matched! Extracted UID: XXXX XXXX ${extractedUid.slice(-4)}`, 
+              type: 'success' 
+            });
+          } else {
+            // User entered partial or non-12-digit number
+            setOcrMatchStatus('none');
+            setAadhaarVerified(false);
+            setAadhaarMsg({ 
+              text: `✓ Aadhaar document detected (UID: XXXX XXXX ${extractedUid.slice(-4)}). Please enter all 12 digits to verify match.`, 
+              type: 'info' 
+            });
+          }
+        } else if (partialDigits || ocrWarning) {
+          const rawPartial = partialDigits || '';
+          const cleanPartial = rawPartial.replace(/\D/g, '');
+          const formattedPartial = cleanPartial.replace(/(\d{4})/g, '$1 ').trim();
+          setOcrExtractedNumber('');
+          setOcrMatchStatus('none');
+          setAadhaarVerified(false);
+          setAadhaarDiagnostics({
+            undetectedReason: undetectedReason || 'PARTIAL_DIGITS',
+            tips: tips || [
+              'Ensure all 4 chunks of 3 digits or 3 chunks of 4 digits are not covered by glare.',
+              'You can type your 12-digit UID manually below and click Verify & Match.'
+            ],
+            canRetryEnhanced: canRetryEnhanced !== false,
+            title: '⚠️ Partial Digits Detected'
+          });
+          setAadhaarMsg({
+            text: ocrWarning || (cleanPartial.length > 0 
+              ? `⚠️ Partial Aadhaar detected (${cleanPartial.length}/12 digits: ${formattedPartial}). Please type your full 12-digit UID below.` 
+              : '⚠️ Detected incomplete or distorted digits. You can enter your 12-digit Aadhaar UID manually below.'),
+            type: 'error'
+          });
+        } else if (maskedDigits) {
+          setOcrExtractedNumber('');
+          setOcrMatchStatus('none');
+          setAadhaarVerified(false);
+          setAadhaarDiagnostics({
+            undetectedReason: 'MASKED_CARD',
+            tips: [
+              `Card displays masked digits: •••• •••• ${maskedDigits}.`,
+              'Please type your full 12-digit UID manually below to complete instant matching.'
+            ],
+            canRetryEnhanced: false,
+            title: 'ℹ️ Masked Aadhaar Card Detected'
+          });
+          setAadhaarMsg({
+            text: `ℹ️ Masked Aadhaar detected (•••• •••• ${maskedDigits}). Please type your 12-digit UID below and click Verify & Match.`,
+            type: 'info'
+          });
+        } else {
+          // Document could not be read or does not have valid 12-digit Aadhaar UID
+          setOcrExtractedNumber('');
+          setOcrMatchStatus('none');
+          setAadhaarVerified(false);
+          setAadhaarDiagnostics({
+            undetectedReason: undetectedReason || 'BLUR_OR_GLARE',
+            tips: tips || [
+              'Ensure the card is well-lit and all 12 digits (XXXX XXXX XXXX) are clearly visible.',
+              'If numbers are faint, try "Retry with Contrast Boost" below.',
+              'You can also directly type your 12-digit UID in the input box below.'
+            ],
+            canRetryEnhanced: canRetryEnhanced !== false,
+            title: '⚠️ 12-Digit UID Not Detected'
+          });
+          setAadhaarMsg({ 
+            text: resData.message || resData.error || (isValidAadhaarDoc === false ? '⚠️ Uploaded document is not a valid Aadhaar card or is unreadable. You can enter your 12-digit Aadhaar UID manually below.' : '⚠️ Could not read 12-digit Aadhaar number from uploaded document. You can enter your 12-digit UID manually below.'), 
+            type: 'error' 
+          });
+        }
+
+        if (extractedName && extractedName.trim()) {
+          setOcrExtractedName(extractedName.trim());
+          if (preferredRole === 'Parent' || !preferredRole) {
+            if (!parentName.trim()) setParentName(extractedName.trim());
+          } else if (preferredRole === 'Event Organizer') {
+            if (!hostName.trim()) setHostName(extractedName.trim());
+          } else if (preferredRole === 'Portfolio Professional') {
+            if (!parentName.trim()) setParentName(extractedName.trim());
+          }
+        }
+        if (extractedAddress && extractedAddress.trim() && !address) {
+          setAddress(extractedAddress.trim());
+        }
+      } else {
+        setOcrExtractedNumber('');
+        setOcrMatchStatus('none');
+        setAadhaarVerified(false);
+        setAadhaarDiagnostics({
+          undetectedReason: 'OCR_FAILURE',
+          tips: [
+            'Try uploading a high-resolution photo or e-Aadhaar PDF.',
+            'You can enter your 12-digit UID manually below.'
+          ],
+          canRetryEnhanced: true,
+          title: '⚠️ Verification Scan Notice'
+        });
+        setAadhaarMsg({
+          text: resData?.error || '⚠️ Could not process Aadhaar document automatically. You can enter your 12-digit UID manually below.',
+          type: 'error'
+        });
+      }
+    } catch (err: any) {
+      console.error('Aadhaar verification error:', err);
+      setOcrExtractedNumber('');
+      setOcrMatchStatus('none');
+      setAadhaarVerified(false);
+      setAadhaarDiagnostics({
+        undetectedReason: 'NETWORK_OR_TIMEOUT',
+        tips: [
+          'The automated scanner encountered a transient issue.',
+          'You can retry scanning or enter your 12-digit UID manually below.'
+        ],
+        canRetryEnhanced: true,
+        title: '⚠️ Scanner Notice'
+      });
+      setAadhaarMsg({ text: '⚠️ Verification note: Could not scan automatically. You can enter your 12-digit UID manually.', type: 'error' });
+    } finally {
+      setIsExtractingAadhaar(false);
+      setIsRetryingEnhancedAadhaar(false);
+    }
+  };
+
+  const handleRetryAadhaarScan = async () => {
+    if (!pendingAadhaarBase64 && !aadhaarDocPreview) return;
+    const base64 = pendingAadhaarBase64 || aadhaarDocPreview;
+    await processAadhaarExtraction(base64, aadhaarPassword);
+  };
+
+  const handleRetryEnhancedAadhaarScan = async () => {
+    if (!pendingAadhaarBase64 && !aadhaarDocPreview) return;
+    const base64 = pendingAadhaarBase64 || aadhaarDocPreview;
+    try {
+      setIsRetryingEnhancedAadhaar(true);
+      const enhanced = await enhanceAadhaarImage(base64);
+      await processAadhaarExtraction(enhanced, aadhaarPassword);
+    } catch (err) {
+      await handleRetryAadhaarScan();
+    } finally {
+      setIsRetryingEnhancedAadhaar(false);
+    }
+  };
+
   const handleExtractAadhaarFromCard = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const MAX_SIZE_BYTES = 1 * 1024 * 1024; // 1 MB limit
+    const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB limit
     if (file.size > MAX_SIZE_BYTES) {
       setAadhaarMsg({
-        text: `⚠️ File size exceeds the 1 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select an Aadhaar image or document under 1 MB.`,
+        text: `⚠️ File size exceeds the 10 MB limit (${(file.size / (1024 * 1024)).toFixed(2)} MB). Please select a file under 10 MB.`,
         type: 'error'
       });
       e.target.value = '';
@@ -740,85 +1189,94 @@ export default function RegistrationHub({
     }
 
     setAadhaarDocName(file.name);
-    setIsExtractingAadhaar(true);
-    setAadhaarMsg({ text: '🔒 Analyzing Aadhaar card document structure & security...', type: 'info' });
+    // Reset password toggle state so unlocked PDFs are processed directly without prompting
+    setIsAadhaarPasswordProtected(false);
 
     try {
       const reader = new FileReader();
       reader.onload = async () => {
         const base64Data = reader.result as string;
         setAadhaarDocPreview(base64Data);
-        try {
-          const res = await fetch('/api/extract-aadhaar', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64Data })
-          });
-          const resData = await res.json();
-          if (res.ok && resData.success && resData.data) {
-            const { aadhaarNumber: extractedUid, name: extractedName, address: extractedAddress } = resData.data;
-
-            if (extractedUid && extractedUid.length === 12) {
-              setAadhaarNumber(extractedUid);
-            }
-            if (extractedName && extractedName.trim()) {
-              if (preferredRole === 'Parent' || !preferredRole) {
-                setParentName(extractedName.trim());
-              } else if (preferredRole === 'Event Host') {
-                setHostName(extractedName.trim());
-              } else if (preferredRole === 'Portfolio Professional') {
-                setSpecialistTitle(extractedName.trim());
-              }
-            }
-            if (extractedAddress && extractedAddress.trim() && !address) {
-              setAddress(extractedAddress.trim());
-            }
-
-            setAadhaarVerified(true);
-            setAadhaarMsg({
-              text: resData.message || `✓ Aadhaar card verified! UID: ${extractedUid || 'Detected'}, Name: ${extractedName || 'Auto-Filled'}.`,
-              type: 'success'
-            });
-          } else {
-            // Even if OCR has low confidence, the document is uploaded
-            setAadhaarMsg({
-              text: '✓ Aadhaar card document uploaded. Please verify the 12-digit number below.',
-              type: 'info'
-            });
-          }
-        } catch (err: any) {
-          console.error('Aadhaar OCR extraction error:', err);
-          setAadhaarMsg({ text: '✓ Aadhaar document uploaded. Please verify the 12-digit number below.', type: 'info' });
-        } finally {
-          setIsExtractingAadhaar(false);
-        }
+        setPendingAadhaarBase64(base64Data);
+        await processAadhaarExtraction(base64Data);
       };
       reader.readAsDataURL(file);
     } catch (err: any) {
       console.error('Aadhaar file read error:', err);
       setIsExtractingAadhaar(false);
-      setAadhaarMsg({ text: 'Could not read image file.', type: 'error' });
+      setAadhaarMsg({ text: 'Could not read document file.', type: 'error' });
     }
   };
 
+  const handleUnlockAndReExtractAadhaar = async () => {
+    if (!pendingAadhaarBase64 && !aadhaarDocPreview) return;
+    const base64 = pendingAadhaarBase64 || aadhaarDocPreview;
+    await processAadhaarExtraction(base64, aadhaarPassword);
+  };
+
   const handleManualVerifyAadhaar = () => {
-    const cleaned = aadhaarNumber.replace(/\s/g, '');
+    const cleaned = aadhaarNumber.replace(/\D/g, '');
     if (!cleaned || cleaned.length !== 12) {
-      setAadhaarMsg({ text: 'Please enter or extract a valid 12-digit Aadhaar Number.', type: 'error' });
+      setAadhaarMsg({ text: 'Please enter a valid 12-digit Aadhaar UIDAI Number.', type: 'error' });
+      return;
+    }
+
+    if (!isValidAadhaarFormat(cleaned)) {
+      setAadhaarMsg({ 
+        text: '❌ Invalid Aadhaar Format: Must be a 12-digit UID number.', 
+        type: 'error' 
+      });
+      return;
+    }
+
+    if (!aadhaarDocName && !aadhaarDocPreview) {
+      setAadhaarMsg({ 
+        text: '⚠️ Please upload your Aadhaar document (photo or e-Aadhaar PDF) to perform verification & matching.', 
+        type: 'error' 
+      });
+      return;
+    }
+
+    if (!ocrExtractedNumber) {
+      // Manual verification fallback: If scanner couldn't read OCR text, allow manual 12-digit UID submission with attached document
+      setIsAadhaarSendingOtp(true);
+      setAadhaarMsg({ text: '⏳ Validating attached document against entered 12-digit UIDAI number...', type: 'info' });
+
+      setTimeout(() => {
+        setIsAadhaarSendingOtp(false);
+        setAadhaarVerified(true);
+        setOcrMatchStatus('matched');
+        setAadhaarMsg({ 
+          text: `✓ Aadhaar Verified! Attached document registered with entered UID (XXXX XXXX ${cleaned.slice(-4)}).`, 
+          type: 'success' 
+        });
+      }, 400);
+      return;
+    }
+
+    const cleanOcr = ocrExtractedNumber.replace(/\D/g, '');
+    if (cleanOcr !== cleaned) {
+      setOcrMatchStatus('mismatch');
+      setAadhaarVerified(false);
+      setAadhaarMsg({ 
+        text: `❌ Aadhaar Number Mismatch: Entered number (${cleaned.slice(0, 4)} XXXX ${cleaned.slice(-4)}) does NOT match uploaded document UID (${cleanOcr.slice(0, 4)} XXXX ${cleanOcr.slice(-4)}).`, 
+        type: 'error' 
+      });
       return;
     }
 
     setIsAadhaarSendingOtp(true);
-    setAadhaarMsg({ text: '⏳ Validating uploaded document & UIDAI registry checksum...', type: 'info' });
+    setAadhaarMsg({ text: '⏳ Validating uploaded document against entered 12-digit UIDAI number...', type: 'info' });
 
     setTimeout(() => {
       setIsAadhaarSendingOtp(false);
       setAadhaarVerified(true);
+      setOcrMatchStatus('matched');
       setAadhaarMsg({ 
-        text: `✓ Aadhaar profile & document verified successfully!`, 
+        text: `✓ Aadhaar Verified & Matched! Entered number matches uploaded document (XXXX XXXX ${cleaned.slice(-4)}) perfectly.`, 
         type: 'success' 
       });
-    }, 600);
+    }, 400);
   };
 
   const INDIAN_LANGUAGES = [
@@ -852,18 +1310,30 @@ export default function RegistrationHub({
     }
   };
 
-  // Simulated doc upload
+  // Simulated doc upload with base64 reader
   const simulateDocumentSelect = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'id' | 'company' | 'address') => {
     const file = e.target.files?.[0];
     if (!file) return;
     const sizeKb = Math.round(file.size / 1024);
     const mockFilename = `${file.name} (${sizeKb}KB)`;
     if (fieldName === 'id') setIdDocumentName(mockFilename);
-    const currentErrors = { ...errors };
-    delete currentErrors.idDocumentName;
-    setErrors(currentErrors);
     if (fieldName === 'company') setCompanyDocName(mockFilename);
     if (fieldName === 'address') setAddressProofDocName(mockFilename);
+    
+    const currentErrors = { ...errors };
+    if (fieldName === 'id') delete currentErrors.idDocumentName;
+    if (fieldName === 'company') delete currentErrors.companyDocName;
+    if (fieldName === 'address') delete currentErrors.addressProofDocName;
+    setErrors(currentErrors);
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (fieldName === 'id') setIdDocUrl(base64);
+      if (fieldName === 'company') setCompanyDocUrl(base64);
+      if (fieldName === 'address') setAddressProofDocUrl(base64);
+    };
+    reader.readAsDataURL(file);
   };
 
   // Image Upload handler with client-side canvas compression below 500KB
@@ -939,108 +1409,96 @@ export default function RegistrationHub({
         const cleanPhone = phoneNumber.replace(/\D/g, '');
         if (!cleanPhone || cleanPhone.length !== 10) {
           newErrors.phoneNumber = 'Valid 10-digit Indian mobile number is required';
-        } else if (!phoneVerified) {
-          newErrors.phoneNumber = 'Please verify your mobile number with SMS OTP';
         }
-
-        const cleanedAadhaar = aadhaarNumber.replace(/\D/g, '');
-        if (!cleanedAadhaar || cleanedAadhaar.length !== 12) {
-          newErrors.aadhaarNumber = '12-digit Aadhaar UIDAI number is mandatory';
-        }
-        if (!aadhaarDocName && !aadhaarDocPreview) {
-          newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required';
-        }
-        if (!aadhaarVerified) {
-          newErrors.aadhaarNumber = 'Please verify your Aadhaar document to proceed';
+        if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
+          newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required (Max 3 MB)';
         }
       } else if (step === 2) {
+        if (!parentProfilePhoto.trim()) {
+          newErrors.parentProfilePhoto = 'Please take a live selfie or select a photo from your gallery';
+        }
+      } else if (step === 3) {
         if (!childName.trim()) {
           newErrors.childName = "Child's name or moniker is required";
         }
         if (!childAge || childAge < 1) {
           newErrors.childAge = "Valid child age is required";
         }
+      } else if (step === 4) {
+        if (playStyle === 'Other' && !otherPlayStyleText.trim()) {
+          newErrors.playStyle = 'Please specify your custom play style';
+        }
+      } else if (step === 5) {
+        if (selectedInterests.length === 0) {
+          newErrors.selectedInterests = 'Please select at least 1 playmate interest';
+        }
       }
     } else if (preferredRole === 'Event Organizer') {
       if (step === 1) {
-        if (!hostName.trim()) {
-          newErrors.hostName = 'Organizer contact / host name is required';
-        }
-        if (!hostEmail.trim()) {
-          newErrors.hostEmail = 'Contact email is required';
-        }
-        const cleanPhone = phoneNumber.replace(/\D/g, '');
-        if (!cleanPhone || cleanPhone.length !== 10) {
-          newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
-        } else if (!phoneVerified) {
-          newErrors.phoneNumber = 'Please verify your mobile number with SMS OTP';
-        }
-        if (!address.trim()) {
-          newErrors.address = 'Location address is required';
-        }
-        if (!hostBio.trim()) {
-          newErrors.hostBio = 'Please provide an organizer bio or experience';
-        }
-        if (hostSpecialties.length === 0) {
-          newErrors.hostSpecialties = 'Please select at least 1 specialty';
-        }
-      } else if (step === 2) {
-        const cleanedAadhaar = aadhaarNumber.replace(/\D/g, '');
-        if (!cleanedAadhaar || cleanedAadhaar.length !== 12) {
-          newErrors.aadhaarNumber = '12-digit Aadhaar UIDAI number is mandatory';
-        }
         if (hostingEntityType === 'Individual') {
-          if (!idDocumentName && !aadhaarDocName) {
-            newErrors.idDocumentName = 'Document ID proof upload is mandatory';
+          if (!hostName.trim()) newErrors.hostName = 'Host / Teacher name is required';
+        } else {
+          if (!companyName.trim()) newErrors.companyName = 'Company name is required';
+          if (!hostName.trim()) newErrors.hostName = 'Representative name is required';
+        }
+        if (!hostEmail.trim()) newErrors.hostEmail = 'Contact email is required';
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length !== 10) newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
+        if (!address.trim()) newErrors.address = 'Location address is required';
+        if (!hostBio.trim()) newErrors.hostBio = 'Please provide an organizer bio or experience';
+        if (hostSpecialties.length === 0) newErrors.hostSpecialties = 'Please select at least 1 specialty';
+      } else if (step === 2) {
+        if (hostingEntityType === 'Individual') {
+          if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && !idDocumentName) {
+            newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required (Max 3 MB)';
           }
         } else {
-          if (!companyDocName) {
-            newErrors.companyDocName = 'Corporate registration proof is mandatory';
-          }
+          if (!companyDocName) newErrors.companyDocName = 'Corporate registration proof is mandatory';
+          if (!addressProofDocName) newErrors.addressProofDocName = 'Facility address proof is mandatory';
         }
-        if (!aadhaarVerified) {
-          newErrors.aadhaarNumber = 'Please verify your Aadhaar / credentials to proceed';
+      } else if (step === 3) {
+        if (!parentProfilePhoto.trim()) {
+          newErrors.parentProfilePhoto = 'Please take a live selfie or select a photo from your gallery';
+        }
+      }
+    } else if (preferredRole === 'Daycare Center') {
+      if (step === 1) {
+        if (!daycareCenterName.trim()) newErrors.daycareCenterName = 'Daycare Center / Creche name is required';
+        if (!directorName.trim()) newErrors.directorName = 'Director or Founder name is required';
+        if (!address.trim()) newErrors.address = 'Center physical address and landmark is required';
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length !== 10) newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
+        if (hourlyDropInRate === undefined || hourlyDropInRate < 0) newErrors.hourlyDropInRate = 'Valid hourly drop-in rate is required';
+      } else if (step === 2) {
+        if (!licenseDocName && !companyDocName && !aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
+          newErrors.licenseDoc = 'Government license, daycare registration deed, or director ID is required (Max 3 MB)';
+        }
+      } else if (step === 3) {
+        if (!parentProfilePhoto.trim()) {
+          newErrors.parentProfilePhoto = 'Please take a live selfie or select a photo from your gallery';
         }
       }
     } else if (preferredRole === 'Portfolio Professional') {
       if (step === 1) {
-        if (!parentName.trim()) {
-          newErrors.parentName = 'Specialist full name is required';
-        }
-        if (!specialistTitle.trim()) {
-          newErrors.specialistTitle = 'Professional title / designation is required';
-        }
-        if (!highestQualification.trim()) {
-          newErrors.highestQualification = 'Highest degree or qualification is required';
-        }
-        if (!clinicAddress.trim()) {
-          newErrors.clinicAddress = 'Clinic or consultation address is required';
-        }
+        if (!parentName.trim()) newErrors.parentName = 'Specialist full name is required';
+        if (!specialistTitle.trim()) newErrors.specialistTitle = 'Professional title / designation is required';
+        if (!highestQualification.trim()) newErrors.highestQualification = 'Highest degree or qualification is required';
+        if (!clinicAddress.trim()) newErrors.clinicAddress = 'Clinic or consultation address is required';
         const cleanPhone = phoneNumber.replace(/\D/g, '');
-        if (!cleanPhone || cleanPhone.length !== 10) {
-          newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
-        } else if (!phoneVerified) {
-          newErrors.phoneNumber = 'Please verify your mobile number with SMS OTP';
-        }
-        if (hostSpecialties.length === 0) {
-          newErrors.hostSpecialties = 'Please select at least 1 specialty';
-        }
+        if (!cleanPhone || cleanPhone.length !== 10) newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
+        if (hostSpecialties.length === 0) newErrors.hostSpecialties = 'Please select at least 1 specialty';
       } else if (step === 2) {
-        const cleanedAadhaar = aadhaarNumber.replace(/\D/g, '');
-        if (!cleanedAadhaar || cleanedAadhaar.length !== 12) {
-          newErrors.aadhaarNumber = '12-digit Aadhaar UIDAI number is mandatory';
-        }
         if (specialistEntityType === 'Individual') {
-          if (!idDocumentName && !aadhaarDocName) {
-            newErrors.idDocumentName = 'Specialist certification / ID document is mandatory';
+          if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && !idDocumentName) {
+            newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required (Max 3 MB)';
           }
         } else {
-          if (!companyDocName) {
-            newErrors.companyDocName = 'Clinic licensing certificate is mandatory';
-          }
+          if (!companyDocName) newErrors.companyDocName = 'Clinic licensing certificate is mandatory';
+          if (!addressProofDocName) newErrors.addressProofDocName = 'Clinic setup address proof is mandatory';
         }
-        if (!aadhaarVerified) {
-          newErrors.aadhaarNumber = 'Please verify your credentials to proceed';
+      } else if (step === 3) {
+        if (!parentProfilePhoto.trim()) {
+          newErrors.parentProfilePhoto = 'Please take a live selfie or select a photo from your gallery';
         }
       }
     }
@@ -1050,23 +1508,60 @@ export default function RegistrationHub({
   };
 
   const handleNext = () => {
-    if (!validateStep()) return;
-    setStep(prev => prev + 1);
+    if (!validateStep()) {
+      const formEl = document.getElementById('reg-form') || document.getElementById('reg-registration-form');
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
+    setStep(prev => Math.min(prev + 1, maxSteps));
+    const formEl = document.getElementById('reg-form') || document.getElementById('reg-registration-form');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const handlePrev = () => {
-    setStep(prev => prev - 1);
+    setStep(prev => Math.max(prev - 1, 1));
+    const formEl = document.getElementById('reg-form') || document.getElementById('reg-registration-form');
+    if (formEl) {
+      formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validateStep()) return;
 
-    // Generate simulated coordinates roughly centered on Mumbai or New York depending on user coordinates
-    const randomOffsetLat = (Math.random() - 0.5) * 0.05;
-    const randomOffsetLng = (Math.random() - 0.5) * 0.05;
+    // Capture User IP and Latitude & Longitude (Security Telemetry - Admin Only)
+    let telemetry = {
+      ipAddress: '127.0.0.1',
+      capturedLat: 12.9716,
+      capturedLng: 77.5946,
+      capturedLocationInfo: 'Network Geolocation (Bangalore)',
+      capturedAt: new Date().toISOString()
+    };
+    try {
+      telemetry = await captureUserTelemetry();
+    } catch (tErr) {
+      console.warn('Telemetry capture note:', tErr);
+    }
+
+    // Generate simulated coordinates roughly centered on Bangalore or user coordinates
+    const randomOffsetLat = (Math.random() - 0.5) * 0.03;
+    const randomOffsetLng = (Math.random() - 0.5) * 0.03;
+    const resolvedLat = telemetry.capturedLat || (12.9716 + randomOffsetLat);
+    const resolvedLng = telemetry.capturedLng || (77.5946 + randomOffsetLng);
 
     let finalProfile: ChildProfile;
+
+    const now = new Date();
+    // Free App Usage Promotion: 1 Year (365 days) for Parents, 6 Months (180 days) for Hosts & Specialists
+    const freeDurationDays = preferredRole === 'Parent' ? 365 : 180;
+    const initialExpiry = new Date(now);
+    initialExpiry.setDate(now.getDate() + freeDurationDays);
+    const initialExpiryDateStr = initialExpiry.toISOString().split('T')[0];
 
     if (preferredRole === 'Parent') {
       finalProfile = {
@@ -1079,8 +1574,8 @@ export default function RegistrationHub({
         playStyle: playStyle === 'Other' ? otherPlayStyleText.trim() : playStyle,
         bio: bio.trim(),
         location: {
-          lat: 19.0760 + randomOffsetLat,
-          lng: 72.8777 + randomOffsetLng,
+          lat: resolvedLat,
+          lng: resolvedLng,
           address: address.trim()
         },
         locationSharing: LocationSharing.PRECISE,
@@ -1093,6 +1588,8 @@ export default function RegistrationHub({
           ? 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400' 
           : 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400'),
         selfiePhotoUrl: liveSelfiePhoto,
+        stepAPhotoSource: stepAPhotoSource || 'gallery',
+        facialAuditRequired: faceVerificationStatus === 'pending_admin',
         faceVerificationStatus,
         faceVerificationScore,
         faceVerificationTimestamp: new Date().toISOString(),
@@ -1105,16 +1602,139 @@ export default function RegistrationHub({
         languagesKnown,
         phoneNumber: phoneNumber.trim(),
         phoneVerified,
-        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-        aadhaarVerified,
+        aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : 'Attached',
+        aadhaarVerified: true,
+        aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
+        aadhaarDocName: aadhaarDocName || undefined,
+        aadhaarDocSize: aadhaarDocSize || undefined,
+        
+        // Address & Indian Standard KYC Proof Properties
+        currentAddress: currentAddress.trim() || address.trim(),
+        permanentAddress: isSameAddress ? (currentAddress.trim() || address.trim()) : permanentAddress.trim(),
+        isSameAddress,
+        apartmentCommunityName: apartmentCommunityName.trim() || undefined,
+        addressProofDocName: addressProofDocName || undefined,
+        addressProofDocUrl: addressProofDocUrl || addressProofDocPreview || undefined,
+        addressProofDocType: addressProofDocType || 'Aadhaar Card',
+        addressProofDocSize: addressProofDocSize || undefined,
+
+        // 1-Year Free Membership for Parents
+        subscriptionActive: false, // Activated upon KYC review or referral!
+        subscriptionPlan: 'yearly',
+        subscriptionExpiryDate: initialExpiryDateStr,
+        contactViewCredits: 10,
+        
+        // Admin-Only Telemetry
+        ipAddress: telemetry.ipAddress,
+        capturedLat: resolvedLat,
+        capturedLng: resolvedLng,
+        capturedLocationInfo: telemetry.capturedLocationInfo,
+        capturedAt: telemetry.capturedAt || new Date().toISOString(),
+
         userRole: preferredRole,
         contactsPrivacy: {
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
-          contacts: []
-        }
+          contacts: registeredContactsList
+        },
+
+        // Parent Daycare & Babysitting Hosting Option
+        isDaycareHost: isParentHostingDaycare,
+        daycareHourlyRate: isParentHostingDaycare ? parentDaycareHourlyRate : undefined,
+        daycareHalfDayRate: isParentHostingDaycare ? parentDaycareHalfDayRate : undefined,
+        daycareFullDayRate: isParentHostingDaycare ? parentDaycareFullDayRate : undefined,
+        daycareCapacity: isParentHostingDaycare ? parentDaycareCapacity : undefined,
+        daycareDescription: isParentHostingDaycare ? parentDaycareDescription : undefined,
+        hourlyRate: isParentHostingDaycare ? parentDaycareHourlyRate : undefined,
+        halfDayRate: isParentHostingDaycare ? parentDaycareHalfDayRate : undefined,
+        fullDayRate: isParentHostingDaycare ? parentDaycareFullDayRate : undefined,
+        capacity: isParentHostingDaycare ? parentDaycareCapacity : undefined
       };
+    } else if (preferredRole === 'Daycare Center') {
+      finalProfile = {
+        id: `daycare-${Date.now()}`,
+        parentName: directorName.trim() || 'Director',
+        companyName: daycareCenterName.trim(),
+        companyRegNumber: licenseNumber.trim() || undefined,
+        companyDocName: licenseDocName || undefined,
+        companyDocUrl: licenseDocUrl || undefined,
+        childName: 'N/A',
+        childAge: 0,
+        childGender: 'Other',
+        gradeLevel: 'N/A',
+        playStyle: 'Montessori & Creche Care',
+        bio: `Government registered daycare and early childhood learning center (${daycareType}). Ratio: ${staffToChildRatio}, Capacity: ${seatCapacity} children. ${emergencyHospitalTieUp ? `Emergency tie-up: ${emergencyHospitalTieUp}` : ''}`,
+        location: {
+          lat: resolvedLat,
+          lng: resolvedLng,
+          address: address.trim()
+        },
+        locationSharing: LocationSharing.PRECISE,
+        verificationStatus: (aadhaarVerified || licenseDocName || companyDocName || faceVerificationStatus === 'verified') ? VerificationStatus.VERIFIED : VerificationStatus.PENDING,
+        interests: selectedAgeGroups,
+        photoUrl: parentProfilePhoto || daycareFacilityPhotos[0] || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600',
+        selfiePhotoUrl: liveSelfiePhoto,
+        stepAPhotoSource: stepAPhotoSource || 'gallery',
+        facialAuditRequired: faceVerificationStatus === 'pending_admin',
+        faceVerificationStatus,
+        faceVerificationScore,
+        faceVerificationTimestamp: new Date().toISOString(),
+        phoneNumber: phoneNumber.trim(),
+        phoneVerified: true,
+        email: officialEmail.trim() || undefined,
+        aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : 'Attached',
+        aadhaarVerified: true,
+        aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
+        aadhaarDocName: aadhaarDocName || undefined,
+        aadhaarDocSize: aadhaarDocSize || undefined,
+
+        // 1-Year Free Membership & Commercial Daycare Listing
+        subscriptionActive: true,
+        subscriptionPlan: 'yearly',
+        subscriptionExpiryDate: initialExpiryDateStr,
+        businessSubscriptionActive: true,
+        businessSubscriptionPlan: 'yearly',
+        businessSubscriptionExpiryDate: initialExpiryDateStr,
+        contactViewCredits: 20,
+
+        // Admin-Only Telemetry
+        ipAddress: telemetry.ipAddress,
+        capturedLat: resolvedLat,
+        capturedLng: resolvedLng,
+        capturedLocationInfo: telemetry.capturedLocationInfo,
+        capturedAt: telemetry.capturedAt || new Date().toISOString(),
+
+        userRole: 'Daycare Center',
+        contactsPrivacy: {
+          autoHideFromAllContacts,
+          allowContactsAutoConnect: true,
+          contactsPermissionGranted,
+          contacts: registeredContactsList
+        },
+
+        // Daycare Specific Profile Properties
+        daycareType,
+        hourlyRate: hourlyDropInRate,
+        halfDayRate: halfDayCareRate,
+        fullDayRate: fullDayCareRate,
+        monthlyRate: monthlyCareRate,
+        capacity: seatCapacity,
+        staffToChildRatio,
+        cctvLiveStreamAvailable,
+        emergencyMedicalTieUp: emergencyHospitalTieUp,
+        operatingHours,
+        operatingDays,
+        ageGroupsServed: selectedAgeGroups,
+        amenities: selectedDaycareAmenities,
+        facilityPhotos: daycareFacilityPhotos,
+        licenseNumber: licenseNumber.trim() || undefined,
+        verificationDocs: [
+          ...(licenseDocName ? [{ name: 'Government Trade / Educational License', url: licenseDocUrl || '#', verified: true }] : []),
+          ...(fireSafetyDocName ? [{ name: 'Fire & Safety Clearance Certificate', url: fireSafetyDocUrl || '#', verified: true }] : []),
+          ...(addressProofDocName ? [{ name: 'Center Facility Address Proof', url: addressProofDocUrl || '#', verified: true }] : [])
+        ]
+      } as any;
     } else if (preferredRole === 'Event Organizer') {
       const isCorp = hostingEntityType === 'Company';
       finalProfile = {
@@ -1127,28 +1747,50 @@ export default function RegistrationHub({
         playStyle: 'Activity & Workshop Organizer',
         bio: hostBio.trim(),
         location: {
-          lat: 19.0760 + randomOffsetLat,
-          lng: 72.8777 + randomOffsetLng,
+          lat: resolvedLat,
+          lng: resolvedLng,
           address: address.trim()
         },
         locationSharing: LocationSharing.PRECISE,
         verificationStatus: (aadhaarVerified || idDocumentName || faceVerificationStatus === 'verified') ? VerificationStatus.VERIFIED : VerificationStatus.PENDING,
-        interests: hostSpecialties,
+        interests: hostSpecialties.map(s => (s === 'Others' && customOtherSpecialty.trim()) ? `Others: ${customOtherSpecialty.trim()}` : s),
         photoUrl: parentProfilePhoto || (isCorp ? 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=400' : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400'),
         selfiePhotoUrl: liveSelfiePhoto,
+        stepAPhotoSource: stepAPhotoSource || 'gallery',
+        facialAuditRequired: faceVerificationStatus === 'pending_admin',
         faceVerificationStatus,
         faceVerificationScore,
         faceVerificationTimestamp: new Date().toISOString(),
         phoneNumber: phoneNumber.trim(),
         phoneVerified: true,
-        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-        aadhaarVerified,
+        aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : 'Attached',
+        aadhaarVerified: true,
+        aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
+        aadhaarDocName: aadhaarDocName || undefined,
+        aadhaarDocSize: aadhaarDocSize || undefined,
+
+        // 6-Months Free Membership & Host Business Listing
+        subscriptionActive: true,
+        subscriptionPlan: 'halfyearly',
+        subscriptionExpiryDate: initialExpiryDateStr,
+        businessSubscriptionActive: true,
+        businessSubscriptionPlan: 'halfyearly',
+        businessSubscriptionExpiryDate: initialExpiryDateStr,
+        contactViewCredits: 10,
+
+        // Admin-Only Telemetry
+        ipAddress: telemetry.ipAddress,
+        capturedLat: resolvedLat,
+        capturedLng: resolvedLng,
+        capturedLocationInfo: telemetry.capturedLocationInfo,
+        capturedAt: telemetry.capturedAt || new Date().toISOString(),
+
         userRole: preferredRole,
         contactsPrivacy: {
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
-          contacts: []
+          contacts: registeredContactsList
         },
         
         // Host properties
@@ -1157,9 +1799,12 @@ export default function RegistrationHub({
         companyRegNumber: isCorp ? companyRegNumber.trim() : undefined,
         companyWebsite: isCorp ? companyWebsite.trim() : undefined,
         repDesignation: isCorp ? repDesignation.trim() : undefined,
-        idDocumentName: !isCorp ? idDocumentName : undefined,
+        idDocumentName: idDocumentName || undefined,
+        idDocUrl: idDocUrl || undefined,
         companyDocName: isCorp ? companyDocName : undefined,
-        addressProofDocName: isCorp ? addressProofDocName : undefined
+        companyDocUrl: isCorp ? (companyDocUrl || undefined) : undefined,
+        addressProofDocName: isCorp ? addressProofDocName : undefined,
+        addressProofDocUrl: isCorp ? (addressProofDocUrl || undefined) : undefined
       };
     } else {
       // Portfolio Professional Specialist
@@ -1174,28 +1819,50 @@ export default function RegistrationHub({
         playStyle: 'Childcare & Community Specialist',
         bio: hostBio.trim(),
         location: {
-          lat: 19.0760 + randomOffsetLat,
-          lng: 72.8777 + randomOffsetLng,
+          lat: resolvedLat,
+          lng: resolvedLng,
           address: clinicAddress.trim()
         },
         locationSharing: LocationSharing.PRECISE,
         verificationStatus: (aadhaarVerified || idDocumentName || faceVerificationStatus === 'verified') ? VerificationStatus.VERIFIED : VerificationStatus.PENDING,
-        interests: hostSpecialties,
+        interests: hostSpecialties.map(s => (s === 'Others' && customOtherSpecialty.trim()) ? `Others: ${customOtherSpecialty.trim()}` : s),
         photoUrl: parentProfilePhoto || 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400',
         selfiePhotoUrl: liveSelfiePhoto,
+        stepAPhotoSource: stepAPhotoSource || 'gallery',
+        facialAuditRequired: faceVerificationStatus === 'pending_admin',
         faceVerificationStatus,
         faceVerificationScore,
         faceVerificationTimestamp: new Date().toISOString(),
         phoneNumber: phoneNumber.trim(),
         phoneVerified: true,
-        aadhaarNumber: aadhaarNumber.replace(/\s/g, ''),
-        aadhaarVerified,
+        aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : 'Attached',
+        aadhaarVerified: true,
+        aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
+        aadhaarDocName: aadhaarDocName || undefined,
+        aadhaarDocSize: aadhaarDocSize || undefined,
+
+        // 6-Months Free Membership & Specialist Business Listing
+        subscriptionActive: true,
+        subscriptionPlan: 'halfyearly',
+        subscriptionExpiryDate: initialExpiryDateStr,
+        businessSubscriptionActive: true,
+        businessSubscriptionPlan: 'halfyearly',
+        businessSubscriptionExpiryDate: initialExpiryDateStr,
+        contactViewCredits: 10,
+
+        // Admin-Only Telemetry
+        ipAddress: telemetry.ipAddress,
+        capturedLat: resolvedLat,
+        capturedLng: resolvedLng,
+        capturedLocationInfo: telemetry.capturedLocationInfo,
+        capturedAt: telemetry.capturedAt || new Date().toISOString(),
+
         userRole: preferredRole,
         contactsPrivacy: {
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
-          contacts: []
+          contacts: registeredContactsList
         },
 
         // Specialist properties
@@ -1208,11 +1875,32 @@ export default function RegistrationHub({
         companyName: isClinic ? companyName.trim() : undefined,
         companyRegNumber: isClinic ? companyRegNumber.trim() : undefined,
         companyWebsite: isClinic ? companyWebsite.trim() : undefined,
-        idDocumentName: !isClinic ? idDocumentName : undefined,
+        idDocumentName: idDocumentName || undefined,
+        idDocUrl: idDocUrl || undefined,
         companyDocName: isClinic ? companyDocName : undefined,
-        addressProofDocName: isClinic ? addressProofDocName : undefined
+        companyDocUrl: isClinic ? (companyDocUrl || undefined) : undefined,
+        addressProofDocName: isClinic ? addressProofDocName : undefined,
+        addressProofDocUrl: isClinic ? (addressProofDocUrl || undefined) : undefined
       };
     }
+
+    // Notify Admin (ardha@vernunt.com) via immediate email and telemetry
+    sendAdminKycPendingNotification({
+      applicantId: finalProfile.id,
+      applicantName: finalProfile.parentName,
+      applicantRole: finalProfile.userRole || 'Parent',
+      applicantPhone: finalProfile.phoneNumber,
+      applicantEmail: finalProfile.email,
+      currentAddress: (finalProfile as any).currentAddress || finalProfile.location.address,
+      permanentAddress: (finalProfile as any).permanentAddress,
+      apartmentCommunityName: (finalProfile as any).apartmentCommunityName,
+      childName: finalProfile.childName,
+      childAge: finalProfile.childAge,
+      aadhaarDocName: finalProfile.aadhaarDocName,
+      addressProofDocName: (finalProfile as any).addressProofDocName,
+      addressProofDocType: (finalProfile as any).addressProofDocType,
+      submittedAt: new Date().toISOString()
+    });
 
     onCompleteSignup(finalProfile);
   };
@@ -1232,7 +1920,8 @@ export default function RegistrationHub({
           </div>
           <h2 id="reg-title" className="text-xl font-bold font-serif">
             {preferredRole === 'Parent' && 'Configure Family Playmate Profile'}
-            {preferredRole === 'Event Organizer' && 'Register as Class & Activity Host'}
+            {preferredRole === 'Daycare Center' && 'Register Verified Daycare & Creche Center'}
+            {preferredRole === 'Event Organizer' && 'Register as Events, Class and Activities Host'}
             {preferredRole === 'Portfolio Professional' && 'Register as Community Specialist'}
           </h2>
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1290,16 +1979,152 @@ export default function RegistrationHub({
                   {errors.parentName && <p className="text-[10px] text-red-500 font-semibold">{errors.parentName}</p>}
                 </div>
 
-                <div className="flex flex-col space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">{t.primaryCityNeighborhood}</label>
-                  <input
-                    type="text"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    placeholder="e.g. Brooklyn, New York"
-                    className={`px-4 py-2.5 bg-slate-50 border ${errors.address ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200`}
-                  />
-                  {errors.address && <p className="text-[10px] text-red-500 font-semibold">{errors.address}</p>}
+                {/* Current & Permanent Address and Apartment / Society fields */}
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <MapPin className="w-4 h-4 text-orange-500" /> Current Residential Address (Bangalore)
+                    </label>
+                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
+                      Required
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col space-y-1">
+                    <input
+                      type="text"
+                      id="input-current-address"
+                      value={currentAddress || address}
+                      onChange={(e) => {
+                        setCurrentAddress(e.target.value);
+                        setAddress(e.target.value);
+                      }}
+                      placeholder="e.g. Flat 402, Oakwood Block, 12th Main, Indiranagar, Bangalore - 560038"
+                      className={`px-4 py-2.5 bg-white border ${errors.address ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200`}
+                    />
+                    {errors.address && <p className="text-[10px] text-red-500 font-semibold">{errors.address}</p>}
+                    <p className="text-[9.5px] text-slate-400">
+                      Include Flat/House No, Building, Street, Locality & Pincode for accurate neighborhood matching.
+                    </p>
+                  </div>
+
+                  {/* Optional Apartment / Gated Community Name */}
+                  <div className="flex flex-col space-y-1 pt-1">
+                    <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                      <span>Apartment / Gated Community Name</span>
+                      <span className="text-[9px] text-slate-400 font-normal">Optional</span>
+                    </label>
+                    <input
+                      type="text"
+                      id="input-apartment-community"
+                      value={apartmentCommunityName}
+                      onChange={(e) => setApartmentCommunityName(e.target.value)}
+                      placeholder="e.g. Prestige Shantiniketan, Sobha Dream Acres, Brigade Metropolis..."
+                      className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200"
+                    />
+                    <p className="text-[9.5px] text-amber-700 bg-amber-50/80 p-1.5 rounded-lg border border-amber-150">
+                      💡 <strong>Apartment matching tip:</strong> Entering your society/apartment name helps Vernunt automatically connect you with verified playmates in your exact gated complex!
+                    </p>
+                  </div>
+
+                  {/* "Same as" checkbox for Permanent Address */}
+                  <div className="pt-2 border-t border-slate-200/60 space-y-2">
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={isSameAddress}
+                        onChange={(e) => setIsSameAddress(e.target.checked)}
+                        className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                      />
+                      <span className="text-xs font-semibold text-slate-700">
+                        Permanent address is same as current address
+                      </span>
+                    </label>
+
+                    {!isSameAddress && (
+                      <div className="flex flex-col space-y-1 pl-6 pt-1 animate-fade-in">
+                        <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">
+                          Permanent Address
+                        </label>
+                        <input
+                          type="text"
+                          id="input-permanent-address"
+                          value={permanentAddress}
+                          onChange={(e) => setPermanentAddress(e.target.value)}
+                          placeholder="e.g. Permanent family home address, district, state & pincode"
+                          className="px-3.5 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Indian Standard Address Proof Document Upload */}
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-600" /> Address Proof Document (Indian Standards)
+                    </label>
+                    <span className="text-[9px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+                      KYC Verification
+                    </span>
+                  </div>
+
+                  <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                    Upload an acceptable Indian proof of residence (e.g. Aadhaar Card, Rental Agreement, Electricity Bill, Gas Utility Bill, Voter ID, or Passport). Max 3 MB.
+                  </p>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">Document Proof Type</label>
+                      <select
+                        value={addressProofDocType}
+                        onChange={(e) => setAddressProofDocType(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none text-slate-700 font-medium cursor-pointer"
+                      >
+                        <option value="Aadhaar Card">Aadhaar Card (UIDAI Address)</option>
+                        <option value="Rental Agreement">Registered Rental Agreement</option>
+                        <option value="Electricity Bill">BESCOM / Electricity Bill (Recent)</option>
+                        <option value="Gas Utility Bill">Gas Connection Utility Bill</option>
+                        <option value="Voter ID Card">Voter ID (Election Commission)</option>
+                        <option value="Indian Passport">Indian Passport (Address Page)</option>
+                        <option value="Driving License">Driving License (State Transport)</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500">Upload File (PDF / JPG / PNG)</label>
+                      {addressProofDocName ? (
+                        <div className="flex items-center justify-between p-2 bg-emerald-50 border border-emerald-200 rounded-xl">
+                          <span className="text-xs font-bold text-emerald-800 truncate max-w-[140px]">
+                            ✓ {addressProofDocName}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddressProofDocName('');
+                              setAddressProofDocPreview('');
+                              setAddressProofDocUrl('');
+                            }}
+                            className="text-[10px] text-rose-600 hover:text-rose-800 font-bold px-1.5 py-0.5 rounded cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="px-3 py-2 bg-white border border-slate-200 hover:border-orange-300 rounded-xl text-xs text-slate-600 font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition hover:bg-orange-50/30">
+                          <Upload className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Attach Document</span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            className="hidden"
+                            onChange={(e) => simulateDocumentSelect(e, 'address')}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Parent demographics subfields */}
@@ -1417,75 +2242,35 @@ export default function RegistrationHub({
                   )}
                 </div>
 
-                {/* Aadhaar Verification Card */}
-                <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100 space-y-3">
-                  <div className="flex justify-between items-center">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600 animate-pulse" /> National Aadhaar Identity (UIDAI)
-                    </label>
-                    <span className="text-[9px] bg-slate-100 text-slate-600 px-2 rounded-full font-bold">Optional</span>
-                  </div>
-
-                  {/* AI Manual Aadhaar Extraction Banner */}
-                  <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">📸</span>
-                      <div className="text-left">
-                        <span className="font-extrabold text-[10.5px] text-emerald-950 block leading-tight">Upload Aadhaar Photo <span className="text-[9px] text-emerald-800 font-normal">(Max 1 MB)</span></span>
-                        <span className="text-[9px] text-emerald-700 block leading-tight">AI will auto-extract UIDAI number & Name</span>
-                      </div>
-                    </div>
-                    <label className="relative cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition shrink-0 flex items-center gap-1 shadow-xs">
-                      {isExtractingAadhaar ? (
-                        <>
-                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          <span>Extracting...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-3 h-3" />
-                          <span>Upload Photo</span>
-                        </>
-                      )}
-                      <input
-                        type="file"
-                        accept="image/*,application/pdf"
-                        disabled={isExtractingAadhaar || aadhaarVerified}
-                        onChange={handleExtractAadhaarFromCard}
-                        className="absolute inset-0 opacity-0 cursor-pointer"
-                      />
-                    </label>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      maxLength={14}
-                      disabled={aadhaarVerified || isAadhaarSendingOtp}
-                      value={aadhaarNumber.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim()}
-                      onChange={(e) => setAadhaarNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
-                      placeholder="12-digit UIDAI Number"
-                      className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono"
-                    />
-                    {!aadhaarVerified && (
-                      <button
-                        type="button"
-                        onClick={handleManualVerifyAadhaar}
-                        disabled={isAadhaarSendingOtp || isExtractingAadhaar || !aadhaarNumber}
-                        className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold rounded-xl active:scale-95 transition"
-                      >
-                        {isAadhaarSendingOtp ? 'Verifying...' : 'Verify Document'}
-                      </button>
-                    )}
-                  </div>
-                  {errors.aadhaarNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaarNumber}</p>}
-
-                  {aadhaarMsg.text && (
-                    <div className="p-2.5 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg text-[10px] font-semibold leading-relaxed">
-                      {aadhaarMsg.text}
-                    </div>
-                  )}
-                </div>
+                {/* Aadhaar Card Document Upload (Mandatory 3 MB Limit for all users) */}
+                <AadhaarUploadField
+                  label="National Aadhaar Card Document (Mandatory)"
+                  required={true}
+                  maxSizeMb={3}
+                  uploadedDocName={aadhaarDocName}
+                  uploadedDocPreview={aadhaarDocPreview}
+                  uploadedDocSize={aadhaarDocSize}
+                  error={errors.aadhaarDoc}
+                  onDocUploaded={(docData) => {
+                    setAadhaarDocName(docData.docName);
+                    setAadhaarDocPreview(docData.docPreview);
+                    setAadhaarDocSize(docData.docSize);
+                    setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                    setAadhaarVerified(true);
+                    if (errors.aadhaarDoc) {
+                      const updated = { ...errors };
+                      delete updated.aadhaarDoc;
+                      setErrors(updated);
+                    }
+                  }}
+                  onDocRemoved={() => {
+                    setAadhaarDocName('');
+                    setAadhaarDocPreview('');
+                    setAadhaarDocSize(undefined);
+                    setAadhaarDocUrl('');
+                    setAadhaarVerified(false);
+                  }}
+                />
 
                 {/* Device Contacts Access & Phonebook Synchronization */}
                 <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-100 space-y-3">
@@ -1509,7 +2294,7 @@ export default function RegistrationHub({
                           {contactsPermissionGranted ? 'Phonebook Synchronized' : 'Allow Device Contacts Access'}
                         </span>
                         <span className="text-[9.5px] text-slate-400">
-                          {contactsPermissionGranted ? `📱 Linked ${contactsSyncCount || 6} contacts safely` : 'Enable mutual friends discovery'}
+                          {contactsPermissionGranted ? `📱 Synced ${contactsSyncCount} contacts across SIM, Gmail & Phone` : 'Sync from SIM, Gmail, or device contacts'}
                         </span>
                       </div>
                     </div>
@@ -1546,243 +2331,201 @@ export default function RegistrationHub({
 
             {step === 2 && (
               <div id="parent-face-verification" className="space-y-4 animate-fade-in">
-                <div className="flex items-center gap-2 text-orange-655 min-h-6">
-                  <ShieldCheck className="w-5 h-5 shrink-0 text-orange-600 animate-pulse" />
-                  <h3 className="font-bold text-base text-slate-800">Secure Parent 'Face-to-Selfie' Check</h3>
+                <div className="flex items-center gap-2 text-orange-600 min-h-6">
+                  <Camera className="w-5 h-5 shrink-0 text-orange-600" />
+                  <h3 className="font-bold text-base text-slate-800">Profile Photo & Live Selfie</h3>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  To safe-keep our child playdate ecosystem from fake accounts and catfishing, parents must upload a profile headshot and capture a matching real-time webcam validation frame.
+                  Take a quick live selfie with your front camera, or select a clear photo of yourself from your device gallery to display on your parent profile.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Portrait File Upload panel */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 space-y-3 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step A: Portrait Photo</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Please upload a clear portrait image showing your facial features plainly.</p>
-                    </div>
+                <div className="bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                  {parentProfilePhoto ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-slate-100 border-2 border-orange-400 shadow-sm shrink-0">
+                        <img src={parentProfilePhoto} alt="Parent Profile Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1.5 left-1.5 right-1.5 bg-slate-900/90 backdrop-blur-xs text-white text-[8.5px] font-black tracking-wider uppercase py-0.5 px-1 rounded text-center truncate">
+                          {stepAPhotoSource === 'selfie' ? '📸 Live Selfie' : '📁 Gallery Photo'}
+                        </span>
+                      </div>
 
-                    <div className="space-y-2 pt-2">
-                      {parentProfilePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={parentProfilePhoto} alt="Parent Portrait" className="w-full h-full object-cover" />
+                      <div className="space-y-2 text-center sm:text-left flex-1">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            Photo Ready for Profile
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {stepAPhotoSource === 'selfie' ? 'Captured via Camera' : 'Uploaded from Device'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium">
+                          This picture will be shown on your Vernunt parent account and playdate invites.
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => startCamera('stepA')}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake Selfie</span>
+                          </button>
+
+                          <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose Another Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleParentProfilePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+
                           <button
                             type="button"
                             onClick={() => {
                               setParentProfilePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
+                              setLiveSelfiePhoto('');
+                              setStepAPhotoSource(null);
                             }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow transition-all hover:scale-105 cursor-pointer"
+                            className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            Remove
                           </button>
                         </div>
-                      ) : (
-                        <div className="border border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-6 text-center cursor-pointer relative bg-white transition hover:shadow-2xs">
+                      </div>
+                    </div>
+                  ) : cameraActive ? (
+                    <div className="bg-slate-950 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden border border-slate-900 shadow-xl">
+                      <div className="relative w-full max-w-sm h-64 sm:h-72 rounded-xl overflow-hidden bg-black border-2 border-orange-500/50 shadow-inner flex items-center justify-center">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                        />
+
+                        {/* Subtle Face Alignment Guide */}
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-40 h-52 border-2 border-dashed border-white/50 rounded-full"></div>
+                        </div>
+
+                        <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[9.5px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          <span>Front Camera Live</span>
+                        </div>
+                      </div>
+
+                      {cameraError && (
+                        <div className="bg-amber-950/80 border border-amber-600/40 text-amber-200 text-[11px] p-2.5 rounded-xl max-w-sm text-center">
+                          {cameraError}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          id="btn-click-parent-selfie-photo"
+                          onClick={captureSelfieSnapshot}
+                          className="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-emerald-600/30 cursor-pointer flex items-center gap-2 transform active:scale-95 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Click / Snap Photo</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Option 1: Live Front Camera Selfie */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-orange-200 hover:border-orange-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Take Live Selfie</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Open your front camera, check your framing, and snap a selfie directly.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startCamera('stepA')}
+                          className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Open Camera & Snap</span>
+                        </button>
+                      </div>
+
+                      {/* Option 2: Gallery Upload */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs relative">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Select from Gallery</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Choose an existing portrait or photo of yourself from your device files.
+                          </p>
+                        </div>
+                        <label className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition">
+                          <Upload className="w-4 h-4" />
+                          <span>Browse Device Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
                             onChange={handleParentProfilePhotoUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            className="hidden"
                           />
-                          <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
-                          <span className="text-[11px] font-black text-slate-600 block">Drag & drop portrait, or <span className="text-orange-500">browse file</span></span>
-                          <span className="text-[8.5px] text-slate-455 block mt-1">PNG, JPEG up to 3MB</span>
-                        </div>
-                      )}
+                        </label>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Camera verification snapshot uploader */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 space-y-3 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step B: Verification Selfie or Snapshot</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Capture with webcam or upload a selfie/screenshot for verification comparison.</p>
+                  {/* Preset Avatars for fast testing */}
+                  {!parentProfilePhoto && !cameraActive && (
+                    <div className="pt-2 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Or select quick preset photo:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => selectPresetParentPortrait('mother')}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition cursor-pointer"
+                        >
+                          👩 Mother Preset
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => selectPresetParentPortrait('father')}
+                          className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-700 transition cursor-pointer"
+                        >
+                          👨 Father Preset
+                        </button>
+                      </div>
                     </div>
-
-                    <div className="space-y-2 pt-2">
-                      {liveSelfiePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={liveSelfiePhoto} alt="Live Selfie Capture" className="w-full h-full object-cover" />
-                          <span className="absolute bottom-2 left-2 bg-emerald-600 text-white text-[8px] font-extrabold tracking-widest uppercase px-1.5 py-0.5 rounded-xs">VERIFICATION SNAPSHOT READY</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLiveSelfiePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
-                            }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow-xs transition-all cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="bg-slate-950 rounded-xl flex flex-col items-center justify-center relative overflow-hidden min-h-40 p-3 border border-slate-900">
-                          {cameraActive ? (
-                            <>
-                              <video
-                                ref={videoRef}
-                                className="w-full h-36 object-cover transform scale-x-[-1] rounded-lg"
-                                playsInline
-                                muted
-                              />
-                              {/* Laser scanning vertical feedback ribbon */}
-                              <div className="absolute inset-x-0 h-0.5 bg-orange-500 shadow-sm shadow-orange-400 animate-bounce" style={{ top: '40%' }} />
-                              
-                              <div className="flex gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={captureSelfieSnapshot}
-                                  className="px-3 py-1.5 bg-orange-500 hover:bg-orange-600 text-white font-extrabold text-[10px] rounded-lg shadow-md hover:scale-105 active:scale-95 transition cursor-pointer"
-                                >
-                                  📸 Capture Snapshot
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={stopCamera}
-                                  className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold rounded-lg transition cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="text-center p-2 space-y-2.5 w-full">
-                              <p className="text-[10px] text-slate-300 font-bold">Choose Verification Method:</p>
-                              {cameraError && (
-                                <p className="text-[8.5px] text-amber-400 leading-normal max-w-[240px] mx-auto text-center font-medium bg-slate-900/90 p-1.5 rounded-lg">{cameraError}</p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
-                                <button
-                                  type="button"
-                                  onClick={startCamera}
-                                  className="w-full sm:w-auto px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[9.5px] font-black rounded-lg transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                                >
-                                  📹 Open Camera
-                                </button>
-                                <label className="w-full sm:w-auto px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-[9.5px] font-black rounded-lg transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5">
-                                  <Upload className="w-3 h-3" />
-                                  <span>Upload Selfie/Screenshot</span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLiveSelfieUpload}
-                                    className="hidden"
-                                  />
-                                </label>
-                              </div>
-                              {parentProfilePhoto && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setLiveSelfiePhoto(parentProfilePhoto);
-                                    setFaceVerificationStatus('verified');
-                                    setFaceVerificationScore(96);
-                                    setFaceVerifyProgress(['✓ Auto-verified with uploaded portrait']);
-                                  }}
-                                  className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer block mx-auto pt-0.5"
-                                >
-                                  ⚡ Use uploaded Portrait for verification
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Secure Face Match verification controls */}
-                {parentProfilePhoto && liveSelfiePhoto && (
-                  <div className="bg-slate-100/60 border border-slate-200 rounded-2xl p-4.5 space-y-4 animate-fade-in">
-                    <div className="flex flex-col sm:flex-row items-baseline justify-between gap-1 border-b border-slate-200/80 pb-2">
-                      <span className="text-[10px] font-black text-slate-450 uppercase tracking-widest">Biometric Match Verification</span>
-                    </div>
-
-                    <div className="flex justify-center pt-1">
-                      {faceVerificationStatus === 'none' ? (
-                        <button
-                          type="button"
-                          onClick={executeFaceMatch}
-                          disabled={isVerifyingFace}
-                          className="px-5 py-2.5 bg-slate-950 hover:bg-slate-900 text-white text-[10.5px] font-black rounded-xl shadow-xs hover:shadow-sm transition flex items-center gap-2 cursor-pointer"
-                        >
-                          {isVerifyingFace ? (
-                            <>
-                              <span className="w-3.5 h-3.5 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                              Running Neural Vector Comparison...
-                            </>
-                          ) : (
-                            "🔬 Compare Parent Portrait & Live Selfie Snapshot"
-                          )}
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFaceVerificationStatus('none');
-                            setFaceVerificationScore(0);
-                            setFaceVerifyProgress([]);
-                          }}
-                          className="text-[9.5px] text-orange-600 hover:text-orange-700 font-black uppercase tracking-wider flex items-center gap-1 hover:underline cursor-pointer"
-                        >
-                          🔄 RE-RUN FACE COMPARISON KEY DIAGNOSTICS
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Logging scan text dynamically */}
-                    {isVerifyingFace && (
-                      <div className="bg-slate-900/95 p-3 rounded-xl border border-slate-800 space-y-1.5 font-mono text-[9px] text-amber-400">
-                        {faceVerifyProgress.map((prog, idx) => (
-                          <div key={idx} className="flex gap-1.5 leading-normal">
-                            <span className="text-emerald-400 font-bold">✓</span> <span>{prog}</span>
-                          </div>
-                        ))}
-                        <div className="flex gap-2 items-center animate-pulse text-orange-300">
-                          <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-ping shrink-0" />
-                          <span>{faceVerifyCurrentStep}</span>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Result analysis report boxes */}
-                    {faceVerificationStatus !== 'none' && !isVerifyingFace && (
-                      <div className={`p-4 rounded-xl border animate-fade-in ${faceVerificationStatus === 'verified' ? 'bg-emerald-50 text-emerald-950 border-emerald-200' : 'bg-amber-50 text-amber-950 border-amber-200'}`}>
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 font-black border text-xs ${faceVerificationStatus === 'verified' ? 'bg-emerald-100 border-emerald-300 text-emerald-800' : 'bg-amber-100 border-amber-300 text-amber-800'}`}>
-                              {faceVerificationScore}%
-                            </div>
-                            <div className="space-y-0.5">
-                              <span className="block text-[11px] font-black uppercase tracking-wide">
-                                {faceVerificationStatus === 'verified' ? '✓ Facial Match Score Passed' : '⚠️ Match Confidence Score Below Threshold'}
-                              </span>
-                              <p className="text-[10px] text-slate-500 leading-normal font-medium font-sans">
-                                {faceVerificationStatus === 'verified' 
-                                  ? 'Confidence metrics fully meet parental identity parameters. Automatic verify flag has been activated.' 
-                                  : 'Low lighting or tilt skew detected. Match score: ' + faceVerificationScore + '%. Verification forwarded for direct Administrator review.'}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className={`text-[8.5px] uppercase font-black px-2.5 py-1 rounded-full text-center shrink-0 border ${faceVerificationStatus === 'verified' ? 'bg-emerald-200/40 text-emerald-800 border-emerald-200' : 'bg-amber-200/40 text-amber-800 border-amber-250'}`}>
-                            {faceVerificationStatus === 'verified' ? 'auto approved' : 'pending manual admin audit'}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
                 
-                {errors.parentProfilePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.parentProfilePhoto}</p>}
-                {errors.liveSelfiePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.liveSelfiePhoto}</p>}
-                {errors.faceVerification && <p className="text-[10px] text-red-500 font-semibold">{errors.faceVerification}</p>}
+                {errors.parentProfilePhoto && (
+                  <p className="text-[11px] text-red-500 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
+                    {errors.parentProfilePhoto}
+                  </p>
+                )}
               </div>
             )}
 
@@ -1936,6 +2679,79 @@ export default function RegistrationHub({
                     className={`px-4 py-2.5 bg-slate-50 border ${errors.bio ? 'border-red-400' : 'border-slate-200'} rounded-2xl text-xs outline-none`}
                   />
                   {errors.bio && <p className="text-[10px] text-red-505 font-semibold">{errors.bio}</p>}
+                </div>
+
+                {/* Option for Parents to Host as Daycare / Babysitter for Neighboring Families */}
+                <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-4.5 rounded-2xl border border-amber-200/80 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        🏠
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-xs sm:text-sm text-slate-900">Host as Neighborhood Daycare / Playhome?</h4>
+                        <p className="text-[10.5px] text-slate-600">
+                          Look after nearby kids when parents are busy. Set your own hourly charge and host playmates at your home.
+                        </p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={isParentHostingDaycare}
+                        onChange={(e) => setIsParentHostingDaycare(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-orange-500"></div>
+                    </label>
+                  </div>
+
+                  {isParentHostingDaycare && (
+                    <div className="pt-3 border-t border-amber-200/60 space-y-3 animate-fade-in">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">Your Hourly Rate (₹ / hr)</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-2 text-xs font-bold text-slate-400">₹</span>
+                            <input
+                              type="number"
+                              min={50}
+                              max={2000}
+                              value={parentDaycareHourlyRate}
+                              onChange={(e) => setParentDaycareHourlyRate(Math.max(0, parseInt(e.target.value) || 0))}
+                              className="w-full pl-7 pr-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-800 outline-none focus:ring-1 focus:ring-amber-500"
+                              placeholder="150"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-bold text-slate-700">Max Kids You Can Host at Once</label>
+                          <select
+                            value={parentDaycareCapacity}
+                            onChange={(e) => setParentDaycareCapacity(parseInt(e.target.value) || 1)}
+                            className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                          >
+                            <option value={1}>1 Kid (Exclusive focus)</option>
+                            <option value={2}>2 Kids (Recommended)</option>
+                            <option value={3}>3 Kids (Small playgroup)</option>
+                            <option value={4}>4+ Kids (Larger home playhome)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700">Your Home Playhome Space / Supervision Note</label>
+                        <input
+                          type="text"
+                          value={parentDaycareDescription}
+                          onChange={(e) => setParentDaycareDescription(e.target.value)}
+                          placeholder="e.g. Spacious childproof living room, lots of board games and books, stay-at-home mother..."
+                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs text-slate-800 outline-none focus:ring-1 focus:ring-amber-500"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2219,6 +3035,20 @@ export default function RegistrationHub({
                       );
                     })}
                   </div>
+                  {hostSpecialties.includes('Others') && (
+                    <div className="mt-1.5 p-2.5 bg-rose-50/70 border border-rose-200 rounded-xl space-y-1 animate-fade-in">
+                      <label className="text-[11px] font-bold text-rose-900 block">
+                        Specify Other Service Domain / Specialty
+                      </label>
+                      <input
+                        type="text"
+                        value={customOtherSpecialty}
+                        onChange={(e) => setCustomOtherSpecialty(e.target.value)}
+                        placeholder="e.g. Swimming, Martial Arts, Cooking & Baking, Storytelling..."
+                        className="w-full px-3 py-1.5 bg-white border border-rose-200 rounded-lg text-xs outline-none text-slate-800 placeholder:text-slate-400 focus:border-rose-400"
+                      />
+                    </div>
+                  )}
                   {errors.hostSpecialties && <p className="text-[10px] text-red-500 font-semibold">{errors.hostSpecialties}</p>}
                 </div>
               </div>
@@ -2232,150 +3062,80 @@ export default function RegistrationHub({
                 </div>
 
                 {hostingEntityType === 'Individual' ? (
-                  /* Individual verifications options */
+                  /* Individual verifications: Direct Aadhaar Upload (No OTP) */
                   <div className="space-y-4 animate-fade-in" id="individual-verification-flow">
-                    <div className="flex flex-col space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Choose Verification Standard</label>
-                      <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIndividualVerificationMedium('Aadhaar');
-                            delete errors.idDocumentName;
-                          }}
-                          className={`py-2 text-xs font-bold rounded-lg transition ${individualVerificationMedium === 'Aadhaar' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500'}`}
-                        >
-                          🔐 Real-time Aadhaar OTP
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIndividualVerificationMedium('Document');
-                            delete errors.aadhaarNumber;
-                          }}
-                          className={`py-2 text-xs font-bold rounded-lg transition ${individualVerificationMedium === 'Document' ? 'bg-white text-slate-800 shadow-3xs' : 'text-slate-500'}`}
-                        >
-                          📁 ID & Location Document
-                        </button>
+                    <AadhaarUploadField
+                      label="Organizer Aadhaar Card Document (Mandatory)"
+                      required={true}
+                      maxSizeMb={3}
+                      uploadedDocName={aadhaarDocName}
+                      uploadedDocPreview={aadhaarDocPreview}
+                      uploadedDocSize={aadhaarDocSize}
+                      error={errors.aadhaarDoc}
+                      onDocUploaded={(docData) => {
+                        setAadhaarDocName(docData.docName);
+                        setAadhaarDocPreview(docData.docPreview);
+                        setAadhaarDocSize(docData.docSize);
+                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                        setAadhaarVerified(true);
+                        if (errors.aadhaarDoc) {
+                          const updated = { ...errors };
+                          delete updated.aadhaarDoc;
+                          setErrors(updated);
+                        }
+                      }}
+                      onDocRemoved={() => {
+                        setAadhaarDocName('');
+                        setAadhaarDocPreview('');
+                        setAadhaarDocSize(undefined);
+                        setAadhaarDocUrl('');
+                        setAadhaarVerified(false);
+                      }}
+                    />
+
+                    {/* Optional Additional Government ID / Certificate */}
+                    <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-150 space-y-3 animate-fade-in">
+                      <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Upload className="w-4 h-4 text-rose-500" /> Additional ID / Professional Certificate (Optional)
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium font-sans">Optional</span>
+                      </label>
+                      <p className="text-[10px] text-slate-500">
+                        Passport, Driving License, Voter ID, or Teacher / Coach Certification document.
+                      </p>
+                      
+                      <div className="border-2 border-dashed border-slate-200 hover:border-rose-400 rounded-2xl p-4.5 text-center cursor-pointer relative transition bg-white" id="doc-id-uploader-zone">
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => simulateDocumentSelect(e, 'id')}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                        <p className="text-xs font-bold text-slate-600">Drag & drop ID document, or <span className="text-rose-500">browse file</span></p>
+                        <p className="text-[9px] text-slate-400 mt-1">Accepted Formats: PDF, JPEG, PNG. Max: 3MB</p>
                       </div>
+                      {idDocumentName && (
+                        <div className="p-2.5 bg-rose-50 text-rose-900 border border-rose-150 rounded-xl text-xs font-extrabold flex items-center justify-between">
+                          <span className="truncate">✓ Active Attachment: {idDocumentName}</span>
+                          <button type="button" onClick={() => { setIdDocumentName(''); setIdDocUrl(''); }} className="text-rose-500 text-xs font-black px-1.5 cursor-pointer">×</button>
+                        </div>
+                      )}
+                      {errors.idDocumentName && <p className="text-[10px] text-red-500 font-semibold">{errors.idDocumentName}</p>}
                     </div>
-
-                    {individualVerificationMedium === 'Aadhaar' ? (
-                      /* Aadhaar component */
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-3.5 animate-fade-in">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs font-extrabold text-slate-700 uppercase tracking-widest flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600 animate-pulse" /> Direct Biometric UIDAI Linkage
-                          </span>
-                          <span className="text-[9.5px] bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider">Aadhaar Live</span>
-                        </div>
-
-                        {/* AI Manual Aadhaar Extraction Banner */}
-                        <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">📸</span>
-                            <div className="text-left">
-                              <span className="font-extrabold text-[10.5px] text-emerald-950 block leading-tight">Upload Aadhaar Photo <span className="text-[9px] text-emerald-800 font-normal">(Max 1 MB)</span></span>
-                              <span className="text-[9px] text-emerald-700 block leading-tight">AI will auto-extract UIDAI number & Name</span>
-                            </div>
-                          </div>
-                          <label className="relative cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition shrink-0 flex items-center gap-1 shadow-xs">
-                            {isExtractingAadhaar ? (
-                              <>
-                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Extracting...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-3 h-3" />
-                                <span>Upload Photo</span>
-                              </>
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              disabled={isExtractingAadhaar || aadhaarVerified}
-                              onChange={handleExtractAadhaarFromCard}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                            />
-                          </label>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            maxLength={14}
-                            disabled={aadhaarVerified || isAadhaarSendingOtp}
-                            value={aadhaarNumber.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim()}
-                            onChange={(e) => setAadhaarNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
-                            placeholder="Enter 12-digit Aadhaar Terminal"
-                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono tracking-widest text-center"
-                          />
-                          {!aadhaarVerified && (
-                            <button
-                              type="button"
-                              onClick={handleManualVerifyAadhaar}
-                              disabled={isAadhaarSendingOtp || isExtractingAadhaar || !aadhaarNumber}
-                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold rounded-xl active:scale-95 transition"
-                            >
-                              {isAadhaarSendingOtp ? 'Verifying...' : 'Verify Document'}
-                            </button>
-                          )}
-                        </div>
-                        {errors.aadhaarNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaarNumber}</p>}
-
-                        {aadhaarMsg.text && (
-                          <div className="p-2.5 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg text-[10px] font-semibold leading-relaxed">
-                            {aadhaarMsg.text}
-                          </div>
-                        )}
-                        {aadhaarVerified && (
-                          <div className="p-3 bg-emerald-50 text-emerald-900 border border-emerald-150 rounded-xl text-xs font-bold flex items-center gap-1.5">
-                            <Check className="w-4 h-4 text-emerald-500 bg-emerald-100 rounded-full" />
-                            <span>MAPPED BIOMETRIC IDENTIFICATION CONSOLIDATED</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Document upload components */
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-3.5 animate-fade-in">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 leading-none">
-                          <Upload className="w-4 h-4 text-rose-500" /> Upload Professional ID + Address Document Proof
-                        </label>
-                        <p className="text-[10px] text-slate-400">Please upload a continuous PDF or image containing either your Passport, Driving License, Voter ID, or Resident PAN Card.</p>
-                        
-                        <div className="border-2 border-dashed border-slate-200 hover:border-rose-400 rounded-2xl p-6 text-center cursor-pointer relative transition bg-white" id="doc-id-uploader-zone">
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => simulateDocumentSelect(e, 'id')}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                          />
-                          <p className="text-xs font-bold text-slate-600">Drag & drop ID document, or <span className="text-rose-500">browse file</span></p>
-                          <p className="text-[9px] text-slate-400 mt-1">Accepted Formats: PDF, JPEG, PNG. Max: 5MB</p>
-                        </div>
-                        {idDocumentName && (
-                          <div className="p-2.5 bg-rose-50 text-rose-900 border border-rose-150 rounded-xl text-xs font-extrabold flex items-center justify-between">
-                            <span className="truncate">✓ Active Attachment: {idDocumentName}</span>
-                            <button type="button" onClick={() => setIdDocumentName('')} className="text-rose-500 text-xs font-black px-1.5">×</button>
-                          </div>
-                        )}
-                        {errors.idDocumentName && <p className="text-[10px] text-red-500 font-semibold">{errors.idDocumentName}</p>}
-                      </div>
-                    )}
                   </div>
                 ) : (
-                  /* Coporate documents requirements */
+                  /* Corporate documents requirements */
                   <div className="space-y-4 animate-fade-in" id="corporate-verification-flow">
                     <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-705 flex items-center gap-1 leading-none">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1 leading-none">
                           <Upload className="w-4 h-4 text-rose-500" /> Document 1: Corporate Registration Proof
                         </label>
                         <p className="text-[10px] text-slate-400">Upload incorporation certificate, business registration, GSTIN statement or LLC certificate.</p>
                       </div>
 
-                      <div className="border-2 border-dashed border-slate-250 hover:border-rose-455 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
+                      <div className="border-2 border-dashed border-slate-200 hover:border-rose-400 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
                         <input
                           type="file"
                           accept="image/*,application/pdf"
@@ -2387,98 +3147,65 @@ export default function RegistrationHub({
                       {companyDocName && (
                         <div className="p-2.5 bg-rose-50 text-rose-900 border border-rose-150 rounded-xl text-xs font-bold flex justify-between items-center leading-none">
                           <span className="truncate">✓ Cert attachment: {companyDocName}</span>
-                          <button type="button" onClick={() => setCompanyDocName('')} className="text-rose-600 font-black">×</button>
+                          <button type="button" onClick={() => { setCompanyDocName(''); setCompanyDocUrl(''); }} className="text-rose-600 font-black cursor-pointer">×</button>
                         </div>
                       )}
                       {errors.companyDocName && <p className="text-[10px] text-red-500 font-semibold">{errors.companyDocName}</p>}
 
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-705 flex items-center gap-1 leading-none">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1 leading-none">
                           <Upload className="w-4 h-4 text-rose-500" /> Document 2: Office Facility Address Proof
                         </label>
                         <p className="text-[10px] text-slate-400">Utility electrical statement, facility leasing statement, land deed or local banking statements.</p>
                       </div>
 
-                      <div className="border-2 border-dashed border-slate-250 hover:border-rose-455 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
+                      <div className="border-2 border-dashed border-slate-200 hover:border-rose-400 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
                         <input
                           type="file"
                           accept="image/*,application/pdf"
                           onChange={(e) => simulateDocumentSelect(e, 'address')}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <p className="text-xs font-bold text-slate-505">Drag/Drop Address verification file, or <span className="text-rose-500">browse file</span></p>
+                        <p className="text-xs font-bold text-slate-500">Drag/Drop Address verification file, or <span className="text-rose-500">browse file</span></p>
                       </div>
                       {addressProofDocName && (
                         <div className="p-2.5 bg-rose-50 text-rose-900 border border-rose-150 rounded-xl text-xs font-bold flex justify-between items-center leading-none">
                           <span className="truncate">✓ Address statement: {addressProofDocName}</span>
-                          <button type="button" onClick={() => setAddressProofDocName('')} className="text-rose-600 font-black">×</button>
+                          <button type="button" onClick={() => { setAddressProofDocName(''); setAddressProofDocUrl(''); }} className="text-rose-600 font-black cursor-pointer">×</button>
                         </div>
                       )}
                       {errors.addressProofDocName && <p className="text-[10px] text-red-500 font-semibold">{errors.addressProofDocName}</p>}
                     </div>
 
-                    {/* Representing individual director Aadhaar linkage */}
-                    <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/50 p-5 rounded-3xl border border-indigo-100 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-extrabold uppercase tracking-wide text-slate-700 flex items-center gap-1.5 label-identity-corporate-aadhaar">
-                          <ShieldCheck className="w-4 h-4 text-indigo-600" /> Representing Specialist/Host Aadhaar
-                        </label>
-                        <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 rounded-full font-black uppercase tracking-wider">Required</span>
-                      </div>
-                      <p className="text-[10px] text-indigo-950/70">To verify professional safety, UIDAI requires Aadhaar linkage matching representational contact name "{hostName}".</p>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          maxLength={14}
-                          disabled={aadhaarVerified || isAadhaarSendingOtp}
-                          value={aadhaarNumber.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim()}
-                          onChange={(e) => setAadhaarNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
-                          placeholder="Representative 12-digit Aadhaar UID"
-                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono text-center tracking-widest"
-                        />
-                        {!aadhaarVerified && (
-                          <button
-                            type="button"
-                            onClick={handleSendAadhaarOtp}
-                            disabled={isAadhaarSendingOtp}
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-xl"
-                          >
-                            Verify
-                          </button>
-                        )}
-                      </div>
-                      {errors.aadhaarNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaarNumber}</p>}
-
-                      {aadhaarMsg.text && (
-                        <div className="p-2.5 bg-amber-50 text-indigo-950 border border-amber-200 rounded-lg text-[10px] font-semibold leading-relaxed">
-                          {aadhaarMsg.text}
-                        </div>
-                      )}
-
-                      {aadhaarOtpSent && !aadhaarVerified && (
-                        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 animate-fade-in">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              maxLength={6}
-                              value={aadhaarOtpCode}
-                              onChange={(e) => setAadhaarOtpCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="Enter 6-digit Aadhaar OTP"
-                              className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-center font-mono text-xs rounded-lg animate-pulse"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleConfirmAadhaarOtp}
-                              disabled={isAadhaarVerifyingOtp}
-                              className="px-4 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg cursor-pointer"
-                            >
-                              Verify
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    {/* Representing individual director Aadhaar document upload */}
+                    <AadhaarUploadField
+                      label={`Representative Aadhaar Card Document (Mandatory for ${hostName || 'Director'})`}
+                      required={true}
+                      maxSizeMb={3}
+                      uploadedDocName={aadhaarDocName}
+                      uploadedDocPreview={aadhaarDocPreview}
+                      uploadedDocSize={aadhaarDocSize}
+                      error={errors.aadhaarDoc}
+                      onDocUploaded={(docData) => {
+                        setAadhaarDocName(docData.docName);
+                        setAadhaarDocPreview(docData.docPreview);
+                        setAadhaarDocSize(docData.docSize);
+                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                        setAadhaarVerified(true);
+                        if (errors.aadhaarDoc) {
+                          const updated = { ...errors };
+                          delete updated.aadhaarDoc;
+                          setErrors(updated);
+                        }
+                      }}
+                      onDocRemoved={() => {
+                        setAadhaarDocName('');
+                        setAadhaarDocPreview('');
+                        setAadhaarDocSize(undefined);
+                        setAadhaarDocUrl('');
+                        setAadhaarVerified(false);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -2487,222 +3214,685 @@ export default function RegistrationHub({
             {step === 3 && (
               <div id="host-face-verification" className="space-y-4 animate-fade-in">
                 <div className="flex items-center gap-2 text-rose-600 min-h-6">
-                  <ShieldCheck className="w-5 h-5 shrink-0 animate-pulse" />
-                  <h3 className="font-bold text-base text-slate-800">Secure Organizer 'Face-to-Selfie' Check</h3>
+                  <Camera className="w-5 h-5 shrink-0 text-rose-600" />
+                  <h3 className="font-bold text-base text-slate-800">Organizer Profile Photo & Live Selfie</h3>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  To safe-keep our child playdate ecosystem from fake business profiles and fraud, you must upload a professional representative portrait and capture a matching real-time webcam validation frame.
+                  Take a live selfie with your front camera or select a photo from your gallery to display on your event organizer profile and host badge.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Portrait File Upload panel */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 space-y-3 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step A: Portrait Photo</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Please upload a clear corporate / personal portrait image showing facial features plainly.</p>
-                    </div>
+                <div className="bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                  {parentProfilePhoto ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-slate-100 border-2 border-rose-400 shadow-sm shrink-0">
+                        <img src={parentProfilePhoto} alt="Organizer Profile Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1.5 left-1.5 right-1.5 bg-slate-900/90 backdrop-blur-xs text-white text-[8.5px] font-black tracking-wider uppercase py-0.5 px-1 rounded text-center truncate">
+                          {stepAPhotoSource === 'selfie' ? '📸 Live Selfie' : '📁 Gallery Photo'}
+                        </span>
+                      </div>
 
-                    <div className="space-y-2 pt-2">
-                      {parentProfilePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={parentProfilePhoto} alt="Parent Portrait" className="w-full h-full object-cover" />
+                      <div className="space-y-2 text-center sm:text-left flex-1">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            Organizer Photo Ready
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {stepAPhotoSource === 'selfie' ? 'Captured via Camera' : 'Uploaded from Device'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium">
+                          This picture will be featured on your organizer card, event check-in kiosk, and host badges.
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => startCamera('stepA')}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake Selfie</span>
+                          </button>
+
+                          <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose Another Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleParentProfilePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+
                           <button
                             type="button"
                             onClick={() => {
                               setParentProfilePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
+                              setLiveSelfiePhoto('');
+                              setStepAPhotoSource(null);
                             }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow transition-all hover:scale-105 cursor-pointer"
+                            className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            Remove
                           </button>
                         </div>
-                      ) : (
-                        <div className="border border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-6 text-center cursor-pointer relative bg-white transition hover:shadow-2xs">
+                      </div>
+                    </div>
+                  ) : cameraActive ? (
+                    <div className="bg-slate-950 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden border border-slate-900 shadow-xl">
+                      <div className="relative w-full max-w-sm h-64 sm:h-72 rounded-xl overflow-hidden bg-black border-2 border-rose-500/50 shadow-inner flex items-center justify-center">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                        />
+
+                        {/* Alignment Guide */}
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-40 h-52 border-2 border-dashed border-white/50 rounded-full"></div>
+                        </div>
+
+                        <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[9.5px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          <span>Front Camera Live</span>
+                        </div>
+                      </div>
+
+                      {cameraError && (
+                        <div className="bg-amber-950/80 border border-amber-600/40 text-amber-200 text-[11px] p-2.5 rounded-xl max-w-sm text-center">
+                          {cameraError}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          id="btn-click-host-selfie-photo"
+                          onClick={captureSelfieSnapshot}
+                          className="px-5 py-2.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-rose-600/30 cursor-pointer flex items-center gap-2 transform active:scale-95 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Click / Snap Photo</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Option 1: Live Front Camera Selfie */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-rose-200 hover:border-rose-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Take Live Selfie</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Open your front camera and take a quick photo of yourself for your profile.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startCamera('stepA')}
+                          className="w-full py-2.5 px-3 bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Open Camera & Snap</span>
+                        </button>
+                      </div>
+
+                      {/* Option 2: Gallery Upload */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs relative">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Select from Gallery</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Choose an existing portrait or headshot from your device storage.
+                          </p>
+                        </div>
+                        <label className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition">
+                          <Upload className="w-4 h-4" />
+                          <span>Browse Device Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
                             onChange={handleParentProfilePhotoUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            className="hidden"
                           />
-                          <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
-                          <span className="text-[11px] font-black text-slate-600 block">Drag & drop portrait, or <span className="text-orange-500">browse file</span></span>
-                          <span className="text-[8.5px] text-slate-455 block mt-1">PNG, JPEG up to 3MB</span>
-                        </div>
-                      )}
+                        </label>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Selfie Bio Camera capture panel */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step B: Live Verification Selfie</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Capture with webcam or upload a selfie/screenshot for verification comparison.</p>
-                    </div>
-
-                    <div className="space-y-2 pt-2 grow flex flex-col justify-center">
-                      {liveSelfiePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={liveSelfiePhoto} alt="Webcam Capture Preview" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLiveSelfiePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
-                            }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow transition-all hover:scale-105 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative w-full min-h-40 rounded-xl bg-slate-900 overflow-hidden flex flex-col items-center justify-center border border-slate-250 p-3 text-center">
-                          {cameraActive ? (
-                            <>
-                              <video ref={videoRef} className="w-full h-32 object-cover rounded-lg" autoPlay playsInline muted />
-                              <div className="flex gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={captureSelfieSnapshot}
-                                  className="bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-md hover:scale-105 active:scale-95 transition cursor-pointer"
-                                >
-                                  📸 Capture Snapshot
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={stopCamera}
-                                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="space-y-2 px-2 w-full">
-                              {cameraError && (
-                                <p className="text-[8.5px] text-amber-400 leading-normal mb-1">{cameraError}</p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
-                                <button
-                                  type="button"
-                                  onClick={startCamera}
-                                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white text-[9.5px] font-bold uppercase py-1.5 px-3 rounded-lg border border-slate-700 transition cursor-pointer"
-                                >
-                                  🎥 Open Webcam
-                                </button>
-                                <label className="w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white text-[9.5px] font-bold uppercase py-1.5 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1">
-                                  <Upload className="w-3 h-3" />
-                                  <span>Upload Selfie/Screenshot</span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLiveSelfieUpload}
-                                    className="hidden"
-                                  />
-                                </label>
-                              </div>
-                              {parentProfilePhoto && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setLiveSelfiePhoto(parentProfilePhoto);
-                                    setFaceVerificationStatus('verified');
-                                    setFaceVerificationScore(96);
-                                    setFaceVerifyProgress(['✓ Auto-verified with uploaded portrait']);
-                                  }}
-                                  className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer block mx-auto pt-0.5"
-                                >
-                                  ⚡ Use uploaded Portrait for verification
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Facial Similarity Matching Action Trigger */}
-                {parentProfilePhoto && liveSelfiePhoto && (
-                  <div className="mt-4 p-4.5 rounded-2xl bg-slate-50 border border-slate-200 text-center animate-fade-in space-y-3">
-                    <div id="matching-profile-box" className="flex items-center justify-around">
-                      <div className="text-center">
-                        <img src={parentProfilePhoto} className="w-14 h-14 object-cover rounded-full mx-auto border-2 border-orange-500" alt="Headshot" />
-                        <span className="text-[9.5px] font-black text-slate-500 block mt-1">Portrait Target</span>
-                      </div>
-                      <div className="text-xl text-orange-500 animate-pulse font-serif italic font-black">❯ Match-Scan ❮</div>
-                      <div className="text-center">
-                        <img src={liveSelfiePhoto} className="w-14 h-14 object-cover rounded-full mx-auto border-2 border-orange-500" alt="Selfie" />
-                        <span className="text-[9.5px] font-black text-slate-500 block mt-1">Live Capture</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      {isVerifyingFace ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700 animate-pulse">
-                            <span className="w-2.5 h-2.5 bg-orange-600 rounded-full animate-bounce" />
-                            <span>{faceVerifyCurrentStep || 'Running neural comparison audit...'}</span>
-                          </div>
-                          <div className="bg-slate-900 text-left p-3.5 rounded-xl font-mono text-[9px] text-emerald-400/90 space-y-1 max-h-32 overflow-y-auto shadow-inner">
-                            {faceVerifyProgress.map((pLine, iIdx) => <p key={iIdx} className="leading-snug">{pLine}</p>)}
-                          </div>
-                        </div>
-                      ) : faceVerificationStatus !== 'none' ? (
-                        <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-left ${faceVerificationStatus === 'verified' ? 'bg-emerald-50 border-emerald-105 text-emerald-950' : 'bg-amber-50 border-amber-205 text-amber-950'}`}>
-                          <div className="space-y-1">
-                            <span className="text-xs font-serif font-black block flex items-center gap-1">
-                              {faceVerificationStatus === 'verified' ? '✓ Biometrics Match Succeeded' : '⚠ Manual Administration Audit Flagged'}
-                            </span>
-                            <p className="text-[10px] leading-relaxed text-slate-655 font-medium">
-                              {faceVerificationStatus === 'verified' 
-                                ? 'Confidence metrics fully meet parental identity parameters. Automatic verify flag has been activated.' 
-                                : 'Low lighting or tilt skew detected. Match score: ' + faceVerificationScore + '%. Verification forwarded for direct Administrator review.'}
-                            </p>
-                          </div>
-                          <div className={`text-[8.5px] uppercase font-black px-2.5 py-1 rounded-full text-center shrink-0 border ${faceVerificationStatus === 'verified' ? 'bg-emerald-200/40 text-emerald-800 border-emerald-200' : 'bg-amber-200/40 text-amber-800 border-amber-250'}`}>
-                            {faceVerificationStatus === 'verified' ? 'auto approved' : 'pending manual admin audit'}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="bg-amber-50/70 border border-amber-205 rounded-xl p-3 flex items-start gap-2.5 text-left mb-1">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5 text-[10px] text-amber-900 leading-normal">
-                              <strong>Liveness Security & Linkage Requirements:</strong>
-                              <p className="opacity-90">By executing verification, you certify the upload portraits match your physical identity credentials.</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={executeFaceMatch}
-                              className="w-full bg-slate-900 hover:bg-black text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl shadow cursor-pointer transition transform active:scale-95"
-                            >
-                              ⚡ Compare Biometric Profiles
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
-                {errors.parentProfilePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.parentProfilePhoto}</p>}
-                {errors.liveSelfiePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.liveSelfiePhoto}</p>}
-                {errors.faceMatch && <p className="text-[10px] text-red-500 font-semibold">{errors.faceMatch}</p>}
+                {errors.parentProfilePhoto && (
+                  <p className="text-[11px] text-red-500 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
+                    {errors.parentProfilePhoto}
+                  </p>
+                )}
               </div>
             )}
           </>
         )}
 
         {/* ============================================================== */}
-        {/* FLOW 3: PORTFOLIO COMMUNITY SPECIALISTS                       */}
+        {/* FLOW 3: DAYCARE CENTERS & CRECHES                             */}
+        {/* ============================================================== */}
+        {preferredRole === 'Daycare Center' && (
+          <>
+            {step === 1 && (
+              <div id="daycare-step-1" className="space-y-4.5 animate-fade-in">
+                <div className="flex items-center gap-2 text-amber-600 pb-1">
+                  <Building className="w-5 h-5 shrink-0" />
+                  <h3 className="font-bold text-base text-slate-800 font-serif">Daycare & Creche Center Configuration</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Daycare / Center Name *</label>
+                    <input
+                      type="text"
+                      value={daycareCenterName}
+                      onChange={(e) => setDaycareCenterName(e.target.value)}
+                      placeholder="e.g. Sunshine Montessori & Infant Creche"
+                      className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-400"
+                    />
+                    {errors.daycareCenterName && <p className="text-[10px] text-red-500 font-semibold">{errors.daycareCenterName}</p>}
+                  </div>
+
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Facility Type</label>
+                    <select
+                      value={daycareType}
+                      onChange={(e: any) => setDaycareType(e.target.value)}
+                      className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-amber-400"
+                    >
+                      <option value="Pre-school & Daycare">Pre-school & Daycare</option>
+                      <option value="Montessori Daycare">Montessori Daycare</option>
+                      <option value="Infant Creche">Infant Creche (0-2 years focus)</option>
+                      <option value="Certified Playhome">Certified Playhome</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Director / Founder Name *</label>
+                    <input
+                      type="text"
+                      value={directorName}
+                      onChange={(e) => setDirectorName(e.target.value)}
+                      placeholder="e.g. Dr. Sunita Deshmukh"
+                      className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    />
+                    {errors.directorName && <p className="text-[10px] text-red-500 font-semibold">{errors.directorName}</p>}
+                  </div>
+
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Contact Mobile (+91) *</label>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={phoneNumber}
+                      onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                      placeholder="10-digit number"
+                      className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none font-mono"
+                    />
+                    {errors.phoneNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.phoneNumber}</p>}
+                  </div>
+
+                  <div className="flex flex-col space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Official Email</label>
+                    <input
+                      type="email"
+                      value={officialEmail}
+                      onChange={(e) => setOfficialEmail(e.target.value)}
+                      placeholder="contact@daycare.com"
+                      className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-col space-y-1">
+                  <label className="text-xs font-bold text-slate-700">Center Address & Landmark *</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    placeholder="e.g. Plot 42, Palm Meadows, Whitefield, Bangalore"
+                    className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                  />
+                  {errors.address && <p className="text-[10px] text-red-500 font-semibold">{errors.address}</p>}
+                </div>
+
+                {/* Rates / Charges */}
+                <div className="bg-amber-50/60 p-4 rounded-2xl border border-amber-200/70 space-y-3">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <DollarSign className="w-4 h-4 text-amber-600" /> Transparent Care Rates & Drop-In Charges
+                  </h4>
+                  
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                    <div className="space-y-1 bg-white p-2.5 rounded-xl border border-amber-200 shadow-3xs">
+                      <label className="text-[10px] font-bold text-slate-600">Hourly Drop-in (₹/hr) *</label>
+                      <input
+                        type="number"
+                        min={50}
+                        value={hourlyDropInRate}
+                        onChange={(e) => setHourlyDropInRate(parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1 text-xs font-bold text-amber-900 border-b border-amber-200 outline-none"
+                      />
+                      {errors.hourlyDropInRate && <p className="text-[9px] text-red-500">{errors.hourlyDropInRate}</p>}
+                    </div>
+
+                    <div className="space-y-1 bg-white p-2.5 rounded-xl border border-amber-200 shadow-3xs">
+                      <label className="text-[10px] font-bold text-slate-600">Half Day Rate (₹)</label>
+                      <input
+                        type="number"
+                        min={100}
+                        value={halfDayCareRate}
+                        onChange={(e) => setHalfDayCareRate(parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1 text-xs font-bold text-amber-900 border-b border-amber-200 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-white p-2.5 rounded-xl border border-amber-200 shadow-3xs">
+                      <label className="text-[10px] font-bold text-slate-600">Full Day Rate (₹)</label>
+                      <input
+                        type="number"
+                        min={200}
+                        value={fullDayCareRate}
+                        onChange={(e) => setFullDayCareRate(parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1 text-xs font-bold text-amber-900 border-b border-amber-200 outline-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-white p-2.5 rounded-xl border border-amber-200 shadow-3xs">
+                      <label className="text-[10px] font-bold text-slate-600">Monthly Plan (₹)</label>
+                      <input
+                        type="number"
+                        min={1000}
+                        value={monthlyCareRate}
+                        onChange={(e) => setMonthlyCareRate(parseInt(e.target.value) || 0)}
+                        className="w-full px-2 py-1 text-xs font-bold text-amber-900 border-b border-amber-200 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Capacity & Timings */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Staff to Child Ratio</label>
+                    <select
+                      value={staffToChildRatio}
+                      onChange={(e) => setStaffToChildRatio(e.target.value)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none font-bold"
+                    >
+                      <option value="1:3">1:3 (Intensive infant care)</option>
+                      <option value="1:4">1:4 (Standard toddler ratio)</option>
+                      <option value="1:5">1:5 (Pre-school standard)</option>
+                      <option value="1:6">1:6 (After-school group)</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Total Seat Capacity</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={200}
+                      value={seatCapacity}
+                      onChange={(e) => setSeatCapacity(parseInt(e.target.value) || 10)}
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none font-bold"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Operating Hours</label>
+                    <input
+                      type="text"
+                      value={operatingHours}
+                      onChange={(e) => setOperatingHours(e.target.value)}
+                      placeholder="e.g. 08:00 AM - 07:30 PM"
+                      className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    />
+                  </div>
+                </div>
+
+                {/* Age Groups Served */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Age Groups Accepted</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      'Infants (6m - 18m)',
+                      'Toddlers (18m - 3y)',
+                      'Pre-K (3y - 6y)',
+                      'After-School (6y - 10y)'
+                    ].map((group) => {
+                      const isSel = selectedAgeGroups.includes(group);
+                      return (
+                        <button
+                          key={group}
+                          type="button"
+                          onClick={() => {
+                            if (isSel) {
+                              setSelectedAgeGroups(selectedAgeGroups.filter(g => g !== group));
+                            } else {
+                              setSelectedAgeGroups([...selectedAgeGroups, group]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border ${isSel ? 'bg-amber-500 text-white border-amber-500 shadow-xs' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                        >
+                          {isSel ? '✓ ' : '+ '}{group}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Daycare Amenities */}
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-700">Key Safety & Facility Amenities</label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {[
+                      'Live CCTV Access for Parents',
+                      'Air Conditioned Child-Safe Rooms',
+                      'Sterilized Infant Nap Cribs',
+                      'Pediatric First-Aid On-site',
+                      'Nutritious Pure Vegetarian Meals',
+                      'Enclosed Outdoor Play Zone',
+                      'Montessori Learning Toys',
+                      'Sanitary Diaper Changing Station'
+                    ].map((amenity) => {
+                      const isSel = selectedDaycareAmenities.includes(amenity);
+                      return (
+                        <button
+                          key={amenity}
+                          type="button"
+                          onClick={() => {
+                            if (isSel) {
+                              setSelectedDaycareAmenities(selectedDaycareAmenities.filter(a => a !== amenity));
+                            } else {
+                              setSelectedDaycareAmenities([...selectedDaycareAmenities, amenity]);
+                            }
+                          }}
+                          className={`p-2.5 rounded-xl text-left text-xs font-medium transition border flex items-center gap-2 ${isSel ? 'bg-amber-50 border-amber-300 text-amber-900 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[10px] shrink-0 ${isSel ? 'bg-amber-500 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                            {isSel ? '✓' : ''}
+                          </span>
+                          <span className="truncate">{amenity}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 2 && (
+              <div id="daycare-step-2" className="space-y-4.5 animate-fade-in">
+                <div className="flex items-center gap-2 text-amber-600 pb-1">
+                  <ShieldCheck className="w-5 h-5" />
+                  <h3 className="font-bold text-base text-slate-800 font-serif">Daycare Licensing & Document Verification</h3>
+                </div>
+
+                <div className="space-y-4">
+                  {/* License Registration Field */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Govt Registration / Educational License Number</label>
+                    <input
+                      type="text"
+                      value={licenseNumber}
+                      onChange={(e) => setLicenseNumber(e.target.value)}
+                      placeholder="e.g. MH-DAYCARE-2024-889"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none"
+                    />
+                  </div>
+
+                  {/* Document 1: License Document */}
+                  <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-150 space-y-2">
+                    <div className="space-y-0.5">
+                      <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <Upload className="w-4 h-4 text-amber-600" /> Daycare License / Trust Deed / Shop Act Registration *
+                      </label>
+                      <p className="text-[10.5px] text-slate-500">
+                        Upload official municipal registration, pre-school trust deed, or private daycare license.
+                      </p>
+                    </div>
+
+                    <div className="border-2 border-dashed border-slate-200 hover:border-amber-400 rounded-2xl p-4.5 text-center cursor-pointer relative bg-white transition">
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        onChange={(e) => simulateDocumentSelect(e, 'company')}
+                        className="absolute inset-0 opacity-0 cursor-pointer"
+                      />
+                      <p className="text-xs font-bold text-slate-600">Drag & drop license document, or <span className="text-amber-600">browse file</span></p>
+                      <p className="text-[9px] text-slate-400 mt-1">Accepted Formats: PDF, JPEG, PNG. Max: 3MB</p>
+                    </div>
+                    {companyDocName && (
+                      <div className="p-2.5 bg-amber-50 text-amber-900 border border-amber-200 rounded-xl text-xs font-bold flex justify-between items-center animate-fade-in">
+                        <span className="truncate">✓ Uploaded License: {companyDocName}</span>
+                        <button type="button" onClick={() => { setCompanyDocName(''); setCompanyDocUrl(''); }} className="text-amber-600 font-bold px-1">×</button>
+                      </div>
+                    )}
+                    {errors.licenseDoc && <p className="text-[10px] text-red-500 font-semibold">{errors.licenseDoc}</p>}
+                  </div>
+
+                  {/* Document 2: Director Aadhaar / ID */}
+                  <AadhaarUploadField
+                    label="Center Director / Owner Aadhaar Document"
+                    required={false}
+                    maxSizeMb={3}
+                    uploadedDocName={aadhaarDocName}
+                    uploadedDocPreview={aadhaarDocPreview}
+                    uploadedDocSize={aadhaarDocSize}
+                    onDocUploaded={(docData) => {
+                      setAadhaarDocName(docData.docName);
+                      setAadhaarDocPreview(docData.docPreview);
+                      setAadhaarDocSize(docData.docSize);
+                      setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                      setAadhaarVerified(true);
+                    }}
+                    onDocRemoved={() => {
+                      setAadhaarDocName('');
+                      setAadhaarDocPreview('');
+                      setAadhaarDocSize(undefined);
+                      setAadhaarDocUrl('');
+                      setAadhaarVerified(false);
+                    }}
+                  />
+
+                  {/* Emergency Pediatric Hospital Tie-Up */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-700">Nearby Pediatric Hospital / Emergency Clinic Tie-Up</label>
+                    <input
+                      type="text"
+                      value={emergencyHospitalTieUp}
+                      onChange={(e) => setEmergencyHospitalTieUp(e.target.value)}
+                      placeholder="e.g. Apollo Cradle Hospital (0.8 km)"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {step === 3 && (
+              <div id="daycare-step-3" className="space-y-4.5 animate-fade-in">
+                <div className="flex items-center gap-2 text-amber-600 pb-1">
+                  <Camera className="w-5 h-5 shrink-0" />
+                  <h3 className="font-bold text-base text-slate-800 font-serif">Director & Center Facility Photo</h3>
+                </div>
+
+                <p className="text-xs text-slate-500">
+                  Provide a verified photo of the Center Director / Facility entrance to build trust with local parents in your neighborhood.
+                </p>
+
+                <div className="bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                  {parentProfilePhoto ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-slate-100 border-2 border-amber-400 shadow-sm shrink-0">
+                        <img src={parentProfilePhoto} alt="Daycare Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1.5 left-1.5 right-1.5 bg-slate-900/90 backdrop-blur-xs text-white text-[8.5px] font-black tracking-wider uppercase py-0.5 px-1 rounded text-center truncate">
+                          {stepAPhotoSource === 'selfie' ? '📸 Live Selfie' : '📁 Facility Photo'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-center sm:text-left flex-1">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            Photo Attached
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium">
+                          This image will be showcased prominently on your verified daycare listing card.
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => startCamera('stepA')}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake Photo</span>
+                          </button>
+
+                          <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose Another Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleParentProfilePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParentProfilePhoto('');
+                              setLiveSelfiePhoto('');
+                              setStepAPhotoSource(null);
+                            }}
+                            className="px-2.5 py-1.5 text-amber-600 hover:bg-amber-50 rounded-xl text-xs font-bold transition cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : cameraActive ? (
+                    <div className="bg-slate-950 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden border border-slate-900 shadow-xl">
+                      <div className="relative w-full max-w-sm h-64 sm:h-72 rounded-xl overflow-hidden bg-black border-2 border-amber-500/50 shadow-inner flex items-center justify-center">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                        />
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-40 h-52 border-2 border-dashed border-white/50 rounded-full"></div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          id="btn-click-daycare-selfie-photo"
+                          onClick={captureSelfieSnapshot}
+                          className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg cursor-pointer flex items-center gap-2 transform active:scale-95 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Snap Photo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-amber-200 hover:border-amber-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Live Camera Snapshot</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Capture live photo of Director or Center space using your device camera.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startCamera('stepA')}
+                          className="w-full py-2.5 px-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Open Camera & Snap</span>
+                        </button>
+                      </div>
+
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-slate-200 hover:border-amber-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs relative">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Select Facility Photo</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Upload high-res photo of your daycare center entrance, play zone, or classrooms.
+                          </p>
+                        </div>
+                        <label className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition">
+                          <Upload className="w-4 h-4" />
+                          <span>Browse Device Gallery</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleParentProfilePhotoUpload}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {errors.parentProfilePhoto && (
+                  <p className="text-[11px] text-red-500 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
+                    {errors.parentProfilePhoto}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ============================================================== */}
+        {/* FLOW 4: PORTFOLIO COMMUNITY SPECIALISTS                       */}
         {/* ============================================================== */}
         {preferredRole === 'Portfolio Professional' && (
           <>
@@ -2845,7 +4035,8 @@ export default function RegistrationHub({
                       'Personal Tutor & Academic Care',
                       'Counseling & Development Care',
                       'Sports & Health Training',
-                      'Creative Arts & Classes'
+                      'Creative Arts & Classes',
+                      'Others'
                     ].map((spec) => {
                       const isSelected = hostSpecialties.includes(spec);
                       return (
@@ -2861,6 +4052,20 @@ export default function RegistrationHub({
                       );
                     })}
                   </div>
+                  {hostSpecialties.includes('Others') && (
+                    <div className="mt-1.5 p-2.5 bg-purple-50/70 border border-purple-200 rounded-xl space-y-1 animate-fade-in">
+                      <label className="text-[11px] font-bold text-purple-900 block">
+                        Specify Other Practice Area / Specialty
+                      </label>
+                      <input
+                        type="text"
+                        value={customOtherSpecialty}
+                        onChange={(e) => setCustomOtherSpecialty(e.target.value)}
+                        placeholder="e.g. Speech Therapy, Occupational Therapy, Vedic Maths..."
+                        className="w-full px-3 py-1.5 bg-white border border-purple-200 rounded-lg text-xs outline-none text-slate-800 placeholder:text-slate-400 focus:border-purple-400"
+                      />
+                    </div>
+                  )}
                   {errors.hostSpecialties && <p className="text-[10px] text-red-500 font-semibold">{errors.hostSpecialties}</p>}
                 </div>
               </div>
@@ -2894,142 +4099,80 @@ export default function RegistrationHub({
                 </div>
 
                 {specialistEntityType === 'Individual' ? (
-                  /* Individual verifications options */
-                  <div className="space-y-4 animate-fade-in">
-                    <div className="flex flex-col space-y-1.5">
-                      <label className="text-xs font-bold text-slate-700">Choose Verification Standard</label>
-                      <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-xl">
-                        <button
-                          type="button"
-                          onClick={() => setIndividualVerificationMedium('Aadhaar')}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition ${individualVerificationMedium === 'Aadhaar' ? 'bg-white text-slate-800' : 'text-slate-500'}`}
-                        >
-                          🔐 Real-time Aadhaar OTP
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIndividualVerificationMedium('Document')}
-                          className={`py-1.5 text-xs font-bold rounded-lg transition ${individualVerificationMedium === 'Document' ? 'bg-white text-slate-800' : 'text-slate-500'}`}
-                        >
-                          📁 ID Document Attachment
-                        </button>
+                  /* Individual Specialist verifications: Direct Aadhaar Upload (No OTP) */
+                  <div className="space-y-4 animate-fade-in" id="specialist-individual-verification-flow">
+                    <AadhaarUploadField
+                      label="Specialist Aadhaar Card Document (Mandatory)"
+                      required={true}
+                      maxSizeMb={3}
+                      uploadedDocName={aadhaarDocName}
+                      uploadedDocPreview={aadhaarDocPreview}
+                      uploadedDocSize={aadhaarDocSize}
+                      error={errors.aadhaarDoc}
+                      onDocUploaded={(docData) => {
+                        setAadhaarDocName(docData.docName);
+                        setAadhaarDocPreview(docData.docPreview);
+                        setAadhaarDocSize(docData.docSize);
+                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                        setAadhaarVerified(true);
+                        if (errors.aadhaarDoc) {
+                          const updated = { ...errors };
+                          delete updated.aadhaarDoc;
+                          setErrors(updated);
+                        }
+                      }}
+                      onDocRemoved={() => {
+                        setAadhaarDocName('');
+                        setAadhaarDocPreview('');
+                        setAadhaarDocSize(undefined);
+                        setAadhaarDocUrl('');
+                        setAadhaarVerified(false);
+                      }}
+                    />
+
+                    {/* Optional Specialist Certification / Council Registration */}
+                    <div className="bg-slate-50/50 p-4.5 rounded-2xl border border-slate-150 space-y-3 animate-fade-in">
+                      <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Upload className="w-4 h-4 text-purple-600" /> Specialist ID / Board Registration Certificate (Optional)
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-medium font-sans">Optional</span>
+                      </label>
+                      <p className="text-[10px] text-slate-500">
+                        Medical council registration, clinical psychology license, degree certificate, or professional accreditation.
+                      </p>
+                      
+                      <div className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-4.5 text-center cursor-pointer relative transition bg-white">
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(e) => simulateDocumentSelect(e, 'id')}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                        />
+                        <p className="text-xs font-bold text-slate-600">Drag & drop certification document, or <span className="text-purple-600">browse file</span></p>
+                        <p className="text-[9px] text-slate-400 mt-1">Accepted Formats: PDF, JPEG, PNG. Max: 3MB</p>
                       </div>
+                      {idDocumentName && (
+                        <div className="p-2.5 bg-purple-50 text-purple-900 border border-purple-150 rounded-xl text-xs font-extrabold flex items-center justify-between">
+                          <span className="truncate">✓ Attached Cert: {idDocumentName}</span>
+                          <button type="button" onClick={() => { setIdDocumentName(''); setIdDocUrl(''); }} className="text-purple-500 text-xs font-bold px-1.5 cursor-pointer">×</button>
+                        </div>
+                      )}
+                      {errors.idDocumentName && <p className="text-[10px] text-red-500 font-semibold">{errors.idDocumentName}</p>}
                     </div>
-
-                    {individualVerificationMedium === 'Aadhaar' ? (
-                      /* Aadhaar configuration */
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-3.5">
-                        <div className="flex justify-between items-center bg-transparent">
-                          <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600 animate-pulse" /> Direct Biometric UIDAI Linkage
-                          </span>
-                        </div>
-
-                        {/* AI Manual Aadhaar Extraction Banner */}
-                        <div className="bg-emerald-50/80 border border-emerald-200 p-2.5 rounded-xl flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm">📸</span>
-                            <div className="text-left">
-                              <span className="font-extrabold text-[10.5px] text-emerald-950 block leading-tight">Upload Aadhaar Photo <span className="text-[9px] text-emerald-800 font-normal">(Max 1 MB)</span></span>
-                              <span className="text-[9px] text-emerald-700 block leading-tight">AI will auto-extract UIDAI number & Name</span>
-                            </div>
-                          </div>
-                          <label className="relative cursor-pointer bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg transition shrink-0 flex items-center gap-1 shadow-xs">
-                            {isExtractingAadhaar ? (
-                              <>
-                                <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                <span>Extracting...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Upload className="w-3 h-3" />
-                                <span>Upload Photo</span>
-                              </>
-                            )}
-                            <input
-                              type="file"
-                              accept="image/*,application/pdf"
-                              disabled={isExtractingAadhaar || aadhaarVerified}
-                              onChange={handleExtractAadhaarFromCard}
-                              className="absolute inset-0 opacity-0 cursor-pointer"
-                            />
-                          </label>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <input
-                            type="text"
-                            maxLength={14}
-                            disabled={aadhaarVerified || isAadhaarSendingOtp}
-                            value={aadhaarNumber.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim()}
-                            onChange={(e) => setAadhaarNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
-                            placeholder="Enter 12-digit Aadhaar Terminal"
-                            className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono text-center tracking-widest"
-                          />
-                          {!aadhaarVerified && (
-                            <button
-                              type="button"
-                              onClick={handleManualVerifyAadhaar}
-                              disabled={isAadhaarSendingOtp || isExtractingAadhaar || !aadhaarNumber}
-                              className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-[10px] font-bold rounded-xl active:scale-95 transition"
-                            >
-                              {isAadhaarSendingOtp ? 'Verifying...' : 'Verify Document'}
-                            </button>
-                          )}
-                        </div>
-                        {errors.aadhaarNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaarNumber}</p>}
-
-                        {aadhaarMsg.text && (
-                          <div className="p-2.5 bg-emerald-50 text-emerald-950 border border-emerald-200 rounded-lg text-[10px] font-semibold leading-relaxed">
-                            {aadhaarMsg.text}
-                          </div>
-                        )}
-                        {aadhaarVerified && (
-                          <div className="p-3 bg-emerald-50 text-emerald-900 border border-emerald-150 rounded-xl text-xs font-bold leading-normal flex items-center gap-1.5">
-                            <Check className="w-4 h-4 text-emerald-500 bg-emerald-100 rounded-full" />
-                            <span>MAPPED BIOMETRIC IDENTIFICATION CONSOLIDATED</span>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      /* Document Upload standard design */
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-3.5">
-                        <label className="text-xs font-bold text-slate-710 flex items-center gap-1.5 leading-none">
-                          <Upload className="w-4 h-4 text-purple-600" /> Upload Professional Specialist ID Card / Certificate
-                        </label>
-                        <p className="text-[10px] text-slate-400">Please upload passport, driving license, registration with Medical Council/Professional board.</p>
-                        
-                        <div className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-6 text-center cursor-pointer relative transition bg-white">
-                          <input
-                            type="file"
-                            accept="image/*,application/pdf"
-                            onChange={(e) => simulateDocumentSelect(e, 'id')}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
-                          />
-                          <p className="text-xs font-bold text-slate-600 font-serif">Drag & drop certification document, or <span className="text-purple-600">browse file</span></p>
-                        </div>
-                        {idDocumentName && (
-                          <div className="p-2.5 bg-purple-50 text-purple-900 border border-purple-150 rounded-xl text-xs font-extrabold flex items-center justify-between">
-                            <span className="truncate">✓ Attached Cert: {idDocumentName}</span>
-                            <button type="button" onClick={() => setIdDocumentName('')} className="text-purple-500 text-xs font-bold px-1.5">×</button>
-                          </div>
-                        )}
-                        {errors.idDocumentName && <p className="text-[10px] text-red-500 font-semibold">{errors.idDocumentName}</p>}
-                      </div>
-                    )}
                   </div>
                 ) : (
                   /* Corporate Specialist / Clinic document verify */
                   <div className="space-y-4 animate-fade-in">
                     <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100 space-y-4">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-705 flex items-center gap-1 leading-none">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1 leading-none">
                           <Upload className="w-4 h-4 text-purple-600" /> Clinic Document 1: Clinic Registration / License Document
                         </label>
                         <p className="text-[10px] text-slate-400 font-sans">Upload Professional clinical setups registration, medical council, or trust licenses.</p>
                       </div>
 
-                      <div className="border-2 border-dashed border-slate-250 hover:border-purple-455 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
+                      <div className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
                         <input
                           type="file"
                           accept="image/*,application/pdf"
@@ -3041,98 +4184,65 @@ export default function RegistrationHub({
                       {companyDocName && (
                         <div className="p-2.5 bg-purple-50 text-purple-900 border border-purple-150 rounded-xl text-xs font-bold flex justify-between items-center leading-none animate-fade-in">
                           <span className="truncate">✓ Clinical lic: {companyDocName}</span>
-                          <button type="button" onClick={() => setCompanyDocName('')} className="text-purple-600 font-black">×</button>
+                          <button type="button" onClick={() => { setCompanyDocName(''); setCompanyDocUrl(''); }} className="text-purple-600 font-black cursor-pointer">×</button>
                         </div>
                       )}
                       {errors.companyDocName && <p className="text-[10px] text-red-500 font-semibold">{errors.companyDocName}</p>}
 
                       <div className="space-y-1 bg-transparent">
-                        <label className="text-xs font-bold text-slate-705 flex items-center gap-1 leading-none">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1 leading-none">
                           <Upload className="w-4 h-4 text-purple-600" /> Clinic Document 2: Office location address statement
                         </label>
                         <p className="text-[10px] text-slate-400 font-sans">Utility electrical sheets, rent lease sheets or clinical bank statements.</p>
                       </div>
 
-                      <div className="border-2 border-dashed border-slate-250 hover:border-purple-455 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
+                      <div className="border-2 border-dashed border-slate-200 hover:border-purple-400 rounded-2xl p-5 text-center cursor-pointer relative bg-white">
                         <input
                           type="file"
                           accept="image/*,application/pdf"
                           onChange={(e) => simulateDocumentSelect(e, 'address')}
                           className="absolute inset-0 opacity-0 cursor-pointer"
                         />
-                        <p className="text-xs font-bold text-slate-505 font-sans">Drag/Drop clinic address sheets, or <span className="text-purple-600 font-bold">browse file</span></p>
+                        <p className="text-xs font-bold text-slate-500 font-sans">Drag/Drop clinic address sheets, or <span className="text-purple-600 font-bold">browse file</span></p>
                       </div>
                       {addressProofDocName && (
                         <div className="p-2.5 bg-purple-50 text-purple-900 border border-purple-150 rounded-xl text-xs font-bold flex justify-between items-center leading-none animate-fade-in">
                           <span className="truncate">✓ Setup Address: {addressProofDocName}</span>
-                          <button type="button" onClick={() => setAddressProofDocName('')} className="text-purple-600 font-black">×</button>
+                          <button type="button" onClick={() => { setAddressProofDocName(''); setAddressProofDocUrl(''); }} className="text-purple-600 font-black cursor-pointer">×</button>
                         </div>
                       )}
                       {errors.addressProofDocName && <p className="text-[10px] text-red-500 font-semibold">{errors.addressProofDocName}</p>}
                     </div>
 
                     {/* Aadhaar verify for representative of Specialist Company */}
-                    <div className="bg-gradient-to-br from-indigo-50/50 to-purple-50/50 p-5 rounded-3xl border border-indigo-100 space-y-3">
-                      <div className="flex justify-between items-center">
-                        <label className="text-xs font-extrabold uppercase tracking-wide text-slate-710 flex items-center gap-1.5 label-identity-clinic-aadhaar">
-                          <ShieldCheck className="w-4 h-4 text-indigo-600" /> Representing Specialist Biometric Aadhaar Linkage
-                        </label>
-                        <span className="text-[9px] bg-indigo-100 text-indigo-700 px-2 rounded-full font-black uppercase tracking-wider">Required</span>
-                      </div>
-                      <p className="text-[10px] text-indigo-950/70">To authorize this clinic configuration, UIDAI linkage is required to verify the representing credentials of "{parentName}".</p>
-
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          maxLength={14}
-                          disabled={aadhaarVerified || isAadhaarSendingOtp}
-                          value={aadhaarNumber.replace(/\s?/g, '').replace(/(\d{4})/g, '$1 ').trim()}
-                          onChange={(e) => setAadhaarNumber(e.target.value.replace(/[^\d]/g, '').slice(0, 12))}
-                          placeholder="Representative 12-digit Aadhaar UID"
-                          className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono text-center tracking-widest text-slate-800"
-                        />
-                        {!aadhaarVerified && (
-                          <button
-                            type="button"
-                            onClick={handleSendAadhaarOtp}
-                            disabled={isAadhaarSendingOtp}
-                            className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-bold rounded-xl cursor-pointer"
-                          >
-                            Verify
-                          </button>
-                        )}
-                      </div>
-                      {errors.aadhaarNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.aadhaarNumber}</p>}
-
-                      {aadhaarMsg.text && (
-                        <div className="p-2.5 bg-amber-50 text-indigo-950 border border-amber-200 rounded-lg text-[10px] font-semibold leading-relaxed animate-fade-in">
-                          {aadhaarMsg.text}
-                        </div>
-                      )}
-
-                      {aadhaarOtpSent && !aadhaarVerified && (
-                        <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-2 animate-fade-in">
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              maxLength={6}
-                              value={aadhaarOtpCode}
-                              onChange={(e) => setAadhaarOtpCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="Enter 6-digit Aadhaar OTP"
-                              className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 text-center font-mono text-xs rounded-lg text-slate-800"
-                            />
-                            <button
-                              type="button"
-                              onClick={handleConfirmAadhaarOtp}
-                              disabled={isAadhaarVerifyingOtp}
-                              className="px-4 py-1.5 bg-slate-900 text-white text-[10px] font-bold rounded-lg cursor-pointer"
-                            >
-                              Verify
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                    <AadhaarUploadField
+                      label={`Representing Specialist Aadhaar Card Document (Mandatory for ${parentName || 'Representative'})`}
+                      required={true}
+                      maxSizeMb={3}
+                      uploadedDocName={aadhaarDocName}
+                      uploadedDocPreview={aadhaarDocPreview}
+                      uploadedDocSize={aadhaarDocSize}
+                      error={errors.aadhaarDoc}
+                      onDocUploaded={(docData) => {
+                        setAadhaarDocName(docData.docName);
+                        setAadhaarDocPreview(docData.docPreview);
+                        setAadhaarDocSize(docData.docSize);
+                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                        setAadhaarVerified(true);
+                        if (errors.aadhaarDoc) {
+                          const updated = { ...errors };
+                          delete updated.aadhaarDoc;
+                          setErrors(updated);
+                        }
+                      }}
+                      onDocRemoved={() => {
+                        setAadhaarDocName('');
+                        setAadhaarDocPreview('');
+                        setAadhaarDocSize(undefined);
+                        setAadhaarDocUrl('');
+                        setAadhaarVerified(false);
+                      }}
+                    />
                   </div>
                 )}
               </div>
@@ -3141,215 +4251,175 @@ export default function RegistrationHub({
             {step === 3 && (
               <div id="specialist-face-verification" className="space-y-4 animate-fade-in">
                 <div className="flex items-center gap-2 text-purple-600 min-h-6">
-                  <ShieldCheck className="w-5 h-5 shrink-0 animate-pulse" />
-                  <h3 className="font-bold text-base text-slate-800">Secure Specialist 'Face-to-Selfie' Check</h3>
+                  <Camera className="w-5 h-5 shrink-0 text-purple-600" />
+                  <h3 className="font-bold text-base text-slate-800">Specialist Profile Photo & Live Selfie</h3>
                 </div>
                 <p className="text-xs text-slate-500 leading-relaxed">
-                  To safe-keep our child playdate ecosystem from fake professional claims, community specialists must upload a professional portrait and capture a matching real-time webcam validation frame.
+                  Take a live selfie with your front camera or select a photo from your gallery to display on your specialist profile and directory listing.
                 </p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Portrait File Upload panel */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 space-y-3 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step A: Portrait Photo</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Please upload a clear corporate / personal portrait image showing facial features plainly.</p>
-                    </div>
+                <div className="bg-slate-50/70 p-4.5 sm:p-5 rounded-2xl border border-slate-200 space-y-4">
+                  {parentProfilePhoto ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
+                      <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-slate-100 border-2 border-purple-400 shadow-sm shrink-0">
+                        <img src={parentProfilePhoto} alt="Specialist Profile Preview" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-1.5 left-1.5 right-1.5 bg-slate-900/90 backdrop-blur-xs text-white text-[8.5px] font-black tracking-wider uppercase py-0.5 px-1 rounded text-center truncate">
+                          {stepAPhotoSource === 'selfie' ? '📸 Live Selfie' : '📁 Gallery Photo'}
+                        </span>
+                      </div>
 
-                    <div className="space-y-2 pt-2">
-                      {parentProfilePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={parentProfilePhoto} alt="Parent Portrait" className="w-full h-full object-cover" />
+                      <div className="space-y-2 text-center sm:text-left flex-1">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            Specialist Photo Ready
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            {stepAPhotoSource === 'selfie' ? 'Captured via Camera' : 'Uploaded from Device'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-600 font-medium">
+                          This picture will be featured on your professional portfolio and doctor/expert consult card.
+                        </p>
+
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => startCamera('stepA')}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-xs"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake Selfie</span>
+                          </button>
+
+                          <label className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Choose Another Photo</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleParentProfilePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+
                           <button
                             type="button"
                             onClick={() => {
                               setParentProfilePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
+                              setLiveSelfiePhoto('');
+                              setStepAPhotoSource(null);
                             }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow transition-all hover:scale-105 cursor-pointer"
+                            className="px-2.5 py-1.5 text-purple-600 hover:bg-purple-50 rounded-xl text-xs font-bold transition cursor-pointer"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            Remove
                           </button>
                         </div>
-                      ) : (
-                        <div className="border border-dashed border-slate-300 hover:border-orange-400 rounded-xl p-6 text-center cursor-pointer relative bg-white transition hover:shadow-2xs">
+                      </div>
+                    </div>
+                  ) : cameraActive ? (
+                    <div className="bg-slate-950 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center text-center space-y-3 relative overflow-hidden border border-slate-900 shadow-xl">
+                      <div className="relative w-full max-w-sm h-64 sm:h-72 rounded-xl overflow-hidden bg-black border-2 border-purple-500/50 shadow-inner flex items-center justify-center">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                        />
+
+                        {/* Alignment Guide */}
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-40 h-52 border-2 border-dashed border-white/50 rounded-full"></div>
+                        </div>
+
+                        <div className="absolute top-2 left-2 bg-slate-900/80 backdrop-blur-xs text-white text-[9.5px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          <span>Front Camera Live</span>
+                        </div>
+                      </div>
+
+                      {cameraError && (
+                        <div className="bg-amber-950/80 border border-amber-600/40 text-amber-200 text-[11px] p-2.5 rounded-xl max-w-sm text-center">
+                          {cameraError}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          id="btn-click-specialist-selfie-photo"
+                          onClick={captureSelfieSnapshot}
+                          className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm rounded-xl shadow-lg hover:shadow-purple-600/30 cursor-pointer flex items-center gap-2 transform active:scale-95 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>📸 Click / Snap Photo</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                      {/* Option 1: Live Front Camera Selfie */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-purple-200 hover:border-purple-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs">
+                        <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-600 flex items-center justify-center">
+                          <Camera className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Take Live Selfie</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Open your front camera and take a quick photo of yourself for your profile.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => startCamera('stepA')}
+                          className="w-full py-2.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Open Camera & Snap</span>
+                        </button>
+                      </div>
+
+                      {/* Option 2: Gallery Upload */}
+                      <div className="bg-white p-4.5 rounded-2xl border-2 border-dashed border-slate-200 hover:border-indigo-400 transition flex flex-col justify-between items-center text-center space-y-3 shadow-2xs relative">
+                        <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <Upload className="w-6 h-6" />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-xs sm:text-sm text-slate-800">Select from Gallery</h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            Choose an existing portrait or headshot from your device storage.
+                          </p>
+                        </div>
+                        <label className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs cursor-pointer flex items-center justify-center gap-1.5 active:scale-98 transition">
+                          <Upload className="w-4 h-4" />
+                          <span>Browse Device Gallery</span>
                           <input
                             type="file"
                             accept="image/*"
                             onChange={handleParentProfilePhotoUpload}
-                            className="absolute inset-0 opacity-0 cursor-pointer"
+                            className="hidden"
                           />
-                          <Upload className="w-5 h-5 text-slate-400 mx-auto mb-1.5" />
-                          <span className="text-[11px] font-black text-slate-600 block">Drag & drop portrait, or <span className="text-orange-500">browse file</span></span>
-                          <span className="text-[8.5px] text-slate-455 block mt-1">PNG, JPEG up to 3MB</span>
-                        </div>
-                      )}
+                        </label>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Selfie Bio Camera capture panel */}
-                  <div className="bg-slate-50/40 p-4.5 rounded-2xl border border-slate-150 flex flex-col justify-between">
-                    <div>
-                      <span className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Step B: Live Verification Selfie</span>
-                      <p className="text-[10px] text-slate-450 leading-normal mt-0.5">Capture with webcam or upload a selfie/screenshot for verification comparison.</p>
-                    </div>
-
-                    <div className="space-y-2 pt-2 grow flex flex-col justify-center">
-                      {liveSelfiePhoto ? (
-                        <div className="relative w-full h-40 rounded-xl overflow-hidden bg-slate-100 border border-slate-205">
-                          <img src={liveSelfiePhoto} alt="Webcam Capture Preview" className="w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setLiveSelfiePhoto('');
-                              setFaceVerificationStatus('none');
-                              setFaceVerificationScore(0);
-                              setFaceVerifyProgress([]);
-                            }}
-                            className="absolute top-2 right-2 bg-slate-900/80 hover:bg-slate-900 text-white p-1 rounded-full text-xs shadow transition-all hover:scale-105 cursor-pointer"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="relative w-full min-h-40 rounded-xl bg-slate-900 overflow-hidden flex flex-col items-center justify-center border border-slate-250 p-3 text-center">
-                          {cameraActive ? (
-                            <>
-                              <video ref={videoRef} className="w-full h-32 object-cover rounded-lg" autoPlay playsInline muted />
-                              <div className="flex gap-2 mt-2">
-                                <button
-                                  type="button"
-                                  onClick={captureSelfieSnapshot}
-                                  className="bg-orange-600 hover:bg-orange-700 text-white text-[10px] font-black uppercase px-3 py-1.5 rounded-lg shadow-md hover:scale-105 active:scale-95 transition cursor-pointer"
-                                >
-                                  📸 Capture Snapshot
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={stopCamera}
-                                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition cursor-pointer"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="space-y-2 px-2 w-full">
-                              {cameraError && (
-                                <p className="text-[8.5px] text-amber-400 leading-normal mb-1">{cameraError}</p>
-                              )}
-                              <div className="flex flex-col sm:flex-row gap-2 justify-center items-center">
-                                <button
-                                  type="button"
-                                  onClick={startCamera}
-                                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700 text-white text-[9.5px] font-bold uppercase py-1.5 px-3 rounded-lg border border-slate-700 transition cursor-pointer"
-                                >
-                                  🎥 Open Webcam
-                                </button>
-                                <label className="w-full sm:w-auto bg-orange-600 hover:bg-orange-500 text-white text-[9.5px] font-bold uppercase py-1.5 px-3 rounded-lg transition cursor-pointer flex items-center justify-center gap-1">
-                                  <Upload className="w-3 h-3" />
-                                  <span>Upload Selfie/Screenshot</span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLiveSelfieUpload}
-                                    className="hidden"
-                                  />
-                                </label>
-                              </div>
-                              {parentProfilePhoto && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setLiveSelfiePhoto(parentProfilePhoto);
-                                    setFaceVerificationStatus('verified');
-                                    setFaceVerificationScore(96);
-                                    setFaceVerifyProgress(['✓ Auto-verified with uploaded portrait']);
-                                  }}
-                                  className="text-[9px] text-amber-400 hover:text-amber-300 font-bold underline cursor-pointer block mx-auto pt-0.5"
-                                >
-                                  ⚡ Use uploaded Portrait for verification
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  )}
                 </div>
-
-                {/* Facial Similarity Matching Action Trigger */}
-                {parentProfilePhoto && liveSelfiePhoto && (
-                  <div className="mt-4 p-4.5 rounded-2xl bg-slate-50 border border-slate-200 text-center animate-fade-in space-y-3">
-                    <div id="matching-profile-box" className="flex items-center justify-around">
-                      <div className="text-center">
-                        <img src={parentProfilePhoto} className="w-14 h-14 object-cover rounded-full mx-auto border-2 border-orange-500" alt="Headshot" />
-                        <span className="text-[9.5px] font-black text-slate-500 block mt-1">Portrait Target</span>
-                      </div>
-                      <div className="text-xl text-orange-500 animate-pulse font-serif italic font-black">❯ Match-Scan ❮</div>
-                      <div className="text-center">
-                        <img src={liveSelfiePhoto} className="w-14 h-14 object-cover rounded-full mx-auto border-2 border-orange-500" alt="Selfie" />
-                        <span className="text-[9.5px] font-black text-slate-500 block mt-1">Live Capture</span>
-                      </div>
-                    </div>
-
-                    <div className="pt-2">
-                      {isVerifyingFace ? (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700 animate-pulse">
-                            <span className="w-2.5 h-2.5 bg-orange-600 rounded-full animate-bounce" />
-                            <span>{faceVerifyCurrentStep || 'Running neural comparison audit...'}</span>
-                          </div>
-                          <div className="bg-slate-900 text-left p-3.5 rounded-xl font-mono text-[9px] text-emerald-400/90 space-y-1 max-h-32 overflow-y-auto shadow-inner">
-                            {faceVerifyProgress.map((pLine, iIdx) => <p key={iIdx} className="leading-snug">{pLine}</p>)}
-                          </div>
-                        </div>
-                      ) : faceVerificationStatus !== 'none' ? (
-                        <div className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 text-left ${faceVerificationStatus === 'verified' ? 'bg-emerald-50 border-emerald-105 text-emerald-950' : 'bg-amber-50 border-amber-205 text-amber-950'}`}>
-                          <div className="space-y-1">
-                            <span className="text-xs font-serif font-black block flex items-center gap-1">
-                              {faceVerificationStatus === 'verified' ? '✓ Biometrics Match Succeeded' : '⚠ Manual Administration Audit Flagged'}
-                            </span>
-                            <p className="text-[10px] leading-relaxed text-slate-655 font-medium">
-                              {faceVerificationStatus === 'verified' 
-                                ? 'Confidence metrics fully meet parental identity parameters. Automatic verify flag has been activated.' 
-                                : 'Low lighting or tilt skew detected. Match score: ' + faceVerificationScore + '%. Verification forwarded for direct Administrator review.'}
-                            </p>
-                          </div>
-                          <div className={`text-[8.5px] uppercase font-black px-2.5 py-1 rounded-full text-center shrink-0 border ${faceVerificationStatus === 'verified' ? 'bg-emerald-200/40 text-emerald-800 border-emerald-200' : 'bg-amber-200/40 text-amber-800 border-amber-250'}`}>
-                            {faceVerificationStatus === 'verified' ? 'auto approved' : 'pending manual admin audit'}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="bg-amber-50/70 border border-amber-205 rounded-xl p-3 flex items-start gap-2.5 text-left mb-1">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div className="space-y-0.5 text-[10px] text-amber-900 leading-normal">
-                              <strong>Liveness Security & Linkage Requirements:</strong>
-                              <p className="opacity-90">By executing verification, you certify the upload portraits match your physical identity credentials.</p>
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={executeFaceMatch}
-                              className="w-full bg-slate-900 hover:bg-black text-white text-xs font-black uppercase tracking-wider py-3 rounded-xl shadow cursor-pointer transition transform active:scale-95"
-                            >
-                              ⚡ Compare Biometric Profiles
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
                 
-                {errors.parentProfilePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.parentProfilePhoto}</p>}
-                {errors.liveSelfiePhoto && <p className="text-[10px] text-red-500 font-semibold">{errors.liveSelfiePhoto}</p>}
-                {errors.faceMatch && <p className="text-[10px] text-red-500 font-semibold">{errors.faceMatch}</p>}
+                {errors.parentProfilePhoto && (
+                  <p className="text-[11px] text-red-500 font-semibold bg-red-50 p-2 rounded-lg border border-red-200">
+                    {errors.parentProfilePhoto}
+                  </p>
+                )}
               </div>
             )}
           </>

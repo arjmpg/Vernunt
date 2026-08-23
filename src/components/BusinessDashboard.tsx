@@ -16,8 +16,8 @@ interface BusinessDashboardProps {
   bookingsList: Booking[];
   globalCommissionRate: number;
   setGlobalCommissionRate: (rate: number) => void;
-  userRole: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
-  onUpdateRole: (role: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin') => void;
+  userRole: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
+  onUpdateRole: (role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Admin') => void;
 }
 
 export default function BusinessDashboard({
@@ -360,7 +360,7 @@ export default function BusinessDashboard({
 
         {/* Workspace switch controls */}
         <div className="bg-white/10 backdrop-blur-xs p-1.5 rounded-2xl border border-white/10 self-start lg:self-auto space-x-1 flex flex-wrap gap-1">
-          {['Parent', 'Event Organizer', 'Portfolio Professional', 'Admin']
+          {['Parent', 'Daycare Center', 'Event Organizer', 'Portfolio Professional', 'Admin']
             .filter((role) => role !== 'Admin' || userProfile?.userRole === 'Admin')
             .map((role) => {
               const isSelected = userRole === role;
@@ -386,7 +386,7 @@ export default function BusinessDashboard({
                       : 'text-slate-300 hover:text-white hover:bg-white/5'
                   }`}
                 >
-                  {role === 'Admin' ? '⚖️ Admin Panel' : role}
+                  {role === 'Admin' ? '⚖️ Admin Panel' : role === 'Daycare Center' ? '🏫 Daycare Hub' : role}
                 </button>
               );
             })}

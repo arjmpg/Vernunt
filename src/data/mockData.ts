@@ -1,422 +1,453 @@
-import { ChildProfile, VerificationStatus, CommunityEvent, MarketItem } from '../types.ts';
+import { ChildProfile, VerificationStatus, CommunityEvent, MarketItem, DaycarePlayhomeProfile, CareBookingRequest } from '../types.ts';
+import { BANGALORE_PLAYMATES } from './bangaloreProfiles.ts';
 
-export const INITIAL_PLAYMATES: ChildProfile[] = [
-  {
-    id: 'playmate-1',
-    parentName: 'Sarah Jenkins',
-    childName: 'Liam',
-    childAge: 5,
-    childGender: 'Boy',
-    gradeLevel: 'Kindergarten',
-    playStyle: 'Cooperative & Social',
-    bio: 'Liam is very friendly and loves building elaborate block cities! He is looking for a playmate to build Lego setups, draw, and play board games in the park.',
-    location: {
-      lat: 19.0760,
-      lng: 72.8777,
-      address: 'Bandra West, Mumbai, India'
-    },
-    locationSharing: 0 as any, // PRECISE
-    verificationStatus: VerificationStatus.VERIFIED,
-    interests: ['Lego Building', 'Drawing', 'Play-Doh', 'Board Games'],
-    preferredActivities: ['Indoor Games', 'Park Play'],
-    photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
-    parentPhotoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400',
-    childPhotoUrl: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=400',
-    phoneNumber: '9820112233',
-    parentProfession: 'Software Architect',
-    religion: 'Hinduism',
-    caste: 'General',
-    motherTongue: 'English',
-    languagesKnown: ['English', 'Hindi', 'Punjabi'],
-    availableDays: ['Wednesday', 'Saturday', 'Sunday'],
-    availableTimes: ['Afternoon', 'Evening'],
-    activityStatus: 'Currently Active',
-    lookingForImmediatePlaydate: true,
-    lastActiveAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    contactsPrivacy: {
-      autoHideFromAllContacts: false,
-      allowContactsAutoConnect: true,
-      contactsPermissionGranted: true,
-      lastSyncedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString(),
-      contacts: [
-        { id: 'c-1', name: 'Rohan Sharma (Uncle)', phone: '9820199881', relationship: 'Family', visibility: 'visible', syncedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-2', name: 'Ananya Mehta (Neighbor)', phone: '9820455667', relationship: 'Neighbor', visibility: 'visible', syncedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-3', name: 'Vikram Joshi (Colleague)', phone: '9811223344', relationship: 'Work', visibility: 'hidden', syncedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-4', name: 'Priya Kapoor (Preschool Mom)', phone: '9930887766', relationship: 'School', visibility: 'connected', syncedAt: new Date(Date.now() - 2 * 24 * 3600 * 1000).toISOString() }
-      ]
-    }
-  },
-  {
-    id: 'playmate-2',
-    parentName: 'Marcus Chen',
-    childName: 'Chloe',
-    childAge: 7,
-    childGender: 'Girl',
-    gradeLevel: '2nd Grade',
-    playStyle: 'Energetic & Sporty',
-    bio: 'Chloe is an active explorer who loves soccer and tag! She has endless energy, is certified friendly, and is always excited to make new park playmates.',
-    location: {
-      lat: 19.1136,
-      lng: 72.8697,
-      address: 'Andheri East, Mumbai, India'
-    },
-    locationSharing: 0 as any, // PRECISE
-    verificationStatus: VerificationStatus.VERIFIED,
-    interests: ['Soccer Practice', 'Tag Play', 'Trampoline', 'Swimming'],
-    preferredActivities: ['Park Play', 'Sports Activities'],
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-    parentPhotoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400',
-    childPhotoUrl: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=400',
-    phoneNumber: '9833445566',
-    parentProfession: 'Financial Analyst',
-    religion: 'Christianity',
-    motherTongue: 'English',
-    languagesKnown: ['English', 'Mandarin'],
-    availableDays: ['Saturday', 'Sunday', 'Tuesday'],
-    availableTimes: ['Morning', 'Afternoon'],
-    activityStatus: 'Available for Play',
-    lookingForImmediatePlaydate: false,
-    lastActiveAt: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    contactsPrivacy: {
-      autoHideFromAllContacts: false,
-      allowContactsAutoConnect: true,
-      contactsPermissionGranted: true,
-      lastSyncedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString(),
-      contacts: [
-        { id: 'c-5', name: 'Dr. Kevin Chen', phone: '9833112211', relationship: 'Family', visibility: 'visible', syncedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-6', name: 'Coach Rajesh (Soccer)', phone: '9877665544', relationship: 'School', visibility: 'connected', syncedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-7', name: 'Siddharth Roy (Boss)', phone: '9920114477', relationship: 'Work', visibility: 'hidden', syncedAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString() }
-      ]
-    }
-  },
-  {
-    id: 'playmate-3',
-    parentName: 'Elena Rostova',
-    childName: 'Leo',
-    childAge: 4,
-    childGender: 'Boy',
-    gradeLevel: 'Preschool',
-    playStyle: 'Quiet & Creative',
-    bio: 'Leo is a quiet kid who enjoys finger-painting, clay crafts, and storytime circles. He warms up quickly and loves sharing crayons at the creative table!',
-    location: {
-      lat: 19.1663,
-      lng: 72.8526,
-      address: 'Goregaon West, Mumbai, India'
-    },
-    locationSharing: 1 as any, // APPROXIMATE
-    verificationStatus: VerificationStatus.VERIFIED,
-    interests: ['Finger Painting', 'Clay Crafts', 'Storytelling', 'Coloring Books'],
-    preferredActivities: ['Indoor Games', 'Educational Activities'],
-    photoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
-    parentPhotoUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
-    childPhotoUrl: 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=400',
-    phoneNumber: '9819223344',
-    parentProfession: 'Yoga Practice Coach',
-    religion: 'Sikhism',
-    motherTongue: 'Russian',
-    languagesKnown: ['English', 'Russian', 'Hindi'],
-    availableDays: ['Monday', 'Tuesday', 'Thursday'],
-    availableTimes: ['Morning', 'Evening'],
-    activityStatus: 'Away',
-    lookingForImmediatePlaydate: false,
-    lastActiveAt: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-    contactsPrivacy: {
-      autoHideFromAllContacts: true,
-      allowContactsAutoConnect: false,
-      contactsPermissionGranted: true,
-      lastSyncedAt: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString(),
-      contacts: [
-        { id: 'c-8', name: 'Svetlana Rostova (Grandma)', phone: '9819001122', relationship: 'Family', visibility: 'visible', syncedAt: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString() },
-        { id: 'c-9', name: 'Aarav Singhania (Neighbor)', phone: '9819334455', relationship: 'Neighbor', visibility: 'hidden', syncedAt: new Date(Date.now() - 1 * 24 * 3600 * 1000).toISOString() }
-      ]
-    }
-  },
-  {
-    id: 'playmate-4',
-    parentName: 'David Kim',
-    childName: 'Emma',
-    childAge: 8,
-    childGender: 'Girl',
-    gradeLevel: '3rd Grade',
-    playStyle: 'Inquisitive & Educational',
-    bio: 'Emma is a curious, avid reader who loves chess, puzzle books, junior science models, and logic quizzes. She is calm, polite, and loves collaborative learning!',
-    location: {
-      lat: 19.0178,
-      lng: 72.8478,
-      address: 'Dadar, Mumbai, India'
-    },
-    locationSharing: 0 as any, // PRECISE
-    verificationStatus: VerificationStatus.UNVERIFIED,
-    interests: ['Chess Games', 'Science Kits', 'Reading Books', 'Lego Robotics'],
-    preferredActivities: ['Educational Activities', 'Indoor Games'],
-    photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400',
-    parentPhotoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400',
-    childPhotoUrl: '',
-    phoneNumber: '9821887766',
-    parentProfession: 'Project Leader',
-    religion: 'Jainism',
-    motherTongue: 'Telugu',
-    languagesKnown: ['English', 'Telugu', 'Tamil'],
-    availableDays: ['Thursday', 'Friday', 'Saturday'],
-    availableTimes: ['Afternoon', 'Evening'],
-    activityStatus: 'Currently Active',
-    lookingForImmediatePlaydate: true,
-    lastActiveAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
-  }
-];
+export const INITIAL_PLAYMATES: ChildProfile[] = BANGALORE_PLAYMATES;
 
 export const MOCK_EVENTS: CommunityEvent[] = [
   {
-    id: 'event-1',
-    title: 'Central Park Family Art & Craft Circle',
-    description: 'Bring your paints, crayons, and sketchbooks! Parents and children gather on the lawn for a fun drawing topic, balloon modeling, and snacks.',
-    date: '2026-06-15',
-    time: '14:00',
-    location: 'Central Park Picnic Lawn, NY',
-    hostName: 'Sarah Jenkins',
-    attendeesCount: 22,
+    id: 'blr-event-1',
+    title: 'Cubbon Park Weekend Family Art & Nature Sketching',
+    description: 'Bring your watercolors, pastels, and sketchbooks! Parents and children gather on the bamboo grove lawn for guided nature sketching, leaf printing, and healthy picnic snacks.',
+    date: '2026-06-20',
+    time: '09:00 AM',
+    location: 'Cubbon Park Bamboo Grove Lawn, Bangalore',
+    hostName: 'Karthik & Deepa Rao',
+    attendeesCount: 38,
     joined: false,
     category: 'Event',
     photoUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600',
-    tags: ['Art', 'Craft', 'Painting', 'Outdoor'],
+    tags: ['Art', 'Nature', 'Cubbon Park', 'Sensory'],
     iconEmoji: '🎨',
     ticketPrice: 0,
-    lat: 19.0790,
-    lng: 72.8750
+    lat: 12.9763,
+    lng: 77.5929
   },
   {
-    id: 'event-2',
-    title: 'Junior Soccer Drills & Relay Race',
-    description: 'An fun, active afternoon featuring dribbling drills, parent-child relay races, and mini-matches for kids aged 4-8. Ice creams will be provided!',
-    date: '2026-06-22',
-    time: '10:00',
-    location: 'Westside Grass Field & Playground',
-    hostName: 'Coach Bradley',
-    attendeesCount: 15,
+    id: 'blr-event-2',
+    title: 'HSR Layout Junior Football & Agility Drills',
+    description: 'An energetic morning session featuring fun dribbling obstacle courses, parent-child relay races, and beginner mini-matches for kids aged 4-9 at HSR Sector 2 park.',
+    date: '2026-06-21',
+    time: '07:30 AM',
+    location: 'Sector 2 Play Arena Park, HSR Layout, Bangalore',
+    hostName: 'Coach Rakesh (Bangalore FC Academy)',
+    attendeesCount: 26,
     joined: false,
     category: 'Activity',
     photoUrl: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=600',
-    tags: ['Sports', 'Soccer', 'Outdoor', 'Run'],
+    tags: ['Football', 'Fitness', 'HSR Layout', 'Sports'],
     iconEmoji: '⚽',
     ticketPrice: 0,
-    lat: 19.0720,
-    lng: 72.8740
+    lat: 12.9121,
+    lng: 77.6446
   },
   {
-    id: 'event-3',
-    title: 'Junior Explorers Botanical Trail Walk',
-    description: 'A slow-paced walk exploring local butterflies, flowers, and tree leaves. Includes a custom printed map with magnifying glass items!',
-    date: '2026-06-28',
-    time: '08:30',
-    location: 'Inwood Nature Sanctuary Trail',
-    hostName: 'Marlon (Environmentalist)',
-    attendeesCount: 12,
-    joined: false,
-    category: 'Activity',
-    photoUrl: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=600',
-    tags: ['Nature', 'Hiking', 'Outdoor', 'Science'],
-    iconEmoji: '🌿',
-    ticketPrice: 0,
-    lat: 19.0710,
-    lng: 72.8820
-  },
-  {
-    id: 'event-4',
-    title: 'Lego Masters Speed Building Showdown',
-    description: 'Showoff your quickest and most creative brick constructions! Bring your custom block ideas. Judged across age groups with physical medal certificates for all participants.',
-    date: '2026-06-18',
-    time: '11:00',
-    location: 'Community Center Main Hall, NY',
-    hostName: 'Gupta Family Club',
-    attendeesCount: 34,
-    joined: false,
-    category: 'Competition',
-    photoUrl: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=600',
-    tags: ['Lego', 'Bricks', 'Competition', 'Indoor'],
-    iconEmoji: '🧱',
-    ticketPrice: 249,
-    lat: 19.0810,
-    lng: 72.8710
-  },
-  {
-    id: 'event-5',
-    title: 'Vedic Math & Abacus Speed Math Cup',
-    description: 'Fun mental mathematics challenges featuring double-digit operations, pattern puzzles, and logic games. Highly interactive and designed to boost confidence!',
-    date: '2026-07-04',
-    time: '15:00',
-    location: 'Symphony Prep Academy Hall B',
-    hostName: 'Prof. Ananth Kumar',
-    attendeesCount: 41,
-    joined: false,
-    category: 'Competition',
-    photoUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600',
-    tags: ['Math', 'Abacus', 'Logic', 'Indoor'],
-    iconEmoji: '🧮',
-    ticketPrice: 199,
-    lat: 19.0680,
-    lng: 72.8790
-  },
-  {
-    id: 'event-6',
-    title: 'Classical Indian Sanskrit Shloka Chanting Class',
-    description: 'An elementary workshop focusing on the linguistic pronunciation of core shlokas and simple chants. Develops absolute concentration and cognitive pronunciation.',
-    date: '2026-06-19',
-    time: '17:30',
-    location: 'Heritage Yoga & Meditation Studio',
-    hostName: 'Shastri Shastriji',
-    attendeesCount: 18,
-    joined: true,
-    category: 'Class',
-    photoUrl: 'https://images.unsplash.com/photo-1545128485-c400e7702796?auto=format&fit=crop&q=80&w=600',
-    tags: ['Sanskrit', 'Chants', 'Heritage', 'Meditation'],
-    iconEmoji: '🕉️',
-    ticketPrice: 0,
-    lat: 19.0820,
-    lng: 72.8680
-  },
-  {
-    id: 'event-7',
-    title: 'Kids Scratch & Robotics Weekend Boot Camp',
-    description: 'Dive into interactive animations and micro-controller assembly. Led by tech parents, kids build their very first clicking game on tablets!',
-    date: '2026-06-30',
-    time: '09:00',
-    location: 'TechHub Collab Lab, Floor 3',
-    hostName: 'Arjun & Nikita',
-    attendeesCount: 29,
+    id: 'blr-event-3',
+    title: 'Whitefield Junior Lego Robotics & STEM Challenge',
+    description: 'Hands-on micro-controller assembly and creative motorized brick builds. Guided by tech parents from EPIP & ITPL. Medals & certificates for all young inventors!',
+    date: '2026-06-27',
+    time: '10:30 AM',
+    location: 'Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore',
+    hostName: 'Arjun & Nikita (STEM Parents Collective)',
+    attendeesCount: 42,
     joined: false,
     category: 'Class',
     photoUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=600',
-    tags: ['Robotics', 'Coding', 'Scratch', 'Tech'],
+    tags: ['Robotics', 'Lego', 'Whitefield', 'STEM'],
     iconEmoji: '🤖',
-    ticketPrice: 499,
+    ticketPrice: 299,
     featured: true,
-    isSponsored: true,
-    sponsoredBy: 'TechKids Robotics Academy',
-    lat: 19.0755,
-    lng: 72.8840
+    lat: 12.9698,
+    lng: 77.7500
   },
   {
-    id: 'event-8',
-    title: 'Annual Neighborhood Puppet Show & Drama Carnival',
-    description: 'A magical performance of regional Indian folk tales using giant handmade puppets. Enjoy local treats, popcorn stalls, and a miniature dress-up photo corner.',
-    date: '2026-07-12',
-    time: '16:00',
-    location: 'Riverside Community Safe Park',
-    hostName: 'Vernunt Parents Collective',
-    attendeesCount: 55,
-    joined: false,
-    category: 'Event',
-    photoUrl: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600',
-    tags: ['Puppets', 'Drama', 'Folk', 'Carnival'],
-    iconEmoji: '🎭',
-    ticketPrice: 0,
-    featured: true,
-    lat: 19.0785,
-    lng: 72.8695
-  },
-  {
-    id: 'event-9',
-    title: 'Traditional Indian Clay Pottery & Sculpting Class',
-    description: 'Learn the ancient heritage of sculpting clay deities, small pots, and decorative lamps. Sensory-rich interactive course with natural terracotta clay.',
-    date: '2026-07-18',
-    time: '13:00',
-    location: 'Clay & Kiln Arts Center',
-    hostName: 'Meera Deshmukh',
-    attendeesCount: 16,
+    id: 'blr-event-4',
+    title: 'Indiranagar Clay Pottery & Terracotta Sculpting Studio',
+    description: 'Learn the soothing art of sculpting miniature diyas, animal figurines, and clay pots with natural clay. Interactive sensory-rich workshop for ages 3-10.',
+    date: '2026-06-28',
+    time: '04:00 PM',
+    location: 'Defense Colony Enclave Art Studio, 100 Ft Rd, Indiranagar, Bangalore',
+    hostName: 'Meera Deshmukh (Creative Arts Guild)',
+    attendeesCount: 20,
     joined: false,
     category: 'Class',
     photoUrl: 'https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&q=80&w=600',
-    tags: ['Pottery', 'Clay', 'Art', 'Sensory'],
+    tags: ['Pottery', 'Clay', 'Indiranagar', 'Art'],
     iconEmoji: '🏺',
     ticketPrice: 350,
-    lat: 19.0715,
-    lng: 72.8765
+    lat: 12.9784,
+    lng: 77.6408
   },
   {
-    id: 'event-10',
-    title: 'Central Park Toddler Bubble & Music Circle',
-    description: 'Concurrent weekend toddler sensory session with giant bubble wands, acoustic rhyme sing-alongs, and parachute play for ages 1-4 on the picnic lawn.',
-    date: '2026-06-15',
-    time: '14:30',
-    location: 'Central Park Picnic Lawn, NY',
-    hostName: 'Elena Rostova',
-    attendeesCount: 28,
+    id: 'blr-event-5',
+    title: 'Lalbagh Botanical Seed Discovery & Butterfly Trail Walk',
+    description: 'Explore exotic trees, giant lotus ponds, and butterfly corridors. Includes printed treasure hunt maps, magnifying glasses, and botanical sticker albums for every child!',
+    date: '2026-07-05',
+    time: '08:00 AM',
+    location: 'Lalbagh Botanical Gardens West Gate, Jayanagar / Basavanagudi, Bangalore',
+    hostName: 'Dr. Srinivas Holla (Ecologist)',
+    attendeesCount: 30,
+    joined: false,
+    category: 'Activity',
+    photoUrl: 'https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=600',
+    tags: ['Nature', 'Lalbagh', 'Ecology', 'Outdoor'],
+    iconEmoji: '🌿',
+    ticketPrice: 0,
+    lat: 12.9507,
+    lng: 77.5848
+  },
+  {
+    id: 'blr-event-6',
+    title: 'Koramangala Toddler Music & Giant Bubble Play Circle',
+    description: 'Sensory weekend music circle with xylophones, shakers, acoustic rhymes, and giant iridescent bubbles on the lawn for infants & toddlers aged 0-3.',
+    date: '2026-07-11',
+    time: '10:00 AM',
+    location: 'Koramangala 4th Block Park & Community Center, Bangalore',
+    hostName: 'Sneha & Rohan Gowda',
+    attendeesCount: 35,
     joined: true,
     category: 'Event',
     photoUrl: 'https://images.unsplash.com/photo-1472162072942-cd5147eb3902?auto=format&fit=crop&q=80&w=600',
-    tags: ['Toddlers', 'Music', 'Bubbles', 'Concurrent Playgroup'],
+    tags: ['Toddlers', 'Music', 'Koramangala', 'Bubbles'],
     iconEmoji: '🫧',
     ticketPrice: 0,
-    lat: 19.0792,
-    lng: 72.8755
+    lat: 12.9352,
+    lng: 77.6245
   },
   {
-    id: 'event-11',
-    title: 'Westside Youth Sprint & Agility Challenge',
-    description: 'Concurrent athletic session alongside soccer drills: speed ladders, cone sprints, and fun team obstacle courses for ages 6-12.',
-    date: '2026-06-22',
-    time: '10:30',
-    location: 'Westside Grass Field & Playground',
-    hostName: 'Coach Bradley',
-    attendeesCount: 19,
-    joined: false,
-    category: 'Activity',
-    photoUrl: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&q=80&w=600',
-    tags: ['Athletics', 'Running', 'Concurrent Playgroup'],
-    iconEmoji: '🏃',
-    ticketPrice: 0,
-    lat: 19.0725,
-    lng: 72.8745
-  },
-  {
-    id: 'event-12',
-    title: 'Lego Masters Junior Duplo Free-Play Hub',
-    description: 'Concurrent open-ended brick zone for toddlers and younger siblings happening alongside the Lego speed competition in the adjacent hall.',
-    date: '2026-06-18',
-    time: '11:00',
-    location: 'Community Center Main Hall, NY',
-    hostName: 'Gupta Family Club',
-    attendeesCount: 24,
+    id: 'blr-event-7',
+    title: 'Bangalore Junior Vedic Math & Chess Grand Prix',
+    description: 'Friendly speed arithmetic challenges, pattern logic puzzles, and beginner-to-advanced swiss-format chess rounds. Refreshments and trophies for participants!',
+    date: '2026-07-19',
+    time: '02:30 PM',
+    location: 'Malleshwaram 15th Cross Canara Union Hall, Bangalore',
+    hostName: 'Prof. Ananth Murthy',
+    attendeesCount: 48,
     joined: false,
     category: 'Competition',
-    photoUrl: 'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=600',
-    tags: ['Lego', 'Duplo', 'Concurrent Playgroup'],
-    iconEmoji: '🧱',
+    photoUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600',
+    tags: ['Chess', 'Vedic Math', 'Malleshwaram', 'Logic'],
+    iconEmoji: '♟️',
+    ticketPrice: 199,
+    lat: 13.0031,
+    lng: 77.5643
+  },
+  {
+    id: 'blr-event-8',
+    title: 'Sarjapur Kannada & English Storytelling Puppet Carnival',
+    description: 'Magical dramatization of Tenali Rama and Panchatantra folk stories with giant shadow puppets, folk instruments, and costume dress-ups.',
+    date: '2026-07-26',
+    time: '04:30 PM',
+    location: 'Rainbow Drive Amphitheatre, Sarjapur Road, Bangalore',
+    hostName: 'Vernunt Bangalore Parents Collective',
+    attendeesCount: 65,
+    joined: false,
+    category: 'Event',
+    photoUrl: 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600',
+    tags: ['Puppets', 'Storytelling', 'Sarjapur', 'Heritage'],
+    iconEmoji: '🎭',
     ticketPrice: 0,
-    lat: 19.0815,
-    lng: 72.8715
+    featured: true,
+    lat: 12.9103,
+    lng: 77.6836
   }
 ];
 
 export const MOCK_MARKETPLACE: MarketItem[] = [
   {
     id: 'market-1',
-    title: 'Organic Whole-Wheat Teddy Puffs (Pack of 3)',
-    price: 14.50,
-    description: 'Grain-free organic teddy cookies baked with pureed apple, berries, and zero artificial refined sugar. Kids love them!',
-    sellerName: 'Wholesome Family Bakery',
+    title: 'Organic Ragi & Almond Baby Puffs (Sugar-Free Pack of 4)',
+    price: 380,
+    description: 'Grain-free organic Karnataka sprouted ragi cookies prepared with pureed apple, crushed almonds, and zero artificial sugars. Great for teething infants.',
+    sellerName: 'Namma Wholesome Organic Kitchen',
     category: 'Baby & Kids Food',
     imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&q=80&w=400',
-    contactEmail: 'orders@wholesomefamily.example.com'
+    contactEmail: 'orders@nammaorganics.example.com'
   },
   {
     id: 'market-2',
-    title: 'Waterproof Magnetic Logic Building Gears',
-    price: 24.99,
-    description: 'Practical, safe, and indestructible colorful building wheel gears that magnetic snap, fostering core spatial skills and mechanical logic.',
-    sellerName: 'SmartToy Labs',
+    title: 'Montessori Wooden Balance Beam & Sensory Steps',
+    price: 1450,
+    description: 'Handcrafted smooth non-toxic teak wood balance stepping set for indoor coordination and vestibular muscle development.',
+    sellerName: 'Bangalore Montessori Guild',
     category: 'Toys & Lego',
     imageUrl: 'https://images.unsplash.com/photo-1531844251246-9a1bfaae0d17?auto=format&fit=crop&q=80&w=400',
-    contactEmail: 'support@smarttoylabs.example.com'
+    contactEmail: 'guild@bangaloremontessori.example.com'
   },
   {
     id: 'market-3',
-    title: 'Primary Science Exploration Kit & Scope',
-    price: 35.00,
-    description: 'Features fully shockproof binoculars, a magnifying cylinder, custom bug jar, handbook, and light compass for playground hikes.',
-    sellerName: 'Curiosity Kids Co.',
+    title: 'Junior Backyard Telescope & Star Constellation Map',
+    price: 1999,
+    description: 'Shockproof 70mm optical astronomy scope with moon filter, compass, and laminated Bangalore sky constellation wheel.',
+    sellerName: 'Curious Stargazers Club',
     category: 'Learning Kits',
     imageUrl: 'https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&fit=crop&q=80&w=400',
-    contactEmail: 'explore@curiositykids.example.com'
+    contactEmail: 'sky@curiouskids.example.com'
   }
 ];
+
+export const MOCK_DAYCARES: DaycarePlayhomeProfile[] = [
+  {
+    id: 'blr-playhome-1',
+    title: 'Little Blossoms Montessori Playhome & Creche',
+    hostName: 'Ananya Deshmukh (Certified Montessori Educator)',
+    providerType: 'Certified Playhome',
+    hourlyRate: 180,
+    hourlyRateNeighborHome: 180, // Neighbor / Center premises rate
+    hourlyRateParentHome: 260, // Parent's home care rate
+    halfDayRate: 600,
+    fullDayRate: 1100,
+    monthlyDaycareFee: 8500,
+    bio: 'Certified AMI Montessori educator with 8+ years experience. Safe, sunlit ground floor apartment with childproof corners, wooden sensorial toys, sanitized nap pods, and CCTV security.',
+    location: {
+      lat: 12.9784,
+      lng: 77.6408,
+      address: '12th Main, HAL 2nd Stage, Indiranagar, Bangalore',
+      distance: 0.4
+    },
+    rating: 4.9,
+    reviewsCount: 38,
+    experienceYears: 8,
+    maxCapacity: 6,
+    currentOccupancy: 2,
+    acceptedAgeGroups: ['6m - 2 yrs', '2 - 5 yrs', '5 - 8 yrs'],
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    availableTimeSlots: ['08:30 AM - 01:00 PM', '02:00 PM - 06:30 PM', 'Full Day (8:30 AM - 7 PM)'],
+    amenities: [
+      'AMI Montessori Sensorial Materials',
+      'Childproofed Padded Floors & Air Purifier',
+      'Organic Fresh Purees & Finger Foods',
+      'Live Secure Parent Check-in Log',
+      'Sanitized Nap Cots & First Aid Kit'
+    ],
+    photos: [
+      'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1596464716127-f2a829822301?auto=format&fit=crop&q=80&w=800'
+    ],
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400',
+    phone: '9845011223',
+    email: 'littleblossoms.indiranagar@gmail.com',
+    aadhaarVerified: true,
+    policeVerified: true,
+    isAcceptingNow: true,
+    instantBooking: true,
+    parentKidNames: 'Mom of Aadhya (4y)',
+    emergencyContact: '+91 9845011200',
+    reviews: [
+      {
+        id: 'rev-blr-1',
+        parentName: 'Priya Hegde',
+        rating: 5,
+        comment: 'Left my 2-year old for 4 hours while attending meetings. Ananya sent photo updates every 40 mins. My child loved the wooden puzzles!',
+        date: '2 days ago'
+      },
+      {
+        id: 'rev-blr-2',
+        parentName: 'Vikram Reddy',
+        rating: 5,
+        comment: 'Cleanest playhome in Indiranagar. Extremely trustworthy and transparent drop-off PIN system.',
+        date: '1 week ago'
+      }
+    ]
+  },
+  {
+    id: 'blr-playhome-2',
+    title: 'Kavitha Aunty\'s Cozy HSR Society Sitting & Drop-in',
+    hostName: 'Kavitha Swaminathan',
+    providerType: 'Neighbour Parent',
+    hourlyRate: 150,
+    hourlyRateNeighborHome: 150, // Neighbour premises
+    hourlyRateParentHome: 220, // Parent premises
+    halfDayRate: 500,
+    fullDayRate: 900,
+    bio: 'Loving mom of 2 school-going kids in gated Purva Vantage society, HSR Sector 2. Quiet 3-BHK home with extensive storybook library, Duplo sets, art supplies, and home-cooked wholesome meals.',
+    location: {
+      lat: 12.9121,
+      lng: 77.6446,
+      address: 'Sector 2, 27th Main, HSR Layout, Bangalore',
+      distance: 0.7
+    },
+    rating: 4.8,
+    reviewsCount: 29,
+    experienceYears: 6,
+    maxCapacity: 3,
+    currentOccupancy: 1,
+    acceptedAgeGroups: ['1 - 3 yrs', '3 - 6 yrs', '6 - 10 yrs'],
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    availableTimeSlots: ['09:00 AM - 01:00 PM', '03:30 PM - 07:30 PM', 'Full Day (9 AM - 7 PM)'],
+    amenities: [
+      'Gated Society Security & Park Access',
+      'Fresh Ragi Malt & Wholesome Khichdi',
+      'Extensive Storybook Reading Corner',
+      'Duplo & Wooden Train Sets',
+      'First Aid Certified Parent'
+    ],
+    photos: [
+      'https://images.unsplash.com/photo-1596464716127-f2a829822301?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1544717302-de2939b7ef71?auto=format&fit=crop&q=80&w=800'
+    ],
+    avatarUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400&crop=faces',
+    phone: '9880123456',
+    email: 'kavitha.hsr@example.com',
+    aadhaarVerified: true,
+    policeVerified: true,
+    isAcceptingNow: true,
+    instantBooking: true,
+    parentKidNames: 'Mom of Aarav (5y) & Kabir (8y)',
+    emergencyContact: '+91 9880123400',
+    reviews: [
+      {
+        id: 'rev-blr-3',
+        parentName: 'Swati Suresh',
+        rating: 5,
+        comment: 'Kavitha is a lifesaver! Took care of my daughter during an urgent client escalation. Felt 100% like family.',
+        date: '4 days ago'
+      }
+    ]
+  },
+  {
+    id: 'blr-playhome-3',
+    title: 'Koramangala Free Mutual Reciprocal Care Circle',
+    hostName: 'Meera Nair & Bangalore Parents Circle',
+    providerType: 'Neighbour Parent',
+    hourlyRate: 0, // Free Co-Op
+    hourlyRateNeighborHome: 0,
+    hourlyRateParentHome: 0,
+    halfDayRate: 0,
+    fullDayRate: 0,
+    bio: 'Passionate advocate of neighborhood community sharing! Stay-at-home mother with 3-year-old Reyansh in Koramangala 6th Block. Happy to watch your kid for an hour or two for FREE as reciprocal playmates.',
+    location: {
+      lat: 12.9352,
+      lng: 77.6245,
+      address: '6th Block, Koramangala, Bangalore',
+      distance: 0.9
+    },
+    rating: 4.9,
+    reviewsCount: 22,
+    experienceYears: 4,
+    maxCapacity: 2,
+    currentOccupancy: 0,
+    acceptedAgeGroups: ['2 - 5 yrs'],
+    availableDays: ['Mon', 'Wed', 'Fri', 'Sat'],
+    availableTimeSlots: ['10:00 AM - 01:00 PM', '04:00 PM - 07:00 PM'],
+    amenities: [
+      '100% FREE Neighbor Reciprocal Exchange',
+      'Enclosed Balcony Play Lawn',
+      'Art & Craft Materials & Play-Doh',
+      'Fresh Fruit Platters & Milk',
+      'Aadhaar Verified Trust'
+    ],
+    photos: [
+      'https://images.unsplash.com/photo-1544717302-de2939b7ef71?auto=format&fit=crop&q=80&w=800'
+    ],
+    avatarUrl: 'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?auto=format&fit=crop&q=80&w=400',
+    phone: '9845556677',
+    email: 'meera.nair.blr@example.com',
+    aadhaarVerified: true,
+    policeVerified: false,
+    isAcceptingNow: true,
+    instantBooking: false,
+    parentKidNames: 'Mom of Reyansh (3y)',
+    emergencyContact: '+91 9845556600',
+    reviews: [
+      {
+        id: 'rev-blr-4',
+        parentName: 'Sunita Rao',
+        rating: 5,
+        comment: 'Meera watched my son while I attended a school orientation. Wonderful parent, great community spirit!',
+        date: '5 days ago'
+      }
+    ]
+  },
+  {
+    id: 'blr-playhome-4',
+    title: 'Whitefield Sunny Nest Daycare & Toddler Drop-in Studio',
+    hostName: 'Dr. Sneha Hegde & Rohan Shenoy',
+    providerType: 'Montessori Daycare',
+    hourlyRate: 240,
+    hourlyRateNeighborHome: 240,
+    hourlyRateParentHome: 320,
+    halfDayRate: 750,
+    fullDayRate: 1350,
+    monthlyDaycareFee: 9500,
+    bio: 'Dedicated ground-floor daycare studio in Prestige Shantiniketan with shaded sandbox, soft gym, sensory ball pit, pediatric nurse on call, and HD CCTV parent streaming.',
+    location: {
+      lat: 12.9698,
+      lng: 77.7500,
+      address: 'Prestige Shantiniketan, Whitefield Main Rd, Bangalore',
+      distance: 1.2
+    },
+    rating: 5.0,
+    reviewsCount: 51,
+    experienceYears: 9,
+    maxCapacity: 8,
+    currentOccupancy: 3,
+    acceptedAgeGroups: ['6m - 2 yrs', '2 - 5 yrs', '5 - 10 yrs'],
+    availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    availableTimeSlots: ['08:00 AM - 01:00 PM', '02:00 PM - 06:30 PM', 'Full Day (8 AM - 7:30 PM)'],
+    amenities: [
+      '24/7 HD CCTV Parent Streaming',
+      'Pediatric First Aid & Registered Nurse Assistance',
+      'Fresh Organic Purees & Finger Snacks',
+      'Indoor Ball Pit & Soft Play Gym',
+      'Sanitized Nap Suites'
+    ],
+    photos: [
+      'https://images.unsplash.com/photo-1560421683-6856ea585c78?auto=format&fit=crop&q=80&w=800',
+      'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=800'
+    ],
+    avatarUrl: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&q=80&w=400&crop=faces',
+    phone: '9845998877',
+    email: 'sunnynest.whitefield@gmail.com',
+    aadhaarVerified: true,
+    policeVerified: true,
+    isAcceptingNow: true,
+    instantBooking: true,
+    parentKidNames: 'Parents of Tara (3y) & Vivaan (6y)',
+    emergencyContact: '+91 9845998800',
+    reviews: [
+      {
+        id: 'rev-blr-5',
+        parentName: 'Nisha Singhania',
+        rating: 5,
+        comment: 'Professional staff, sparkling clean nap area. Used them for 5 hours while attending office workshops.',
+        date: '3 days ago'
+      }
+    ]
+  }
+];
+
+export const INITIAL_CARE_BOOKINGS: CareBookingRequest[] = [
+  {
+    id: 'care-req-101',
+    parentId: 'user-0',
+    parentName: 'Ayaan\'s Family',
+    parentPhone: '9845001122',
+    childName: 'Ayaan',
+    childAge: 5,
+    childGender: 'Boy',
+    providerId: 'blr-playhome-1',
+    providerName: 'Ananya Deshmukh',
+    providerTitle: 'Little Blossoms Montessori Playhome & Creche',
+    providerType: 'Certified Playhome',
+    providerHourlyRate: 180,
+    date: '2026-08-25',
+    startTime: '10:00 AM',
+    endTime: '01:00 PM',
+    durationHours: 3,
+    totalAmount: 540,
+    status: 'Accepted',
+    dropOffPin: '4829',
+    pickupPin: '7391',
+    specialInstructions: 'Loves Lego building and apple slices. Has nap around 12:30 PM. Water bottle in yellow backpack.',
+    emergencyContact: '+91 9845001122',
+    createdAt: new Date(Date.now() - 3600 * 1000 * 5).toISOString(),
+    senderRole: 'parent',
+    careActivityLog: [
+      { timestamp: '10:05 AM', activity: 'Arrival & Handshake', note: 'Child settled in with wooden train track' },
+      { timestamp: '11:15 AM', activity: 'Snack Time', note: 'Ate organic fruit slices & water' }
+    ]
+  }
+];
+
+export const INITIAL_DAYCARE_PLAYHOMES: DaycarePlayhomeProfile[] = MOCK_DAYCARES;
+

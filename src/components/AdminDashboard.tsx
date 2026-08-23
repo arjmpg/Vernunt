@@ -20,6 +20,7 @@ import confetti from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import GoogleDriveBackupPanel from './GoogleDriveBackupPanel.tsx';
 import VernuntLogo from './VernuntLogo.tsx';
+import VernuntSeoSuite from './VernuntSeoSuite.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -51,8 +52,8 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | broadcast | contacts | security | backups | settings
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | broadcast | contacts | security | backups | settings | seo
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -332,15 +333,41 @@ export default function AdminDashboard({
     setShowKycDrawer(true);
   };
 
+  const sendApprovalNotification = async (user: Partial<ChildProfile>) => {
+    try {
+      const res = await fetch('/api/notify-approval', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          parentName: user.parentName,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          role: user.userRole,
+          loginUrl: window.location.origin
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showNotification('success', `✓ Verified ${user.parentName} & dispatched Approval Email + SMS with login link!`);
+      }
+    } catch (notifyErr) {
+      console.warn("Notification trigger warning:", notifyErr);
+    }
+  };
+
   const handleSaveUserChanges = async () => {
     if (!selectedUser) return;
     setUpdateLoading(true);
     try {
       const userRef = doc(db, 'users', selectedUser.id);
+      const isNewlyVerified = targetVerification === VerificationStatus.VERIFIED && selectedUser.verificationStatus !== VerificationStatus.VERIFIED;
       const updatePayload = {
         ...selectedUser,
         userRole: targetRole,
         verificationStatus: targetVerification,
+        facialAuditRequired: targetVerification === VerificationStatus.VERIFIED ? false : selectedUser.facialAuditRequired,
+        faceVerificationStatus: targetVerification === VerificationStatus.VERIFIED ? 'verified' : (targetVerification === VerificationStatus.REJECTED ? 'rejected' : selectedUser.faceVerificationStatus),
         aadhaarVerified: targetAadhaarVerified,
         aadhaarNumber: targetAadhaarNum,
         phoneNumber: targetPhone,
@@ -355,7 +382,12 @@ export default function AdminDashboard({
 
       await setDoc(userRef, updatePayload, { merge: true });
       setSelectedUser(updatePayload);
-      showNotification('success', `User "${selectedUser.parentName}" was updated successfully.`);
+      
+      if (isNewlyVerified) {
+        await sendApprovalNotification(updatePayload);
+      } else {
+        showNotification('success', `User "${selectedUser.parentName}" was updated successfully.`);
+      }
       setShowKycDrawer(false);
     } catch (err: any) {
       showNotification('error', `Failed updating user: ${err.message || err}`);
@@ -496,37 +528,38 @@ export default function AdminDashboard({
   // =========================================================================
   const defaultAdminPlans: SubscriptionPlan[] = [
     {
-      id: '1-day',
-      title: '1-Day Flash Pass',
-      price: 49,
-      period: '1 Day',
-      popular: false,
-      saving: null,
-      color: 'border-cyan-200',
-      durationDays: 1,
-      description: 'Instant 24-hour full access pass for quick weekend playdates or emergency trial.',
+      id: 'free-parent-1yr',
+      title: 'Parent 1-Year Free Pass',
+      price: 0,
+      period: '12 Months Free',
+      popular: true,
+      saving: '100% Free Offer',
+      color: 'border-emerald-400 ring-2 ring-emerald-400',
+      durationDays: 365,
+      description: 'Exclusive 1-Year zero-cost access for all registered parents & children.',
       capabilities: [
-        'Unlimited companion playdate chats for 24h',
-        '✨ FREE Bookings for same-day community classes',
+        '🎁 100% FREE Full App Usage for 1 Full Year',
+        'Unlimited companion playdate chats',
+        '✨ FREE Bookings for non-paid classes',
         '🔐 FREE view of Professional Portfolios',
-        '🥇 Bonus: 1 Decrypt Credit included'
+        '🥇 Bonus: 10 Decrypt Credits included'
       ]
     },
     {
-      id: 'weekly',
-      title: 'Weekly Explorer Pass',
-      price: 149,
-      period: '1 Week',
+      id: 'free-host-6mo',
+      title: 'Host & Specialist 6-Month Free Pass',
+      price: 0,
+      period: '6 Months Free',
       popular: false,
-      saving: 'Intro Offer',
-      color: 'border-indigo-200',
-      durationDays: 7,
-      description: '7-day complete access pass for vacation playdates and school break activities.',
+      saving: '100% Free Offer',
+      color: 'border-indigo-400 ring-2 ring-indigo-400',
+      durationDays: 180,
+      description: 'Exclusive 6-Month zero-cost listing & hosting access for organizers and portfolio specialists.',
       capabilities: [
-        'Unlimited companion playdate chats',
-        '✨ FREE Bookings for weekly classes',
-        '🔐 FREE view of Professional Portfolios',
-        '🥇 Bonus: 3 Decrypt Credits included'
+        '🎁 100% FREE Host & Portfolio Listing for 6 Months',
+        'Create & publish unlimited community classes/events',
+        'Collect verified registrations & client appointment requests',
+        '🥇 Bonus: 10 Decrypt Credits included'
       ]
     },
     {
@@ -538,7 +571,7 @@ export default function AdminDashboard({
       saving: null,
       color: 'border-slate-200',
       durationDays: 30,
-      description: 'Perfect for temporary stays or trying out the network.',
+      description: 'Flexible 30-day renewal pass for post-promotional extensions.',
       capabilities: [
         'Unlimited companion playdate chats',
         '✨ FREE Bookings for non-paid classes',
@@ -551,7 +584,7 @@ export default function AdminDashboard({
       title: 'Tri-Active Pass',
       price: 799,
       period: '3 Months',
-      popular: true,
+      popular: false,
       saving: 'Save 10%',
       color: 'border-orange-200',
       durationDays: 90,
@@ -1159,6 +1192,28 @@ export default function AdminDashboard({
             >
               <HardDrive className="w-4 h-4 shrink-0 text-[#72aee6]" />
               {!isSidebarCollapsed && <span>Backups & Cloud</span>}
+            </button>
+
+            {/* MENU ITEM: Vernunt SEO & Instant Indexing Studio */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('seo'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+                activeMenu === 'seo'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-amber-400 shadow-md'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Vernunt SEO & Instant Indexing"
+            >
+              <Globe className="w-4 h-4 shrink-0 text-amber-300" />
+              {!isSidebarCollapsed && (
+                <div className="flex items-center justify-between w-full">
+                  <span>SEO & Indexing</span>
+                  <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                    Rank Math
+                  </span>
+                </div>
+              )}
             </button>
 
             {/* MENU ITEM: Settings & Tabs */}
@@ -1852,16 +1907,18 @@ export default function AdminDashboard({
                                           const userRef = doc(db, 'users', u.id);
                                           await updateDoc(userRef, {
                                             verificationStatus: VerificationStatus.VERIFIED,
-                                            aadhaarVerified: true
+                                            aadhaarVerified: true,
+                                            facialAuditRequired: false,
+                                            faceVerificationStatus: 'verified'
                                           });
-                                          showNotification('success', `Verified ${u.parentName}`);
+                                          await sendApprovalNotification(u);
                                         } catch (err: any) {
                                           showNotification('error', err.message);
                                         }
                                       }} 
-                                      className="hover:underline text-emerald-700"
+                                      className="hover:underline text-emerald-700 font-bold"
                                     >
-                                      Verify
+                                      Approve & Notify
                                     </button>
                                     <span className="text-[#dcdcde]">|</span>
                                     <button 
@@ -1901,17 +1958,75 @@ export default function AdminDashboard({
                               <div className="text-[10px] text-[#646970]">{showUnmaskedPii ? u.email : maskEmail(u.email)}</div>
                             </td>
 
-                            {/* KYC / Aadhaar Verification */}
+                            {/* KYC / Uploaded Documents (Admin Only) */}
                             <td className="py-3 px-3">
-                              {u.aadhaarVerified ? (
-                                <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-xs font-bold text-[10px]">
-                                  <ShieldCheck className="w-3 h-3 text-emerald-600" /> Aadhaar Linked
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 bg-[#f6f7f7] text-[#646970] border border-[#dcdcde] px-2 py-0.5 rounded-xs text-[10px]">
-                                  Unlinked
-                                </span>
-                              )}
+                              <div className="space-y-1">
+                                {u.aadhaarDocUrl ? (
+                                  <a
+                                    href={u.aadhaarDocUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-xs font-bold text-[10px] transition"
+                                    title={u.aadhaarDocName || 'Aadhaar Document'}
+                                  >
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                                    <span>📄 Aadhaar Document</span>
+                                  </a>
+                                ) : u.aadhaarVerified ? (
+                                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-xs font-bold text-[10px]">
+                                    <ShieldCheck className="w-3 h-3 text-emerald-600" /> Aadhaar Linked
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 bg-[#f6f7f7] text-[#646970] border border-[#dcdcde] px-2 py-0.5 rounded-xs text-[10px]">
+                                    Unlinked
+                                  </span>
+                                )}
+
+                                {u.idDocUrl && (
+                                  <div>
+                                    <a
+                                      href={u.idDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 px-2 py-0.5 rounded-xs font-bold text-[10px] transition"
+                                      title={u.idDocumentName || 'Govt ID Document'}
+                                    >
+                                      <Eye className="w-3 h-3 text-purple-600 shrink-0" />
+                                      <span>📁 ID Document</span>
+                                    </a>
+                                  </div>
+                                )}
+
+                                {u.companyDocUrl && (
+                                  <div>
+                                    <a
+                                      href={u.companyDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-xs font-bold text-[10px] transition"
+                                      title={u.companyDocName || 'Corporate Document'}
+                                    >
+                                      <Eye className="w-3 h-3 text-blue-600 shrink-0" />
+                                      <span>🏢 Corporate Doc</span>
+                                    </a>
+                                  </div>
+                                )}
+
+                                {u.addressProofDocUrl && (
+                                  <div>
+                                    <a
+                                      href={u.addressProofDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 px-2 py-0.5 rounded-xs font-bold text-[10px] transition"
+                                      title={u.addressProofDocName || 'Address Proof'}
+                                    >
+                                      <Eye className="w-3 h-3 text-amber-600 shrink-0" />
+                                      <span>📍 Address Proof</span>
+                                    </a>
+                                  </div>
+                                )}
+                              </div>
                             </td>
 
                             {/* Role */}
@@ -2511,6 +2626,54 @@ export default function AdminDashboard({
                   <span className="font-bold text-[#50575e] text-[11px] uppercase tracking-wider flex items-center gap-1">
                     <Zap className="w-3.5 h-3.5 text-amber-500" /> Quick Presets:
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddPlan({
+                      id: 'free-parent-1yr',
+                      title: 'Parent 1-Year Free Pass',
+                      price: 0,
+                      period: '12 Months Free',
+                      durationDays: 365,
+                      popular: true,
+                      color: 'border-emerald-400',
+                      saving: '100% Free',
+                      description: 'Exclusive 1-Year zero-cost access for all registered parents & children.',
+                      capabilities: [
+                        '🎁 100% FREE Full App Usage for 1 Full Year',
+                        'Unlimited companion playdate chats',
+                        '✨ FREE Bookings for non-paid classes',
+                        '🔐 FREE view of Professional Portfolios',
+                        '🥇 Bonus: 10 Decrypt Credits included'
+                      ]
+                    })}
+                    className="px-2.5 py-1 bg-emerald-50 border border-emerald-300 text-emerald-900 text-[11px] font-bold rounded-full hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    🎁 Parent 1-Yr Free (₹0)
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenAddPlan({
+                      id: 'free-host-6mo',
+                      title: 'Host & Specialist 6-Month Free Pass',
+                      price: 0,
+                      period: '6 Months Free',
+                      durationDays: 180,
+                      color: 'border-indigo-400',
+                      saving: '100% Free',
+                      description: 'Exclusive 6-Month zero-cost listing & hosting access for organizers and portfolio specialists.',
+                      capabilities: [
+                        '🎁 100% FREE Host & Portfolio Listing for 6 Months',
+                        'Create & publish unlimited community classes/events',
+                        'Collect verified registrations & client appointment requests',
+                        '🥇 Bonus: 10 Decrypt Credits included'
+                      ]
+                    })}
+                    className="px-2.5 py-1 bg-indigo-50 border border-indigo-300 text-indigo-900 text-[11px] font-bold rounded-full hover:bg-indigo-100 transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    🎁 Host/Specialist 6-Mo Free (₹0)
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => handleOpenAddPlan({
@@ -3495,6 +3658,15 @@ export default function AdminDashboard({
             </div>
           )}
 
+          {/* ========================================================================= */}
+          {/* VIEW L: VERNUNT ENTERPRISE SEO & INSTANT INDEXING STUDIO                 */}
+          {/* ========================================================================= */}
+          {activeMenu === 'seo' && (
+            <div className="space-y-4 animate-fadeIn">
+              <VernuntSeoSuite />
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -3518,6 +3690,373 @@ export default function AdminDashboard({
               >
                 <XSquare className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Biometric Comparison & Facial Audit Card if user has photos */}
+            {(selectedUser.parentPhotoUrl || selectedUser.selfiePhotoUrl || selectedUser.photoUrl || selectedUser.facialAuditRequired) && (
+              <div className="p-3 bg-[#f6f7f7] border border-[#c3c4c7] rounded-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-[#1d2327]">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                    <span>Facial Recognition & Biometric Audit</span>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-xs font-bold text-[10px] uppercase ${
+                    selectedUser.faceVerificationStatus === 'verified' 
+                      ? 'bg-emerald-100 text-emerald-800' 
+                      : selectedUser.faceVerificationStatus === 'rejected'
+                      ? 'bg-rose-100 text-rose-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {selectedUser.faceVerificationStatus === 'verified' ? '✓ Biometrics Verified' : selectedUser.facialAuditRequired ? '⚠ Manual Review Required' : selectedUser.faceVerificationStatus || 'Pending'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-1">
+                  <div className="space-y-1 text-center bg-white p-2 border border-[#dcdcde] rounded-xs">
+                    <span className="text-[10px] font-bold text-[#50575e] block">Step A: Portrait / ID Photo</span>
+                    <div className="w-24 h-24 mx-auto rounded-xs overflow-hidden border border-[#c3c4c7] bg-slate-100 flex items-center justify-center">
+                      {(selectedUser.parentPhotoUrl || selectedUser.photoUrl) ? (
+                        <img 
+                          src={selectedUser.parentPhotoUrl || selectedUser.photoUrl} 
+                          alt="Step A Portrait" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span className="text-[9px] text-[#8c8f94]">No Photo</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-[#646970] block">Source: {selectedUser.stepAPhotoSource || 'Gallery / Portrait'}</span>
+                  </div>
+
+                  <div className="space-y-1 text-center bg-white p-2 border border-[#dcdcde] rounded-xs">
+                    <span className="text-[10px] font-bold text-[#50575e] block">Step B: Live Camera Selfie</span>
+                    <div className="w-24 h-24 mx-auto rounded-xs overflow-hidden border border-[#c3c4c7] bg-slate-100 flex items-center justify-center">
+                      {selectedUser.selfiePhotoUrl ? (
+                        <img 
+                          src={selectedUser.selfiePhotoUrl} 
+                          alt="Step B Live Selfie" 
+                          className="w-full h-full object-cover" 
+                          referrerPolicy="no-referrer"
+                        />
+                      ) : (
+                        <span className="text-[9px] text-[#8c8f94]">Skipped (Direct Selfie in Step A)</span>
+                      )}
+                    </div>
+                    <span className="text-[9px] text-emerald-700 font-bold block">
+                      {selectedUser.faceVerificationScore ? `AI Score: ${selectedUser.faceVerificationScore}% Match` : 'Live Front Camera'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Audit Action Buttons */}
+                <div className="flex justify-end gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const userRef = doc(db, 'users', selectedUser.id);
+                        await updateDoc(userRef, {
+                          facialAuditRequired: false,
+                          faceVerificationStatus: 'rejected',
+                          verificationStatus: VerificationStatus.REJECTED
+                        });
+                        setTargetVerification(VerificationStatus.REJECTED);
+                        showNotification('warning', `Rejected facial recognition for ${selectedUser.parentName}`);
+                      } catch (e: any) {
+                        showNotification('error', e.message);
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-white hover:bg-rose-50 text-[#d63638] border border-[#d63638] rounded-xs font-bold text-[10px] transition cursor-pointer"
+                  >
+                    Reject Biometrics
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        const userRef = doc(db, 'users', selectedUser.id);
+                        await updateDoc(userRef, {
+                          facialAuditRequired: false,
+                          faceVerificationStatus: 'verified',
+                          verificationStatus: VerificationStatus.VERIFIED,
+                          aadhaarVerified: true
+                        });
+                        setTargetVerification(VerificationStatus.VERIFIED);
+                        setTargetAadhaarVerified(true);
+                        await sendApprovalNotification(selectedUser);
+                      } catch (e: any) {
+                        showNotification('error', e.message);
+                      }
+                    }}
+                    className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xs font-bold text-[10px] transition cursor-pointer"
+                  >
+                    ✓ Approve Biometrics & Send Login Link
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Uploaded Aadhaar Card Document (Mandatory 3MB File) */}
+            <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-emerald-950 text-xs">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>National Aadhaar Card Document (Government Proof)</span>
+                </div>
+                {selectedUser.aadhaarDocUrl ? (
+                  <span className="bg-emerald-100 text-emerald-800 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    Document Attached
+                  </span>
+                ) : (
+                  <span className="bg-amber-100 text-amber-800 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    Pending Upload
+                  </span>
+                )}
+              </div>
+
+              {selectedUser.aadhaarDocUrl ? (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 border border-emerald-200 rounded-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xs bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-base shrink-0">
+                      📄
+                    </div>
+                    <div>
+                      <span className="font-bold text-[#1d2327] block text-xs truncate max-w-xs">
+                        {selectedUser.aadhaarDocName || 'Aadhaar_Document.jpg'}
+                      </span>
+                      <span className="text-[10px] text-[#646970]">
+                        {selectedUser.aadhaarDocSize ? `${(selectedUser.aadhaarDocSize / (1024 * 1024)).toFixed(2)} MB` : 'Max 3 MB Document'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={selectedUser.aadhaarDocUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xs font-bold text-[10.5px] flex items-center gap-1 transition"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Inspect Aadhaar</span>
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[10.5px] text-[#646970] italic">
+                  No separate Aadhaar document file uploaded yet.
+                </p>
+              )}
+            </div>
+
+            {/* Uploaded Government ID / Certification Document (Admin Only) */}
+            {selectedUser.idDocUrl && (
+              <div className="p-3.5 bg-purple-50/70 border border-purple-200 rounded-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-purple-950 text-xs">
+                    <Eye className="w-4 h-4 text-purple-600" />
+                    <span>Uploaded ID Card / Professional Certification</span>
+                  </div>
+                  <span className="bg-purple-100 text-purple-800 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    Admin Visible
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 border border-purple-200 rounded-xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-10 h-10 rounded-xs bg-purple-100 text-purple-700 flex items-center justify-center font-bold text-base shrink-0">
+                      📁
+                    </div>
+                    <div>
+                      <span className="font-bold text-[#1d2327] block text-xs truncate max-w-xs">
+                        {selectedUser.idDocumentName || 'ID_Card_Document.jpg'}
+                      </span>
+                      <span className="text-[10px] text-[#646970]">Government ID / Specialist Certificate</span>
+                    </div>
+                  </div>
+                  <a
+                    href={selectedUser.idDocUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xs font-bold text-[10.5px] flex items-center gap-1 transition"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    <span>Inspect ID Document</span>
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Corporate Registration & Facility Address Documents (Admin Only) */}
+            {(selectedUser.companyDocUrl || selectedUser.addressProofDocUrl) && (
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-950 text-xs">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>Corporate & Organization Documents</span>
+                  </div>
+                  <span className="bg-blue-100 text-blue-800 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    Admin Only
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {selectedUser.companyDocUrl && (
+                    <div className="bg-white p-3 border border-blue-200 rounded-xs space-y-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">1. Company Registration</span>
+                      <span className="text-xs font-bold text-slate-800 block truncate">{selectedUser.companyDocName || 'Company_Registration.pdf'}</span>
+                      <a
+                        href={selectedUser.companyDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-blue-700 hover:bg-blue-800 text-white text-[10px] font-bold rounded-xs transition"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Inspect Certificate</span>
+                      </a>
+                    </div>
+                  )}
+                  {selectedUser.addressProofDocUrl && (
+                    <div className="bg-white p-3 border border-blue-200 rounded-xs space-y-2">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase block">2. Facility / Clinic Address Proof</span>
+                      <span className="text-xs font-bold text-slate-800 block truncate">{selectedUser.addressProofDocName || 'Address_Proof.pdf'}</span>
+                      <a
+                        href={selectedUser.addressProofDocUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-700 hover:bg-amber-800 text-white text-[10px] font-bold rounded-xs transition"
+                      >
+                        <Eye className="w-3 h-3" />
+                        <span>Inspect Address Proof</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Current & Permanent Address & Proof Records (Strictly Admin Only) */}
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-amber-950 text-xs">
+                  <ShieldCheck className="w-4 h-4 text-amber-600" />
+                  <span>Confidential Address Verification (Admin-Only Access)</span>
+                </div>
+                <span className="bg-amber-100 text-amber-800 font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Admin Only
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                {/* Current Address */}
+                <div className="bg-white p-2.5 border border-amber-200 rounded-xs space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Current Residential Address</span>
+                  <p className="text-slate-800 font-medium text-xs leading-relaxed">
+                    {selectedUser.currentAddress || selectedUser.location?.address || 'Not specified during onboarding'}
+                  </p>
+                </div>
+
+                {/* Permanent Address */}
+                <div className="bg-white p-2.5 border border-amber-200 rounded-xs space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 block uppercase tracking-wider">Permanent Address</span>
+                  <p className="text-slate-800 font-medium text-xs leading-relaxed">
+                    {selectedUser.permanentAddress || selectedUser.currentAddress || selectedUser.location?.address || 'Same as Current Address'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Address Proof Document File */}
+              {selectedUser.addressProofDocUrl ? (
+                <div className="bg-white p-2.5 border border-amber-200 rounded-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📍</span>
+                    <div>
+                      <span className="text-xs font-bold text-slate-800 block truncate">
+                        {selectedUser.addressProofDocName || 'Address_Verification_Doc.pdf'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">
+                        Type: {selectedUser.addressProofDocType || 'Govt Address Proof'} {selectedUser.addressProofDocSize ? `• ${(selectedUser.addressProofDocSize / (1024 * 1024)).toFixed(2)} MB` : ''}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={selectedUser.addressProofDocUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 px-3 py-1 bg-amber-700 hover:bg-amber-800 text-white text-[10px] font-bold rounded-xs transition shrink-0"
+                  >
+                    <Eye className="w-3 h-3" />
+                    <span>Inspect Address Proof</span>
+                  </a>
+                </div>
+              ) : (
+                <p className="text-[10px] text-slate-500 italic bg-white/60 p-2 rounded-xs border border-amber-100">
+                  Address proof document verified via physical verification or linked Aadhaar KYC records.
+                </p>
+              )}
+            </div>
+
+            {/* Admin-Only Security Telemetry (IP & GPS Coordinates) */}
+            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xs space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-indigo-950 text-xs">
+                  <MapPin className="w-4 h-4 text-indigo-600" />
+                  <span>Admin Security Telemetry (IP Address & GPS Coordinates)</span>
+                </div>
+                <span className="bg-indigo-100 text-indigo-800 font-extrabold text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Admin Only
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                {/* IP Address */}
+                <div className="bg-white p-2.5 border border-indigo-100 rounded-xs space-y-1">
+                  <span className="text-[10px] font-bold text-[#646970] block uppercase tracking-wider">Client IP Address</span>
+                  <span className="font-mono font-bold text-slate-800 text-xs block">
+                    {selectedUser.ipAddress || 'Not captured (pre-telemetry)'}
+                  </span>
+                  {selectedUser.ipAddress && selectedUser.ipAddress !== '127.0.0.1' && (
+                    <a
+                      href={`https://whatismyipaddress.com/ip/${selectedUser.ipAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9.5px] text-indigo-600 hover:underline font-semibold block"
+                    >
+                      Look up IP origin ↗
+                    </a>
+                  )}
+                </div>
+
+                {/* GPS Coordinates */}
+                <div className="bg-white p-2.5 border border-indigo-100 rounded-xs space-y-1">
+                  <span className="text-[10px] font-bold text-[#646970] block uppercase tracking-wider">Captured Lat / Lng</span>
+                  <span className="font-mono font-bold text-slate-800 text-xs block">
+                    {selectedUser.capturedLat && selectedUser.capturedLng
+                      ? `${selectedUser.capturedLat.toFixed(5)}, ${selectedUser.capturedLng.toFixed(5)}`
+                      : 'Unavailable / Denied'}
+                  </span>
+                  {selectedUser.capturedLat && selectedUser.capturedLng && (
+                    <a
+                      href={`https://www.google.com/maps?q=${selectedUser.capturedLat},${selectedUser.capturedLng}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[9.5px] text-indigo-600 hover:underline font-semibold block"
+                    >
+                      View on Google Maps ↗
+                    </a>
+                  )}
+                </div>
+
+                {/* Location & Capture Time */}
+                <div className="bg-white p-2.5 border border-indigo-100 rounded-xs space-y-1">
+                  <span className="text-[10px] font-bold text-[#646970] block uppercase tracking-wider">Capture Timestamp</span>
+                  <span className="text-slate-700 text-[11px] block">
+                    {selectedUser.capturedAt ? new Date(selectedUser.capturedAt).toLocaleString() : 'N/A'}
+                  </span>
+                  <span className="text-[9.5px] text-slate-500 block truncate">
+                    {selectedUser.capturedLocationInfo || 'Browser Geolocation API'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Form Fields */}

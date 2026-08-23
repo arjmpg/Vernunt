@@ -4,14 +4,13 @@
   and fallback cache support for dynamic assets.
 */
 
-const CACHE_NAME = 'vernunt-static-cache-v2';
-const DYNAMIC_CACHE_NAME = 'vernunt-dynamic-cache-v2';
+const CACHE_NAME = 'vernunt-static-cache-v3';
+const DYNAMIC_CACHE_NAME = 'vernunt-dynamic-cache-v3';
 
 // Pre-cache core structural assets to guarantee instant shell boot
 const PRECACHE_ASSETS = [
   '/',
-  '/index.html',
-  '/data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧸</text></svg>'
+  '/index.html'
 ];
 
 // Installation phase - warm up static precache
@@ -21,20 +20,20 @@ self.addEventListener('install', (event) => {
     caches.open(CACHE_NAME).then((cache) => {
       console.log('[Service Worker] Pre-caching application shell...');
       return cache.addAll(PRECACHE_ASSETS).catch((err) => {
-        console.warn('[Service Worker] Pre-cache warning (some paths may be dynamic):', err);
+        console.warn('[Service Worker] Pre-cache warning:', err);
       });
     })
   );
 });
 
-// Activation phase - cleanup old caches
+// Activation phase - cleanup all old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           if (cacheName !== CACHE_NAME && cacheName !== DYNAMIC_CACHE_NAME) {
-            console.log('[Service Worker] Removing deprecated cache:', cacheName);
+            console.log('[Service Worker] Purging outdated cache:', cacheName);
             return caches.delete(cacheName);
           }
         })
@@ -48,8 +47,22 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Bypass non-GET requests (e.g., Firestore REST API, Auth, Razorpay APIs)
+  // Bypass non-GET requests
   if (request.method !== 'GET') {
+    return;
+  }
+
+  // Bypass Vite dev server requests, source modules, and HMR
+  if (
+    url.pathname.startsWith('/@') ||
+    url.pathname.startsWith('/src/') ||
+    url.pathname.startsWith('/node_modules/') ||
+    url.pathname.endsWith('.ts') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.jsx') ||
+    url.search.includes('import') ||
+    url.search.includes('t=')
+  ) {
     return;
   }
 
@@ -58,13 +71,14 @@ self.addEventListener('fetch', (event) => {
     url.hostname.includes('firestore.googleapis.com') ||
     url.hostname.includes('identitytoolkit.googleapis.com') ||
     url.hostname.includes('securetoken.googleapis.com') ||
+    url.hostname.includes('googleapis.com') ||
     url.search.includes('apiKey=') ||
     url.pathname.includes('/__/auth/')
   ) {
     return;
   }
 
-  // CRITICAL: Always bypass Service Worker for sitemap.xml, robots.txt, API routes, and XML documents
+  // Always bypass Service Worker for sitemap.xml, robots.txt, and backend API routes
   if (
     url.pathname === '/sitemap.xml' ||
     url.pathname === '/robots.txt' ||

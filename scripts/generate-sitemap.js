@@ -142,6 +142,18 @@ if (!fs.existsSync(publicDir)) {
 }
 const publicSitemap = path.join(publicDir, 'sitemap.xml');
 fs.writeFileSync(publicSitemap, xml, 'utf-8');
+fs.writeFileSync(path.join(publicDir, 'vernunt-indexnow-key.txt'), 'vernunt_indexnow_auth_2026', 'utf-8');
+
+// Sub-sitemap: guides
+let guidesXml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+for (const pillar of knowledgePillars) {
+  for (const age of ageSlugs) {
+    guidesXml += `  <url><loc>${baseUrl}/knowledge/${pillar}-${age}-guide</loc><lastmod>${today}</lastmod><priority>0.8</priority></url>\n`;
+  }
+}
+guidesXml += `</urlset>`;
+fs.writeFileSync(path.join(publicDir, 'sitemap-guides.xml'), guidesXml, 'utf-8');
+
 console.log(`[Sitemap Generator] Generated ${publicSitemap} with ${corePages.length + categoryPages.length + (knowledgePillars.length * ageSlugs.length)} URLs.`);
 
 // Also write to /dist/sitemap.xml if /dist exists
@@ -149,5 +161,7 @@ const distDir = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distDir)) {
   const distSitemap = path.join(distDir, 'sitemap.xml');
   fs.writeFileSync(distSitemap, xml, 'utf-8');
+  fs.writeFileSync(path.join(distDir, 'sitemap-guides.xml'), guidesXml, 'utf-8');
+  fs.writeFileSync(path.join(distDir, 'vernunt-indexnow-key.txt'), 'vernunt_indexnow_auth_2026', 'utf-8');
   console.log(`[Sitemap Generator] Also mirrored to ${distSitemap}`);
 }

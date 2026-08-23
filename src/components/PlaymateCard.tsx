@@ -154,8 +154,8 @@ export default function PlaymateCard({
   const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
 
   const isProfileUnlocked = isConnected || !!currentUserProfile?.subscriptionActive;
-  const uLat = currentUserLat || 19.0760;
-  const uLng = currentUserLng || 72.8777;
+  const uLat = currentUserLat || 12.9716;
+  const uLng = currentUserLng || 77.5946;
   const distKm = getHaversineDistance(uLat, uLng, profile.location.lat, profile.location.lng);
   const proxBadge = getProximityBadge(distKm);
 
@@ -572,6 +572,27 @@ export default function PlaymateCard({
               <span className="font-mono text-[9px] text-slate-400 italic">🔒 Protected until connected</span>
             )}
           </div>
+
+          {/* Babysitting & Drop-in Care badge if offered */}
+          {(profile.offersBabysitting || profile.isParentHostingDaycare) && (
+            <div id={`babysitting-badge-${profile.id}`} className="p-2.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-300/80 flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <span className="text-xl">🏠</span>
+                <div>
+                  <span className="text-[10px] font-black text-amber-900 uppercase tracking-wide block flex items-center gap-1">
+                    <span>Hosts Home Daycare & Playhome</span>
+                    <span className="bg-amber-200 text-amber-950 text-[8.5px] font-bold px-1.5 py-0.2 rounded">Neighbour Host</span>
+                  </span>
+                  <span className="text-xs font-black text-slate-900 font-mono">
+                    ₹{profile.parentDaycareHourlyRate || profile.hourlyBabysittingRate || 150}/hr <span className="text-[10px] font-normal text-slate-600 font-sans">• {profile.parentDaycareDescription || profile.babysittingType || 'Neighbor Playhome Co-op'}</span>
+                  </span>
+                </div>
+              </div>
+              <span className="text-[9px] bg-amber-600 text-white font-bold px-2 py-0.5 rounded-full uppercase shrink-0">
+                {profile.parentDaycareCapacity || profile.babysittingCapacity || 2} Kids Max
+              </span>
+            </div>
+          )}
 
           {(profile.parentProfession || profile.religion || profile.motherTongue || (profile.languagesKnown && profile.languagesKnown.length > 0)) && (
             <div id="demographics-panel" className="p-2.5 bg-slate-50/85 rounded-xl border border-slate-100 space-y-1.5">

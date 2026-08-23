@@ -6,6 +6,7 @@ import AestheticImageUploader from './AestheticImageUploader.tsx';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare, attributeAffiliateBooking } from '../utils/affiliate.ts';
+import { sendSpecialistBookingNotifications } from '../utils/notifications.ts';
 
 interface SpecialistsTabProps {
   currentProfile: ChildProfile | null;
@@ -148,10 +149,10 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     }
 
     const initialPhoto = regPhoto || (regCategory === 'Nutritionist' 
-      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400'
+      ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces'
       : regCategory === 'Pediatrician'
-      ? 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400'
-      : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400');
+      ? 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400&crop=faces'
+      : 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400&crop=faces');
 
     let calculatedCommission = globalCommissionRate;
     if (userProfile?.businessListingModel === 'subscription') {
@@ -380,10 +381,12 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
   const handleTriggerRazorpayPayment = async () => {
     if (!selectedSpecialist) return;
-    const fee = selectedSpecialist.sessionFee || 0;
+    const baseFee = selectedSpecialist.sessionFee || 0;
+    const gatewayFee = baseFee > 0 ? Math.round(baseFee * 0.02) : 0;
+    const totalAmount = baseFee + gatewayFee;
 
     // If consultation fee is free, we complete booking immediately without payment gateway invocation!
-    if (fee === 0) {
+    if (totalAmount === 0) {
       setRazorpayStep('processing');
       setTimeout(() => {
         const payId = `free_VIP_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
@@ -413,22 +416,34 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
         onAddBooking(newBooking);
 
+        // Dispatch instant Email notification
+        sendSpecialistBookingNotifications({
+          toEmail: buyerEmail,
+          parentName: buyerName,
+          specialistName: selectedSpecialist.name,
+          specialistRole: selectedSpecialist.title,
+          dateStr: bookingDate,
+          timeSlot: selectedSlot,
+          fee: 0,
+          paymentId: payId
+        }).catch((e) => console.warn('Specialist alert note:', e));
+
         confettiDefault({
           particleCount: 100,
           spread: 70,
           colors: ['#3b82f6', '#f59e0b', '#10b981']
         });
-      }, 1000);
+      }, 500);
       return;
     }
 
     setRazorpayStep('processing');
     try {
-      // 1. Create Order
+      // 1. Create Order with 2% gateway fee included
       const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: fee, planId: `spec_${selectedSpecialist.id}` }),
+        body: JSON.stringify({ amount: totalAmount, planId: `spec_${selectedSpecialist.id}` }),
       });
       if (!response.ok) throw new Error("Server Order initiation fell back or errored.");
       const orderData = await response.json();
@@ -482,7 +497,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 type: 'SpecialistAppointment',
                 buyerName: buyerName,
                 buyerEmail: buyerEmail,
-                amountPaid: fee,
+                amountPaid: totalAmount,
                 commissionPercentage: rate,
                 commissionEarned: earnedCommission,
                 hostEarned: hostShare,
@@ -493,6 +508,18 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               };
 
               onAddBooking(newBooking);
+
+              // Dispatch instant Email notification
+              sendSpecialistBookingNotifications({
+                toEmail: buyerEmail,
+                parentName: buyerName,
+                specialistName: selectedSpecialist.name,
+                specialistRole: selectedSpecialist.title,
+                dateStr: bookingDate,
+                timeSlot: selectedSlot,
+                fee: totalAmount,
+                paymentId: payId
+              }).catch((e) => console.warn('Specialist alert note:', e));
 
               // Attribute affiliate referral commission if buyer came via partner link
               attributeAffiliateBooking(newBooking, `Consultation with ${selectedSpecialist.name}`).catch((err) => {
@@ -881,27 +908,52 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                       </div>
                     </div>
 
-                    {/* Production Payment Summary showing split & commission transparency */}
-                    <div className="bg-orange-50/50 border border-orange-100 p-4 rounded-2xl text-[11px] space-y-1.5 font-medium text-slate-600">
-                      <div className="flex justify-between">
-                        <span>Consultation Standard Fee:</span>
-                        <strong className="text-slate-800">₹{selectedSpecialist.sessionFee}.00</strong>
-                      </div>
-                      <div className="flex justify-between border-t border-orange-100/60 pt-1.5 text-xs text-slate-900">
-                        <span className="font-extrabold flex items-center gap-1 text-orange-600">
-                          <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Payable via Razorpay secure gateway:
-                        </span>
-                        <strong className="font-black">₹{selectedSpecialist.sessionFee}.00</strong>
-                      </div>
-                    </div>
+                    {/* Production Payment Summary showing breakdown & 2% gateway fee */}
+                    {(() => {
+                      const baseFee = selectedSpecialist.sessionFee || 0;
+                      const isFree = baseFee === 0;
+                      const fee2Percent = isFree ? 0 : Math.round(baseFee * 0.02);
+                      const totalPay = baseFee + fee2Percent;
 
-                    <button
-                      onClick={handleTriggerRazorpayPayment}
-                      type="button"
-                      className="w-full py-3 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer select-none"
-                    >
-                      <CreditCard className="w-4 h-4" /> Secure Pay with UPI/Card (Razorpay)
-                    </button>
+                      return (
+                        <div className="space-y-3">
+                          <div className="bg-orange-50/50 border border-orange-100 p-4 rounded-2xl text-[11px] space-y-1.5 font-medium text-slate-600">
+                            <div className="flex justify-between">
+                              <span>Consultation Standard Fee:</span>
+                              <strong className="text-slate-800">{isFree ? 'FREE' : `₹${baseFee}.00`}</strong>
+                            </div>
+                            {!isFree && (
+                              <div className="flex justify-between text-slate-500 text-[10.5px]">
+                                <span>Secure Gateway Fee (2%):</span>
+                                <span>₹{fee2Percent}.00</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between border-t border-orange-100/60 pt-1.5 text-xs text-slate-900">
+                              <span className="font-extrabold flex items-center gap-1 text-orange-600">
+                                <Sparkles className="w-3.5 h-3.5 text-orange-500" /> Total Payable:
+                              </span>
+                              <strong className="font-black text-sm">{isFree ? 'FREE (Complimentary)' : `₹${totalPay}.00`}</strong>
+                            </div>
+                          </div>
+
+                          <button
+                            onClick={handleTriggerRazorpayPayment}
+                            type="button"
+                            className="w-full py-3 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer select-none"
+                          >
+                            {isFree ? (
+                              <>
+                                <Check className="w-4 h-4" /> Confirm Free Appointment
+                              </>
+                            ) : (
+                              <>
+                                <CreditCard className="w-4 h-4" /> Pay ₹{totalPay} with Razorpay Secure
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )
               )}
@@ -1080,9 +1132,9 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                   value={regPhoto}
                   onChange={setRegPhoto}
                   presetSuggestions={[
-                    { name: 'Pediatric Specialist', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400' },
-                    { name: 'Clinical Nutritionist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400' },
-                    { name: 'Academy Language Coach', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400' }
+                    { name: 'Pediatric Specialist', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400&crop=faces' },
+                    { name: 'Clinical Nutritionist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces' },
+                    { name: 'Academy Language Coach', url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400&crop=faces' }
                   ]}
                 />
               </div>

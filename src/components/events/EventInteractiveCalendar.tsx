@@ -61,7 +61,7 @@ export default function EventInteractiveCalendar({
           </div>
           <div>
             <span className="text-[10px] uppercase font-bold text-orange-400 tracking-wider block">
-              WooEvents Interactive Schedule
+              Vernunt Events Interactive Schedule
             </span>
             <h3 className="text-lg font-black text-white">
               {monthNames[month]} {year}

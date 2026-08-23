@@ -627,15 +627,39 @@ export function generateProgrammaticKnowledgeIndex(): Array<{
         // Avoid duplicate slugs
         if (result.some(r => r.slug === slug)) continue;
 
-        const title = `${subject} for ${ageGroup}: ${modifier}`;
-        const summary = `Discover comprehensive insights on ${subject.toLowerCase()} tailored for ${ageGroup}. Learn proven protocols focused on ${benefit.toLowerCase()}.`;
+        const title = `${subject} for ${ageGroup} - ${modifier} | Vernunt Child Growth Hub`;
+        const summary = `Evidence-based guide on ${subject.toLowerCase()} for ${ageGroup}. Clinical milestones, daily routine blueprints, and doctor-approved tips for ${benefit.toLowerCase()}.`;
+        
+        // Contextualized localized keywords for Google search ranking in India and worldwide
+        const regionalKeywords = [
+          `child growth ${ageGroup.toLowerCase()}`,
+          `${subject.toLowerCase()} tips`,
+          `${subject.toLowerCase()} india`,
+          `${subject.toLowerCase()} bangalore`,
+          `how to handle ${subject.toLowerCase()}`,
+          `best ways for ${subject.toLowerCase()}`,
+          `parenting guide ${ageGroup.toLowerCase()}`,
+          `baccho ke liye ${subject.toLowerCase()}`,
+          `baby care tips in india`,
+          `pediatric guidance ${ageGroup.toLowerCase()}`
+        ];
+
         const keywords = [
           subject.toLowerCase(),
           `${subject.toLowerCase()} for ${ageGroup.toLowerCase()}`,
           catData.label.toLowerCase(),
-          'parenting guide',
-          'child development',
-          'vernunt knowledge hub'
+          'baby milestone tracker',
+          'child development milestones',
+          'pediatric care guide',
+          'parenting tips india',
+          'toddler health guide',
+          'newborn care guide',
+          'montessori activities',
+          'vernunt',
+          'vernunt.com',
+          'app.vernunt.com',
+          'vernunt child growth guides',
+          ...regionalKeywords
         ];
 
         result.push({

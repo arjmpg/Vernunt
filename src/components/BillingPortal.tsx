@@ -31,6 +31,44 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
 
   const defaultPlans: SubscriptionPlan[] = [
     {
+      id: 'yearly',
+      title: 'Annual Full Golden Year Pass',
+      price: 2499,
+      period: '12 Months',
+      popular: true,
+      saving: '₹2,499/year or FREE with 1 Referral',
+      color: 'border-orange-500',
+      durationDays: 365,
+      description: 'Complete year-round coverage for optimal Bangalore neighborhood playdates, daycare access, and community classes.',
+      capabilities: [
+        '✨ **Full App Usage** for 1 Full Year (365 Days)',
+        'Unlimited verified playmate companion chats',
+        'Direct booking access for daycares & playhomes',
+        'Free bookings for non-paid classes & events',
+        '🔐 Full view of Specialist & Educator Portfolios',
+        '🥇 Bonus: **60** Contact Unlock Credits included',
+        '🎁 **Tip**: Unlock this 100% FREE by referring 1 parent friend!'
+      ]
+    },
+    {
+      id: 'quarterly',
+      title: 'Tri-Active Pass',
+      price: 799,
+      period: '3 Months',
+      popular: false,
+      saving: 'Save 15%',
+      color: 'border-amber-400',
+      durationDays: 90,
+      description: 'Ideal seasonal pass for early childhood growth friends & weekend workshops.',
+      capabilities: [
+        'Unlimited companion playdate chats',
+        'Direct daycares & playhomes discovery',
+        'Free bookings for non-paid classes & events',
+        '🔐 Access to Professional Portfolios',
+        '🥇 Bonus: **15** Contact Unlock Credits included'
+      ]
+    },
+    {
       id: 'monthly',
       title: 'Monthly Pass',
       price: 299,
@@ -39,63 +77,12 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
       saving: null,
       color: 'border-slate-200',
       durationDays: 30,
-      description: 'Perfect for temporary stays or trying out the network.',
+      description: 'Flexible monthly renewal pass for active family connection.',
       capabilities: [
         'Unlimited companion playdate chats',
-        '✨ **FREE** Bookings for non-paid classes',
-        '🔐 **FREE** view of Professional Portfolios',
-        '🥇 Bonus: **5** Decrypt Credits included'
-      ]
-    },
-    {
-      id: 'quarterly',
-      title: 'Tri-Active Pass',
-      price: 799,
-      period: '3 Months',
-      popular: true,
-      saving: 'Save 10%',
-      color: 'border-orange-200',
-      durationDays: 90,
-      description: 'Our most sought-after plan for early childhood growth friends.',
-      capabilities: [
-        'Unlimited companion playdate chats',
-        '✨ **FREE** Bookings for non-paid classes',
-        '🔐 **FREE** view of Professional Portfolios',
-        '🥇 Bonus: **15** Decrypt Credits included'
-      ]
-    },
-    {
-      id: 'halfyearly',
-      title: 'Semi-Annual Pass',
-      price: 1399,
-      period: '6 Months',
-      popular: false,
-      saving: 'Save 20%',
-      color: 'border-amber-200',
-      durationDays: 180,
-      description: 'Sustain connection habits over a full development season.',
-      capabilities: [
-        'Unlimited companion playdate chats',
-        '✨ **FREE** Bookings for non-paid classes',
-        '🔐 **FREE** view of Professional Portfolios',
-        '🥇 Bonus: **30** Decrypt Credits included'
-      ]
-    },
-    {
-      id: 'yearly',
-      title: 'Full Golden Year Pass',
-      price: 2499,
-      period: '12 Months',
-      popular: false,
-      saving: 'Save 30%',
-      color: 'border-yellow-300',
-      durationDays: 365,
-      description: 'Complete year-round coverage for optimal socialization paths.',
-      capabilities: [
-        'Unlimited companion playdate chats',
-        '✨ **FREE** Bookings for non-paid classes',
-        '🔐 **FREE** view of Professional Portfolios',
-        '🥇 Bonus: **60** Decrypt Credits included'
+        'Daycares & weekend workshops booking',
+        '🔐 Access to Professional Portfolios',
+        '🥇 Bonus: **5** Contact Unlock Credits included'
       ]
     }
   ];

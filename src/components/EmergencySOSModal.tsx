@@ -119,13 +119,13 @@ export default function EmergencySOSModal({ onClose, userProfile }: EmergencySOS
       (error) => {
         console.error('[Emergency Geolocation Fetch Err]:', error);
         setGpsStatus('error');
-        // Setting Indian Mumbai coordinates as a highly-realistic, safety-fallback default for the user preview 
-        const mockLat = 19.0760 + (Math.random() - 0.5) * 0.005;
-        const mockLng = 72.8777 + (Math.random() - 0.5) * 0.005;
+        // Setting Indian Bangalore coordinates as a highly-realistic, safety-fallback default for the user preview 
+        const mockLat = 12.9716 + (Math.random() - 0.5) * 0.005;
+        const mockLng = 77.5946 + (Math.random() - 0.5) * 0.005;
         setCoords({ latitude: mockLat, longitude: mockLng, accuracy: 25 });
-        setAddressFallback('Mumbai Suburban Metropolitan Region, Maharashtra');
+        setAddressFallback('Bangalore Urban Metropolitan Region, Karnataka');
         setErrorMsg('GPS Denied/Timeout. Utilizing high-fidelity location profile fallback coordinates.');
-        addTerminalLog('⚠️ Satellites timed out or permission withheld. Booting regional ISP geolcoation fallback (Mumbai Central).');
+        addTerminalLog('⚠️ Satellites timed out or permission withheld. Booting regional ISP geolocation fallback (Bangalore Central).');
       },
       options
     );

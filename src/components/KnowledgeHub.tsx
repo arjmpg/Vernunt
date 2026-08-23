@@ -92,6 +92,52 @@ export function KnowledgeHub({ initialSlug, onNavigateToRadar }: KnowledgeHubPro
     return getKnowledgeArticleBySlug(selectedArticleSlug);
   }, [selectedArticleSlug]);
 
+  // Dynamic SEO title, meta description, and keywords tags updates
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
+    const setOrUpdateMeta = (nameOrProp: string, value: string, isProperty = false) => {
+      const attr = isProperty ? `meta[property="${nameOrProp}"]` : `meta[name="${nameOrProp}"]`;
+      let tag = document.querySelector(attr);
+      if (!tag) {
+        tag = document.createElement('meta');
+        if (isProperty) {
+          tag.setAttribute('property', nameOrProp);
+        } else {
+          tag.setAttribute('name', nameOrProp);
+        }
+        document.head.appendChild(tag);
+      }
+      tag.setAttribute('content', value);
+    };
+
+    if (currentArticle) {
+      document.title = currentArticle.title;
+      setOrUpdateMeta('title', currentArticle.title);
+      setOrUpdateMeta('description', currentArticle.summary);
+      setOrUpdateMeta('keywords', currentArticle.keywords.join(', '));
+      setOrUpdateMeta('og:title', currentArticle.title, true);
+      setOrUpdateMeta('og:description', currentArticle.summary, true);
+      setOrUpdateMeta('og:url', `https://app.vernunt.com/knowledge/${currentArticle.slug}`, true);
+      setOrUpdateMeta('twitter:title', currentArticle.title);
+      setOrUpdateMeta('twitter:description', currentArticle.summary);
+    } else {
+      const defaultTitle = '1,000+ Child Growth Guides & Nutrition Blueprints | Vernunt (vernunt.com)';
+      const defaultDesc = 'Explore 1,000+ evidence-based pediatric child growth guides, newborn sleep routines, baby-led weaning recipes, and Montessori development blueprints on Vernunt.';
+      const defaultKeywords = 'vernunt, child growth guides, baby milestone tracker, toddler parenting india, newborn sleep routines, blw recipes, montessori parenting';
+      
+      document.title = defaultTitle;
+      setOrUpdateMeta('title', defaultTitle);
+      setOrUpdateMeta('description', defaultDesc);
+      setOrUpdateMeta('keywords', defaultKeywords);
+      setOrUpdateMeta('og:title', defaultTitle, true);
+      setOrUpdateMeta('og:description', defaultDesc, true);
+      setOrUpdateMeta('og:url', 'https://app.vernunt.com/knowledge', true);
+      setOrUpdateMeta('twitter:title', defaultTitle);
+      setOrUpdateMeta('twitter:description', defaultDesc);
+    }
+  }, [currentArticle]);
+
   const toggleSaveArticle = (slug: string) => {
     setSavedArticles(prev => {
       const updated = prev.includes(slug) ? prev.filter(s => s !== slug) : [...prev, slug];

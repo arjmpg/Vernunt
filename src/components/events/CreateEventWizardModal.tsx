@@ -5,6 +5,7 @@ import {
   Sparkles, Image, Tag, ShieldCheck, DollarSign, Check, Users
 } from 'lucide-react';
 import AestheticImageUploader from '../AestheticImageUploader.tsx';
+import { sendEventPublishedNotification } from '../../utils/notifications.ts';
 
 interface CreateEventWizardModalProps {
   userProfile: any;
@@ -147,6 +148,8 @@ export default function CreateEventWizardModal({
       targetAgeRange,
       venueAddressDetails: venueDetails,
       googleMapsUrl: googleMapsUrl || `https://maps.google.com/?q=${encodeURIComponent(location)}`,
+      lat: (typeof userProfile?.location?.lat === 'number' ? userProfile.location.lat : 12.9716) + (Math.random() - 0.5) * 0.005,
+      lng: (typeof userProfile?.location?.lng === 'number' ? userProfile.location.lng : 77.5946) + (Math.random() - 0.5) * 0.005,
       ticketTiers: ticketTiers,
       scheduleAgenda: scheduleAgenda,
       isRecurring: isRecurring,
@@ -159,6 +162,14 @@ export default function CreateEventWizardModal({
     };
 
     onAddEvent(newEvent);
+
+    // Dispatch instant organizer notification
+    if (userProfile?.email) {
+      sendEventPublishedNotification(newEvent, userProfile.email).catch((err) => {
+        console.warn('Organizer publishing alert note:', err);
+      });
+    }
+
     onClose();
   };
 
@@ -174,7 +185,7 @@ export default function CreateEventWizardModal({
             </div>
             <div>
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-orange-200 block">
-                WooEvents Publishing Wizard
+                Vernunt Events Publishing Wizard
               </span>
               <h3 className="text-lg font-black text-white leading-tight">
                 Create & Publish New Event

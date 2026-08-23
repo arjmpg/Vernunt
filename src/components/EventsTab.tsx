@@ -58,17 +58,17 @@ export default function EventsTab({
   const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
   const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
 
-  // Parent GPS coordinates (default to userProfile or Mumbai/Central location)
+  // Parent GPS coordinates (default to userProfile or Bangalore/Central location)
   const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
     ? Number(userProfile.location.lat)
-    : (typeof userProfile?.lat === 'number' ? userProfile.lat : 19.0760);
+    : (typeof userProfile?.lat === 'number' ? userProfile.lat : 12.9716);
   const userLng = typeof userProfile?.location === 'object' && userProfile?.location?.lng !== undefined
     ? Number(userProfile.location.lng)
-    : (typeof userProfile?.lng === 'number' ? userProfile.lng : 72.8777);
+    : (typeof userProfile?.lng === 'number' ? userProfile.lng : 77.5946);
 
   const userLocationDisplay = typeof userProfile?.location === 'object' && userProfile?.location?.address
     ? userProfile.location.address
-    : (typeof userProfile?.location === 'string' ? userProfile.location : 'Central Area (19.07, 72.87)');
+    : (typeof userProfile?.location === 'string' ? userProfile.location : 'Bangalore Central (12.97, 77.59)');
 
   // Check if current user is authorized to operate the Gate Desk & QR Scanner
   const isAuthorizedOrganizer = (evt?: CommunityEvent) => {
@@ -183,7 +183,7 @@ export default function EventsTab({
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const [shareToast, setShareToast] = useState<{ title: string; link: string } | null>(null);
 
-  // Parse deep link if ?eventId= is present in URL
+  // Parse deep link if ?eventId= or ?ticket= is present in URL
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
@@ -202,10 +202,50 @@ export default function EventsTab({
           }
         }, 300);
       }
+
+      // Check for direct ticket pass deep link: ?ticket=VERN-EVT-...
+      const targetTicket = params.get('ticket') || params.get('ticketId') || params.get('pass');
+      if (targetTicket) {
+        const found = myTickets.find(t => t.ticketNumber === targetTicket || t.id === targetTicket);
+        if (found) {
+          const evt = eventsList.find(e => e.id === found.itemId || e.title === found.itemTitle) || eventsList[0] || null;
+          setActiveTicketModalBooking(found);
+          setActiveTicketEvent(evt);
+        } else if (eventsList.length > 0) {
+          // Construct pass for shared ticket link
+          const sharedPass: Booking = {
+            id: `booking-${targetTicket}`,
+            itemId: eventsList[0].id,
+            itemTitle: eventsList[0].title,
+            type: 'EventTicket',
+            buyerName: userProfile?.parentName || 'Arjun MP',
+            buyerEmail: userProfile?.email || 'arjunmpgupta@gmail.com',
+            buyerPhone: userProfile?.phone || '+91 98765 43210',
+            amountPaid: eventsList[0].ticketPrice || 0,
+            commissionPercentage: 10,
+            commissionEarned: 0,
+            hostEarned: 0,
+            dateStr: eventsList[0].date,
+            timeSelected: eventsList[0].time,
+            razorpayPaymentId: 'pay_shared_verified',
+            status: 'Paid',
+            ticketNumber: targetTicket,
+            ticketTierName: 'Official Family Pass',
+            childName: userProfile?.childName || 'Ayaan',
+            childAge: userProfile?.childAge || 6,
+            eventVenue: eventsList[0].location,
+            checkedIn: false,
+            quantity: 1,
+            createdAt: new Date().toISOString()
+          };
+          setActiveTicketModalBooking(sharedPass);
+          setActiveTicketEvent(eventsList[0]);
+        }
+      }
     } catch (err) {
-      console.error('Failed to parse URL event parameter:', err);
+      console.error('Failed to parse URL event/ticket parameter:', err);
     }
-  }, [eventsList]);
+  }, [eventsList, myTickets, userProfile]);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'custom_event_categories'), (snapshot) => {
@@ -603,7 +643,9 @@ export default function EventsTab({
       photoUrl: categoryPic,
       tags: combinedTags,
       ticketPrice: Number(newEventPrice || 0),
-      commissionPercentage: calculatedCommission
+      commissionPercentage: calculatedCommission,
+      lat: userLat + (Math.random() - 0.5) * 0.006,
+      lng: userLng + (Math.random() - 0.5) * 0.006
     };
 
     setEventsList([newlyCreated, ...eventsList]);
@@ -993,7 +1035,7 @@ ${deepLink}`;
           className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 self-start md:self-auto cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Publish WooEvent</span>
+          <span>Publish Vernunt Event</span>
         </button>
       </div>
 
@@ -2177,10 +2219,10 @@ ${deepLink}`;
       )}
 
       {/* WooEvents E-Ticket Pass Modal (QR Code & Pass Download) */}
-      {activeTicketModalBooking && activeTicketEvent && (
+      {activeTicketModalBooking && (
         <EventTicketPassModal
           booking={activeTicketModalBooking}
-          event={activeTicketEvent}
+          event={activeTicketEvent || eventsList.find(e => e.id === activeTicketModalBooking.itemId || e.title === activeTicketModalBooking.itemTitle) || null}
           onClose={() => {
             setActiveTicketModalBooking(null);
             setActiveTicketEvent(null);

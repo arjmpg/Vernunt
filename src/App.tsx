@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ChildProfile, VerificationStatus, LocationSharing, CommunityEvent, SpecialistProfile, Booking } from './types.ts';
-import { INITIAL_PLAYMATES, MOCK_EVENTS } from './data/mockData.ts';
+import { ChildProfile, VerificationStatus, LocationSharing, CommunityEvent, SpecialistProfile, Booking, DaycarePlayhomeProfile, CareBookingRequest, CareBookingStatus } from './types.ts';
+import { INITIAL_PLAYMATES, MOCK_EVENTS, INITIAL_DAYCARE_PLAYHOMES, INITIAL_CARE_BOOKINGS } from './data/mockData.ts';
 import confetti from 'canvas-confetti';
 import { auth, db, triggerGoogleSignIn, handleFirestoreError, OperationType, getGoogleAccessToken } from './utils/firebase.ts';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot, collection } from 'firebase/firestore';
-import { DICTIONARY, LANGUAGES, LanguageCode } from './utils/dictionary.ts';
+import { DICTIONARY, LANGUAGES, LanguageCode, getDictionary } from './utils/dictionary.ts';
 import { createDailyRollingBackup } from './services/googleDriveBackup.ts';
 
 import VernuntLogo from './components/VernuntLogo.tsx';
@@ -31,6 +31,7 @@ import ReferralPortal from './components/ReferralPortal.tsx';
 import BillingPortal from './components/BillingPortal.tsx';
 import { KnowledgeHub } from './components/KnowledgeHub.tsx';
 import AffiliateDashboard from './components/events/AffiliateDashboard.tsx';
+import DaycareSittingTab from './components/DaycareSittingTab.tsx';
 
 // Modal helpers
 import ReportModal from './components/ReportModal.tsx';
@@ -42,6 +43,9 @@ import ContactsPrivacyModal from './components/ContactsPrivacyModal.tsx';
 import RoleSelectionModal from './components/RoleSelectionModal.tsx';
 import ChildSafetyComplianceModal from './components/ChildSafetyComplianceModal.tsx';
 import GoogleAccountSelectModal from './components/GoogleAccountSelectModal.tsx';
+import ProximityAlertToast, { ProximityAlert, playSubtleProximityChime } from './components/ProximityAlertToast.tsx';
+import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
+import EventOrganizerCheckInStation from './components/events/EventOrganizerCheckInStation.tsx';
 
 // Icons
 import { 
@@ -50,7 +54,7 @@ import {
   SlidersHorizontal, Search, RotateCcw, HelpCircle, Check, MapPin,
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
-  Smartphone, EyeOff, Lock, BookOpen, Share2
+  Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -58,6 +62,7 @@ import { captureAffiliateFromUrl } from './utils/affiliate.ts';
 
 const TAB_DEFINITIONS = [
   { id: 'radar', label: 'Near Playmates', icon: Navigation },
+  { id: 'daycare', label: '🍼 Babysitting & Daycare', icon: Baby },
   { id: 'chat', label: 'Chat Messenger', icon: MessageSquare },
   { id: 'events', label: 'Events & Classes', icon: Sparkles },
   { id: 'specialists', label: 'Specialists', icon: Users },
@@ -71,61 +76,129 @@ const TAB_DEFINITIONS = [
   { id: 'admin', label: 'Admin Panel', icon: Shield }
 ];
 
-export default function App() {
-  const [tabsConfig, setTabsConfig] = useState<{ [key: string]: 'header' | 'side' }>({
-    radar: 'header',
-    chat: 'header',
-    events: 'header',
-    specialists: 'header',
-    affiliate: 'side',
-    knowledge: 'header',
-    billing: 'side',
-    planner: 'side',
-    referrals: 'side',
-    portfolio: 'side',
-    business: 'side',
-    admin: 'side'
-  });
+export const DEFAULT_TABS_CONFIG: { [key: string]: 'header' | 'side' } = {
+  radar: 'header',
+  daycare: 'header',
+  chat: 'header',
+  events: 'header',
+  specialists: 'header',
+  knowledge: 'header',
+  affiliate: 'side',
+  billing: 'side',
+  planner: 'side',
+  referrals: 'side',
+  portfolio: 'side',
+  business: 'side',
+  admin: 'side'
+};
 
-  useEffect(() => {
-    let unsub: (() => void) | undefined;
-    try {
-      unsub = onSnapshot(doc(db, 'system_config', 'tabs'), (docSnap) => {
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data && data.placements) {
-            setTabsConfig(data.placements);
-          }
-        }
-      }, (err) => {
-        console.warn('[System Config Tabs Sync] Offline or fallback note:', err?.message || err);
-      });
-    } catch (e) {
-      console.warn('[System Config Tabs Sync] Init error:', e);
+export interface CachedAuthSession {
+  uid: string;
+  userRole: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
+  userProfile: ChildProfile;
+  cachedAt: number;
+}
+
+export const AUTH_SESSION_KEY = 'vernunt_auth_session';
+
+export const getInitialCachedSession = (): CachedAuthSession | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const rawSession = localStorage.getItem(AUTH_SESSION_KEY);
+    if (rawSession) {
+      const parsed: CachedAuthSession = JSON.parse(rawSession);
+      if (parsed && parsed.uid && parsed.userProfile) {
+        return parsed;
+      }
     }
-    return () => {
-      if (unsub) unsub();
-    };
-  }, []);
+    // Fallback: check active or last logged in user profile cache
+    const lastUid = localStorage.getItem('vernunt_active_user_id') || localStorage.getItem('vernunt_last_logged_in_user');
+    if (lastUid) {
+      const rawProfile = localStorage.getItem('vernunt_cached_profile_' + lastUid);
+      if (rawProfile) {
+        const parsedProfile: ChildProfile = JSON.parse(rawProfile);
+        if (parsedProfile && parsedProfile.id) {
+          const role = (parsedProfile.userRole as any) || 'Parent';
+          return {
+            uid: parsedProfile.id,
+            userRole: role,
+            userProfile: parsedProfile,
+            cachedAt: Date.now()
+          };
+        }
+      }
+    }
+  } catch (e) {
+    console.debug('[Auth Cache Initializer] Note:', e);
+  }
+  return null;
+};
 
-  // Global Language selection
-  const [language, setLanguage] = useState<LanguageCode>(() => {
-    return (localStorage.getItem('vernunt_pref_lang') as LanguageCode) || 'en';
-  });
-
-  const changeLanguage = (lang: LanguageCode) => {
-    setLanguage(lang);
-    localStorage.setItem('vernunt_pref_lang', lang);
+export const persistAuthSession = (profile: ChildProfile, role?: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin') => {
+  if (!profile || !profile.id) return;
+  const effectiveRole = role || profile.userRole || 'Parent';
+  const sessionObj: CachedAuthSession = {
+    uid: profile.id,
+    userRole: effectiveRole,
+    userProfile: profile,
+    cachedAt: Date.now()
   };
+  try {
+    localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionObj));
+    localStorage.setItem('vernunt_cached_profile_' + profile.id, JSON.stringify(profile));
+    localStorage.setItem('vernunt_active_user_id', profile.id);
+  } catch (err) {
+    console.debug('[Auth Cache Persist] Storage note:', err);
+  }
+};
 
-  const t = DICTIONARY[language];
+export const clearAuthSession = () => {
+  try {
+    localStorage.removeItem(AUTH_SESSION_KEY);
+    localStorage.removeItem('vernunt_active_user_id');
+  } catch (err) {
+    console.debug('[Auth Cache Clear] Storage note:', err);
+  }
+};
 
-  // Navigation & User session states
-  const [userProfile, setUserProfile] = useState<ChildProfile | null>(null);
-  const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>('landing');
-  const [activeTab, setActiveTab] = useState<'radar' | 'chat' | 'planner' | 'events' | 'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 'referrals' | 'billing'>('radar');
+export default function App() {
+  const initialSession = React.useMemo(() => getInitialCachedSession(), []);
+
+  // Interactive loading screens states (default false so cached users render instantly)
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [loadingTitle, setLoadingTitle] = useState<string>('Booting Workspace...');
+
+  // Navigation & User session states with instant cache hydration
+  const [userProfile, setUserProfile] = useState<ChildProfile | null>(() => initialSession?.userProfile || null);
+  const [userRole, setUserRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin'>(() => initialSession?.userRole || 'Parent');
+  const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => initialSession ? 'dashboard' : 'landing');
+  const [activeTab, setActiveTab] = useState<'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 'referrals' | 'billing' | 'affiliate'>(() => {
+    if (initialSession?.userRole === 'Event Organizer') return 'business';
+    if (initialSession?.userRole === 'Portfolio Professional') return 'portfolio';
+    return 'radar';
+  });
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
   const [mapOrRadarView, setMapOrRadarView] = useState<'list' | 'radar' | 'map'>('list');
+
+  // Multilingual localization state
+  const [language, setLanguage] = useState<LanguageCode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vernunt_language_pref') as LanguageCode;
+      if (saved && DICTIONARY[saved]) return saved;
+    }
+    return 'en';
+  });
+
+  const t = getDictionary(language);
+
+  const changeLanguage = (newLang: LanguageCode) => {
+    setLanguage(newLang);
+    try {
+      localStorage.setItem('vernunt_language_pref', newLang);
+    } catch (e) {
+      console.debug('Language save note:', e);
+    }
+  };
 
   const [isOffline, setIsOffline] = useState<boolean>(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
 
@@ -145,7 +218,23 @@ export default function App() {
 
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [authErrorMessage, setAuthErrorMessage] = useState<string>('');
-  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional'>('Parent');
+  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional'>('Parent');
+
+  // Dynamic Navigation Tab Placements configured via Admin & Firestore
+  const [tabsConfig, setTabsConfig] = useState<{ [key: string]: 'header' | 'side' }>(DEFAULT_TABS_CONFIG);
+
+  useEffect(() => {
+    try {
+      const unsub = onSnapshot(doc(db, 'system_config', 'tabs'), (docSnap) => {
+        if (docSnap.exists() && docSnap.data()?.placements) {
+          setTabsConfig(prev => ({ ...prev, ...docSnap.data()!.placements }));
+        }
+      }, (err) => console.debug("Tabs placement listener note:", err));
+      return () => unsub();
+    } catch (e) {
+      console.debug("Tabs config init note:", e);
+    }
+  }, []);
 
   // Role selection popup state for unregistered users post-verification
   const [showRoleSelectModal, setShowRoleSelectModal] = useState<boolean>(false);
@@ -200,10 +289,10 @@ export default function App() {
     }
   }, []);
 
-  // Synchronize userProfile changes to localStorage for high-fidelity offline backup
+  // Synchronize userProfile changes to localStorage for high-fidelity offline backup & session cache
   useEffect(() => {
     if (userProfile && userProfile.id) {
-      localStorage.setItem('vernunt_cached_profile_' + userProfile.id, JSON.stringify(userProfile));
+      persistAuthSession(userProfile, userProfile.userRole);
     }
   }, [userProfile]);
 
@@ -235,141 +324,128 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // 1. Firebase Auth Session Synchronization
+  // 1. Firebase Auth Session Synchronization (High-Performance, Non-Blocking)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
         // If the user is actively completing the registration wizard, let them finish it!
-        // We do NOT want the auth listener to auto-provision defaults or force dashboard redirection.
         if (appModeRef.current === 'register') {
           setIsLoading(false);
           setIsAuthenticating(false);
           return;
         }
 
-        setIsLoading(true);
-        setLoadingTitle('Loading secure user session...');
-        try {
-          const emailLower = firebaseUser.email?.toLowerCase() || '';
-          const isSystemAdmin = emailLower === 'ardha@vernunt.com' || emailLower === 'arjunmpgupta@gmail.com';
-          const userDocRef = doc(db, 'users', firebaseUser.uid);
-          
-          let userDoc: any = null;
+        const emailLower = firebaseUser.email?.toLowerCase() || '';
+        const isSystemAdmin = emailLower === 'ardha@vernunt.com' || emailLower === 'arjunmpgupta@gmail.com';
+
+        // Fast-path: check if we have a locally cached profile matching this user
+        const localCachedRaw = localStorage.getItem('vernunt_cached_profile_' + firebaseUser.uid);
+        let fastCachedProfile: ChildProfile | null = null;
+        if (localCachedRaw) {
           try {
-            userDoc = await getDoc(userDocRef);
-          } catch (docErr) {
-            console.warn("Could not read user doc directly from Firestore:", docErr);
+            fastCachedProfile = JSON.parse(localCachedRaw);
+          } catch (e) {
+            console.debug('Fast cache read note:', e);
           }
-          
-          if (isSystemAdmin) {
-            let adminProfile: ChildProfile;
-            if (userDoc && userDoc.exists()) {
-              const currentData = userDoc.data() as ChildProfile;
-              adminProfile = {
-                ...currentData,
-                userRole: 'Admin',
-                email: emailLower,
-                phoneNumber: currentData.phoneNumber || '8073749074',
-                aadhaarVerified: true,
-                verificationStatus: VerificationStatus.VERIFIED
-              };
-            } else {
-              adminProfile = {
-                id: firebaseUser.uid,
-                parentName: firebaseUser.displayName || 'Arjun Gupta (Admin)',
-                childName: 'Ayaan',
-                childAge: 6,
-                childGender: 'Boy',
-                gradeLevel: 'Class 1',
-                playStyle: 'Active & Social',
-                bio: 'Vernunt System Admin Panel and Child Safety Coordinator.',
-                location: {
-                  lat: 19.0760,
-                  lng: 72.8777,
-                  address: 'Vernunt HQ, Bandra West, Mumbai, Maharashtra, India'
-                },
-                locationSharing: LocationSharing.PRECISE,
-                verificationStatus: VerificationStatus.VERIFIED,
-                interests: ['Platform Auditing', 'Community Building'],
-                photoUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
-                userRole: 'Admin',
-                email: emailLower,
-                phoneNumber: '8073749074',
-                aadhaarVerified: true,
-                aadhaarNumber: '111122223333'
-              };
+        }
+
+        if (fastCachedProfile) {
+          // Instantly activate user session without blocking UI
+          setUserProfile(fastCachedProfile);
+          const cachedRole = fastCachedProfile.userRole || (isSystemAdmin ? 'Admin' : 'Parent');
+          setUserRole(cachedRole);
+          setAppMode('dashboard');
+          setIsLoading(false);
+          setIsAuthenticating(false);
+
+          // Non-blocking background revalidation with Firestore
+          (async () => {
+            try {
+              const userDocRef = doc(db, 'users', firebaseUser.uid);
+              const userDoc = await getDoc(userDocRef);
+              if (userDoc.exists()) {
+                const freshData = userDoc.data() as ChildProfile;
+                const freshRole = (freshData.userRole as any) || (isSystemAdmin ? 'Admin' : 'Parent');
+                setUserProfile(prev => ({ ...(prev || {}), ...freshData, userRole: freshRole }));
+                setUserRole(freshRole);
+                persistAuthSession({ ...freshData, id: firebaseUser.uid, userRole: freshRole }, freshRole);
+              }
+            } catch (bgErr) {
+              console.debug('[Auth Background Sync] Network/offline note:', bgErr);
+            }
+          })();
+          return;
+        }
+
+        // Cache miss: User is signed in but has no local profile cache on this client
+        (async () => {
+          setIsLoading(true);
+          setLoadingTitle('Loading secure user session...');
+          try {
+            const userDocRef = doc(db, 'users', firebaseUser.uid);
+            let userDoc: any = null;
+            try {
+              userDoc = await getDoc(userDocRef);
+            } catch (docErr) {
+              console.warn("Could not read user doc directly from Firestore:", docErr);
             }
 
-            // Immediately set profile and dashboard view to ensure zero-lag instant login
-            setUserProfile(adminProfile);
-            setUserRole('Admin');
-            setAppMode('dashboard');
-            setActiveTab('radar');
-            try {
-              localStorage.setItem('vernunt_cached_profile_' + firebaseUser.uid, JSON.stringify(adminProfile));
-            } catch (cacheErr) {
-              console.debug("Admin cache write note:", cacheErr);
-            }
+            if (isSystemAdmin) {
+              let adminProfile: ChildProfile;
+              if (userDoc && userDoc.exists()) {
+                const currentData = userDoc.data() as ChildProfile;
+                adminProfile = {
+                  ...currentData,
+                  userRole: 'Admin',
+                  email: emailLower,
+                  phoneNumber: currentData.phoneNumber || '8073749074',
+                  aadhaarVerified: true,
+                  verificationStatus: VerificationStatus.VERIFIED
+                };
+              } else {
+                  adminProfile = {
+                    id: firebaseUser.uid,
+                    parentName: firebaseUser.displayName || 'Arjun Gupta (Admin)',
+                    childName: 'Ayaan',
+                    childAge: 6,
+                    childGender: 'Boy',
+                    gradeLevel: 'Class 1',
+                    playStyle: 'Active & Social',
+                    bio: 'Vernunt System Admin Panel and Child Safety Coordinator.',
+                    location: {
+                      lat: 12.9716,
+                      lng: 77.5946,
+                      address: 'Cubbon Park / Central Bangalore, Karnataka, India'
+                    },
+                    locationSharing: LocationSharing.PRECISE,
+                    verificationStatus: VerificationStatus.VERIFIED,
+                    interests: ['Platform Auditing', 'Community Building'],
+                    photoUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300&crop=faces',
+                    userRole: 'Admin',
+                    email: emailLower,
+                    phoneNumber: '8073749074',
+                    aadhaarVerified: true,
+                    aadhaarNumber: '111122223333'
+                  };
+              }
 
-            // Save in Firestore asynchronously (non-blocking)
-            setDoc(userDocRef, adminProfile, { merge: true }).catch(err => {
-              console.warn("Admin profile background sync note:", err);
-            });
-          } else if (userDoc && userDoc.exists()) {
-            const data = userDoc.data() as ChildProfile;
-            setUserProfile(data);
-            const user_role = data.userRole || 'Parent';
-            setUserRole(user_role);
-            setAppMode('dashboard');
-            try {
-              localStorage.setItem('vernunt_cached_profile_' + firebaseUser.uid, JSON.stringify(data));
-            } catch (cacheErr) {
-              console.debug("User cache write note:", cacheErr);
-            }
-            if (user_role === 'Event Organizer') {
-              setActiveTab('business');
-            } else if (user_role === 'Portfolio Professional') {
-              setActiveTab('portfolio');
-            } else {
+              setUserProfile(adminProfile);
+              setUserRole('Admin');
+              setAppMode('dashboard');
               setActiveTab('radar');
-            }
-          } else {
-            // Check if user already exists under different document key or phone/email
-            let existingDocData: ChildProfile | null = null;
-            try {
-              const { collection, query, where, getDocs } = await import('firebase/firestore');
-              if (emailLower) {
-                const qEmail = query(collection(db, 'users'), where('email', '==', emailLower));
-                const snapEmail = await getDocs(qEmail);
-                if (!snapEmail.empty) {
-                  existingDocData = snapEmail.docs[0].data() as ChildProfile;
-                }
-              }
-              if (!existingDocData && firebaseUser.phoneNumber) {
-                const rawPhone = firebaseUser.phoneNumber.replace('+91', '').trim();
-                const qPhone = query(collection(db, 'users'), where('phoneNumber', 'in', [firebaseUser.phoneNumber, rawPhone]));
-                const snapPhone = await getDocs(qPhone);
-                if (!snapPhone.empty) {
-                  existingDocData = snapPhone.docs[0].data() as ChildProfile;
-                }
-              }
-            } catch (queryErr) {
-              console.warn("Lookup for existing profile returned:", queryErr);
-            }
+              persistAuthSession(adminProfile, 'Admin');
 
-            if (existingDocData) {
-              setUserProfile(existingDocData);
-              const user_role = existingDocData.userRole || 'Parent';
+              setDoc(userDocRef, adminProfile, { merge: true }).catch(err => {
+                console.warn("Admin profile background sync note:", err);
+              });
+            } else if (userDoc && userDoc.exists()) {
+              const data = userDoc.data() as ChildProfile;
+              const user_role = data.userRole || 'Parent';
+              setUserProfile(data);
               setUserRole(user_role);
               setAppMode('dashboard');
-              try {
-                localStorage.setItem('vernunt_cached_profile_' + firebaseUser.uid, JSON.stringify(existingDocData));
-              } catch (cacheErr) {
-                console.debug("Existing profile cache write note:", cacheErr);
-              }
-              setDoc(userDocRef, { ...existingDocData, id: firebaseUser.uid }, { merge: true }).catch(err => {
-                console.warn("User ID sync note:", err);
-              });
+              persistAuthSession({ ...data, id: firebaseUser.uid, userRole: user_role }, user_role);
+
               if (user_role === 'Event Organizer') {
                 setActiveTab('business');
               } else if (user_role === 'Portfolio Professional') {
@@ -377,94 +453,91 @@ export default function App() {
               } else {
                 setActiveTab('radar');
               }
-          } else {
-            // Unregistered Google / Firebase user -> prompt registration popup with pre-verified credentials
-            const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
-            const cleanPhone = firebaseUser.phoneNumber ? firebaseUser.phoneNumber.replace('+91', '').trim() : '';
-            
-            setPendingRegisterDetails({
-              email: emailLower || undefined,
-              phone: cleanPhone || undefined,
-              phoneVerified: Boolean(cleanPhone),
-              parentName: fallbackName || undefined,
-              photoUrl: firebaseUser.photoURL || undefined
-            });
-            setPendingAuthUser({
-              email: emailLower || undefined,
-              phone: cleanPhone || undefined,
-              uid: firebaseUser.uid,
-              displayName: fallbackName || undefined,
-              photoURL: firebaseUser.photoURL || undefined
-            });
+            } else {
+              // Check if user already exists under different document key or phone/email
+              let existingDocData: ChildProfile | null = null;
+              try {
+                const { collection, query, where, getDocs } = await import('firebase/firestore');
+                if (emailLower) {
+                  const qEmail = query(collection(db, 'users'), where('email', '==', emailLower));
+                  const snapEmail = await getDocs(qEmail);
+                  if (!snapEmail.empty) {
+                    existingDocData = snapEmail.docs[0].data() as ChildProfile;
+                  }
+                }
+                if (!existingDocData && firebaseUser.phoneNumber) {
+                  const rawPhone = firebaseUser.phoneNumber.replace('+91', '').trim();
+                  const qPhone = query(collection(db, 'users'), where('phoneNumber', 'in', [firebaseUser.phoneNumber, rawPhone]));
+                  const snapPhone = await getDocs(qPhone);
+                  if (!snapPhone.empty) {
+                    existingDocData = snapPhone.docs[0].data() as ChildProfile;
+                  }
+                }
+              } catch (queryErr) {
+                console.warn("Lookup for existing profile returned:", queryErr);
+              }
+
+              if (existingDocData) {
+                const user_role = existingDocData.userRole || 'Parent';
+                setUserProfile(existingDocData);
+                setUserRole(user_role);
+                setAppMode('dashboard');
+                persistAuthSession({ ...existingDocData, id: firebaseUser.uid, userRole: user_role }, user_role);
+
+                setDoc(userDocRef, { ...existingDocData, id: firebaseUser.uid }, { merge: true }).catch(err => {
+                  console.warn("User ID sync note:", err);
+                });
+                if (user_role === 'Event Organizer') {
+                  setActiveTab('business');
+                } else if (user_role === 'Portfolio Professional') {
+                  setActiveTab('portfolio');
+                } else {
+                  setActiveTab('radar');
+                }
+              } else {
+                // Unregistered user -> prompt registration popup with pre-verified credentials
+                const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
+                const cleanPhone = firebaseUser.phoneNumber ? firebaseUser.phoneNumber.replace('+91', '').trim() : '';
+                
+                setPendingRegisterDetails({
+                  email: emailLower || undefined,
+                  phone: cleanPhone || undefined,
+                  phoneVerified: Boolean(cleanPhone),
+                  parentName: fallbackName || undefined,
+                  photoUrl: firebaseUser.photoURL || undefined
+                });
+                setPendingAuthUser({
+                  email: emailLower || undefined,
+                  phone: cleanPhone || undefined,
+                  uid: firebaseUser.uid,
+                  displayName: fallbackName || undefined,
+                  photoURL: firebaseUser.photoURL || undefined
+                });
+                setShowRoleSelectModal(true);
+              }
+            }
+          } catch (error) {
+            console.warn("Error fetching user profile (offline fallback activated):", error);
+            const cachedStr = localStorage.getItem('vernunt_cached_profile_' + firebaseUser.uid);
+            if (cachedStr) {
+              try {
+                const cachedProfile = JSON.parse(cachedStr);
+                setUserProfile(cachedProfile);
+                setUserRole(cachedProfile.userRole || 'Parent');
+                setAppMode('dashboard');
+              } catch (pErr) {
+                console.error("Failed to parse cached profile:", pErr);
+              }
+            }
+          } finally {
             setIsLoading(false);
             setIsAuthenticating(false);
-            setShowRoleSelectModal(true);
           }
-          }
-        } catch (error) {
-          console.warn("Error fetching user profile (offline fallback activated):", error);
-          const cachedStr = localStorage.getItem('vernunt_cached_profile_' + firebaseUser.uid);
-          if (cachedStr) {
-            try {
-              const cachedProfile = JSON.parse(cachedStr);
-              setUserProfile(cachedProfile);
-              setUserRole(cachedProfile.userRole || 'Parent');
-              setAppMode('dashboard');
-            } catch (pErr) {
-              console.error("Failed to parse cached profile:", pErr);
-            }
-          } else {
-            const emailLower = firebaseUser.email?.toLowerCase() || '';
-            const isSystemAdmin = emailLower === 'ardha@vernunt.com' || emailLower === 'arjunmpgupta@gmail.com';
-            if (isSystemAdmin) {
-              const fallbackAdmin: ChildProfile = {
-                id: firebaseUser.uid,
-                parentName: firebaseUser.displayName || 'Arjun Gupta (Admin)',
-                childName: 'Ayaan',
-                childAge: 6,
-                childGender: 'Boy',
-                gradeLevel: 'Class 1',
-                playStyle: 'Active & Social',
-                bio: 'Vernunt System Admin Panel and Child Safety Coordinator.',
-                location: {
-                  lat: 19.0760,
-                  lng: 72.8777,
-                  address: 'Vernunt HQ, Bandra West, Mumbai, Maharashtra, India'
-                },
-                locationSharing: LocationSharing.PRECISE,
-                verificationStatus: VerificationStatus.VERIFIED,
-                interests: ['Platform Auditing', 'Community Building'],
-                photoUrl: firebaseUser.photoURL || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
-                userRole: 'Admin',
-                email: emailLower,
-                phoneNumber: '8073749074',
-                aadhaarVerified: true,
-                aadhaarNumber: '111122223333'
-              };
-              setUserProfile(fallbackAdmin);
-              setUserRole('Admin');
-              setAppMode('dashboard');
-              setActiveTab('radar');
-            } else {
-              setPendingAuthUser({
-                email: firebaseUser.email || undefined,
-                phone: firebaseUser.phoneNumber || undefined,
-                uid: firebaseUser.uid
-              });
-              setPendingRegisterDetails({
-                email: firebaseUser.email || undefined,
-                phone: firebaseUser.phoneNumber || undefined,
-                phoneVerified: !!firebaseUser.phoneNumber
-              });
-              setShowRoleSelectModal(true);
-            }
-          }
-        } finally {
-          setIsLoading(false);
-          setIsAuthenticating(false);
-        }
+        })();
       } else {
+        clearAuthSession();
         setUserProfile(null);
+        setUserRole('Parent');
         setAppMode('landing');
         setIsLoading(false);
         setIsAuthenticating(false);
@@ -476,22 +549,47 @@ export default function App() {
 
   // 2. Real-time Playmates/Parents DB sync with smart local persistence survival cache
   useEffect(() => {
+    // Clear legacy offline cache keys if present
+    try {
+      localStorage.removeItem('vernunt_offline_playmates');
+      localStorage.removeItem('vernunt_offline_playmates_v2');
+      localStorage.removeItem('vernunt_offline_playmates_v3');
+      localStorage.removeItem('vernunt_offline_playmates_v4');
+    } catch {
+      // ignore
+    }
+
     if (!auth.currentUser) {
-      // Unauthenticated / Sandbox mode: use standard mock data
+      // Unauthenticated / Sandbox mode: use standard Bangalore mock data
       setPlaymates(INITIAL_PLAYMATES);
       setSelectedPlaymate(INITIAL_PLAYMATES[0] || null);
       return;
     }
 
+    const mockPhotoMap = new Map<string, ChildProfile>(INITIAL_PLAYMATES.map(p => [p.id, p]));
+
     // Attempt to seed from local offline cache to ensure immediate offline rendering
-    const cachedPlaymatesStr = localStorage.getItem('vernunt_offline_playmates');
+    const cachedPlaymatesStr = localStorage.getItem('vernunt_offline_playmates_v5');
     if (cachedPlaymatesStr) {
       try {
-        const cachedList = JSON.parse(cachedPlaymatesStr);
+        const cachedList: ChildProfile[] = JSON.parse(cachedPlaymatesStr);
         if (Array.isArray(cachedList) && cachedList.length > 0) {
-          setPlaymates(cachedList);
-          setSelectedPlaymate(cachedList[0] || null);
-          console.log("⚡ Offline/Fast-Boot Cache: Successfully pre-populated playmate nodes from survival cache");
+          // Always ensure photos are updated with latest authentic curated portraits
+          const refreshedCached = cachedList.map(p => {
+            const fresh = mockPhotoMap.get(p.id);
+            if (fresh) {
+              return {
+                ...p,
+                photoUrl: fresh.photoUrl,
+                parentPhotoUrl: fresh.parentPhotoUrl,
+                childPhotoUrl: fresh.childPhotoUrl
+              };
+            }
+            return p;
+          });
+          setPlaymates(refreshedCached);
+          setSelectedPlaymate(refreshedCached[0] || null);
+          console.log("⚡ Offline/Fast-Boot Cache: Successfully pre-populated playmate nodes with fresh photos");
         }
       } catch (err) {
         console.warn("Failed to unpack cached playmates:", err);
@@ -515,20 +613,34 @@ export default function App() {
         }
       }
 
-      setPlaymates(combined);
+      // Always guarantee latest photos from INITIAL_PLAYMATES for all mock profiles
+      const refreshedCombined = combined.map(p => {
+        const fresh = mockPhotoMap.get(p.id);
+        if (fresh) {
+          return {
+            ...p,
+            photoUrl: fresh.photoUrl,
+            parentPhotoUrl: fresh.parentPhotoUrl,
+            childPhotoUrl: fresh.childPhotoUrl
+          };
+        }
+        return p;
+      });
+
+      setPlaymates(refreshedCombined);
       
       // Persist to local survival cache for future fast-boots or offline connections
       try {
-        localStorage.setItem('vernunt_offline_playmates', JSON.stringify(combined));
+        localStorage.setItem('vernunt_offline_playmates_v5', JSON.stringify(refreshedCombined));
       } catch (storeErr) {
         console.warn("Failed to write offline playmates to cache:", storeErr);
       }
 
       setSelectedPlaymate(prev => {
-        if (prev && combined.find(p => p.id === prev.id)) {
+        if (prev && refreshedCombined.find(p => p.id === prev.id)) {
           return prev;
         }
-        return combined[0] || null;
+        return refreshedCombined[0] || null;
       });
     }, (error) => {
       const msg = error?.message || String(error);
@@ -539,12 +651,16 @@ export default function App() {
         console.warn("[Users Live Sync Offline] Falling back to client-cached playmates:", error);
         
         // Use existing state or try to fall back to survival local storage or default initial set
-        const cacheStr = localStorage.getItem('vernunt_offline_playmates');
+        const cacheStr = localStorage.getItem('vernunt_offline_playmates_v5');
         if (cacheStr) {
           try {
-            const cached = JSON.parse(cacheStr);
+            const cached: ChildProfile[] = JSON.parse(cacheStr);
             if (Array.isArray(cached) && cached.length > 0) {
-              setPlaymates(cached);
+              const refreshed = cached.map(p => {
+                const fresh = mockPhotoMap.get(p.id);
+                return fresh ? { ...p, photoUrl: fresh.photoUrl, parentPhotoUrl: fresh.parentPhotoUrl, childPhotoUrl: fresh.childPhotoUrl } : p;
+              });
+              setPlaymates(refreshed);
               return;
             }
           } catch (pErr) {
@@ -581,14 +697,14 @@ export default function App() {
         playStyle: 'Active & Social',
         bio: 'Vernunt System Admin Panel and Child Safety Coordinator.',
         location: {
-          lat: 19.0760,
-          lng: 72.8777,
-          address: 'Vernunt HQ, Bandra West, Mumbai, Maharashtra, India'
+          lat: 12.9716,
+          lng: 77.5946,
+          address: 'Cubbon Park / Central Bangalore, Karnataka, India'
         },
         locationSharing: LocationSharing.PRECISE,
         verificationStatus: VerificationStatus.VERIFIED,
         interests: ['Platform Auditing', 'Community Building'],
-        photoUrl: account.photoURL || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200',
+        photoUrl: account.photoURL || 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=300&crop=faces',
         userRole: 'Admin',
         email: emailLower,
         phoneNumber: '8073749074',
@@ -707,7 +823,6 @@ export default function App() {
   };
 
   // Business, Specialists and commission states
-  const [userRole, setUserRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin'>('Parent');
   const [globalCommissionRate, setGlobalCommissionRate] = useState<number>(15); // Default 15% platform commission
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
 
@@ -808,9 +923,91 @@ export default function App() {
 
   const [eventsList, setEventsList] = useState<CommunityEvent[]>(MOCK_EVENTS);
 
-  // Interactive loading screens states
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [loadingTitle, setLoadingTitle] = useState<string>('Booting Premium Parent Workspace...');
+  // Babysitting & Drop-in Daycare Playhome state
+  const [daycarePlayhomes, setDaycarePlayhomes] = useState<DaycarePlayhomeProfile[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vernunt_daycare_playhomes');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.debug('Daycare cache parse note:', e);
+        }
+      }
+    }
+    return INITIAL_DAYCARE_PLAYHOMES;
+  });
+
+  const [careBookings, setCareBookings] = useState<CareBookingRequest[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('vernunt_care_bookings');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        } catch (e) {
+          console.debug('Care bookings parse note:', e);
+        }
+      }
+    }
+    return INITIAL_CARE_BOOKINGS;
+  });
+
+  const handleSaveDaycareProfile = (newProfile: DaycarePlayhomeProfile) => {
+    setDaycarePlayhomes(prev => {
+      const filtered = prev.filter(p => p.id !== newProfile.id);
+      const updated = [newProfile, ...filtered];
+      try {
+        localStorage.setItem('vernunt_daycare_playhomes', JSON.stringify(updated));
+      } catch (e) {
+        console.debug('Save daycare storage note:', e);
+      }
+      return updated;
+    });
+    triggerToast(`🏡 "${newProfile.title}" is now published and accepting bookings!`, "Sitter Published");
+  };
+
+  const handleAddCareBooking = (newBooking: CareBookingRequest) => {
+    setCareBookings(prev => {
+      const updated = [newBooking, ...prev];
+      try {
+        localStorage.setItem('vernunt_care_bookings', JSON.stringify(updated));
+      } catch (e) {
+        console.debug('Save booking note:', e);
+      }
+      return updated;
+    });
+    triggerToast(`🍼 Sitting request sent to ${newBooking.providerName}!`, "Care Request Sent");
+  };
+
+  const handleUpdateBookingStatus = (bookingId: string, newStatus: CareBookingStatus, logNote?: string) => {
+    setCareBookings(prev => {
+      const updated = prev.map(b => {
+        if (b.id !== bookingId) return b;
+        const newLogs = [...(b.careActivityLog || [])];
+        if (logNote) {
+          newLogs.push({
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            activity: newStatus,
+            note: logNote
+          });
+        }
+        return {
+          ...b,
+          status: newStatus,
+          careActivityLog: newLogs
+        };
+      });
+      try {
+        localStorage.setItem('vernunt_care_bookings', JSON.stringify(updated));
+      } catch (e) {
+        console.debug('Update booking note:', e);
+      }
+      return updated;
+    });
+    triggerToast(`Session status updated: ${newStatus}`, "Care Status");
+  };
 
   // Filter criteria states (with KMs as range criteria)
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(3.0); // Default 3.0 KM scan radius
@@ -989,6 +1186,243 @@ export default function App() {
   const [playmates, setPlaymates] = useState<ChildProfile[]>(INITIAL_PLAYMATES);
   const [selectedPlaymate, setSelectedPlaymate] = useState<ChildProfile | null>(INITIAL_PLAYMATES[0]);
 
+  // Dynamic QR Code Event Check-in modal state
+  const [showDynamicQrModal, setShowDynamicQrModal] = useState<boolean>(false);
+  const [isGeneratingQrPass, setIsGeneratingQrPass] = useState<boolean>(false);
+  const [organizerGateEvent, setOrganizerGateEvent] = useState<CommunityEvent | null>(null);
+
+  // Handle Event QR Generation Action with smooth loading state and immediate toast notification
+  const handleGenerateEventQrAction = () => {
+    if (isGeneratingQrPass) return;
+    setIsGeneratingQrPass(true);
+
+    const registeredBooking = bookingsList.find(b => b.type === 'EventTicket');
+    const matchedEvent = registeredBooking
+      ? eventsList.find(e => e.id === registeredBooking.itemId || e.title === registeredBooking.itemTitle) || eventsList[0]
+      : eventsList[0];
+    const eventTitle = matchedEvent?.title || 'Bangalore Kids Carnival & Play Fair';
+
+    setTimeout(() => {
+      setIsGeneratingQrPass(false);
+      setShowDynamicQrModal(true);
+
+      // Trigger immediate toast notification showing event title and active status
+      triggerToast(
+        `Dynamic QR check-in pass successfully generated for "${eventTitle}". Status: Active & Valid for Gate Entry.`,
+        '🎟️ Event Dynamic QR Pass Ready'
+      );
+    }, 450);
+  };
+
+  // Active User Location Coordinates (used for proximity calculations - Default: Bangalore)
+  const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
+    ? Number(userProfile.location.lat)
+    : (typeof userProfile?.capturedLat === 'number' ? userProfile.capturedLat : 12.9716);
+
+  const userLng = typeof userProfile?.location === 'object' && userProfile?.location?.lng !== undefined
+    ? Number(userProfile.location.lng)
+    : (typeof userProfile?.capturedLng === 'number' ? userProfile.capturedLng : 77.5946);
+
+  // 1km Immediate Proximity Alert Notifications State & Detection
+  const [proximityAlerts, setProximityAlerts] = useState<ProximityAlert[]>([]);
+  const knownPlaymateIdsRef = useRef<Set<string>>(new Set());
+  const knownEventIdsRef = useRef<Set<string>>(new Set());
+  const isInitialMountRef = useRef<boolean>(true);
+
+  // Initialize known IDs on mount so initial static load does not trigger spurious toasts
+  useEffect(() => {
+    INITIAL_PLAYMATES.forEach(p => {
+      if (p.id) knownPlaymateIdsRef.current.add(p.id);
+    });
+    MOCK_EVENTS.forEach(e => {
+      if (e.id) knownEventIdsRef.current.add(e.id);
+    });
+
+    const timer = setTimeout(() => {
+      isInitialMountRef.current = false;
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Monitor newly added playmates within 1km radius
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      playmates.forEach(p => {
+        if (p.id) knownPlaymateIdsRef.current.add(p.id);
+      });
+      return;
+    }
+
+    const currentUserId = userProfile?.id || auth.currentUser?.uid;
+    const newPlaymates = playmates.filter(
+      p => p.id && !knownPlaymateIdsRef.current.has(p.id) && p.id !== currentUserId
+    );
+
+    if (newPlaymates.length > 0) {
+      const alertsToAdd: ProximityAlert[] = [];
+
+      newPlaymates.forEach(p => {
+        knownPlaymateIdsRef.current.add(p.id);
+
+        const pLat = p.location?.lat;
+        const pLng = p.location?.lng;
+        if (typeof pLat === 'number' && typeof pLng === 'number') {
+          const dist = getHaversineDistance(userLat, userLng, pLat, pLng);
+          if (dist <= 1.0) { // Within immediate 1km radius
+            alertsToAdd.push({
+              id: `alert-pm-${p.id}-${Date.now()}`,
+              type: 'playmate',
+              title: `${p.childName || 'New Playmate'} (${p.childAge || 5} ${p.ageUnit || 'yrs'})`,
+              subtitle: `${p.playStyle || 'Friendly Neighbor'} • ${p.parentName ? `Parent: ${p.parentName}` : 'Joined area'}`,
+              distanceKm: dist,
+              distanceText: `${dist.toFixed(1)} km away`,
+              photoUrl: p.childPhotoUrl || p.photoUrl || p.parentPhotoUrl,
+              avatarEmoji: '🧸',
+              timestamp: Date.now(),
+              targetId: p.id,
+              address: p.location?.address || 'Immediate neighborhood (< 1 km)'
+            });
+          }
+        }
+      });
+
+      if (alertsToAdd.length > 0) {
+        setProximityAlerts(prev => [...alertsToAdd, ...prev].slice(0, 5));
+        playSubtleProximityChime();
+      }
+    }
+  }, [playmates, userLat, userLng, userProfile?.id]);
+
+  // Monitor newly added events within 1km radius
+  useEffect(() => {
+    if (isInitialMountRef.current) {
+      eventsList.forEach(e => {
+        if (e.id) knownEventIdsRef.current.add(e.id);
+      });
+      return;
+    }
+
+    const newEvents = eventsList.filter(
+      e => e.id && !knownEventIdsRef.current.has(e.id)
+    );
+
+    if (newEvents.length > 0) {
+      const alertsToAdd: ProximityAlert[] = [];
+
+      newEvents.forEach(e => {
+        knownEventIdsRef.current.add(e.id);
+
+        const eLat = typeof e.lat === 'number' ? e.lat : userLat;
+        const eLng = typeof e.lng === 'number' ? e.lng : userLng;
+        const dist = getHaversineDistance(userLat, userLng, eLat, eLng);
+
+        if (dist <= 1.0) { // Within immediate 1km radius
+          alertsToAdd.push({
+            id: `alert-evt-${e.id}-${Date.now()}`,
+            type: 'event',
+            title: e.title,
+            subtitle: `${e.date} at ${e.time} • ${e.category || 'Event'}`,
+            distanceKm: dist,
+            distanceText: `${dist.toFixed(1)} km away`,
+            photoUrl: e.photoUrl,
+            avatarEmoji: e.iconEmoji || '🎉',
+            timestamp: Date.now(),
+            targetId: e.id,
+            address: e.location || 'Within 1km walking distance'
+          });
+        }
+      });
+
+      if (alertsToAdd.length > 0) {
+        setProximityAlerts(prev => [...alertsToAdd, ...prev].slice(0, 5));
+        playSubtleProximityChime();
+      }
+    }
+  }, [eventsList, userLat, userLng]);
+
+  // Dismiss specific proximity toast alert
+  const handleDismissProximityAlert = (alertId: string) => {
+    setProximityAlerts(prev => prev.filter(a => a.id !== alertId));
+  };
+
+  // Handle user clicking "View" on a proximity toast alert
+  const handleViewProximityAlert = (alert: ProximityAlert) => {
+    setProximityAlerts(prev => prev.filter(a => a.id !== alert.id));
+
+    if (alert.type === 'playmate') {
+      const target = playmates.find(p => p.id === alert.targetId);
+      if (target) {
+        setSelectedPlaymate(target);
+        setAppMode('dashboard');
+        setActiveTab('radar');
+      }
+    } else if (alert.type === 'event') {
+      const target = eventsList.find(e => e.id === alert.targetId);
+      if (target) {
+        setAppMode('dashboard');
+        setActiveTab('events');
+        setTimeout(() => {
+          const el = document.getElementById(`event-card-${target.id}`);
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+      }
+    }
+  };
+
+  // Simulation handler to quickly test 1km proximity notifications in real-time
+  const triggerSimulatedProximityAlert = (type: 'playmate' | 'event') => {
+    if (type === 'playmate') {
+      const testId = `sim-pm-${Date.now()}`;
+      const sampleNames = ['Aarav & Kabir (6 yrs)', 'Saanvi (4 yrs)', 'Diya & Reyansh (5 yrs)', 'Neil (7 yrs)'];
+      const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+      const dist = (0.2 + Math.random() * 0.6).toFixed(1);
+
+      const newAlert: ProximityAlert = {
+        id: `alert-${testId}`,
+        type: 'playmate',
+        title: randomName,
+        subtitle: 'Modern & Creative Play • Active in neighborhood',
+        distanceKm: parseFloat(dist),
+        distanceText: `${dist} km away`,
+        photoUrl: 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=300',
+        avatarEmoji: '🧸',
+        timestamp: Date.now(),
+        targetId: playmates[0]?.id || 'playmate-1',
+        address: 'Sector 54 Park Lane (< 1 km)'
+      };
+      setProximityAlerts(prev => [newAlert, ...prev].slice(0, 5));
+      playSubtleProximityChime();
+    } else {
+      const testId = `sim-evt-${Date.now()}`;
+      const sampleEvents = [
+        'Sunset Origami & Clay Modeling Workshop',
+        'Weekend Little Runners Sprint & Relay',
+        'Neighborhood Board Game & Chess Circle',
+        'Junior Science Magnet & Prism Lab'
+      ];
+      const randomEvent = sampleEvents[Math.floor(Math.random() * sampleEvents.length)];
+      const dist = (0.3 + Math.random() * 0.5).toFixed(1);
+
+      const newAlert: ProximityAlert = {
+        id: `alert-${testId}`,
+        type: 'event',
+        title: randomEvent,
+        subtitle: 'Tomorrow at 04:30 PM • Central Park Green Lawn',
+        distanceKm: parseFloat(dist),
+        distanceText: `${dist} km away`,
+        photoUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600',
+        avatarEmoji: '🎉',
+        timestamp: Date.now(),
+        targetId: eventsList[0]?.id || 'event-1',
+        address: 'Walking distance (0.4 km)'
+      };
+      setProximityAlerts(prev => [newAlert, ...prev].slice(0, 5));
+      playSubtleProximityChime();
+    }
+  };
+
   // Secure connection state (restricting private parent communication)
   const [connectedIds, setConnectedIds] = useState<string[]>(() => {
     const cached = localStorage.getItem('vernunt_connected_ids');
@@ -1094,30 +1528,7 @@ export default function App() {
         const updatedSent = [...interestsSent, partnerId];
         setInterestsSent(updatedSent);
         localStorage.setItem('vernunt_interests_sent', JSON.stringify(updatedSent));
-        triggerToast("💌 Connect request sent to parent! Awaiting guardian approval...", "Request Sent");
-
-        // Simulate other parent auto-accepting with active feedback after 3 seconds
-        setTimeout(() => {
-          setConnectedIds(prevConnected => {
-            if (prevConnected.includes(partnerId)) return prevConnected;
-            const updated = [...prevConnected, partnerId];
-            localStorage.setItem('vernunt_connected_ids', JSON.stringify(updated));
-            return updated;
-          });
-          setInterestsSent(prevSent => {
-            const updated = prevSent.filter(id => id !== partnerId);
-            localStorage.setItem('vernunt_interests_sent', JSON.stringify(updated));
-            return updated;
-          });
-
-          confetti({
-            particleCount: 60,
-            spread: 40,
-            origin: { y: 0.7 }
-          });
-
-          triggerToast("🎉 Parent accepted your connection request! Secure chat is now unlocked.", "Connected!");
-        }, 3000);
+        triggerToast("💌 Connect request sent to parent! Awaiting guardian review & approval...", "Request Sent (Pending)");
       }
     );
   };
@@ -1199,15 +1610,17 @@ export default function App() {
 
   // Handle Sign Up with optional pre-verified details
   const handleStartSignUp = (
-    role: 'Parent' | 'Event Organizer' | 'Portfolio Professional',
+    role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional',
     details?: { phone?: string; email?: string; phoneVerified?: boolean; parentName?: string; photoUrl?: string }
   ) => {
     setIsLoading(true);
     setLoadingTitle(
       role === 'Parent' 
         ? 'Loading family registration workspace...' 
+        : role === 'Daycare Center'
+        ? 'Loading Daycare & Creche Center registration workspace...'
         : role === 'Event Organizer'
-        ? 'Loading activity host registration workspace...'
+        ? 'Loading events, class and activities host registration workspace...'
         : 'Loading professional specialist workspace...'
     );
     setSuggestedRegisterRole(role);
@@ -1222,6 +1635,9 @@ export default function App() {
   const handleQuickStartPlayground = () => {
     setIsLoading(true);
     setLoadingTitle('Spanning localized Ayaan playground radars...');
+    
+    const demoExpiry = new Date();
+    demoExpiry.setDate(demoExpiry.getDate() + 365);
     
     // Generate a beautiful, pre-populated, demo-ready playground profile
     const demoProfile: ChildProfile = {
@@ -1241,7 +1657,11 @@ export default function App() {
       locationSharing: LocationSharing.PRECISE,
       verificationStatus: VerificationStatus.VERIFIED,
       interests: ['Lego Sets', 'Sketching', 'Mini Soccer'],
-      photoUrl: 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400'
+      photoUrl: 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400',
+      subscriptionActive: true,
+      subscriptionPlan: 'yearly',
+      subscriptionExpiryDate: demoExpiry.toISOString().split('T')[0],
+      contactViewCredits: 10
     };
 
     setTimeout(() => {
@@ -1344,10 +1764,73 @@ export default function App() {
     setUserRole(savedRole);
     setAppMode('dashboard');
     
+    // If user registered as Daycare Center or opted into Daycare / Babysitter hosting, sync to daycarePlayhomes
+    if (savedRole === 'Daycare Center' || (profileWithId as any).isDaycareHost) {
+      const daycareProfile: DaycarePlayhomeProfile = {
+        id: `daycare-${uid}`,
+        name: profileWithId.companyName || profileWithId.parentName || 'Verified Daycare Center',
+        type: (profileWithId as any).daycareType || (savedRole === 'Daycare Center' ? 'DaycareCenter' : 'ParentHome'),
+        hostName: profileWithId.parentName || 'Center Director',
+        contactPhone: profileWithId.phoneNumber || '',
+        contactEmail: profileWithId.email || '',
+        hourlyRate: (profileWithId as any).hourlyRate ?? 180,
+        halfDayRate: (profileWithId as any).halfDayRate,
+        fullDayRate: (profileWithId as any).fullDayRate,
+        monthlyRate: (profileWithId as any).monthlyRate,
+        address: profileWithId.location?.address || 'Local Neighborhood',
+        distanceKm: 0.4,
+        lat: profileWithId.location?.lat || 19.0760,
+        lng: profileWithId.location?.lng || 72.8777,
+        capacity: (profileWithId as any).capacity || 15,
+        availableSlotsCount: (profileWithId as any).capacity || 8,
+        rating: 5.0,
+        reviewsCount: 1,
+        verified: true,
+        licenseNumber: profileWithId.companyRegNumber || (profileWithId as any).licenseNumber,
+        staffToChildRatio: (profileWithId as any).staffToChildRatio || '1:4',
+        cctvLiveStreamAvailable: (profileWithId as any).cctvLiveStreamAvailable ?? true,
+        operatingHours: (profileWithId as any).operatingHours || '08:00 AM - 07:30 PM',
+        operatingDays: (profileWithId as any).operatingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+        ageGroupsServed: (profileWithId as any).ageGroupsServed || ['Infants (6m - 18m)', 'Toddlers (18m - 3y)', 'Pre-K (3y - 6y)'],
+        amenities: (profileWithId as any).amenities || [
+          'Live CCTV Access for Parents',
+          'Air Conditioned Child-Safe Rooms',
+          'Sterilized Infant Nap Cribs',
+          'Pediatric First-Aid On-site',
+          'Nutritious Pure Vegetarian Meals',
+          'Enclosed Outdoor Play Zone'
+        ],
+        emergencyMedicalTieUp: (profileWithId as any).emergencyMedicalTieUp || 'Apollo Cradle Hospital (0.8 km)',
+        photos: (profileWithId as any).facilityPhotos || [
+          profileWithId.photoUrl || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600'
+        ],
+        description: profileWithId.bio || 'Certified premium daycare and playhome with strict child safety protocols and live camera streaming.',
+        documents: (profileWithId as any).verificationDocs || [
+          { name: 'Government Trade / Educational License', url: profileWithId.companyDocUrl || '#', verified: true },
+          { name: 'Director Aadhaar Verification', url: profileWithId.aadhaarDocUrl || '#', verified: true }
+        ],
+        instantBooking: true,
+        minimumNoticeHours: 1
+      };
+
+      setDaycarePlayhomes(prev => {
+        const filtered = prev.filter(d => d.id !== daycareProfile.id);
+        const updated = [daycareProfile, ...filtered];
+        try {
+          localStorage.setItem('vernunt_daycare_playhomes', JSON.stringify(updated));
+        } catch (e) {
+          console.debug('Daycare storage sync note:', e);
+        }
+        return updated;
+      });
+    }
+
     if (savedRole === 'Event Organizer') {
       setActiveTab('business');
     } else if (savedRole === 'Portfolio Professional') {
       setActiveTab('portfolio');
+    } else if (savedRole === 'Daycare Center') {
+      setActiveTab('daycare');
     } else {
       setActiveTab('radar');
     }
@@ -1365,15 +1848,20 @@ export default function App() {
     setIsLoading(true);
     setLoadingTitle('Signing out...');
     try {
+      clearAuthSession();
       if (auth.currentUser) {
         await signOut(auth);
       }
     } catch (e) {
       console.error('Sign-out error:', e);
     } finally {
+      clearAuthSession();
       setUserProfile(null);
+      setUserRole('Parent');
       setAppMode('landing');
+      setActiveTab('radar');
       setIsLoading(false);
+      setIsAuthenticating(false);
     }
   };
 
@@ -1399,10 +1887,6 @@ export default function App() {
       });
     }
   };
-
-  // Derive center coordinate for distance filter
-  const userLat = userProfile?.location?.lat || 19.0760;
-  const userLng = userProfile?.location?.lng || 72.8777;
 
   // Filter playmates list in Kilometers and other required criteria
   const filteredPlaymates = playmates.filter((p) => {
@@ -1592,7 +2076,7 @@ export default function App() {
                 if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
                 if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
 
-                const def = TAB_DEFINITIONS.find(t => t.id === tabId);
+                const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
                 if (!def) return null;
 
                 const IconComponent = def.icon;
@@ -1912,49 +2396,80 @@ export default function App() {
 
       {/* Mobile Sticky Tab Navigation Bar */}
       {appMode === 'dashboard' && (
-        <div id="mobile-sticky-tabs" className="lg:hidden bg-white border-b border-slate-100 flex items-center justify-around py-2.5 sticky top-[68px] z-20 shadow-sm">
-          {Object.entries(tabsConfig)
-            .filter(([_, placement]) => placement === 'header')
-            .map(([tabId]) => {
-              // Guards
-              if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
-              if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
+        <div 
+          id="mobile-sticky-tabs" 
+          className="lg:hidden bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-[60px] sm:top-[68px] z-20 shadow-xs px-2.5 py-2"
+        >
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+            {Object.entries(tabsConfig)
+              .filter(([_, placement]) => placement === 'header')
+              .map(([tabId]) => {
+                // Guards
+                if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
+                if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
 
-              const def = TAB_DEFINITIONS.find(t => t.id === tabId);
-              if (!def) return null;
+                const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
+                if (!def) return null;
 
-              const IconComponent = def.icon;
-              const isBilling = tabId === 'billing';
+                const IconComponent = def.icon;
+                const isBilling = tabId === 'billing';
+                const isActive = activeTab === tabId;
 
-              return (
-                <button
-                  key={tabId}
-                  id={`mob-btn-${tabId}`}
-                  onClick={() => setActiveTab(tabId as any)}
-                  className={`flex flex-col items-center gap-1 text-[10px] uppercase font-bold transition cursor-pointer ${
-                    activeTab === tabId
-                      ? isBilling
-                        ? 'text-amber-500 font-extrabold'
-                        : 'text-orange-500 font-extrabold'
-                      : isBilling
-                      ? 'text-amber-500/70'
-                      : 'text-slate-400'
-                  }`}
-                >
-                  <IconComponent className={`w-4 h-4 ${isBilling ? 'animate-pulse text-amber-500' : ''}`} />
-                  {tabId === 'billing' ? '👑 Club' : def.label === 'Near Playmates' ? 'Radar' : def.label === 'Chat Messenger' ? 'Chats' : def.label === 'Events & Classes' ? 'Events' : def.label === 'Specialists' ? 'Consult' : def.label}
-                </button>
-              );
-            })}
+                // Clean, non-overlapping concise labels
+                let mobileLabel = def.label;
+                if (tabId === 'radar') mobileLabel = 'Radar';
+                else if (tabId === 'daycare') mobileLabel = 'Daycare & Sitter';
+                else if (tabId === 'chat') mobileLabel = 'Chats';
+                else if (tabId === 'events') mobileLabel = 'Events';
+                else if (tabId === 'specialists') mobileLabel = 'Specialists';
+                else if (tabId === 'knowledge') mobileLabel = '1000+ Guides';
+                else if (tabId === 'billing') mobileLabel = '👑 VIP';
+                else if (tabId === 'planner') mobileLabel = 'Planner';
+                else if (tabId === 'referrals') mobileLabel = 'Refer';
 
-          {/* More menu trigger */}
-          <button
-            id="mob-btn-more-menu"
-            onClick={() => setIsSideMenuOpen(true)}
-            className="flex flex-col items-center gap-1 text-[10px] uppercase font-extrabold transition text-slate-500 cursor-pointer"
-          >
-            <Menu className="w-4 h-4 text-slate-600" /> More
-          </button>
+                return (
+                  <button
+                    key={tabId}
+                    id={`mob-btn-${tabId}`}
+                    onClick={() => setActiveTab(tabId as any)}
+                    className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer select-none active:scale-95 ${
+                      isActive
+                        ? isBilling
+                          ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
+                          : 'bg-rose-700 text-white font-black shadow-xs shadow-rose-700/20'
+                        : isBilling
+                        ? 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100/60'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/70'
+                    }`}
+                  >
+                    <IconComponent className={`w-3.5 h-3.5 shrink-0 ${isBilling ? 'animate-pulse text-amber-500' : isActive ? 'text-white' : 'text-rose-700'}`} />
+                    <span>{mobileLabel}</span>
+                  </button>
+                );
+              })}
+
+            {/* Store shortcut */}
+            <a
+              id="mob-btn-store-link"
+              href="https://vernunt.com/store"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 transition whitespace-nowrap cursor-pointer"
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-orange-500 shrink-0" />
+              <span>Store</span>
+            </a>
+
+            {/* More menu trigger */}
+            <button
+              id="mob-btn-more-menu"
+              onClick={() => setIsSideMenuOpen(true)}
+              className="shrink-0 flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-extrabold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition whitespace-nowrap cursor-pointer ml-auto"
+            >
+              <Menu className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              <span>More</span>
+            </button>
+          </div>
         </div>
       )}
 
@@ -2022,7 +2537,7 @@ export default function App() {
               </a>
               <button
                 type="button"
-                onClick={() => signOut(auth)}
+                onClick={handleLogOut}
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-705 font-bold text-xs rounded-2xl transition cursor-pointer"
               >
                 Exit Session
@@ -2032,6 +2547,38 @@ export default function App() {
         ) : appMode === 'dashboard' && (
           <div id="dashboard-content-wrapper" className="space-y-6 animate-fade-in">
             
+            {/* Biometric / Facial Audit Pending Status Message Banner */}
+            {(userProfile?.facialAuditRequired || userProfile?.faceVerificationStatus === 'pending_admin') && (
+              <div 
+                id="banner-facial-recognition-pending" 
+                className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white rounded-2xl p-4 sm:p-5 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-4 border border-amber-400/50 animate-fade-in text-left"
+              >
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/30 text-xl">
+                    🛡️
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-serif font-black text-sm sm:text-base tracking-wide">
+                        Profile Pending for Facial Recognition Audit
+                      </span>
+                      <span className="bg-white/20 text-white text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border border-white/30">
+                        Admin Review Required
+                      </span>
+                    </div>
+                    <p className="text-white/90 text-xs leading-relaxed max-w-2xl font-medium">
+                      Your profile registration is submitted. Because facial recognition required manual safety clearance, our community administration team is reviewing your profile photos. <strong>Once approved, an instant confirmation Email & SMS with your login link will be sent to {userProfile?.phoneNumber || userProfile?.email || 'your registered contact'}.</strong>
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <span className="text-[10px] font-bold bg-white/15 px-3 py-1.5 rounded-xl border border-white/20 text-amber-50 whitespace-nowrap">
+                    ⏳ In Safety Queue
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Promotional Campaign/Advertisement Placement: app_top */}
             {banners.filter(b => b.placement === 'app_top' && b.active).map((b) => (
               <div 
@@ -2077,6 +2624,82 @@ export default function App() {
                 {/* Column 1 & 2: Main Map/Radar Toggle & Grid */}
                 <div id="radar-views-panel" className="lg:col-span-2 space-y-6">
                   
+                  {/* Dynamic QR Code Fast Entry Banner for Registered Events */}
+                  <div id="radar-event-qr-banner" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-4 rounded-2xl border border-slate-800 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 flex items-center justify-center text-slate-950 shrink-0 shadow-md">
+                        <QrCode className="w-5 h-5" />
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <h5 className="text-xs sm:text-sm font-black font-serif text-white tracking-tight">
+                            Registered Events Dynamic QR Check-In Pass
+                          </h5>
+                          <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[8.5px] font-black uppercase px-1.5 py-0.2 rounded-full font-mono">
+                            Live Scanner Ready
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-300 font-medium">
+                          Generate instant encrypted dynamic QR passes for organizers to scan and check-in attendees to simplify entry.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      id="btn-generate-event-qr-action"
+                      type="button"
+                      onClick={handleGenerateEventQrAction}
+                      disabled={isGeneratingQrPass}
+                      className="relative overflow-hidden group px-4 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-500 hover:via-orange-600 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-orange-500/30 transform transition-all duration-300 hover:scale-105 active:scale-95 animate-pulse hover:animate-none cursor-pointer shrink-0 font-sans ring-2 ring-amber-400/50 hover:ring-amber-300 disabled:opacity-85 disabled:cursor-wait"
+                    >
+                      {/* Shimmer light-beam overlay for enhanced discoverability */}
+                      <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
+                      
+                      {isGeneratingQrPass ? (
+                        <>
+                          <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
+                          <span>Generating Dynamic QR Pass...</span>
+                        </>
+                      ) : (
+                        <>
+                          <ScanLine className="w-4 h-4 text-slate-950 animate-bounce" />
+                          <span>Generate Dynamic QR Pass</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Babysitting & Drop-in Daycare Marketplace Feature Banner */}
+                  <div id="radar-daycare-banner" className="bg-gradient-to-r from-rose-900 via-rose-950 to-orange-950 text-white p-4 sm:p-5 rounded-2xl border border-rose-800/80 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start sm:items-center gap-3.5">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-orange-500 flex items-center justify-center text-2xl shrink-0 shadow-md">
+                        🍼
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h5 className="text-sm font-black font-serif text-white tracking-tight">
+                            Need a Sitter for an Hour or Day?
+                          </h5>
+                          <span className="bg-gradient-to-r from-amber-400 to-orange-400 text-slate-950 text-[9px] font-black uppercase px-2 py-0.5 rounded-full font-mono shadow-xs">
+                            Auto-Match Nearest First
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-200/90 font-medium leading-relaxed max-w-xl">
+                          Parents can post busy hours (1h to full day) & connect with verified neighbours & playhomes nearest to you. Handshake PIN drop-off & live session activity log included!
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      id="btn-radar-find-sitter-cta"
+                      type="button"
+                      onClick={() => setActiveTab('daycare')}
+                      className="px-4 py-2.5 bg-gradient-to-r from-rose-500 via-orange-500 to-amber-500 hover:from-rose-600 hover:to-amber-600 text-white text-xs font-black rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-orange-500/30 transform transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shrink-0 font-sans ring-2 ring-rose-400/30"
+                    >
+                      <Baby className="w-4 h-4 text-white" />
+                      <span>Find Sitter or Playhome</span>
+                      <ArrowRight className="w-3.5 h-3.5 text-white" />
+                    </button>
+                  </div>
+
                   {/* REAL-TIME RADAR SEARCH & FILTERS HUB */}
                   <div id="filter-hub-card" className="bg-white p-5 rounded-2xl border border-rose-200/80 shadow-md space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-rose-100">
@@ -2087,8 +2710,19 @@ export default function App() {
                         <p className="text-[11px] text-slate-500 font-medium">Find compatible playmates and families near your area</p>
                       </div>
 
-                      {/* Active filter counter badge */}
+                      {/* Active filter counter badge & QR Fast Entry Trigger */}
                       <div className="flex items-center gap-2">
+                        <button
+                          id="btn-generate-event-qr-pass"
+                          type="button"
+                          onClick={() => setShowDynamicQrModal(true)}
+                          className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-[10.5px] font-black px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transform transition-all duration-300 hover:scale-105 active:scale-95 animate-pulse hover:animate-none shadow-sm hover:shadow-md hover:shadow-orange-500/25 ring-1 ring-amber-400/50 cursor-pointer"
+                          title="Generate dynamic QR code for registered events for fast organizer check-in"
+                        >
+                          <QrCode className="w-3.5 h-3.5" />
+                          <span>Event QR Pass</span>
+                        </button>
+
                         {((maxDistanceKm !== 3.0) || filterPlayStyle !== 'All' || filterAgeGroup !== 'All' || filterGender !== 'All' || filterLanguage !== 'All' || filterSearchQuery || filterMinAge !== 0 || filterMaxAge !== 15 || selectedInterests.length > 0 || selectedPreferredActivities.length > 0 || filterAvailableDay !== 'All' || filterAvailableTime !== 'All' || filterOnlyConnected || filterOnlySaved || filterActivityRecency !== 'All') && (
                           <button
                             id="btn-clear-all-filters"
@@ -2793,8 +3427,8 @@ export default function App() {
                                   referrerPolicy="no-referrer"
                                   onError={(e) => {
                                     (e.target as HTMLImageElement).src = p.childGender === 'Girl'
-                                      ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400'
-                                      : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400';
+                                      ? 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=400&crop=faces'
+                                      : 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=400&crop=faces';
                                   }}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent"></div>
@@ -2969,6 +3603,30 @@ export default function App() {
               </div>
             )}
 
+            {/* Tab: Babysitting & Drop-in Daycare Marketplace */}
+            {activeTab === 'daycare' && (
+              <DaycareSittingTab
+                daycarePlayhomes={daycarePlayhomes}
+                careBookings={careBookings}
+                currentUserProfile={userProfile}
+                onSaveDaycareProfile={handleSaveDaycareProfile}
+                onAddCareBooking={handleAddCareBooking}
+                onUpdateBookingStatus={handleUpdateBookingStatus}
+                onOpenChatWithUser={(opponentId) => {
+                  const mate = playmates.find(p => p.id === opponentId);
+                  if (mate) {
+                    handleOpenChatTrigger(mate);
+                  } else {
+                    setActiveTab('chat');
+                  }
+                }}
+                onOpenUserProfile={(targetUser) => {
+                  setSelectedPlaymate(targetUser);
+                  setActiveTab('radar');
+                }}
+              />
+            )}
+
             {/* Tab: Instant chats log */}
             {activeTab === 'chat' && (
               <ChatPanel 
@@ -3124,81 +3782,164 @@ export default function App() {
       </main>
 
       {/* Persistent global footer */}
-      <footer id="global-page-footer" className="bg-white border-t border-slate-100 py-8 text-center text-xs text-slate-400 mt-auto px-4">
-        <div className="max-w-4xl mx-auto space-y-4 mb-5">
-          <div className="flex flex-wrap items-center justify-center gap-2.5">
-            <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-400">Host Portals:</span>
+      <footer id="global-page-footer" className="bg-white border-t border-slate-200/80 py-10 text-center text-xs text-slate-500 mt-auto px-4">
+        <div className="max-w-5xl mx-auto space-y-6 mb-6">
+          
+          {/* Dedicated Host & Provider Registration Portals */}
+          <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
+              <div className="text-left">
+                <span className="text-[10px] uppercase font-black tracking-wider text-rose-700 block">Host &amp; Provider Registration Portals</span>
+                <p className="text-[11px] text-slate-600 font-medium">Join Vernunt's verified neighborhood childcare, daycare &amp; activities network</p>
+              </div>
+              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+                🎁 6 - 12 Months Free Introductory Offer
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
+              <button
+                id="footer-btn-host-sitter-playhome"
+                type="button"
+                onClick={() => {
+                  if (userProfile && appMode === 'dashboard') {
+                    setActiveTab('daycare');
+                    setTimeout(() => {
+                      const regBtn = document.getElementById('btn-open-sitter-provider-modal');
+                      if (regBtn) regBtn.click();
+                    }, 100);
+                  } else {
+                    handleStartSignUp('Parent', { isParentHostingDaycare: true });
+                  }
+                }}
+                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🏠</span>
+                <span>Host Sitter / Playhome Registration</span>
+              </button>
+
+              <button
+                id="footer-btn-register-daycare-center"
+                type="button"
+                onClick={() => {
+                  if (userProfile && appMode === 'dashboard') {
+                    setActiveTab('daycare');
+                  } else {
+                    handleStartSignUp('Daycare Center');
+                  }
+                }}
+                className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🏫</span>
+                <span>Register Daycare / Creche Center</span>
+              </button>
+
+              <button
+                id="footer-btn-host-class"
+                type="button"
+                onClick={() => {
+                  if (userProfile && appMode === 'dashboard') {
+                    setActiveTab('events');
+                    setTimeout(() => {
+                      const hostBtn = document.getElementById('btn-trigger-propose-event');
+                      if (hostBtn) hostBtn.click();
+                    }, 100);
+                  } else {
+                    handleStartSignUp('Event Organizer');
+                  }
+                }}
+                className="px-3.5 py-2 bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <span>🎉</span>
+                <span>Host Activity or Event</span>
+              </button>
+
+              <button
+                id="footer-btn-register-spec"
+                type="button"
+                onClick={() => {
+                  if (userProfile && appMode === 'dashboard') {
+                    setActiveTab('specialists');
+                    setTimeout(() => {
+                      const regBtn = document.getElementById('btn-trigger-register-specialist');
+                      if (regBtn) regBtn.click();
+                    }, 100);
+                  } else {
+                    handleStartSignUp('Portfolio Professional');
+                  }
+                }}
+                className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <span>💼</span>
+                <span>Pediatric Specialists &amp; Clinics</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Nav Links */}
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-slate-600">
             <button
-              id="footer-btn-host-class"
+              type="button"
               onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('events');
-                  setTimeout(() => {
-                    const hostBtn = document.getElementById('btn-trigger-propose-event');
-                    if (hostBtn) hostBtn.click();
-                  }, 100);
-                } else {
-                  setSuggestedRegisterRole('Event Organizer');
-                  setAppMode('register');
-                }
-              }}
-              className="px-3 py-1.5 bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-100 rounded-lg font-bold text-[11px] transition shadow-sm cursor-pointer animate-pulse-slow"
-            >
-              ➕ Host Activity or Class
-            </button>
-            <button
-              id="footer-btn-register-spec"
-              onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('specialists');
-                  setTimeout(() => {
-                    const regBtn = document.getElementById('btn-trigger-register-specialist');
-                    if (regBtn) regBtn.click();
-                  }, 100);
-                } else {
-                  setSuggestedRegisterRole('Portfolio Professional');
-                  setAppMode('register');
-                }
-              }}
-              className="px-3 py-1.5 bg-purple-50 text-purple-600 hover:bg-purple-100 border border-purple-100 rounded-lg font-bold text-[11px] transition shadow-sm cursor-pointer"
-            >
-              💼 Register Consultant Portfolio
-            </button>
-            <button
-              id="footer-btn-biz-console"
-              onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('business');
-                } else {
-                  setSuggestedRegisterRole('Event Organizer');
-                  setAppMode('register');
-                }
-              }}
-              className="px-3 py-1.5 bg-slate-900 text-white hover:bg-slate-800 rounded-lg font-bold text-[11px] transition shadow-md cursor-pointer"
-            >
-              ⚙️ Host Business Console
-            </button>
-            <button
-              id="footer-btn-knowledge-hub"
-              onClick={() => {
-                if (appMode !== 'dashboard') {
-                  setAppMode('dashboard');
-                }
+                if (appMode !== 'dashboard') setAppMode('dashboard');
                 setActiveTab('knowledge');
               }}
-              className="px-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 rounded-lg font-bold text-[11px] transition shadow-xs cursor-pointer flex items-center gap-1"
+              className="hover:text-rose-700 transition cursor-pointer"
             >
               📚 1,000+ Child Growth Guides
             </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (appMode !== 'dashboard') setAppMode('dashboard');
+                setActiveTab('daycare');
+              }}
+              className="hover:text-rose-700 transition cursor-pointer"
+            >
+              🍼 Babysitting &amp; Daycare
+            </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (appMode !== 'dashboard') setAppMode('dashboard');
+                setActiveTab('radar');
+              }}
+              className="hover:text-rose-700 transition cursor-pointer"
+            >
+              🎯 Playmate Radar
+            </button>
+            <span>&bull;</span>
+            <a
+              href="https://vernunt.com/store"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-600 hover:text-orange-700 transition font-bold"
+            >
+              🛍️ Vernunt Store (vernunt.com/store)
+            </a>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => setShowChildComplianceModal(true)}
+              className="hover:text-rose-700 transition cursor-pointer"
+            >
+              🛡️ COPPA &amp; DPDP Safety Protocols
+            </button>
           </div>
         </div>
-        <p>© 2026 Vernunt Neighborhood Families Inc. All Rights Reserved. Created under secure, verified vaccine and children safety guidelines.</p>
+
+        <p className="text-[11px] text-slate-400">
+          &copy; 2026 <strong>Vernunt</strong> (vernunt.com &bull; app.vernunt.com). All Rights Reserved. India's Verified Kids Playmate Radar &amp; Childcare Network.
+        </p>
         <button
           id="btn-footer-tac-toggle"
+          type="button"
           onClick={() => setShowLegalModal(true)}
-          className="text-orange-500 font-bold hover:underline mt-1.5 focus:outline-none cursor-pointer"
+          className="text-orange-600 font-bold hover:underline mt-2 text-xs focus:outline-none cursor-pointer"
         >
-          View Privacy Regulations & Guardian Terms of Service
+          View Privacy Regulations &amp; Guardian Terms of Service
         </button>
       </footer>
 
@@ -3278,6 +4019,41 @@ export default function App() {
           actionMessage={aadhaarActionMessage}
         />
       )}
+
+      {/* Dynamic Event QR Pass & Check-In Modal */}
+      {showDynamicQrModal && (
+        <EventDynamicQrPassModal
+          eventsList={eventsList}
+          bookingsList={bookingsList}
+          userProfile={userProfile}
+          onClose={() => setShowDynamicQrModal(false)}
+          onOpenOrganizerGateCheckIn={(event) => {
+            setOrganizerGateEvent(event);
+          }}
+          onUpdateBooking={(updatedBooking) => {
+            setBookingsList(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
+          }}
+        />
+      )}
+
+      {/* Organizer Camera Check-In Station Desk */}
+      {organizerGateEvent && (
+        <EventOrganizerCheckInStation
+          event={organizerGateEvent}
+          userProfile={userProfile}
+          onClose={() => setOrganizerGateEvent(null)}
+          onUpdateEvent={(updated) => {
+            setEventsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+          }}
+        />
+      )}
+
+      {/* Real-time 1km Immediate Proximity Alert Toast (Non-blocking) */}
+      <ProximityAlertToast
+        alerts={proximityAlerts}
+        onDismiss={handleDismissProximityAlert}
+        onView={handleViewProximityAlert}
+      />
 
       {/* Real-time Toast notification */}
       {showPushToast && latestNotification && (
@@ -3386,7 +4162,7 @@ export default function App() {
                     if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
                     if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
 
-                    const def = TAB_DEFINITIONS.find(t => t.id === tabId);
+                    const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
                     if (!def) return null;
 
                     const IconComponent = def.icon;
@@ -3510,6 +4286,45 @@ export default function App() {
               >
                 <X className="w-4 h-4" />
               </button>
+            </div>
+
+            {/* 1km Immediate Proximity Live Beacon Test Section */}
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2 mt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[9.5px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  1km Immediate Proximity Live Radar
+                </span>
+                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Active</span>
+              </div>
+              <p className="text-[10px] text-emerald-900 leading-snug">
+                Subtle non-blocking toasts are triggered automatically when a new playmate or event joins within your immediate 1km walking radius.
+              </p>
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                <button
+                  id="btn-simulate-1km-playmate"
+                  onClick={() => {
+                    triggerSimulatedProximityAlert('playmate');
+                    setShowNotificationDrawer(false);
+                  }}
+                  className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <span>🧸 Test 1km Playmate</span>
+                </button>
+                <button
+                  id="btn-simulate-1km-event"
+                  onClick={() => {
+                    triggerSimulatedProximityAlert('event');
+                    setShowNotificationDrawer(false);
+                  }}
+                  className="px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <span>🎉 Test 1km Event</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3.5 py-4">

@@ -96,8 +96,9 @@ export default function EventBookingModal({
     }
   }
 
-  const convenienceFee = subtotal > 0 ? Math.round(subtotal * 0.02) : 0;
-  const finalTotal = Math.max(0, subtotal - discountAmount + convenienceFee);
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  const convenienceFee = discountedSubtotal > 0 ? Math.round(discountedSubtotal * 0.02) : 0;
+  const finalTotal = discountedSubtotal + convenienceFee;
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,16 +121,18 @@ export default function EventBookingModal({
       alert('Please provide your name and email address.');
       return;
     }
+
+    // For free registration or 0 amount: bypass payment gateway completely and generate ticket immediately!
+    if (finalTotal === 0) {
+      finalizeOrder('FREE_COMMUNITY_PASS_' + Date.now().toString().slice(-6));
+      return;
+    }
+
     setStep('payment_processing');
 
     setTimeout(() => {
-      if (finalTotal === 0) {
-        // Free ticket - bypass OTP
-        finalizeOrder('PAY_FREE_PROMO_' + Date.now().toString().slice(-6));
-      } else {
-        setStep('otp_verify');
-      }
-    }, 1200);
+      setStep('otp_verify');
+    }, 1000);
   };
 
   const finalizeOrder = (paymentId: string) => {
@@ -213,7 +216,7 @@ export default function EventBookingModal({
             </div>
             <div>
               <span className="text-[10px] uppercase tracking-widest font-extrabold text-orange-200 block">
-                WooEvents Verified Checkout
+                Vernunt Events Verified Checkout
               </span>
               <h3 className="text-base font-black leading-tight text-white line-clamp-1">
                 {event.title}

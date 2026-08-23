@@ -3,7 +3,8 @@ import { CommunityEvent, EventAttendee } from '../../types.ts';
 import { 
   QrCode, Camera, CheckCircle2, AlertTriangle, XCircle, Search, 
   UserCheck, Users, Download, RefreshCw, X, ShieldCheck, 
-  Clock, MapPin, Sparkles, Filter, Check, ArrowRight
+  Clock, MapPin, Sparkles, Filter, Check, ArrowRight,
+  Flashlight, FlashlightOff
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -33,8 +34,31 @@ export default function EventOrganizerCheckInStation({
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const [isTorchOn, setIsTorchOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Toggle Camera Torch / Flashlight in low light conditions
+  const toggleCameraTorch = async () => {
+    const nextTorch = !isTorchOn;
+    setIsTorchOn(nextTorch);
+
+    if (streamRef.current) {
+      const videoTrack = streamRef.current.getVideoTracks()[0];
+      if (videoTrack) {
+        try {
+          const capabilities = (videoTrack.getCapabilities && videoTrack.getCapabilities()) || {};
+          if ('torch' in capabilities || (capabilities as any).fillLightMode) {
+            await videoTrack.applyConstraints({
+              advanced: [{ torch: nextTorch }]
+            } as any);
+          }
+        } catch (err) {
+          console.warn('Torch constraint not supported, applying screen illuminator', err);
+        }
+      }
+    }
+  };
 
   // Initialize or load mock/live attendees for this event
   useEffect(() => {
@@ -364,7 +388,7 @@ export default function EventOrganizerCheckInStation({
                 <span className="text-[10px] font-extrabold uppercase tracking-widest bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded-md border border-orange-500/30">
                   Organizer Gate Desk
                 </span>
-                <span className="text-xs text-slate-400">WooEvents Verification Station</span>
+                <span className="text-xs text-slate-400">Vernunt Events Verification Station</span>
                 {userProfile && (
                   <span className="text-[10px] font-semibold bg-emerald-950/80 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-md flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3 text-emerald-400" />
@@ -436,17 +460,34 @@ export default function EventOrganizerCheckInStation({
                   <QrCode className="w-4 h-4 text-orange-600" />
                   Live Gate Scanner
                 </span>
-                <button
-                  onClick={cameraActive ? stopCamera : startCamera}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                    cameraActive 
-                      ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' 
-                      : 'bg-orange-600 text-white hover:bg-orange-700'
-                  }`}
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>{cameraActive ? 'Stop Camera' : 'Start Camera'}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    id="btn-camera-flash-station"
+                    type="button"
+                    onClick={toggleCameraTorch}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                      isTorchOn 
+                        ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 shadow-xs animate-pulse' 
+                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    }`}
+                    title="Toggle camera flash / low-light torch"
+                  >
+                    {isTorchOn ? <Flashlight className="w-3.5 h-3.5 fill-slate-950" /> : <FlashlightOff className="w-3.5 h-3.5" />}
+                    <span>{isTorchOn ? 'Flash ON' : 'Flash'}</span>
+                  </button>
+
+                  <button
+                    onClick={cameraActive ? stopCamera : startCamera}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                      cameraActive 
+                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' 
+                        : 'bg-orange-600 text-white hover:bg-orange-700'
+                    }`}
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>{cameraActive ? 'Stop Camera' : 'Start Camera'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* Video Camera Preview */}
@@ -458,10 +499,30 @@ export default function EventOrganizerCheckInStation({
                     playsInline
                     className="w-full h-full object-cover"
                   />
+
+                  {/* Night-mode ambient light boost when torch is active */}
+                  {isTorchOn && (
+                    <div className="absolute inset-0 pointer-events-none bg-radial from-amber-100/30 via-amber-200/10 to-transparent ring-4 ring-amber-300/40 animate-pulse"></div>
+                  )}
+
                   <div className="absolute inset-0 border-2 border-orange-500/80 rounded-xl m-6 pointer-events-none animate-pulse flex items-center justify-center">
                     <span className="text-[11px] bg-black/70 text-white px-2 py-1 rounded font-medium">
                       Align Attendee QR Code Here
                     </span>
+                  </div>
+
+                  {/* Torch Pill in top corner */}
+                  <div className="absolute top-2 right-2">
+                    <button
+                      type="button"
+                      onClick={toggleCameraTorch}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 backdrop-blur-md transition ${
+                        isTorchOn ? 'bg-amber-400 text-slate-950 ring-1 ring-amber-300' : 'bg-black/60 text-white hover:bg-black/80'
+                      }`}
+                    >
+                      {isTorchOn ? <Flashlight className="w-3 h-3 fill-slate-950" /> : <FlashlightOff className="w-3 h-3" />}
+                      <span>{isTorchOn ? 'Torch Active' : 'Torch Off'}</span>
+                    </button>
                   </div>
                 </div>
               ) : cameraError ? (
@@ -626,6 +687,20 @@ export default function EventOrganizerCheckInStation({
                     }`}
                   >
                     <div className="flex items-start gap-3 min-w-0 flex-1">
+                      {/* Status Indicator Dot (Green for checked in, Orange for pending) */}
+                      <div className="pt-2 shrink-0">
+                        {attendee.checkedIn ? (
+                          <span className="relative flex h-2.5 w-2.5" title="Checked In">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 ring-2 ring-emerald-200"></span>
+                          </span>
+                        ) : (
+                          <span className="relative flex h-2.5 w-2.5" title="Pending Gate Scan">
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500 ring-2 ring-amber-200"></span>
+                          </span>
+                        )}
+                      </div>
+
                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 font-bold text-xs ${
                         attendee.checkedIn 
                           ? 'bg-emerald-500 text-white shadow-sm shadow-emerald-500/30' 

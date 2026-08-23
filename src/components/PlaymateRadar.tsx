@@ -78,9 +78,9 @@ export default function PlaymateRadar({
     }
   };
 
-  // Center coordinates based on user profile or default
-  const centerLat = userProfile?.location?.lat || userProfile?.lat || 19.0760;
-  const centerLng = userProfile?.location?.lng || userProfile?.lng || 72.8777;
+  // Center coordinates based on user profile or default Bangalore
+  const centerLat = userProfile?.location?.lat || userProfile?.lat || 12.9716;
+  const centerLng = userProfile?.location?.lng || userProfile?.lng || 77.5946;
 
   // Effective visible distance range calculated with current zoom
   const effectiveScanRadiusKm = (maxDistanceKm / zoomLevel).toFixed(1);

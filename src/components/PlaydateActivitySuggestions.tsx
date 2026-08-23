@@ -183,7 +183,13 @@ export function PlaydateActivitySuggestions({
         })
       });
 
-      const data = await res.json();
+      let data: any = {};
+      try {
+        const text = await res.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { success: false, error: 'Server response could not be parsed' };
+      }
       if (data.success && data.text) {
         setAiCustomIdeas(data.text);
       } else {

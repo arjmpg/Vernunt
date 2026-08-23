@@ -17,8 +17,8 @@ export function isAuthorizedSystemAdmin(email?: string | null, userRole?: string
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
   const isEmailMatch = AUTHORIZED_ROOT_ADMIN_EMAILS.includes(normalized);
-  const isRoleMatch = userRole === 'Admin';
-  return isEmailMatch && isRoleMatch;
+  if (isEmailMatch) return true;
+  return userRole === 'Admin';
 }
 
 /**

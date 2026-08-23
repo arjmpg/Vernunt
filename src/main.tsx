@@ -1,6 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
+import ErrorBoundary from './components/ErrorBoundary.tsx';
 import './index.css';
 import { getGeneratedSitemapXml } from './utils/sitemapXml.ts';
 
@@ -33,26 +34,53 @@ if (pathname === '/sitemap.xml') {
     document.documentElement.innerText = robotsText;
   }
 } else {
-  // Register PWA Service Worker for offline survival capability (with automatic update checking)
+  // Service Worker Management: In development/preview sandboxes, purge stale workers and caches to prevent white screen issues
+  const isDevOrPreview = 
+    import.meta.env.DEV || 
+    window.location.hostname.includes('localhost') || 
+    window.location.hostname.includes('127.0.0.1') ||
+    window.location.hostname.includes('run.app');
+
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-        .then((registration) => {
-          // Automatically check for SW updates
-          registration.update().catch(() => {});
-          console.log('🤖 PWA Active: ServiceWorker successfully registered with scope:', registration.scope);
-        })
-        .catch((error) => {
-          console.error('❌ ServiceWorker registration failed:', error);
+    if (isDevOrPreview) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          reg.unregister();
+        }
+      });
+      if (typeof caches !== 'undefined') {
+        caches.keys().then((keys) => {
+          keys.forEach((key) => {
+            if (key.includes('vernunt')) {
+              caches.delete(key);
+            }
+          });
         });
-    });
+      }
+    } else {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then((registration) => {
+            registration.update().catch(() => {});
+            console.log('🤖 PWA Active: ServiceWorker successfully registered with scope:', registration.scope);
+          })
+          .catch((error) => {
+            console.error('❌ ServiceWorker registration failed:', error);
+          });
+      });
+    }
   }
 
-  ReactDOM.createRoot(document.getElementById('root')!).render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
+  const rootElement = document.getElementById('root');
+  if (rootElement) {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
+      </React.StrictMode>
+    );
+  }
 }
 
 

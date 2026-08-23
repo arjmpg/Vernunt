@@ -1,7 +1,10 @@
 {
   "name": "Vernunt",
-  "description": "Child playmate and family community platform with strict COPPA and DPDP Act 2023 child compliance, verifiable parental consent, real-time predator & profanity screening, proximity radar, playdate planner, map listings, and community events.",
-  "requestFramePermissions": [],
+  "description": "Vernunt (vernunt.com / app.vernunt.com) - India's verified kids playmate radar, neighborhood babysitting & daycare marketplace, and 1,000+ evidence-based child growth, newborn care, toddler nutrition, and parenting encyclopedia.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

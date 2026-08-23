@@ -215,3 +215,10 @@ export const LANGUAGES = [
   { code: 'mzo', label: 'Mizo', native: 'Mizo', flag: '🇮🇳' },
   { code: 'tcy', label: 'Tulu', native: 'Tulu', flag: '🇮🇳' }
 ] as const;
+
+export function getDictionary(lang?: string): Dictionary {
+  if (lang && DICTIONARY[lang as LanguageCode]) {
+    return DICTIONARY[lang as LanguageCode];
+  }
+  return BASE_DICTIONARIES.en;
+}

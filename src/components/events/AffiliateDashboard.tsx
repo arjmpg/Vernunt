@@ -266,7 +266,7 @@ export default function AffiliateDashboard({
           <div className="space-y-3 max-w-2xl">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-md px-3.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest text-amber-100 border border-white/20">
-                <Sparkles className="w-3.5 h-3.5 text-amber-300" /> WooCommerce-Style Affiliate Program
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" /> Vernunt Affiliate Partner Program
               </span>
               <span className="bg-emerald-500/90 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1 shadow-xs">
                 <ShieldCheck className="w-3 h-3" /> Active Partner ({affiliateTier} Tier)
@@ -530,7 +530,7 @@ export default function AffiliateDashboard({
             </div>
           </div>
 
-          {/* WooCommerce Affiliate Feature Highlights */}
+          {/* Vernunt Affiliate Partner Feature Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-2xs space-y-2">
               <div className="p-2.5 bg-orange-100 text-orange-600 rounded-2xl w-max">

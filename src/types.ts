@@ -1,7 +1,8 @@
 export enum VerificationStatus {
   UNVERIFIED = 'UNVERIFIED',
   PENDING = 'PENDING',
-  VERIFIED = 'VERIFIED'
+  VERIFIED = 'VERIFIED',
+  REJECTED = 'REJECTED'
 }
 
 export enum LocationSharing {
@@ -9,6 +10,8 @@ export enum LocationSharing {
   APPROXIMATE = 'APPROXIMATE',
   HIDDEN = 'HIDDEN'
 }
+
+export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
 
 export interface ChildProfile {
   id: string;
@@ -49,6 +52,42 @@ export interface ChildProfile {
   email?: string;
   aadhaarNumber?: string;
   aadhaarVerified?: boolean;
+  aadhaarDocUrl?: string; // Uploaded Aadhaar card document URL / base64 proof
+  aadhaarDocName?: string; // Uploaded Aadhaar card document filename
+  aadhaarDocSize?: number; // File size in bytes (max 3MB)
+  userRole?: UserRole;
+  
+  // Address & Community parameters (Indian standard KYC)
+  currentAddress?: string;
+  permanentAddress?: string;
+  isSameAddress?: boolean;
+  apartmentCommunityName?: string;
+  addressProofDocName?: string;
+  addressProofDocUrl?: string;
+  addressProofDocType?: 'Aadhaar Card' | 'Voter ID' | 'Indian Passport' | 'Electricity Bill' | 'Rental Agreement' | 'Gas Bill' | 'Driving License';
+  addressProofDocSize?: number;
+  
+  // Babysitting & Daycare hosting fields for parents
+  offersBabysitting?: boolean;
+  hourlyBabysittingRate?: number;
+  hourlyRateNeighborHome?: number; // Rate at Neighbour / Sitter's premises (e.g. Rs.180/hr)
+  hourlyRateParentHome?: number; // Rate at Parent's premises (e.g. Rs.260/hr)
+  halfDayBabysittingRate?: number;
+  fullDayBabysittingRate?: number;
+  babysittingCapacity?: number;
+  babysittingType?: CareProviderType;
+  babysittingBio?: string;
+  babysittingAmenities?: string[];
+  babysittingPhotos?: string[];
+  daycareProfileId?: string;
+  
+  // Security & Admin-Only Telemetry (Hidden from public users, visible ONLY to Administrators)
+  ipAddress?: string; // Client IP address captured during login/registration
+  capturedLat?: number; // Exact GPS / network latitude
+  capturedLng?: number; // Exact GPS / network longitude
+  capturedLocationInfo?: string; // Capture method / accuracy description
+  capturedAt?: string; // Timestamp of IP & location capture
+
   criminalRecordChecked?: boolean;
   positiveReviewsCount?: number;
   attendedEventsCount?: number;
@@ -71,8 +110,11 @@ export interface ChildProfile {
   clinicAddress?: string;
   hostingSpecialties?: string[];
   idDocumentName?: string;
+  idDocUrl?: string;
   companyDocName?: string;
+  companyDocUrl?: string;
   addressProofDocName?: string;
+  addressProofDocUrl?: string;
   
   // Kids Connect Subscription Settings
   subscriptionActive?: boolean;
@@ -93,7 +135,9 @@ export interface ChildProfile {
 
   // Face-to-Selfie verification details for child safety
   selfiePhotoUrl?: string;
-  faceVerificationStatus?: 'none' | 'verified' | 'failed' | 'pending_admin';
+  stepAPhotoSource?: 'selfie' | 'gallery';
+  facialAuditRequired?: boolean;
+  faceVerificationStatus?: 'none' | 'verified' | 'failed' | 'pending_admin' | 'approved' | 'rejected';
   faceVerificationScore?: number;
   faceVerificationTimestamp?: string;
 
@@ -103,6 +147,15 @@ export interface ChildProfile {
   lastActiveAt?: string;
   savedProfileIds?: string[];
   preferredActivities?: string[];
+
+  // Neighbour Babysitting & Daycare Care Options
+  offersBabysitting?: boolean;
+  hourlyBabysittingRate?: number; // e.g. 150 (INR per hour)
+  babysittingCapacity?: number; // max kids
+  babysittingBio?: string;
+  babysittingAmenities?: string[];
+  babysittingSlots?: string[];
+  careProviderType?: CareProviderType;
 
   // Mobile Phone Contacts Privacy & Visibility Settings
   contactsPrivacy?: UserContactsPrivacy;
@@ -200,6 +253,7 @@ export interface UserContact {
   name: string;
   phone: string;
   email?: string;
+  source?: 'sim' | 'gmail' | 'phone' | 'icloud' | 'whatsapp' | 'manual';
   relationship?: 'Family' | 'Friend' | 'Neighbor' | 'School' | 'Work' | 'Other';
   visibility: 'visible' | 'hidden' | 'connected'; // 'visible' = can view profile, 'hidden' = ghost mode (profile hidden from this contact), 'connected' = connected/friends
   syncedAt: string;
@@ -317,7 +371,7 @@ export interface CommunityEvent {
   lat?: number;
   lng?: number;
   iconEmoji?: string;
-  // WooEvents Advanced Parameters
+  // Vernunt Events Advanced Parameters
   ticketTiers?: TicketTier[];
   scheduleAgenda?: EventScheduleItem[];
   targetAgeRange?: string; // e.g. "2 - 8 Years"
@@ -389,7 +443,7 @@ export interface Booking {
   affiliateCode?: string;
   affiliateCommissionEarned?: number;
   affiliateCommissionRate?: number;
-  // WooEvents E-Ticket & Pass Details
+  // Vernunt Events E-Ticket & Pass Details
   ticketNumber?: string; // e.g. "VERN-EVT-9012-748"
   ticketTierName?: string;
   tierId?: string;
@@ -415,4 +469,107 @@ export interface MarketItem {
   category: 'Toys & Lego' | 'Books & Comics' | 'Clothing & Gear' | 'Learning Kits' | 'Baby & Kids Food';
   imageUrl: string;
   contactEmail: string;
+}
+
+export type CareProviderType = 'Neighbour Parent' | 'Certified Playhome' | 'Home Daycare' | 'Montessori Daycare' | 'Pre-school & Daycare' | 'Infant Creche' | 'Experienced Sitter';
+
+export interface DaycarePlayhomeProfile {
+  id: string;
+  userId?: string;
+  title: string; // e.g. "Mrs. Sharma's Warm Playhome & Daycare" or "Bright Horizons Montessori Daycare"
+  hostName: string; // Parent or Director Name
+  providerType: CareProviderType;
+  hourlyRate: number; // In INR (e.g. 150, 300, 0 for free reciprocal exchange)
+  hourlyRateNeighborHome?: number; // Rate at Neighbour / Center premises
+  hourlyRateParentHome?: number; // Rate at Parent's premises (In-home care)
+  halfDayRate?: number; // In INR (e.g. 500)
+  fullDayRate?: number; // In INR (e.g. 900)
+  monthlyDaycareFee?: number; // In INR (e.g. 8500)
+  bio: string;
+  location: {
+    lat: number;
+    lng: number;
+    address: string;
+    distance?: number; // Proximity from active parent
+  };
+  rating: number;
+  reviewsCount: number;
+  experienceYears: number;
+  maxCapacity: number;
+  currentOccupancy: number;
+  acceptedAgeGroups: string[]; // e.g. ["6m - 2 yrs", "2 - 5 yrs", "5 - 10 yrs"]
+  availableDays: string[]; // e.g. ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+  availableTimeSlots: string[]; // e.g. ["09:00 AM - 01:00 PM", "02:00 PM - 06:00 PM", "06:00 PM - 09:00 PM", "Full Day (9 AM - 6 PM)"]
+  amenities: string[]; // e.g. ["CCTV Monitored", "AC & Childproofed", "Organic Snacks/Milk", "Baby Cribs/Cots", "Montessori Toys", "First Aid Certified", "Pet Free", "Soft Play Area"]
+  photos: string[];
+  avatarUrl: string;
+  phone?: string;
+  email?: string;
+  aadhaarVerified: boolean;
+  policeVerified?: boolean;
+  isAcceptingNow: boolean;
+  instantBooking: boolean;
+  parentKidNames?: string; // If neighbour parent, e.g. "Mom of Aarav (4y)"
+  emergencyContact?: string;
+  
+  // Daycare Center & Pre-school specific verification and operational specifications
+  licenseNumber?: string; // Govt Registration / Municipal / Trust License No
+  licenseDocName?: string; // Document filename
+  licenseDocUrl?: string; // Uploaded License document base64/URL
+  policeDocName?: string;
+  policeDocUrl?: string;
+  establishedYear?: number; // e.g. 2018
+  directorName?: string;
+  staffToChildRatio?: string; // e.g. "1:4"
+  cctvAccessAvailable?: boolean;
+  indoorSqft?: number;
+  outdoorPlayArea?: boolean;
+  medicalTieUp?: string; // e.g. "Cloudnine Pediatric Hospital (500m)"
+  mealOptions?: string[]; // e.g. ["Organic Purees", "Vegetarian Home-Cooked", "Snacks & Milk"]
+  
+  reviews?: {
+    id: string;
+    parentName: string;
+    rating: number;
+    comment: string;
+    date: string;
+  }[];
+}
+
+export type CareBookingStatus = 'Pending' | 'Accepted' | 'Declined' | 'Dropped Off' | 'In Care' | 'Ready for Pickup' | 'Completed' | 'Cancelled';
+
+export interface CareBookingRequest {
+  id: string;
+  parentId: string;
+  parentName: string;
+  parentPhone: string;
+  parentPhotoUrl?: string;
+  childName: string;
+  childAge: number;
+  childGender?: string;
+  providerId: string;
+  providerName: string;
+  providerTitle: string;
+  providerType: CareProviderType;
+  providerHourlyRate: number;
+  date: string;
+  startTime: string;
+  endTime: string;
+  durationHours: number;
+  totalAmount: number;
+  status: CareBookingStatus;
+  dropOffPin: string; // 4-digit security PIN for drop-off handshake
+  pickupPin: string; // 4-digit security PIN for pickup handshake
+  specialInstructions?: string; // e.g. "Allergic to peanuts, nap at 2 PM, bottle feeding formula packed"
+  emergencyContact: string;
+  dropOffTime?: string;
+  pickupTime?: string;
+  createdAt: string;
+  updatedAt?: string;
+  senderRole: 'parent' | 'provider';
+  careActivityLog?: {
+    timestamp: string;
+    activity: string; // "Snack Time", "Story Reading", "Nap Time", "Lego Play"
+    note?: string;
+  }[];
 }

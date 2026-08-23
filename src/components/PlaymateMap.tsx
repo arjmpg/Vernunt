@@ -63,9 +63,9 @@ export default function PlaymateMap({
   onToggleJoinEvent,
   onNavigateToEventsTab
 }: PlaymateMapProps) {
-  const ourNeighborhood = userProfile?.location?.address || 'Mumbai, Maharashtra, India';
-  const centerLat = userProfile?.location?.lat || 19.0760;
-  const centerLng = userProfile?.location?.lng || 72.8777;
+  const ourNeighborhood = userProfile?.location?.address || 'Bangalore, Karnataka, India';
+  const centerLat = userProfile?.location?.lat || 12.9716;
+  const centerLng = userProfile?.location?.lng || 77.5946;
 
   // Overlay state: Toggle showing community events & classes
   const [showEventsOverlay, setShowEventsOverlay] = useState<boolean>(true);
@@ -795,7 +795,7 @@ export default function PlaymateMap({
                           className="w-9 h-9 rounded-full object-cover" 
                           referrerPolicy="no-referrer"
                           onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400';
+                            (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=400&crop=faces';
                           }}
                         />
                         <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>
@@ -964,8 +964,8 @@ export default function PlaymateMap({
                     referrerPolicy="no-referrer" 
                     onError={(e) => {
                       (e.target as HTMLImageElement).src = p.childGender === 'Girl'
-                        ? 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400'
-                        : 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=400';
+                        ? 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&fit=crop&q=80&w=400&crop=faces'
+                        : 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=400&crop=faces';
                     }}
                   />
                   <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full"></span>

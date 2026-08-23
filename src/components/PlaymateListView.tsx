@@ -35,8 +35,8 @@ export function PlaymateListView({
   onAcceptConnection,
   maxDistanceKm
 }: PlaymateListViewProps) {
-  const userLat = userProfile?.location?.lat ?? 19.0760;
-  const userLng = userProfile?.location?.lng ?? 72.8777;
+  const userLat = userProfile?.location?.lat ?? 12.9716;
+  const userLng = userProfile?.location?.lng ?? 77.5946;
 
   if (!playmates || playmates.length === 0) {
     return (
