@@ -66,6 +66,10 @@ export interface ChildProfile {
   addressProofDocUrl?: string;
   addressProofDocType?: 'Aadhaar Card' | 'Voter ID' | 'Indian Passport' | 'Electricity Bill' | 'Rental Agreement' | 'Gas Bill' | 'Driving License';
   addressProofDocSize?: number;
+  kycSubmitted?: boolean;
+  kycSubmittedAt?: string;
+  kycVerifiedAt?: string;
+  kycRejectionReason?: string;
   
   // Babysitting & Daycare hosting fields for parents
   offersBabysitting?: boolean;
@@ -473,17 +477,20 @@ export interface MarketItem {
   contactEmail: string;
 }
 
-export type CareProviderType = 'Neighbour Parent' | 'Certified Playhome' | 'Home Daycare' | 'Montessori Daycare' | 'Pre-school & Daycare' | 'Infant Creche' | 'Experienced Sitter';
+export type CareProviderType = 'Neighbour Parent' | 'Home Care Center' | 'Babysitter & Nanny' | 'Certified Playhome' | 'Home Daycare' | 'Montessori Daycare' | 'Pre-school & Daycare' | 'Infant Creche' | 'Experienced Sitter' | 'Independent Caregiver';
 
 export interface DaycarePlayhomeProfile {
   id: string;
   userId?: string;
   title: string; // e.g. "Mrs. Sharma's Warm Playhome & Daycare" or "Bright Horizons Montessori Daycare"
-  hostName: string; // Parent or Director Name
+  hostName: string; // Parent, Individual Caregiver or Director Name
   providerType: CareProviderType;
+  providerEntityType?: 'Individual' | 'Company'; // Individual Home Provider vs Commercial Facility
+  careServiceModes?: ('host_at_my_home' | 'visit_parents_home')[]; // Whether provider hosts at home, visits parent's home, or both
   hourlyRate: number; // In INR (e.g. 150, 300, 0 for free reciprocal exchange)
-  hourlyRateNeighborHome?: number; // Rate at Neighbour / Center premises
-  hourlyRateParentHome?: number; // Rate at Parent's premises (In-home care)
+  hourlyRateNeighborHome?: number; // Rate at Provider's Home / Center premises (₹/hr)
+  hourlyRateParentHome?: number; // Rate to visit Parent's premises / In-home care (₹/hr)
+  visitingRadiusKm?: number; // Distance radius provider is willing to travel to visit parent's house (e.g. 5km)
   halfDayRate?: number; // In INR (e.g. 500)
   fullDayRate?: number; // In INR (e.g. 900)
   monthlyDaycareFee?: number; // In INR (e.g. 8500)
@@ -559,6 +566,8 @@ export interface CareBookingRequest {
   endTime: string;
   durationHours: number;
   totalAmount: number;
+  serviceMode?: 'host_at_my_home' | 'visit_parents_home'; // Whether care takes place at provider's home/center or parent's home
+  serviceLocationAddress?: string;
   status: CareBookingStatus;
   dropOffPin: string; // 4-digit security PIN for drop-off handshake
   pickupPin: string; // 4-digit security PIN for pickup handshake

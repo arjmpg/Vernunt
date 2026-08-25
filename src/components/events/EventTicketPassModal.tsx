@@ -158,12 +158,17 @@ ${ticketViewUrl}
 ${ticketViewUrl}`;
 
     // Try native Web Share API with PDF file if supported (Android/iOS)
-    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+    if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
       try {
         const pdfBlob = await getTicketPdfBlob({ booking, event, qrCodeDataUrl });
-        const pdfFile = new File([pdfBlob], `Vernunt-Ticket-${ticketNumber}.pdf`, { type: 'application/pdf' });
+        let pdfFile: File | null = null;
+        try {
+          pdfFile = new File([pdfBlob], `Vernunt-Ticket-${ticketNumber}.pdf`, { type: 'application/pdf' });
+        } catch {
+          pdfFile = null;
+        }
         
-        if (navigator.canShare({ files: [pdfFile] })) {
+        if (pdfFile && navigator.canShare({ files: [pdfFile] })) {
           await navigator.share({
             title: `Vernunt Admission Pass #${ticketNumber}`,
             text: text,

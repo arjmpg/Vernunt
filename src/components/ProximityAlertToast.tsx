@@ -27,8 +27,8 @@ interface ProximityAlertToastProps {
  */
 export function playSubtleProximityChime() {
   try {
-    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioCtx) return;
+    const AudioCtx = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+    if (!AudioCtx || typeof AudioCtx !== 'function') return;
     const ctx = new AudioCtx();
     if (ctx.state === 'suspended') {
       ctx.resume().catch(() => {});

@@ -31,9 +31,13 @@ export default function EmergencySOSModal({ onClose, userProfile }: EmergencySOS
     if (isMuted) return;
     try {
       if (!audioCtxRef.current) {
-        audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioCtxClass = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+        if (AudioCtxClass && typeof AudioCtxClass === 'function') {
+          audioCtxRef.current = new AudioCtxClass();
+        }
       }
       const ctx = audioCtxRef.current;
+      if (!ctx) return;
       if (ctx.state === 'suspended') {
         ctx.resume();
       }

@@ -1180,7 +1180,9 @@ export default function App() {
   // Web Audio chime player
   const playNotificationChime = () => {
     try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const AudioCtxClass = typeof window !== 'undefined' ? (window.AudioContext || (window as any).webkitAudioContext) : null;
+      if (!AudioCtxClass || typeof AudioCtxClass !== 'function') return;
+      const audioCtx = new AudioCtxClass();
       
       const osc1 = audioCtx.createOscillator();
       const gain1 = audioCtx.createGain();
@@ -1194,16 +1196,20 @@ export default function App() {
       osc1.stop(audioCtx.currentTime + 0.4);
 
       setTimeout(() => {
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5
-        gain2.gain.setValueAtTime(0.12, audioCtx.currentTime);
-        gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.start();
-        osc2.stop(audioCtx.currentTime + 0.45);
+        try {
+          const osc2 = audioCtx.createOscillator();
+          const gain2 = audioCtx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(659.25, audioCtx.currentTime); // E5
+          gain2.gain.setValueAtTime(0.12, audioCtx.currentTime);
+          gain2.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          osc2.start();
+          osc2.stop(audioCtx.currentTime + 0.45);
+        } catch {
+          // ignore
+        }
       }, 100);
 
     } catch (err) {
@@ -2726,6 +2732,45 @@ export default function App() {
         ) : appMode === 'dashboard' && (
           <div id="dashboard-content-wrapper" className="space-y-6 animate-fade-in">
             
+            {/* KYC Verification Pending Status Banner */}
+            {userProfile && userProfile.userRole !== 'Admin' && (userProfile.verificationStatus === VerificationStatus.PENDING || userProfile.verificationStatus === 'PENDING' || !userProfile.aadhaarVerified || userProfile.verificationStatus === VerificationStatus.UNVERIFIED) && (
+              <div 
+                id="banner-kyc-pending" 
+                className="bg-gradient-to-r from-rose-900 via-red-900 to-rose-950 text-white rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-rose-700/60 animate-fade-in text-left relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 w-64 h-full bg-rose-500/10 pointer-events-none blur-2xl"></div>
+                <div className="flex items-start gap-3.5 relative z-10">
+                  <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20 text-2xl shadow-inner">
+                    🛡️
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-serif font-black text-sm sm:text-base text-amber-300 tracking-wide">
+                        KYC Pending — Finish KYC to Unlock Full Profiles & Parent Photos
+                      </span>
+                      <span className="bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                        Action Required
+                      </span>
+                    </div>
+                    <p className="text-rose-100/90 text-xs leading-relaxed max-w-2xl font-medium">
+                      You can freely explore nearby playmates, names, ages, distance, mother tongue, and parent professions! To view verified parent photos, initiate playdates, and unlock direct chats, please submit your Aadhaar & address proof for community verification.
+                    </p>
+                  </div>
+                </div>
+                <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto justify-end relative z-10">
+                  <button
+                    type="button"
+                    id="btn-finish-kyc-banner"
+                    onClick={() => setShowAadhaarVerifyModal(true)}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-serif font-black text-xs rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-slate-950" />
+                    <span>Finish KYC Verification ⚡</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Biometric / Facial Audit Pending Status Message Banner */}
             {(userProfile?.facialAuditRequired || userProfile?.faceVerificationStatus === 'pending_admin') && (
               <div 

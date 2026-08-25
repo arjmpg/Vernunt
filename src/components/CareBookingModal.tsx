@@ -3,7 +3,7 @@ import { DaycarePlayhomeProfile, ChildProfile, CareBookingRequest } from '../typ
 import { 
   X, Calendar, Clock, MapPin, ShieldCheck, Shield, Heart, 
   Baby, DollarSign, AlertCircle, CheckCircle2, Phone, Sparkles, Lock,
-  Camera, Utensils, Award
+  Camera, Utensils, Award, Home, Navigation, Briefcase
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendCareReservationNotifications } from '../utils/notifications.ts';
@@ -27,6 +27,16 @@ export default function CareBookingModal({
   initialStartTime,
   initialDurationHours = 2
 }: CareBookingModalProps) {
+  // Service mode options supported by provider
+  const availableModes = provider.careServiceModes || ['host_at_my_home'];
+  const [serviceMode, setServiceMode] = useState<'host_at_my_home' | 'visit_parents_home'>(
+    availableModes.includes('host_at_my_home') ? 'host_at_my_home' : 'visit_parents_home'
+  );
+
+  const [serviceLocationAddress, setServiceLocationAddress] = useState<string>(
+    (currentUserProfile as any)?.currentAddress || currentUserProfile?.location.address || ''
+  );
+
   const [selectedDate, setSelectedDate] = useState<string>(
     initialDate || new Date().toISOString().split('T')[0]
   );
@@ -61,18 +71,25 @@ export default function CareBookingModal({
     { label: 'Full Day (8h)', hours: 8, tag: 'Full Day Pass' }
   ];
 
+  // Active hourly rate based on selected mode
+  const effectiveHourlyRate = serviceMode === 'visit_parents_home'
+    ? (provider.hourlyRateParentHome !== undefined ? provider.hourlyRateParentHome : provider.hourlyRate)
+    : (provider.hourlyRateNeighborHome !== undefined ? provider.hourlyRateNeighborHome : provider.hourlyRate);
+
   // Calculate Total Fee
   const calculateTotal = () => {
-    if (provider.hourlyRate === 0) return 0;
-    if (durationHours >= 8 && provider.fullDayRate) {
-      return provider.fullDayRate;
+    if (effectiveHourlyRate === 0) return 0;
+    if (serviceMode === 'host_at_my_home') {
+      if (durationHours >= 8 && provider.fullDayRate) {
+        return provider.fullDayRate;
+      }
+      if (durationHours >= 4 && provider.halfDayRate) {
+        const baseHalf = provider.halfDayRate;
+        const extraHours = durationHours - 4;
+        return baseHalf + extraHours * effectiveHourlyRate;
+      }
     }
-    if (durationHours >= 4 && provider.halfDayRate) {
-      const baseHalf = provider.halfDayRate;
-      const extraHours = durationHours - 4;
-      return baseHalf + extraHours * provider.hourlyRate;
-    }
-    return provider.hourlyRate * durationHours;
+    return effectiveHourlyRate * durationHours;
   };
 
   const totalFee = calculateTotal();
@@ -110,6 +127,10 @@ export default function CareBookingModal({
       alert('Please fill out your child details and contact number.');
       return;
     }
+    if (serviceMode === 'visit_parents_home' && !serviceLocationAddress.trim()) {
+      alert('Please provide your home address where the caregiver will visit.');
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -130,7 +151,9 @@ export default function CareBookingModal({
       providerName: provider.hostName,
       providerTitle: provider.title,
       providerType: provider.providerType,
-      providerHourlyRate: provider.hourlyRate,
+      providerHourlyRate: effectiveHourlyRate,
+      serviceMode,
+      serviceLocationAddress: serviceMode === 'visit_parents_home' ? serviceLocationAddress : undefined,
       date: selectedDate,
       startTime,
       endTime: endTimeStr,
@@ -147,7 +170,7 @@ export default function CareBookingModal({
         {
           timestamp: 'Just Now',
           activity: 'Request Created',
-          note: `Care request sent for ${durationHours} hr (${startTime} to ${endTimeStr})`
+          note: `Care request sent for ${durationHours} hr (${startTime} to ${endTimeStr}) via ${serviceMode === 'visit_parents_home' ? 'Visiting Parent Home' : 'Drop-off at Provider Space'}`
         }
       ]
     };
@@ -194,15 +217,15 @@ export default function CareBookingModal({
 
           <div className="flex items-center gap-2 mb-1">
             <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1">
-              🍼 Daycare & Babysitting Drop-off
+              🍼 Daycare &amp; Babysitting Booking
             </span>
             <span className="text-[10px] font-extrabold bg-emerald-500 text-white px-2 py-0.5 rounded-full shadow-2xs">
-              {provider.hourlyRate === 0 ? '🎁 100% Free Co-Op' : `₹${provider.hourlyRate}/hr`}
+              {effectiveHourlyRate === 0 ? '🎁 100% Free Co-Op' : `₹${effectiveHourlyRate}/hr`}
             </span>
           </div>
 
           <h3 className="font-serif font-black text-xl text-white leading-tight">
-            Book Child Sitting & Playhome Care
+            Book Child Care &amp; Sitting
           </h3>
           <p className="text-xs text-orange-100 mt-1 flex items-center gap-1">
             <MapPin className="w-3.5 h-3.5 shrink-0" />
@@ -227,7 +250,7 @@ export default function CareBookingModal({
                   Sitting Request Sent Successfully!
                 </h4>
                 <p className="text-xs text-slate-600 mt-1 max-w-md mx-auto">
-                  We have notified <strong>{provider.hostName}</strong> of your care request for <strong>{createdBooking.childName}</strong> on {createdBooking.date} from {createdBooking.startTime} to {createdBooking.endTime}.
+                  We have notified <strong>{provider.hostName}</strong> of your care request for <strong>{createdBooking.childName}</strong> on {createdBooking.date} from {createdBooking.startTime} to {createdBooking.endTime} ({createdBooking.serviceMode === 'visit_parents_home' ? "Visiting Parent's Home" : "Drop-off at Provider's Space"}).
                 </p>
               </div>
 
@@ -235,7 +258,7 @@ export default function CareBookingModal({
               <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 text-left max-w-md mx-auto space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1">
-                    <Lock className="w-3.5 h-3.5 text-amber-700" /> Secure Drop-off Handshake
+                    <Lock className="w-3.5 h-3.5 text-amber-700" /> Secure Care Handshake
                   </span>
                   <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-2 py-0.5 rounded-full">
                     Aadhaar Protected
@@ -244,23 +267,23 @@ export default function CareBookingModal({
 
                 <div className="grid grid-cols-2 gap-2 text-center">
                   <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-500 block uppercase">Drop-Off PIN</span>
+                    <span className="text-[10px] font-bold text-slate-500 block uppercase">Start / Drop-Off PIN</span>
                     <span className="font-mono text-2xl font-black text-slate-900 tracking-widest">
                       {createdBooking.dropOffPin}
                     </span>
-                    <span className="text-[9px] text-slate-500 block mt-0.5">Show upon leaving kid</span>
+                    <span className="text-[9px] text-slate-500 block mt-0.5">Share upon session start</span>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-amber-200 shadow-2xs">
-                    <span className="text-[10px] font-bold text-slate-500 block uppercase">Pickup PIN</span>
+                    <span className="text-[10px] font-bold text-slate-500 block uppercase">End / Pickup PIN</span>
                     <span className="font-mono text-2xl font-black text-slate-900 tracking-widest">
                       {createdBooking.pickupPin}
                     </span>
-                    <span className="text-[9px] text-slate-500 block mt-0.5">Show upon pickup</span>
+                    <span className="text-[9px] text-slate-500 block mt-0.5">Share upon pickup/session end</span>
                   </div>
                 </div>
 
                 <p className="text-[11px] text-amber-900 leading-snug">
-                  🛡️ <strong>Safety Guarantee:</strong> Provide the 4-digit Drop-off PIN to {provider.hostName} when leaving your child. You can track live sitting status in the <strong>Daycare & Sitting</strong> tab.
+                  🛡️ <strong>Safety Guarantee:</strong> Provide the 4-digit PIN to {provider.hostName} to verify identity. You can track live sitting status in the <strong>Daycare &amp; Sitting</strong> tab.
                 </p>
               </div>
 
@@ -270,7 +293,7 @@ export default function CareBookingModal({
                   onClick={onClose}
                   className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition cursor-pointer"
                 >
-                  Done & View Care Tracker
+                  Done &amp; View Care Tracker
                 </button>
               </div>
             </div>
@@ -296,23 +319,100 @@ export default function CareBookingModal({
                   <p className="text-[11px] text-slate-600 truncate mt-0.5">
                     Host: {provider.hostName} • {provider.experienceYears}y experience • {provider.providerType}
                   </p>
-                  <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 font-semibold">
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-slate-600 font-semibold">
                     <span className="text-amber-700 bg-amber-100/80 px-1.5 py-0.2 rounded font-black">
                       ★ {provider.rating.toFixed(1)} ({provider.reviewsCount} reviews)
                     </span>
-                    <span>•</span>
-                    <span className="text-rose-700 font-bold">
-                      {provider.hourlyRate === 0 ? '100% Free Sharing' : `₹${provider.hourlyRate} / hour`}
-                    </span>
+                    {provider.hourlyRateNeighborHome !== undefined && (
+                      <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                        🏡 Drop-off: ₹{provider.hourlyRateNeighborHome}/hr
+                      </span>
+                    )}
+                    {provider.hourlyRateParentHome !== undefined && (
+                      <span className="text-indigo-700 font-bold bg-indigo-50 px-1.5 py-0.5 rounded">
+                        🚶‍♀️ Home Visit: ₹{provider.hourlyRateParentHome}/hr
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* 0. SERVICE MODE SELECTION (CRITICAL FOR VISITING VS HOSTING) */}
+              {availableModes.length > 1 && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Briefcase className="w-4 h-4 text-emerald-600" />
+                    <span>Choose Where You Want Childcare Service</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setServiceMode('host_at_my_home')}
+                      className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                        serviceMode === 'host_at_my_home'
+                          ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-500 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                          <span>🏡 Drop-off at Provider's Home</span>
+                        </span>
+                        <span className="text-xs font-mono font-black text-emerald-700">
+                          ₹{provider.hourlyRateNeighborHome ?? provider.hourlyRate}/hr
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 mt-1">
+                        Bring your child to {provider.hostName}'s prepared daycare/play space.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setServiceMode('visit_parents_home')}
+                      className={`p-3 rounded-2xl border-2 text-left transition cursor-pointer flex flex-col justify-between ${
+                        serviceMode === 'visit_parents_home'
+                          ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 shadow-xs'
+                          : 'bg-white border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                          <span>🚶‍♀️ Provider Visits My House</span>
+                        </span>
+                        <span className="text-xs font-mono font-black text-indigo-700">
+                          ₹{provider.hourlyRateParentHome ?? provider.hourlyRate}/hr
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 mt-1">
+                        Caregiver comes directly to your home to watch over babies/kids.
+                      </p>
+                    </button>
+                  </div>
+
+                  {serviceMode === 'visit_parents_home' && (
+                    <div className="pt-2 animate-fade-in">
+                      <label className="block text-[11px] font-extrabold text-slate-800 mb-1">
+                        Your House Address (Where Caregiver Will Visit) *
+                      </label>
+                      <input
+                        type="text"
+                        value={serviceLocationAddress}
+                        onChange={(e) => setServiceLocationAddress(e.target.value)}
+                        placeholder="e.g. Flat 402, Sunshine Heights, 14th Road, Bandra West"
+                        className="w-full px-3 py-2 bg-white border-2 border-indigo-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-indigo-600"
+                        required
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 1. Date & Time Selection */}
               <div className="space-y-3">
                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Calendar className="w-4 h-4 text-rose-600" />
-                  <span>1. Select Date & Drop-Off Start Time</span>
+                  <span>1. Select Date &amp; Start Time</span>
                 </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -348,10 +448,10 @@ export default function CareBookingModal({
                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center justify-between">
                   <span className="flex items-center gap-1.5">
                     <Clock className="w-4 h-4 text-orange-600" />
-                    <span>2. How Long Will You Be Out? (Duration)</span>
+                    <span>2. How Long Will You Need Care? (Duration)</span>
                   </span>
                   <span className="text-[11px] font-extrabold text-orange-700">
-                    Pickup: {endTimeStr}
+                    Session Ends: {endTimeStr}
                   </span>
                 </label>
 
@@ -385,7 +485,7 @@ export default function CareBookingModal({
               <div className="space-y-3 pt-1 border-t border-slate-100">
                 <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Baby className="w-4 h-4 text-amber-600" />
-                  <span>3. Child Details & Special Instructions</span>
+                  <span>3. Child Details &amp; Special Instructions</span>
                 </label>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -461,7 +561,7 @@ export default function CareBookingModal({
                     rows={2}
                     value={specialInstructions}
                     onChange={(e) => setSpecialInstructions(e.target.value)}
-                    placeholder="e.g. Loves mango slices, nap time around 2:00 PM, allergic to peanuts, formula bottle packed in bag..."
+                    placeholder="e.g. Loves storybooks, nap time around 2:00 PM, allergic to peanuts, formula bottle packed in bag..."
                     className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-rose-600"
                   />
                 </div>
@@ -471,17 +571,17 @@ export default function CareBookingModal({
               <div className="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200/80 rounded-2xl p-4 space-y-2">
                 <div className="flex items-center justify-between text-xs text-slate-700">
                   <span className="font-medium">
-                    Rate: {provider.hourlyRate === 0 ? 'Free Community Sharing' : `₹${provider.hourlyRate}/hour × ${durationHours} hours`}
+                    Rate: {effectiveHourlyRate === 0 ? 'Free Community Sharing' : `₹${effectiveHourlyRate}/hour × ${durationHours} hours (${serviceMode === 'visit_parents_home' ? "Visiting Rate" : "Host Home Rate"})`}
                   </span>
                   <span className="font-bold text-slate-900">
-                    {provider.hourlyRate === 0 ? '₹0' : `₹${provider.hourlyRate * durationHours}`}
+                    {effectiveHourlyRate === 0 ? '₹0' : `₹${effectiveHourlyRate * durationHours}`}
                   </span>
                 </div>
 
-                {durationHours >= 8 && provider.fullDayRate && (
+                {serviceMode === 'host_at_my_home' && durationHours >= 8 && provider.fullDayRate && (
                   <div className="flex items-center justify-between text-[11px] text-emerald-700 font-bold">
                     <span>Full-Day Pass Discount applied</span>
-                    <span>-₹{(provider.hourlyRate * durationHours) - provider.fullDayRate}</span>
+                    <span>-₹{(effectiveHourlyRate * durationHours) - provider.fullDayRate}</span>
                   </div>
                 )}
 
@@ -519,7 +619,7 @@ export default function CareBookingModal({
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 text-amber-200" />
-                      <span>Send Care Request & Generate Drop-Off Pass</span>
+                      <span>Confirm &amp; Request Care (₹{totalFee})</span>
                     </>
                   )}
                 </button>

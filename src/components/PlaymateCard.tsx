@@ -153,7 +153,9 @@ export default function PlaymateCard({
   const [liked, setLiked] = useState(isInterestSent || isConnected);
   const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
 
-  const isProfileUnlocked = isConnected || !!currentUserProfile?.subscriptionActive;
+  const isViewerKycVerified = currentUserProfile?.userRole === 'Admin' || (currentUserProfile?.verificationStatus === VerificationStatus.VERIFIED && !!currentUserProfile?.aadhaarVerified);
+  const isParentPhotoUnlocked = isConnected || isViewerKycVerified;
+  const isProfileUnlocked = isConnected || !!currentUserProfile?.subscriptionActive || isViewerKycVerified;
   const uLat = currentUserLat || 12.9716;
   const uLng = currentUserLng || 77.5946;
   const distKm = getHaversineDistance(uLat, uLng, profile.location.lat, profile.location.lng);
@@ -186,7 +188,7 @@ export default function PlaymateCard({
           <img 
             src={parentPhoto} 
             alt={`Parent/Guardian: ${profile.parentName}`} 
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isParentPhotoUnlocked ? 'blur-xl saturate-[0.2] brightness-75 select-none' : ''}`} 
             referrerPolicy="no-referrer"
           />
         ) : (
@@ -221,6 +223,31 @@ export default function PlaymateCard({
               </button>
             </div>
           )
+        )}
+
+        {/* Lock mask for parent photo when viewer KYC is not verified */}
+        {activePhotoTab === 'parent' && !isParentPhotoUnlocked && (
+          <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center mb-1.5 shadow-sm">
+              <Lock className="w-5 h-5 text-amber-400 animate-pulse" />
+            </div>
+            <span className="text-[10.5px] text-white uppercase font-black tracking-widest font-mono">Parent Photo Locked</span>
+            <span className="text-[9px] text-slate-200 leading-tight max-w-[200px] mt-1 font-sans">
+              Finish your Aadhaar & Address KYC to view verified parent photos & connect
+            </span>
+            {onOpenVerify && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenVerify(profile);
+                }}
+                className="mt-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-[9.5px] font-black rounded-lg transition shadow-md cursor-pointer"
+              >
+                Complete KYC ⚡
+              </button>
+            )}
+          </div>
         )}
 
         {/* Lock mask for child photo when profile is locked */}
@@ -368,19 +395,17 @@ export default function PlaymateCard({
         <div id="card-basics" className="flex justify-between items-start">
           <div>
             <h3 id="child-id-name" className="text-xl font-bold font-serif text-rose-950 hover:text-rose-700 transition-colors flex items-center gap-1.5 flex-wrap">
-              {isProfileUnlocked ? profile.childName : "🔒 Hidden Child Identity"}
-              {isProfileUnlocked && (
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                  profile.childGender === 'Boy' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 
-                  profile.childGender === 'Girl' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
-                  'bg-amber-50 text-amber-700 border border-amber-200'
-                }`}>
-                  {profile.childGender}
-                </span>
-              )}
+              {profile.childName || "Playmate"}
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                profile.childGender === 'Boy' ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 
+                profile.childGender === 'Girl' ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
+                'bg-amber-50 text-amber-700 border border-amber-200'
+              }`}>
+                {profile.childGender || 'Child'}
+              </span>
             </h3>
             <p id="child-id-grade" className="text-xs font-semibold text-slate-600 mt-0.5">
-              {isProfileUnlocked ? `${profile.gradeLevel} • ${profile.childAge} ${profile.ageUnit === 'months' ? 'months' : 'yrs'} old` : "🔒 Connect to reveal age & grade"}
+              {profile.gradeLevel ? `${profile.gradeLevel} • ` : ''}{profile.childAge} {profile.ageUnit === 'months' ? 'months' : 'yrs'} old
             </p>
           </div>
 
@@ -643,15 +668,15 @@ export default function PlaymateCard({
 
         {/* Interests Badges */}
         <div id="interests-tags-flex" className="flex flex-wrap gap-1">
-          {isProfileUnlocked ? (
+          {profile.interests && profile.interests.length > 0 ? (
             profile.interests.map((tag) => (
               <span id={`badge-tag-${tag}-${profile.id}`} key={tag} className="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 transition-colors text-slate-600 py-1 px-2 rounded-lg">
                 #{tag}
               </span>
             ))
           ) : (
-            <span className="text-[10px] font-extrabold bg-slate-100 text-slate-400 py-1 px-2.5 rounded-lg flex items-center gap-1 select-none">
-              🔒 Playtime Hobbies Secured
+            <span className="text-[10px] font-medium text-slate-400 py-0.5">
+              No interests specified
             </span>
           )}
         </div>

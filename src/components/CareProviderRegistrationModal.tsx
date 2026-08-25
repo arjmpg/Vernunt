@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { DaycarePlayhomeProfile, ChildProfile, CareProviderType } from '../types.ts';
 import { 
   X, ShieldCheck, MapPin, DollarSign, Clock, Baby, 
-  Home, Check, Sparkles, Plus, Trash2, Camera, Info, Eye
+  Home, Check, Sparkles, Plus, Trash2, Camera, Info, Eye,
+  Navigation, UserCheck, HeartHandshake, Briefcase
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -20,17 +21,29 @@ export default function CareProviderRegistrationModal({
   existingProfile
 }: CareProviderRegistrationModalProps) {
   const [providerType, setProviderType] = useState<CareProviderType>(
-    existingProfile?.providerType || (currentUserProfile?.userRole === 'Event Organizer' ? 'Certified Playhome' : 'Neighbour Parent')
+    existingProfile?.providerType || 'Home Care Center'
   );
   
   const [title, setTitle] = useState<string>(
-    existingProfile?.title || `${currentUserProfile?.parentName || 'Cozy Home'}'s Playhome & Sitting Space`
+    existingProfile?.title || `${currentUserProfile?.parentName || 'Warm'}'s Home Care & Sitter Space`
   );
   const [hostName, setHostName] = useState<string>(
-    existingProfile?.hostName || currentUserProfile?.parentName || 'Neighbour Parent'
+    existingProfile?.hostName || currentUserProfile?.parentName || 'Care Host'
   );
-  const [hourlyRate, setHourlyRate] = useState<number>(
-    existingProfile?.hourlyRate !== undefined ? existingProfile.hourlyRate : 150
+
+  // Service Offerings: Host at Home vs Visit Parent's Home
+  const [canHostAtHome, setCanHostAtHome] = useState<boolean>(
+    existingProfile?.careServiceModes ? existingProfile.careServiceModes.includes('host_at_my_home') : true
+  );
+  const [canVisitParentHome, setCanVisitParentHome] = useState<boolean>(
+    existingProfile?.careServiceModes ? existingProfile.careServiceModes.includes('visit_parents_home') : true
+  );
+
+  // Rates for Hosting at My Home (Home Care Center)
+  const [hourlyRateNeighborHome, setHourlyRateNeighborHome] = useState<number>(
+    existingProfile?.hourlyRateNeighborHome !== undefined 
+      ? existingProfile.hourlyRateNeighborHome 
+      : (existingProfile?.hourlyRate !== undefined ? existingProfile.hourlyRate : 150)
   );
   const [halfDayRate, setHalfDayRate] = useState<number>(
     existingProfile?.halfDayRate !== undefined ? existingProfile.halfDayRate : 500
@@ -38,25 +51,35 @@ export default function CareProviderRegistrationModal({
   const [fullDayRate, setFullDayRate] = useState<number>(
     existingProfile?.fullDayRate !== undefined ? existingProfile.fullDayRate : 900
   );
+
+  // Rates for Visiting Parent's Home (In-Home Sitter)
+  const [hourlyRateParentHome, setHourlyRateParentHome] = useState<number>(
+    existingProfile?.hourlyRateParentHome !== undefined 
+      ? existingProfile.hourlyRateParentHome 
+      : 200
+  );
+  const [visitingRadiusKm, setVisitingRadiusKm] = useState<number>(
+    existingProfile?.visitingRadiusKm || 5
+  );
   
   const [experienceYears, setExperienceYears] = useState<number>(
-    existingProfile?.experienceYears || 5
+    existingProfile?.experienceYears || 3
   );
   const [maxCapacity, setMaxCapacity] = useState<number>(
     existingProfile?.maxCapacity || 3
   );
   const [bio, setBio] = useState<string>(
-    existingProfile?.bio || 'Welcoming environment with plenty of games, books, and attentive supervision. Delighted to look after your child while you attend to errands or work!'
+    existingProfile?.bio || 'Passionate about nurturing care and early engagement. Welcoming home space with toys and books, or happy to visit parents’ home to look after babies and kids with utmost love and safety.'
   );
   const [address, setAddress] = useState<string>(
-    existingProfile?.location.address || currentUserProfile?.location.address || 'Bandra West, Mumbai, India'
+    existingProfile?.location.address || (currentUserProfile as any)?.currentAddress || currentUserProfile?.location.address || 'Bandra West, Mumbai, India'
   );
   const [phone, setPhone] = useState<string>(
     existingProfile?.phone || currentUserProfile?.phoneNumber || '9820112233'
   );
 
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>(
-    existingProfile?.acceptedAgeGroups || ['1 - 3 yrs', '3 - 6 yrs', '6 - 10 yrs']
+    existingProfile?.acceptedAgeGroups || ['Infants (6m - 18m)', 'Toddlers (18m - 3y)', '3 - 6 yrs']
   );
   const [selectedDays, setSelectedDays] = useState<string[]>(
     existingProfile?.availableDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -72,30 +95,33 @@ export default function CareProviderRegistrationModal({
 
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(
     existingProfile?.amenities || [
-      'CCTV Live Stream Link',
-      'Childproofed Enclosed Playroom',
+      'Childproofed Safe Play Area',
       'Sanitized Nap Cots & Bedding',
-      'Organic Fresh Purees & Fruit Bowls',
-      'First Aid Kit',
-      'Lego & Storybook Library'
+      'First Aid Trained',
+      'Storybook & Montessori Toys Library',
+      'CCTV / Live Video Updates'
     ]
   );
 
-  const ALL_AGE_GROUPS = ['6m - 2 yrs', '1 - 3 yrs', '2 - 5 yrs', '3 - 6 yrs', '6 - 10 yrs', '10+ yrs'];
+  const ALL_AGE_GROUPS = [
+    'Infants (6m - 18m)',
+    'Toddlers (18m - 3y)',
+    'Pre-K (3y - 6y)',
+    'School Age (6y - 10y)'
+  ];
   const ALL_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   
   const ALL_AMENITIES = [
-    'CCTV Live Stream Link',
-    'Childproofed Enclosed Playroom',
-    'AC & Soft Foam Flooring',
+    'Childproofed Safe Play Area',
     'Sanitized Nap Cots & Bedding',
-    'Organic Fresh Purees & Fruit Bowls',
     'First Aid & CPR Trained',
-    'Lego & Storybook Library',
-    'Enclosed Private Garden Lawn',
-    'Pediatric Nurse Assistance',
-    'Pet Free & Smoke Free',
-    'UV Toy Sanitizer Machine'
+    'Storybook & Montessori Toys Library',
+    'CCTV / Live Video Updates',
+    'Healthy Snacks & Fruit Bowls',
+    'AC & Soft Foam Mat Flooring',
+    'Pet Free & Smoke Free Space',
+    'Potty Training Assistance',
+    'Outdoor Garden Walk'
   ];
 
   const handleToggleAgeGroup = (group: string) => {
@@ -106,7 +132,7 @@ export default function CareProviderRegistrationModal({
 
   const handleToggleDay = (day: string) => {
     setSelectedDays(prev => 
-      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
+      prev.includes(day) ? prev.filter(d => g !== day) : [...prev, day]
     );
   };
 
@@ -133,6 +159,17 @@ export default function CareProviderRegistrationModal({
       alert('Please enter your space title and host name.');
       return;
     }
+    if (!canHostAtHome && !canVisitParentHome) {
+      alert('Please select at least one care offering: Host at My Home, or Visit Parents House.');
+      return;
+    }
+
+    const careServiceModes: ('host_at_my_home' | 'visit_parents_home')[] = [];
+    if (canHostAtHome) careServiceModes.push('host_at_my_home');
+    if (canVisitParentHome) careServiceModes.push('visit_parents_home');
+
+    // Primary display hourly rate
+    const primaryRate = canHostAtHome ? Number(hourlyRateNeighborHome) : Number(hourlyRateParentHome);
 
     const newProfile: DaycarePlayhomeProfile = {
       id: existingProfile?.id || `playhome-custom-${Date.now()}`,
@@ -140,9 +177,14 @@ export default function CareProviderRegistrationModal({
       title: title.trim(),
       hostName: hostName.trim(),
       providerType,
-      hourlyRate: Number(hourlyRate) || 0,
-      halfDayRate: Number(halfDayRate) || 0,
-      fullDayRate: Number(fullDayRate) || 0,
+      providerEntityType: 'Individual',
+      careServiceModes,
+      hourlyRate: primaryRate || 0,
+      hourlyRateNeighborHome: canHostAtHome ? Number(hourlyRateNeighborHome) : undefined,
+      hourlyRateParentHome: canVisitParentHome ? Number(hourlyRateParentHome) : undefined,
+      visitingRadiusKm: canVisitParentHome ? Number(visitingRadiusKm) : undefined,
+      halfDayRate: canHostAtHome ? (Number(halfDayRate) || 0) : undefined,
+      fullDayRate: canHostAtHome ? (Number(fullDayRate) || 0) : undefined,
       bio: bio.trim(),
       location: {
         lat: currentUserProfile?.location.lat || 19.0760,
@@ -153,11 +195,11 @@ export default function CareProviderRegistrationModal({
       rating: existingProfile?.rating || 5.0,
       reviewsCount: existingProfile?.reviewsCount || 1,
       experienceYears: Number(experienceYears) || 3,
-      maxCapacity: Number(maxCapacity) || 3,
+      maxCapacity: canHostAtHome ? (Number(maxCapacity) || 3) : 1,
       currentOccupancy: 0,
-      acceptedAgeGroups: selectedAgeGroups.length > 0 ? selectedAgeGroups : ['2 - 6 yrs'],
-      availableDays: selectedDays.length > 0 ? selectedDays : ['Mon', 'Wed', 'Fri'],
-      availableTimeSlots: availableSlots.length > 0 ? availableSlots : ['10:00 AM - 02:00 PM'],
+      acceptedAgeGroups: selectedAgeGroups.length > 0 ? selectedAgeGroups : ['1 - 3 yrs', '3 - 6 yrs'],
+      availableDays: selectedDays.length > 0 ? selectedDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      availableTimeSlots: availableSlots.length > 0 ? availableSlots : ['09:00 AM - 01:00 PM', '02:00 PM - 06:30 PM'],
       amenities: selectedAmenities,
       photos: existingProfile?.photos || [
         'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=800',
@@ -175,9 +217,9 @@ export default function CareProviderRegistrationModal({
       reviews: existingProfile?.reviews || [
         {
           id: 'rev-init',
-          parentName: 'Vernunt Verification Team',
+          parentName: 'Vernunt Community Safety',
           rating: 5,
-          comment: 'Identity verified with active parent background.',
+          comment: 'Identity and residential verified. Available for verified bookings.',
           date: 'Just now'
         }
       ]
@@ -202,33 +244,38 @@ export default function CareProviderRegistrationModal({
             <X className="w-5 h-5" />
           </button>
 
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex flex-wrap items-center gap-2 mb-1.5">
             <span className="text-[10px] font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full backdrop-blur-xs flex items-center gap-1">
-              🏡 Sitter & Playhome Provider Setup
+              💼 Care Jobs &amp; Earning Creator
             </span>
-            <span className="text-[10px] font-extrabold bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full shadow-2xs">
-              💰 Set Custom Hourly Price
+            <span className="text-[10px] font-extrabold bg-amber-400 text-slate-950 px-2.5 py-0.5 rounded-full shadow-2xs">
+              💰 Host at Home or Visit Parents
             </span>
           </div>
 
           <h3 className="font-serif font-black text-xl text-white leading-tight">
-            {existingProfile ? 'Edit Your Sitter / Playhome Profile' : 'Offer Childcare & Babysitting to Neighbours'}
+            {existingProfile ? 'Edit Your Care Provider Profile' : 'Offer Home Care or In-Home Babysitting'}
           </h3>
-          <p className="text-xs text-emerald-100 mt-1">
-            Post your available hours, set your own hourly fees (or ₹0 for free mutual sharing), and earn by helping local families.
+          <p className="text-xs text-emerald-100 mt-1 leading-relaxed">
+            Create independent income! If you have space at home, host as a home care center. If you want to visit parents’ homes to look after babies, set your visiting rate—or do both!
           </p>
         </div>
 
         {/* Body */}
         <form onSubmit={handleSubmit} className="p-5 overflow-y-auto flex-1 space-y-5">
           
-          {/* Provider Type Selection */}
+          {/* Provider Category Selection */}
           <div className="space-y-2">
             <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
-              Provider Category
+              Provider Category / Profile Type
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {(['Neighbour Parent', 'Certified Playhome', 'Home Daycare', 'Experienced Sitter'] as CareProviderType[]).map((type) => (
+              {[
+                { type: 'Home Care Center' as CareProviderType, icon: '🏡', label: 'Home Care Center' },
+                { type: 'Babysitter & Nanny' as CareProviderType, icon: '🚶‍♀️', label: 'Babysitter & Nanny' },
+                { type: 'Neighbour Parent' as CareProviderType, icon: '👪', label: 'Neighbour Parent' },
+                { type: 'Certified Playhome' as CareProviderType, icon: '🏫', label: 'Certified Playhome' },
+              ].map(({ type, icon, label }) => (
                 <button
                   key={type}
                   type="button"
@@ -239,13 +286,184 @@ export default function CareProviderRegistrationModal({
                       : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700 font-bold text-xs'
                   }`}
                 >
-                  <span className="text-base">
-                    {type === 'Neighbour Parent' ? '👪' : type === 'Certified Playhome' ? '🏫' : type === 'Home Daycare' ? '🧸' : '✨'}
-                  </span>
-                  <span className="text-[11px] leading-tight mt-1">{type}</span>
+                  <span className="text-base">{icon}</span>
+                  <span className="text-[11px] leading-tight mt-1">{label}</span>
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* SERVICE MODES & RATE CONFIGURATION (THE CORE USER REQUIREMENT) */}
+          <div className="bg-gradient-to-br from-emerald-50/90 via-teal-50/70 to-amber-50/90 border-2 border-emerald-300 rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm">
+            <div className="flex items-center justify-between border-b border-emerald-200/80 pb-2.5">
+              <div>
+                <h4 className="text-xs sm:text-sm font-black text-emerald-950 flex items-center gap-1.5 uppercase tracking-wide">
+                  <Briefcase className="w-4 h-4 text-emerald-700" />
+                  <span>Choose Where You Will Provide Care &amp; Set Rates</span>
+                </h4>
+                <p className="text-[11px] text-emerald-800 mt-0.5">
+                  Select one or both options below. Parents will see your transparent rates for each service.
+                </p>
+              </div>
+              <span className="text-[10px] font-black bg-emerald-700 text-white px-2.5 py-1 rounded-full uppercase shrink-0 shadow-2xs">
+                100% Retained
+              </span>
+            </div>
+
+            {/* OPTION 1: HOST AT MY HOME (HOME CARE CENTER) */}
+            <div className={`p-4 rounded-2xl border-2 transition ${canHostAtHome ? 'bg-white border-emerald-500 shadow-xs' : 'bg-emerald-50/40 border-slate-200 opacity-80'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <label className="flex items-start gap-2.5 cursor-pointer flex-1">
+                  <input
+                    type="checkbox"
+                    checked={canHostAtHome}
+                    onChange={(e) => setCanHostAtHome(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 accent-emerald-600 rounded cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                      <span>🏡 Host Children at My Home / Place (Home Care Center)</span>
+                    </span>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Parents drop off their babies/children at your home. You provide space, toys, nap cots, and supervision.
+                    </p>
+                  </div>
+                </label>
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md shrink-0">
+                  Drop-Off Care
+                </span>
+              </div>
+
+              {canHostAtHome && (
+                <div className="mt-3.5 pt-3 border-t border-emerald-100 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-fade-in">
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-800 mb-1">
+                      Rate to Host at Home (₹ / hr) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-black text-slate-500">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={10}
+                        value={hourlyRateNeighborHome}
+                        onChange={(e) => setHourlyRateNeighborHome(Number(e.target.value))}
+                        placeholder="150"
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border-2 border-emerald-400 rounded-xl text-xs font-black text-slate-900 focus:outline-emerald-600"
+                        required={canHostAtHome}
+                      />
+                    </div>
+                    <span className="text-[9.5px] text-emerald-700 font-medium mt-0.5 block">
+                      {hourlyRateNeighborHome === 0 ? '🎁 Free mutual help' : `Parents see: ₹${hourlyRateNeighborHome}/hr at your home`}
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Half-Day Pass (4 hrs)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-black text-slate-500">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={halfDayRate}
+                        onChange={(e) => setHalfDayRate(Number(e.target.value))}
+                        placeholder="500"
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Full-Day Pass (8 hrs)
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-black text-slate-500">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={50}
+                        value={fullDayRate}
+                        onChange={(e) => setFullDayRate(Number(e.target.value))}
+                        placeholder="900"
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* OPTION 2: GO TO PARENTS' HOUSE (IN-HOME CARE / BABYSITTER) */}
+            <div className={`p-4 rounded-2xl border-2 transition ${canVisitParentHome ? 'bg-white border-indigo-500 shadow-xs' : 'bg-indigo-50/40 border-slate-200 opacity-80'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <label className="flex items-start gap-2.5 cursor-pointer flex-1">
+                  <input
+                    type="checkbox"
+                    checked={canVisitParentHome}
+                    onChange={(e) => setCanVisitParentHome(e.target.checked)}
+                    className="w-4 h-4 mt-0.5 accent-indigo-600 rounded cursor-pointer"
+                  />
+                  <div>
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                      <span>🚶‍♀️ Go to Parents’ House to Look After Babies (In-Home Sitter)</span>
+                    </span>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Travel to the parent’s residence for on-demand babysitting, infant feeding, and attentive in-home supervision.
+                    </p>
+                  </div>
+                </label>
+                <span className="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-md shrink-0">
+                  Visiting Care
+                </span>
+              </div>
+
+              {canVisitParentHome && (
+                <div className="mt-3.5 pt-3 border-t border-indigo-100 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-fade-in">
+                  <div>
+                    <label className="block text-[11px] font-extrabold text-slate-800 mb-1">
+                      Visiting Hourly Rate (₹ / hr to visit parent's house) *
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-xs font-black text-slate-500">₹</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step={10}
+                        value={hourlyRateParentHome}
+                        onChange={(e) => setHourlyRateParentHome(Number(e.target.value))}
+                        placeholder="200"
+                        className="w-full pl-7 pr-3 py-1.5 bg-white border-2 border-indigo-400 rounded-xl text-xs font-black text-slate-900 focus:outline-indigo-600 shadow-inner"
+                        required={canVisitParentHome}
+                      />
+                    </div>
+                    <span className="text-[9.5px] text-indigo-700 font-medium mt-0.5 block">
+                      Parents see: ₹{hourlyRateParentHome}/hr to visit their home
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Max Travel Distance (Radius)
+                    </label>
+                    <select
+                      value={visitingRadiusKm}
+                      onChange={(e) => setVisitingRadiusKm(Number(e.target.value))}
+                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-indigo-600"
+                    >
+                      <option value={2}>Within 2 km (Walking / Immediate neighbourhood)</option>
+                      <option value={5}>Within 5 km (Standard city radius)</option>
+                      <option value={10}>Within 10 km (Extended locality)</option>
+                      <option value={15}>Within 15 km (Wide coverage)</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
           {/* Title & Host Name */}
@@ -258,7 +476,7 @@ export default function CareProviderRegistrationModal({
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Kavita Aunty's Cozy Home Sitting"
+                placeholder="e.g. Kavita Aunty's Cozy Home Care & Sitting"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
                 required
               />
@@ -276,83 +494,6 @@ export default function CareProviderRegistrationModal({
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
                 required
               />
-            </div>
-          </div>
-
-          {/* HOURLY RATE SETTER (CRITICAL USER REQUEST) */}
-          <div className="bg-gradient-to-br from-emerald-50 via-teal-50 to-amber-50 border-2 border-emerald-300 rounded-2xl p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-xs font-black uppercase tracking-wider text-emerald-950 flex items-center gap-1.5">
-                <DollarSign className="w-4 h-4 text-emerald-700" />
-                <span>Set How Much You Want to Charge (Hourly Rate)</span>
-              </label>
-              <span className="text-[10px] font-bold bg-emerald-600 text-white px-2 py-0.5 rounded-full">
-                100% Retained by You
-              </span>
-            </div>
-
-            <p className="text-[11px] text-emerald-900">
-              Charge whatever amount you want per hour for looking after children. Enter <strong>0</strong> if you want to provide free reciprocal community playgroup care.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-              <div>
-                <label className="block text-[11px] font-extrabold text-slate-800 mb-1">
-                  Hourly Rate (₹ / hr) *
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-black text-slate-500">₹</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={10}
-                    value={hourlyRate}
-                    onChange={(e) => setHourlyRate(Number(e.target.value))}
-                    placeholder="150"
-                    className="w-full pl-7 pr-3 py-2 bg-white border-2 border-emerald-400 rounded-xl text-sm font-black text-slate-900 focus:outline-emerald-600 shadow-inner"
-                    required
-                  />
-                </div>
-                <span className="text-[9px] text-slate-500 mt-0.5 block">
-                  {hourlyRate === 0 ? '🎁 Free mutual help' : `Parents see: ₹${hourlyRate}/hr`}
-                </span>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Half-Day Pass (4 hrs)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-black text-slate-500">₹</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={halfDayRate}
-                    onChange={(e) => setHalfDayRate(Number(e.target.value))}
-                    placeholder="500"
-                    className="w-full pl-7 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                  Full-Day Pass (8 hrs)
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-xs font-black text-slate-500">₹</span>
-                  <input
-                    type="number"
-                    min={0}
-                    step={50}
-                    value={fullDayRate}
-                    onChange={(e) => setFullDayRate(Number(e.target.value))}
-                    placeholder="900"
-                    className="w-full pl-7 pr-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -374,7 +515,7 @@ export default function CareProviderRegistrationModal({
 
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                Max Children Capacity
+                Max Children Capacity (At Home)
               </label>
               <input
                 type="number"
@@ -382,7 +523,8 @@ export default function CareProviderRegistrationModal({
                 max={25}
                 value={maxCapacity}
                 onChange={(e) => setMaxCapacity(Number(e.target.value))}
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
+                disabled={!canHostAtHome}
+                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600 disabled:bg-slate-100 disabled:text-slate-400"
               />
             </div>
 
@@ -404,13 +546,13 @@ export default function CareProviderRegistrationModal({
           <div className="space-y-3">
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                About Your Care & Space
+                About Your Care, Space &amp; Background
               </label>
               <textarea
                 rows={2}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Describe your home, activities for kids, toys available, hygiene, and snacks provided..."
+                placeholder="Describe your home environment, activities for kids, toys available, hygiene routines, and willingness to travel to parents' homes..."
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs text-slate-900 focus:outline-emerald-600"
                 required
               />
@@ -418,7 +560,7 @@ export default function CareProviderRegistrationModal({
 
             <div>
               <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                Neighbourhood / Address (For distance calculation)
+                Base Address / Locality (For distance calculation)
               </label>
               <input
                 type="text"
@@ -529,7 +671,7 @@ export default function CareProviderRegistrationModal({
           {/* Amenities */}
           <div className="space-y-2">
             <label className="block text-xs font-black uppercase tracking-wider text-slate-700">
-              Facilities & Safety Amenities
+              Facilities &amp; Safety Amenities
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {ALL_AMENITIES.map((amenity) => {
@@ -568,10 +710,10 @@ export default function CareProviderRegistrationModal({
             </button>
             <button
               type="submit"
-              className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-sm rounded-xl shadow-md transition transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
+              className="flex-1 py-2.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-600 hover:from-emerald-700 hover:to-indigo-700 text-white font-black text-sm rounded-xl shadow-md transition transform active:scale-98 cursor-pointer flex items-center justify-center gap-2"
             >
               <Sparkles className="w-4 h-4 text-amber-200" />
-              <span>{existingProfile ? 'Update Availability & Rate' : 'Publish Sitter / Playhome Listing (Instant Live)'}</span>
+              <span>{existingProfile ? 'Update Availability & Rates' : 'Publish Home Care / Sitter Listing (Instant Live)'}</span>
             </button>
           </div>
 

@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
-import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye } from 'lucide-react';
+import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye, Lock } from 'lucide-react';
 
 interface PlaymateListViewProps {
   playmates: ChildProfile[];
@@ -108,6 +108,8 @@ export function PlaymateListView({
           const isConnected = connectedIds.includes(p.id);
           const isSent = interestsSent.includes(p.id);
           const isReceived = interestsReceived.includes(p.id);
+          const isViewerVerified = userProfile?.userRole === 'Admin' || (userProfile?.verificationStatus === VerificationStatus.VERIFIED && !!userProfile?.aadhaarVerified);
+          const isPhotoUnlocked = isConnected || isViewerVerified;
           const dKm = (p as any)._cachedDistance ?? getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
           const proxBadge = getProximityBadge(dKm);
           const matchResult = calculateMatchScore(userProfile, p);
@@ -125,17 +127,22 @@ export function PlaymateListView({
               {/* Top Accent Stripe / Badges */}
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3">
-                  <div className="relative shrink-0">
+                  <div className="relative shrink-0 w-14 h-14 rounded-2xl overflow-hidden border border-slate-200/80 shadow-xs">
                     <img 
                       src={p.parentPhotoUrl || p.photoUrl} 
                       alt={`Parent: ${p.parentName}`} 
-                      className="w-14 h-14 rounded-2xl object-cover border border-slate-200/80 shadow-xs group-hover:scale-105 transition duration-200"
+                      className={`w-full h-full object-cover group-hover:scale-105 transition duration-200 ${!isPhotoUnlocked ? 'blur-md saturate-[0.2] brightness-75 select-none' : ''}`} 
                       referrerPolicy="no-referrer"
                       loading="lazy"
                     />
+                    {!isPhotoUnlocked && (
+                      <div className="absolute inset-0 bg-slate-950/40 flex items-center justify-center text-amber-300" title="Parent photo locked until KYC verification">
+                        <Lock className="w-4 h-4" />
+                      </div>
+                    )}
                     {p.childPhotoUrl && (
                       <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full overflow-hidden border-2 border-white shadow-xs bg-slate-100" title={`Child: ${p.childName}`}>
-                        <img src={p.childPhotoUrl} alt={p.childName} className="w-full h-full object-cover" loading="lazy" />
+                        <img src={p.childPhotoUrl} alt={p.childName} className={`w-full h-full object-cover ${!isPhotoUnlocked ? 'blur-sm saturate-[0.2]' : ''}`} loading="lazy" />
                       </div>
                     )}
                     {p.verificationStatus === VerificationStatus.VERIFIED && (
