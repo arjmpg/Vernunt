@@ -79,6 +79,7 @@ export default function AdminDashboard({
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [verificationFilter, setVerificationFilter] = useState<string>('all');
+  const [userSortBy, setUserSortBy] = useState<'latest' | 'oldest' | 'name_asc' | 'name_desc' | 'role'>('latest');
   const [selectedUser, setSelectedUser] = useState<ChildProfile | null>(null);
 
   // In-line KYC / Role editing modal state
@@ -803,6 +804,84 @@ export default function AdminDashboard({
     }));
   };
 
+  // Helper for sorting & displaying user registration dates
+  const getUserRegistrationTime = (u: ChildProfile): number => {
+    if (u.createdAt) {
+      const t = new Date(u.createdAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (u.registeredAt) {
+      const t = new Date(u.registeredAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (u.capturedAt) {
+      const t = new Date(u.capturedAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (u.lastActiveAt) {
+      const t = new Date(u.lastActiveAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    if (u.id) {
+      const match = u.id.match(/\d{10,}/);
+      if (match) {
+        const num = Number(match[0]);
+        if (!isNaN(num) && num > 1000000000) return num;
+      }
+    }
+    return 0;
+  };
+
+  const formatRegistrationDate = (u: ChildProfile): { dateStr: string; timeStr: string; relativeStr: string; isRecent: boolean } => {
+    const time = getUserRegistrationTime(u);
+    if (!time) {
+      return { dateStr: 'Standard Entry', timeStr: '', relativeStr: 'Enrolled', isRecent: false };
+    }
+    const date = new Date(time);
+    const now = Date.now();
+    const diffMs = now - time;
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    let relativeStr = '';
+    let isRecent = false;
+
+    if (diffMinutes < 1) {
+      relativeStr = 'Just now';
+      isRecent = true;
+    } else if (diffMinutes < 60) {
+      relativeStr = `${diffMinutes}m ago`;
+      isRecent = true;
+    } else if (diffHours < 24) {
+      relativeStr = `${diffHours}h ago`;
+      isRecent = true;
+    } else if (diffDays === 1) {
+      relativeStr = 'Yesterday';
+    } else if (diffDays < 7) {
+      relativeStr = `${diffDays}d ago`;
+    } else if (diffDays < 30) {
+      const weeks = Math.floor(diffDays / 7);
+      relativeStr = `${weeks}w ago`;
+    } else {
+      const months = Math.floor(diffDays / 30);
+      relativeStr = `${months}mo ago`;
+    }
+
+    const dateStr = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: date.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+    });
+
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    return { dateStr, timeStr, relativeStr, isRecent };
+  };
+
   // Filtered Users computation
   const allUsers = userProfile ? [userProfile, ...playmates.filter(p => p.id !== userProfile.id)] : playmates;
   const verifiedCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.VERIFIED).length;
@@ -817,6 +896,7 @@ export default function AdminDashboard({
       (u.parentName || '').toLowerCase().includes(term) ||
       (u.childName || '').toLowerCase().includes(term) ||
       (u.email || '').toLowerCase().includes(term) ||
+      (u.phoneNumber || '').toLowerCase().includes(term) ||
       (u.id || '').toLowerCase().includes(term);
 
     const matchesRole = roleFilter === 'all' || u.userRole === roleFilter;
@@ -837,6 +917,29 @@ export default function AdminDashboard({
     if (activeSubTab === 'admins') return matchesSearch && u.userRole === 'Admin';
 
     return matchesSearch && matchesRole && matchesVerification;
+  }).sort((a, b) => {
+    if (userSortBy === 'latest') {
+      return getUserRegistrationTime(b) - getUserRegistrationTime(a);
+    }
+    if (userSortBy === 'oldest') {
+      return getUserRegistrationTime(a) - getUserRegistrationTime(b);
+    }
+    if (userSortBy === 'name_asc') {
+      const nameA = (a.childName || a.parentName || '').toLowerCase();
+      const nameB = (b.childName || b.parentName || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    }
+    if (userSortBy === 'name_desc') {
+      const nameA = (a.childName || a.parentName || '').toLowerCase();
+      const nameB = (b.childName || b.parentName || '').toLowerCase();
+      return nameB.localeCompare(nameA);
+    }
+    if (userSortBy === 'role') {
+      const roleA = (a.userRole || 'Parent').toLowerCase();
+      const roleB = (b.userRole || 'Parent').toLowerCase();
+      return roleA.localeCompare(roleB);
+    }
+    return 0;
   });
 
   return (
@@ -1785,30 +1888,107 @@ export default function AdminDashboard({
               </ul>
 
               {/* Bulk Actions & Filters Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 py-1 text-xs">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2.5 py-1 text-xs">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Bulk Actions */}
+                  <div className="flex items-center gap-1">
+                    <select
+                      value={bulkAction}
+                      onChange={e => setBulkAction(e.target.value)}
+                      className="p-1.5 bg-white border border-[#8c8f94] rounded-xs text-xs outline-none focus:border-[#2271b1]"
+                    >
+                      <option value="-1">Bulk actions</option>
+                      <option value="verify">Approve KYC & Verify</option>
+                      <option value="block">Block User Account</option>
+                      <option value="unblock">Unblock / Unlock Account</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleBulkUserAction}
+                      disabled={bulkAction === '-1' || selectedUserIds.length === 0}
+                      className="px-3 py-1.5 bg-[#f6f7f7] hover:bg-[#f0f0f1] border border-[#8c8f94] rounded-xs text-xs font-semibold text-[#2c3338] disabled:opacity-40 cursor-pointer"
+                    >
+                      Apply
+                    </button>
+                  </div>
+
+                  {/* Role Filter */}
                   <select
-                    value={bulkAction}
-                    onChange={e => setBulkAction(e.target.value)}
-                    className="p-1 bg-white border border-[#8c8f94] rounded-xs text-xs outline-none"
+                    value={roleFilter}
+                    onChange={e => setRoleFilter(e.target.value)}
+                    className="p-1.5 bg-white border border-[#8c8f94] rounded-xs text-xs outline-none focus:border-[#2271b1]"
                   >
-                    <option value="-1">Bulk actions</option>
-                    <option value="verify">Approve KYC & Verify</option>
-                    <option value="block">Block User Account</option>
-                    <option value="unblock">Unblock / Unlock Account</option>
+                    <option value="all">All Roles</option>
+                    <option value="Parent">Parents</option>
+                    <option value="Event Organizer">Event Organizers</option>
+                    <option value="Portfolio Professional">Specialists</option>
+                    <option value="Admin">Administrators</option>
                   </select>
+
+                  {/* Verification Filter */}
+                  <select
+                    value={verificationFilter}
+                    onChange={e => setVerificationFilter(e.target.value)}
+                    className="p-1.5 bg-white border border-[#8c8f94] rounded-xs text-xs outline-none focus:border-[#2271b1]"
+                  >
+                    <option value="all">All KYC Status</option>
+                    <option value={VerificationStatus.VERIFIED}>Verified Only</option>
+                    <option value={VerificationStatus.PENDING}>Pending Review</option>
+                    <option value="aadhaar">Aadhaar Verified</option>
+                    <option value={VerificationStatus.UNVERIFIED}>Unverified</option>
+                  </select>
+
+                  {/* Sort Order Selector (Requested by Admin) */}
+                  <div className="flex items-center gap-1.5 bg-white border border-[#2271b1] rounded-xs px-2 py-1 shadow-2xs">
+                    <Clock className="w-3.5 h-3.5 text-[#2271b1]" />
+                    <span className="text-[11px] font-bold text-[#1d2327]">Sort by:</span>
+                    <select
+                      value={userSortBy}
+                      onChange={e => setUserSortBy(e.target.value as any)}
+                      className="bg-transparent text-xs text-[#2271b1] font-bold outline-none cursor-pointer pr-1"
+                    >
+                      <option value="latest">⚡ Latest / Newest Registered First</option>
+                      <option value="oldest">⏳ Oldest Registered First</option>
+                      <option value="name_asc">🔤 Name (A → Z)</option>
+                      <option value="name_desc">🔤 Name (Z → A)</option>
+                      <option value="role">🏷️ User Role</option>
+                    </select>
+                  </div>
+
+                  {/* Quick Toggle Pill for Latest Registrations */}
                   <button
                     type="button"
-                    onClick={handleBulkUserAction}
-                    disabled={bulkAction === '-1' || selectedUserIds.length === 0}
-                    className="px-3 py-1 bg-[#f6f7f7] hover:bg-[#f0f0f1] border border-[#8c8f94] rounded-xs text-xs font-semibold text-[#2c3338] disabled:opacity-40 cursor-pointer"
+                    onClick={() => setUserSortBy(prev => prev === 'latest' ? 'oldest' : 'latest')}
+                    className={`px-2.5 py-1 rounded-xs font-semibold text-xs border transition flex items-center gap-1 cursor-pointer ${
+                      userSortBy === 'latest'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 shadow-2xs'
+                        : 'bg-white text-[#646970] border-[#c3c4c7] hover:border-[#2271b1]'
+                    }`}
+                    title="Toggle newest or oldest registration order"
                   >
-                    Apply
+                    {userSortBy === 'latest' ? (
+                      <>
+                        <ArrowDown className="w-3 h-3 text-emerald-600" />
+                        <span>Showing Newest First</span>
+                      </>
+                    ) : userSortBy === 'oldest' ? (
+                      <>
+                        <ArrowUp className="w-3 h-3 text-amber-600" />
+                        <span>Showing Oldest First</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock className="w-3 h-3" />
+                        <span>Sort: Latest</span>
+                      </>
+                    )}
                   </button>
                 </div>
 
-                <div className="text-xs text-[#646970]">
-                  {filteredUsers.length} user(s)
+                <div className="flex items-center gap-2 text-xs text-[#646970] font-medium">
+                  <span className="bg-[#f0f0f1] px-2 py-0.5 rounded-xs border border-[#dcdcde]">
+                    {filteredUsers.length} user(s) found
+                  </span>
                 </div>
               </div>
 
@@ -1833,13 +2013,36 @@ export default function AdminDashboard({
                       <th className="py-2.5 px-3">Mobile & Email</th>
                       <th className="py-2.5 px-3">KYC / Aadhaar</th>
                       <th className="py-2.5 px-3">Role</th>
+                      
+                      {/* Clickable Sortable Header for Registration Date */}
+                      <th 
+                        onClick={() => setUserSortBy(prev => prev === 'latest' ? 'oldest' : 'latest')}
+                        className="py-2.5 px-3 cursor-pointer select-none hover:bg-[#eaecee] transition text-[#2271b1] group"
+                        title="Click to sort by registration date (latest vs oldest)"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold underline decoration-dotted decoration-[#2271b1]">Registered</span>
+                          {userSortBy === 'latest' ? (
+                            <span className="inline-flex items-center gap-0.5 text-emerald-700 bg-emerald-100 px-1 py-0.2 rounded-xs text-[10px] font-bold">
+                              <ArrowDown className="w-3 h-3" /> Newest
+                            </span>
+                          ) : userSortBy === 'oldest' ? (
+                            <span className="inline-flex items-center gap-0.5 text-amber-700 bg-amber-100 px-1 py-0.2 rounded-xs text-[10px] font-bold">
+                              <ArrowUp className="w-3 h-3" /> Oldest
+                            </span>
+                          ) : (
+                            <Clock className="w-3 h-3 text-[#8c8f94] group-hover:text-[#2271b1]" />
+                          )}
+                        </div>
+                      </th>
+
                       <th className="py-2.5 px-3 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#f0f0f1]">
                     {filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-8 text-center text-[#646970]">
+                        <td colSpan={9} className="py-8 text-center text-[#646970]">
                           No users found matching current filter criteria.
                         </td>
                       </tr>
@@ -2039,6 +2242,40 @@ export default function AdminDashboard({
                               }`}>
                                 {u.userRole || 'Parent'}
                               </span>
+                            </td>
+
+                            {/* Registered Date & Relative Badge */}
+                            <td className="py-3 px-3">
+                              {(() => {
+                                const reg = formatRegistrationDate(u);
+                                const fullTimestamp = u.createdAt || u.registeredAt || u.capturedAt || (getUserRegistrationTime(u) ? new Date(getUserRegistrationTime(u)).toISOString() : null);
+                                return (
+                                  <div 
+                                    className="space-y-0.5" 
+                                    title={fullTimestamp ? `Registered: ${new Date(fullTimestamp).toLocaleString()}` : 'Registered on Vernunt'}
+                                  >
+                                    <div className="flex items-center gap-1 font-semibold text-[#1d2327]">
+                                      <Calendar className="w-3 h-3 text-[#646970] shrink-0" />
+                                      <span className="font-mono text-[11px]">{reg.dateStr}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 rounded-xs text-[9.5px] font-bold ${
+                                        reg.isRecent 
+                                          ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' 
+                                          : 'bg-[#f0f0f1] text-[#646970]'
+                                      }`}>
+                                        <Clock className="w-2.5 h-2.5" />
+                                        {reg.relativeStr}
+                                      </span>
+                                      {reg.isRecent && (
+                                        <span className="text-[9px] text-emerald-700 font-extrabold tracking-tight">
+                                          ⚡ NEW
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Status */}
@@ -3681,7 +3918,14 @@ export default function AdminDashboard({
                 <h2 className="font-bold text-sm text-[#1d2327]">
                   Edit User & KYC Verification: {selectedUser.parentName}
                 </h2>
-                <span className="text-[10px] text-[#646970] font-mono">User ID: {selectedUser.id}</span>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                  <span className="text-[10px] text-[#646970] font-mono">User ID: {selectedUser.id}</span>
+                  <span className="text-[#dcdcde]">•</span>
+                  <span className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-xs">
+                    <Clock className="w-2.5 h-2.5 text-emerald-700" />
+                    Joined: {selectedUser.createdAt || selectedUser.registeredAt ? new Date(selectedUser.createdAt || selectedUser.registeredAt!).toLocaleString() : 'Registered User'}
+                  </span>
+                </div>
               </div>
               <button
                 type="button"

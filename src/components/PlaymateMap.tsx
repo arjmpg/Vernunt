@@ -151,9 +151,10 @@ export default function PlaymateMap({
   const allMapItems = useMemo<MapItem[]>(() => {
     const items: MapItem[] = [];
 
-    // 1. Playmates
+    // 1. Playmates (limit to top 60 nearest for silky smooth map clustering & rendering)
     if (showPlaymatesOverlay) {
-      playmates.forEach((p, idx) => {
+      const topPlaymates = playmates.slice(0, 60);
+      topPlaymates.forEach((p, idx) => {
         let x = 50;
         let y = 50;
         if (p.location?.lat && p.location?.lng) {

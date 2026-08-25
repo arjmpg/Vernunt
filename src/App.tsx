@@ -46,6 +46,14 @@ import GoogleAccountSelectModal from './components/GoogleAccountSelectModal.tsx'
 import ProximityAlertToast, { ProximityAlert, playSubtleProximityChime } from './components/ProximityAlertToast.tsx';
 import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
 import EventOrganizerCheckInStation from './components/events/EventOrganizerCheckInStation.tsx';
+import ActivityFeedWidget from './components/ActivityFeedWidget.tsx';
+import SyncOutboxDrawer, { SyncStatusBadge } from './components/SyncOutboxDrawer.tsx';
+import { 
+  queueConnectionRequest, 
+  queueAcceptConnection, 
+  queueCareBooking, 
+  queueCareStatusUpdate 
+} from './utils/syncOutbox.ts';
 
 // Icons
 import { 
@@ -180,6 +188,35 @@ export default function App() {
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
   const [mapOrRadarView, setMapOrRadarView] = useState<'list' | 'radar' | 'map'>('list');
 
+  // Open-access Knowledge Base state for unregistered/guest users
+  const [isGuestViewingKnowledge, setIsGuestViewingKnowledge] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      const guide = params.get('guide') || params.get('article') || params.get('slug');
+      const path = window.location.pathname;
+      return tab === 'knowledge' || !!guide || path.startsWith('/knowledge') || path.startsWith('/guide');
+    } catch {
+      return false;
+    }
+  });
+  const [guestKnowledgeSlug, setGuestKnowledgeSlug] = useState<string | undefined>(() => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const guide = params.get('guide') || params.get('article') || params.get('slug');
+      const path = window.location.pathname;
+      if (guide) return guide;
+      if (path.startsWith('/knowledge/') || path.startsWith('/guide/')) {
+        return path.split('/')[2] || undefined;
+      }
+    } catch (e) {
+      console.debug('Failed to parse initial knowledge slug:', e);
+    }
+    return undefined;
+  });
+
   // Multilingual localization state
   const [language, setLanguage] = useState<LanguageCode>(() => {
     if (typeof window !== 'undefined') {
@@ -201,6 +238,7 @@ export default function App() {
   };
 
   const [isOffline, setIsOffline] = useState<boolean>(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [isOutboxDrawerOpen, setIsOutboxDrawerOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -277,12 +315,28 @@ export default function App() {
 
       const targetTab = params.get('tab');
       const targetEventId = params.get('eventId') || params.get('event');
+      const guideSlug = params.get('guide') || params.get('article') || params.get('slug');
+      const path = window.location.pathname;
+
       if (targetTab === 'events' || targetEventId) {
         setActiveTab('events');
       } else if (targetTab === 'affiliate') {
         setActiveTab('affiliate');
       } else if (targetTab === 'specialists') {
         setActiveTab('specialists');
+      } else if (targetTab === 'knowledge' || guideSlug || path.startsWith('/knowledge') || path.startsWith('/guide')) {
+        let extractedSlug = guideSlug;
+        if (!extractedSlug && (path.startsWith('/knowledge/') || path.startsWith('/guide/'))) {
+          extractedSlug = path.split('/')[2] || null;
+        }
+        if (extractedSlug) {
+          setGuestKnowledgeSlug(extractedSlug);
+        }
+        if (userProfile) {
+          setActiveTab('knowledge');
+        } else {
+          setIsGuestViewingKnowledge(true);
+        }
       }
     } catch (err) {
       console.error('Failed to parse URL referral/tab parameter:', err);
@@ -978,6 +1032,14 @@ export default function App() {
       }
       return updated;
     });
+
+    // Enqueue to background sync outbox for offline persistence & Firebase push
+    try {
+      queueCareBooking(newBooking);
+    } catch (err) {
+      console.debug('Sync outbox care booking note:', err);
+    }
+
     triggerToast(`🍼 Sitting request sent to ${newBooking.providerName}!`, "Care Request Sent");
   };
 
@@ -1006,16 +1068,26 @@ export default function App() {
       }
       return updated;
     });
+
+    // Enqueue status update to sync outbox
+    try {
+      queueCareStatusUpdate(bookingId, newStatus, logNote);
+    } catch (err) {
+      console.debug('Sync outbox care status update note:', err);
+    }
+
     triggerToast(`Session status updated: ${newStatus}`, "Care Status");
   };
 
   // Filter criteria states (with KMs as range criteria)
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(3.0); // Default 3.0 KM scan radius
+  const deferredMaxDistanceKm = React.useDeferredValue(maxDistanceKm);
   const [filterPlayStyle, setFilterPlayStyle] = useState<string>('All');
   const [filterAgeGroup, setFilterAgeGroup] = useState<string>('All');
   const [filterGender, setFilterGender] = useState<string>('All');
   const [filterLanguage, setFilterLanguage] = useState<string>('All');
   const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
+  const deferredSearchQuery = React.useDeferredValue(filterSearchQuery);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
   
   // Custom precise filters requested by user:
@@ -1501,6 +1573,13 @@ export default function App() {
         localStorage.setItem('vernunt_connected_ids', JSON.stringify(updatedConn));
         localStorage.setItem('vernunt_interests_received', JSON.stringify(updatedRecv));
 
+        // Enqueue to background sync outbox for offline resilience and Firebase sync
+        try {
+          queueAcceptConnection(partnerId, userProfile);
+        } catch (err) {
+          console.debug('Sync outbox accept note:', err);
+        }
+
         confetti({
           particleCount: 100,
           spread: 60,
@@ -1528,6 +1607,14 @@ export default function App() {
         const updatedSent = [...interestsSent, partnerId];
         setInterestsSent(updatedSent);
         localStorage.setItem('vernunt_interests_sent', JSON.stringify(updatedSent));
+
+        // Enqueue to background sync outbox
+        try {
+          queueConnectionRequest(partnerId, userProfile);
+        } catch (err) {
+          console.debug('Sync outbox connect note:', err);
+        }
+
         triggerToast("💌 Connect request sent to parent! Awaiting guardian review & approval...", "Request Sent (Pending)");
       }
     );
@@ -1888,124 +1975,160 @@ export default function App() {
     }
   };
 
-  // Filter playmates list in Kilometers and other required criteria
-  const filteredPlaymates = playmates.filter((p) => {
-    // Exclude if parent or profile is blocked by user locally
-    if (blockedIds.includes(p.id)) return false;
+  // Filter playmates list in Kilometers and other required criteria (Memoized for high-fps performance)
+  const filteredPlaymates = React.useMemo(() => {
+    const cleanQuery = deferredSearchQuery.trim().toLowerCase();
+    const hasInterests = selectedInterests.length > 0;
+    const lowerInterests = hasInterests ? selectedInterests.map(i => i.toLowerCase()) : [];
+    const hasActivities = selectedPreferredActivities.length > 0;
+    const lowerActivities = hasActivities ? selectedPreferredActivities.map(a => a.toLowerCase()) : [];
+    const targetLang = filterLanguage !== 'All' ? filterLanguage.split('/')[0].trim().toLowerCase() : '';
+    const now = Date.now();
 
-    // Exclude if parent or profile is blocked/suspended by admin
-    if (p.isBlocked) return false;
+    const results: (ChildProfile & { _cachedDistance: number })[] = [];
 
-    // 1. Distance filter (in kilometers instead of miles)
-    const distanceKm = getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
-    if (distanceKm > maxDistanceKm) return false;
+    for (let i = 0; i < playmates.length; i++) {
+      const p = playmates[i];
+      // Exclude if parent or profile is blocked by user locally
+      if (blockedIds.includes(p.id)) continue;
 
-    // 2. Play style filter
-    if (filterPlayStyle !== 'All') {
-      const pStyleLower = p.playStyle.toLowerCase();
-      const fStyleLower = filterPlayStyle.toLowerCase();
-      if (filterPlayStyle === 'Outdoor') {
-        if (!pStyleLower.includes('outdoor') && !pStyleLower.includes('sporty')) return false;
-      } else if (filterPlayStyle === 'Indoor') {
-        if (!pStyleLower.includes('indoor') && !pStyleLower.includes('quiet') && !pStyleLower.includes('creative')) return false;
-      } else {
-        if (!pStyleLower.includes(fStyleLower)) return false;
+      // Exclude if parent or profile is blocked/suspended by admin
+      if (p.isBlocked) continue;
+
+      // 1. Distance filter (in kilometers)
+      const distanceKm = getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
+      if (distanceKm > deferredMaxDistanceKm) continue;
+
+      // 2. Play style filter
+      if (filterPlayStyle !== 'All') {
+        const pStyleLower = p.playStyle.toLowerCase();
+        const fStyleLower = filterPlayStyle.toLowerCase();
+        if (filterPlayStyle === 'Outdoor') {
+          if (!pStyleLower.includes('outdoor') && !pStyleLower.includes('sporty')) continue;
+        } else if (filterPlayStyle === 'Indoor') {
+          if (!pStyleLower.includes('indoor') && !pStyleLower.includes('quiet') && !pStyleLower.includes('creative')) continue;
+        } else {
+          if (!pStyleLower.includes(fStyleLower)) continue;
+        }
       }
-    }
 
-    // 3. Age bracket category group matching (can coexist or act as preset)
-    if (filterAgeGroup !== 'All') {
-      const age = p.childAge;
-      if (filterAgeGroup === 'Infant' && (age < 0 || age > 1)) return false;
-      if (filterAgeGroup === 'Toddler' && (age < 1 || age > 2)) return false;
-      if (filterAgeGroup === 'Preschool' && (age < 3 || age > 4)) return false;
-      if (filterAgeGroup === 'Kindergarten' && (age < 5 || age > 6)) return false;
-      if (filterAgeGroup === 'SchoolAge' && age < 7) return false;
-    }
-
-    // Precise continuous age range filter:
-    if (p.childAge < filterMinAge || p.childAge > filterMaxAge) return false;
-
-    // 4. Gender filter
-    if (filterGender !== 'All' && p.childGender !== filterGender) return false;
-
-    // 5. Language barrier/Demographic filter
-    if (filterLanguage !== 'All') {
-      const targetLang = filterLanguage.split('/')[0].trim().toLowerCase();
-      const languages = p.languagesKnown || [];
-      const matchesKnown = languages.some(l => {
-        const lNorm = l.toLowerCase().trim();
-        return lNorm.includes(targetLang) || targetLang.includes(lNorm);
-      });
-      const matchesMother = p.motherTongue ? (
-        p.motherTongue.toLowerCase().trim().includes(targetLang) || targetLang.includes(p.motherTongue.toLowerCase().trim())
-      ) : false;
-      if (!matchesKnown && !matchesMother) return false;
-    }
-
-    // 6. Fuzzy text matching (Name, Interests, Bio, Parent Profession)
-    if (filterSearchQuery.trim()) {
-      const query = filterSearchQuery.toLowerCase().trim();
-      const nameMatch = p.childName.toLowerCase().includes(query) || p.parentName.toLowerCase().includes(query);
-      const interestMatch = p.interests.some(el => el.toLowerCase().includes(query));
-      const bioMatch = p.bio?.toLowerCase().includes(query) || false;
-      const professionMatch = p.parentProfession?.toLowerCase().includes(query) || false;
-      if (!nameMatch && !interestMatch && !bioMatch && !professionMatch) return false;
-    }
-
-    // 7. Days of availability filter
-    if (filterAvailableDay !== 'All') {
-      const days = p.availableDays || [];
-      if (!days.includes(filterAvailableDay)) return false;
-    }
-
-    // 8. Times of availability filter
-    if (filterAvailableTime !== 'All') {
-      const times = p.availableTimes || [];
-      if (!times.includes(filterAvailableTime)) return false;
-    }
-
-    // 9. Shared Interests tag click filtering
-    if (selectedInterests.length > 0) {
-      const pInterestsLower = (p.interests || []).map(i => i.toLowerCase());
-      const hasMatch = selectedInterests.some(sel => 
-        pInterestsLower.some(pi => pi.includes(sel.toLowerCase()))
-      );
-      if (!hasMatch) return false;
-    }
-
-    // 10. Preferred Activities filtering
-    if (selectedPreferredActivities.length > 0) {
-      const pActLower = (p.preferredActivities || []).map(a => a.toLowerCase());
-      const hasMatch = selectedPreferredActivities.some(sel => 
-        pActLower.some(pa => pa.includes(sel.toLowerCase()))
-      );
-      if (!hasMatch) return false;
-    }
-
-    // 11. Connected Friends Only filter
-    if (filterOnlyConnected && !connectedIds.includes(p.id)) return false;
-
-    // 12. Saved Profiles Only filter
-    if (filterOnlySaved && !savedProfileIds.includes(p.id)) return false;
-
-    // 13. Activity Recency filter (Active last 24 hrs / Active 1 week / Currently Active)
-    if (filterActivityRecency !== 'All') {
-      const now = Date.now();
-      const lastActiveMs = p.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
-      const hoursDiff = lastActiveMs > 0 ? (now - lastActiveMs) / (1000 * 3600) : 9999;
-
-      if (filterActivityRecency === 'active24h') {
-        if (hoursDiff > 24 && p.activityStatus !== 'Currently Active') return false;
-      } else if (filterActivityRecency === 'active1w') {
-        if (hoursDiff > 168 && p.activityStatus !== 'Currently Active' && p.activityStatus !== 'Available for Play') return false;
-      } else if (filterActivityRecency === 'currentlyActive') {
-        if (p.activityStatus !== 'Currently Active' && !p.lookingForImmediatePlaydate) return false;
+      // 3. Age bracket category group matching
+      if (filterAgeGroup !== 'All') {
+        const age = p.childAge;
+        if (filterAgeGroup === 'Infant' && (age < 0 || age > 1)) continue;
+        if (filterAgeGroup === 'Toddler' && (age < 1 || age > 2)) continue;
+        if (filterAgeGroup === 'Preschool' && (age < 3 || age > 4)) continue;
+        if (filterAgeGroup === 'Kindergarten' && (age < 5 || age > 6)) continue;
+        if (filterAgeGroup === 'SchoolAge' && age < 7) continue;
       }
+
+      // Precise continuous age range filter
+      if (p.childAge < filterMinAge || p.childAge > filterMaxAge) continue;
+
+      // 4. Gender filter
+      if (filterGender !== 'All' && p.childGender !== filterGender) continue;
+
+      // 5. Language barrier/Demographic filter
+      if (targetLang) {
+        const languages = p.languagesKnown || [];
+        const matchesKnown = languages.some(l => {
+          const lNorm = l.toLowerCase().trim();
+          return lNorm.includes(targetLang) || targetLang.includes(lNorm);
+        });
+        const matchesMother = p.motherTongue ? (
+          p.motherTongue.toLowerCase().trim().includes(targetLang) || targetLang.includes(p.motherTongue.toLowerCase().trim())
+        ) : false;
+        if (!matchesKnown && !matchesMother) continue;
+      }
+
+      // 6. Fuzzy text matching (Name, Interests, Bio, Parent Profession)
+      if (cleanQuery) {
+        const nameMatch = p.childName.toLowerCase().includes(cleanQuery) || p.parentName.toLowerCase().includes(cleanQuery);
+        const interestMatch = p.interests.some(el => el.toLowerCase().includes(cleanQuery));
+        const bioMatch = p.bio?.toLowerCase().includes(cleanQuery) || false;
+        const professionMatch = p.parentProfession?.toLowerCase().includes(cleanQuery) || false;
+        if (!nameMatch && !interestMatch && !bioMatch && !professionMatch) continue;
+      }
+
+      // 7. Days of availability filter
+      if (filterAvailableDay !== 'All') {
+        const days = p.availableDays || [];
+        if (!days.includes(filterAvailableDay)) continue;
+      }
+
+      // 8. Times of availability filter
+      if (filterAvailableTime !== 'All') {
+        const times = p.availableTimes || [];
+        if (!times.includes(filterAvailableTime)) continue;
+      }
+
+      // 9. Shared Interests tag click filtering
+      if (hasInterests) {
+        const pInterestsLower = (p.interests || []).map(item => item.toLowerCase());
+        const hasMatch = lowerInterests.some(sel => 
+          pInterestsLower.some(pi => pi.includes(sel))
+        );
+        if (!hasMatch) continue;
+      }
+
+      // 10. Preferred Activities filtering
+      if (hasActivities) {
+        const pActLower = (p.preferredActivities || []).map(a => a.toLowerCase());
+        const hasMatch = lowerActivities.some(sel => 
+          pActLower.some(pa => pa.includes(sel))
+        );
+        if (!hasMatch) continue;
+      }
+
+      // 11. Connected Friends Only filter
+      if (filterOnlyConnected && !connectedIds.includes(p.id)) continue;
+
+      // 12. Saved Profiles Only filter
+      if (filterOnlySaved && !savedProfileIds.includes(p.id)) continue;
+
+      // 13. Activity Recency filter
+      if (filterActivityRecency !== 'All') {
+        const lastActiveMs = p.lastActiveAt ? new Date(p.lastActiveAt).getTime() : 0;
+        const hoursDiff = lastActiveMs > 0 ? (now - lastActiveMs) / (1000 * 3600) : 9999;
+
+        if (filterActivityRecency === 'active24h') {
+          if (hoursDiff > 24 && p.activityStatus !== 'Currently Active') continue;
+        } else if (filterActivityRecency === 'active1w') {
+          if (hoursDiff > 168 && p.activityStatus !== 'Currently Active' && p.activityStatus !== 'Available for Play') continue;
+        } else if (filterActivityRecency === 'currentlyActive') {
+          if (p.activityStatus !== 'Currently Active' && !p.lookingForImmediatePlaydate) continue;
+        }
+      }
+
+      results.push({ ...p, _cachedDistance: distanceKm });
     }
 
-    return true;
-  });
+    // Sort ascending by distance
+    results.sort((a, b) => a._cachedDistance - b._cachedDistance);
+    return results;
+  }, [
+    playmates,
+    deferredMaxDistanceKm,
+    userLat,
+    userLng,
+    deferredSearchQuery,
+    filterPlayStyle,
+    filterAgeGroup,
+    filterGender,
+    filterLanguage,
+    filterMinAge,
+    filterMaxAge,
+    selectedInterests,
+    selectedPreferredActivities,
+    filterAvailableDay,
+    filterAvailableTime,
+    filterOnlyConnected,
+    filterOnlySaved,
+    filterActivityRecency,
+    blockedIds,
+    connectedIds,
+    savedProfileIds
+  ]);
 
   // Safe selected playmate resolving (defaults to first matching when list changes)
   const activePlaymate = filteredPlaymates.find(p => p.id === selectedPlaymate?.id) || filteredPlaymates[0] || null;
@@ -2041,8 +2164,8 @@ export default function App() {
               setAppMode('dashboard');
               setActiveTab('radar');
             } else {
-              setIsLoading(true);
-              setLoadingTitle('Navigating to landing gateway...');
+              setIsGuestViewingKnowledge(false);
+              setGuestKnowledgeSlug(undefined);
               setAppMode('landing');
             }
           }}
@@ -2147,6 +2270,9 @@ export default function App() {
 
           {appMode === 'dashboard' ? (
             <div className="flex items-center gap-2 sm:gap-3">
+              {/* Background Sync Outbox Badge */}
+              <SyncStatusBadge onClick={() => setIsOutboxDrawerOpen(true)} />
+
               {/* Real-time Push alerts console trigger */}
               <div className="relative">
                 <button
@@ -2285,7 +2411,29 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 sm:gap-3.5 select-none font-sans">
+            <div className="flex items-center gap-2 sm:gap-3 select-none font-sans">
+              <button
+                id="header-btn-knowledge-guest"
+                type="button"
+                onClick={() => {
+                  if (isGuestViewingKnowledge) {
+                    setIsGuestViewingKnowledge(false);
+                    setGuestKnowledgeSlug(undefined);
+                  } else {
+                    setIsGuestViewingKnowledge(true);
+                    setGuestKnowledgeSlug(undefined);
+                  }
+                }}
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                  isGuestViewingKnowledge
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>{isGuestViewingKnowledge ? '← Home' : '1,000+ Guides'}</span>
+              </button>
+
               <a
                 id="header-btn-store-guest"
                 href="https://vernunt.com/store"
@@ -2477,17 +2625,48 @@ export default function App() {
       <main id="app-main" className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8">
         
         {/* Onboarding View Logic */}
-        {appMode === 'landing' && (
+        {appMode === 'landing' && !isGuestViewingKnowledge && (
           <LandingLoginGateway 
             onStartSignUp={handleStartSignUp} 
             onQuickStart={handleQuickStartPlayground} 
             onGoogleSignIn={handleGoogleSignIn}
             onSelectGoogleAccount={handleSelectGoogleAccount}
+            onOpenKnowledgeBase={(slug) => {
+              setIsGuestViewingKnowledge(true);
+              setGuestKnowledgeSlug(slug);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             isAuthenticating={isAuthenticating}
             externalAuthError={authErrorMessage}
             language={language}
             banners={banners.filter(b => b.placement === 'home' && b.active)}
           />
+        )}
+
+        {/* Unregistered / Guest 1000+ Knowledge Base Open View */}
+        {appMode === 'landing' && isGuestViewingKnowledge && (
+          <div className="animate-fade-in">
+            <KnowledgeHub
+              initialSlug={guestKnowledgeSlug}
+              isGuest={true}
+              onNavigateToRadar={(interestKeyword) => {
+                handleStartSignUp('Parent');
+              }}
+              onStartSignUp={(role) => handleStartSignUp((role as any) || 'Parent')}
+              onBackToLanding={() => {
+                setIsGuestViewingKnowledge(false);
+                setGuestKnowledgeSlug(undefined);
+                if (typeof window !== 'undefined' && window.history?.replaceState) {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('tab');
+                  url.searchParams.delete('guide');
+                  url.searchParams.delete('article');
+                  url.searchParams.delete('slug');
+                  window.history.replaceState({}, '', url.toString());
+                }
+              }}
+            />
+          </div>
         )}
 
         {appMode === 'register' && (
@@ -2780,17 +2959,17 @@ export default function App() {
                             <MapPin className="w-3.5 h-3.5 text-rose-700" /> Max Match Radius
                           </label>
                           <span className="text-xs font-mono font-black text-rose-800 bg-rose-50 px-2.5 py-0.5 rounded-lg border border-rose-200">
-                            {maxDistanceKm} km
+                            {maxDistanceKm < 1 ? maxDistanceKm.toFixed(4) : maxDistanceKm.toFixed(1)} km
                           </span>
                         </div>
                         <div className="flex items-center gap-3 pt-1">
-                          <span className="text-[10px] text-slate-400 font-mono">Local</span>
+                          <span className="text-[10px] text-slate-400 font-mono">Local (0.1km)</span>
                           <input
                             id="slider-filter-km-radius"
                             type="range"
-                            min="0.0001"
+                            min="0.1"
                             max="1000"
-                            step="0.0001"
+                            step="0.5"
                             value={maxDistanceKm}
                             onChange={(e) => setMaxDistanceKm(parseFloat(e.target.value))}
                             className="flex-1 accent-rose-700 h-2 bg-rose-100 rounded-lg cursor-pointer"
@@ -3328,8 +3507,37 @@ export default function App() {
                   )}
                 </div>
 
-                {/* Column 3: Playmate details profiling card */}
+                {/* Column 3: Playmate details profiling card & Real-time Activity Feed */}
                 <div id="profile-card-column" className="lg:col-span-1 space-y-5">
+                  {/* Real-time Categorized Activity Feed Widget */}
+                  <ActivityFeedWidget
+                    playmates={playmates}
+                    eventsList={eventsList}
+                    careBookings={careBookings}
+                    proximityAlerts={proximityAlerts}
+                    connectedIds={connectedIds}
+                    interestsSent={interestsSent}
+                    interestsReceived={interestsReceived}
+                    userLat={userLat}
+                    userLng={userLng}
+                    onSelectPlaymate={(p) => {
+                      handleSelectPlaymate(p);
+                      setDetailModalProfile(p);
+                    }}
+                    onNavigateToTab={(tab, subId) => {
+                      setActiveTab(tab as any);
+                      if (subId && tab === 'events') {
+                        setTimeout(() => {
+                          const el = document.getElementById(`event-card-${subId}`);
+                          if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                      }
+                    }}
+                    onAcceptConnection={handleAcceptConnection}
+                    onOpenChat={(p) => handleOpenChatTrigger(p)}
+                    onOpenOutbox={() => setIsOutboxDrawerOpen(true)}
+                  />
+
                   {/* Promotional Campaign/Advertisement Placement: app_sidebar */}
                   {banners.filter(b => b.placement === 'app_sidebar' && b.active).map((b) => (
                     <div 
@@ -3400,7 +3608,7 @@ export default function App() {
                       </div>
                       
                       <div className="flex items-stretch gap-3.5 overflow-x-auto pb-2 scrollbar-thin pt-1">
-                        {filteredPlaymates.map((p) => {
+                        {filteredPlaymates.slice(0, 24).map((p) => {
                           const isSelected = activePlaymate?.id === p.id;
                           const dKm = getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
                           const proxBadge = getProximityBadge(dKm);
@@ -3519,6 +3727,20 @@ export default function App() {
                             </div>
                           );
                         })}
+
+                        {filteredPlaymates.length > 24 && (
+                          <div 
+                            id="roster-view-all-card"
+                            onClick={() => setDashboardSubView('list')}
+                            className="flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed border-rose-200 min-w-[155px] sm:min-w-[175px] max-w-[185px] bg-rose-50/40 text-center cursor-pointer hover:bg-rose-100/50 transition duration-200 group"
+                          >
+                            <span className="w-10 h-10 rounded-full bg-rose-100 group-hover:bg-rose-200 flex items-center justify-center text-rose-700 text-lg font-black mb-2 transition">
+                              +{filteredPlaymates.length - 24}
+                            </span>
+                            <h5 className="text-xs font-black text-rose-900 leading-tight">View All in List View</h5>
+                            <p className="text-[10px] text-rose-600 mt-1 font-medium">Browse all {filteredPlaymates.length} matches</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -3766,6 +3988,7 @@ export default function App() {
               <BillingPortal 
                 userProfile={userProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
+                onNavigateToReferrals={() => setActiveTab('referrals')}
               />
             )}
 
@@ -3881,19 +4104,27 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                if (appMode !== 'dashboard') setAppMode('dashboard');
-                setActiveTab('knowledge');
+                if (userProfile && appMode === 'dashboard') {
+                  setActiveTab('knowledge');
+                } else {
+                  setIsGuestViewingKnowledge(true);
+                  setGuestKnowledgeSlug(undefined);
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              className="hover:text-rose-700 transition cursor-pointer"
+              className="hover:text-rose-700 font-bold transition cursor-pointer text-rose-800"
             >
-              📚 1,000+ Child Growth Guides
+              📚 1,000+ Child Growth Guides (Open Access)
             </button>
             <span>&bull;</span>
             <button
               type="button"
               onClick={() => {
-                if (appMode !== 'dashboard') setAppMode('dashboard');
-                setActiveTab('daycare');
+                if (userProfile && appMode === 'dashboard') {
+                  setActiveTab('daycare');
+                } else {
+                  handleStartSignUp('Parent');
+                }
               }}
               className="hover:text-rose-700 transition cursor-pointer"
             >
@@ -3903,8 +4134,11 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                if (appMode !== 'dashboard') setAppMode('dashboard');
-                setActiveTab('radar');
+                if (userProfile && appMode === 'dashboard') {
+                  setActiveTab('radar');
+                } else {
+                  handleStartSignUp('Parent');
+                }
               }}
               className="hover:text-rose-700 transition cursor-pointer"
             >
@@ -4529,6 +4763,12 @@ export default function App() {
           onClose={() => setShowChildComplianceModal(false)}
         />
       )}
+
+      {/* Background Sync Outbox Drawer */}
+      <SyncOutboxDrawer
+        isOpen={isOutboxDrawerOpen}
+        onClose={() => setIsOutboxDrawerOpen(false)}
+      />
 
       {/* Conditionally Render Animated Loader overlay */}
       {isLoading && (

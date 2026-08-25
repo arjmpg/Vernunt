@@ -37,14 +37,50 @@ import {
 
 interface KnowledgeHubProps {
   initialSlug?: string;
+  isGuest?: boolean;
   onNavigateToRadar?: (interestKeyword?: string) => void;
+  onStartSignUp?: (role?: string) => void;
+  onBackToLanding?: () => void;
 }
 
-export function KnowledgeHub({ initialSlug, onNavigateToRadar }: KnowledgeHubProps) {
+export function KnowledgeHub({ 
+  initialSlug, 
+  isGuest = false,
+  onNavigateToRadar,
+  onStartSignUp,
+  onBackToLanding
+}: KnowledgeHubProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>('All');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(initialSlug || null);
+
+  // Sync initialSlug when prop changes
+  useEffect(() => {
+    if (initialSlug) {
+      setSelectedArticleSlug(initialSlug);
+    }
+  }, [initialSlug]);
+
+  // Update browser URL query parameter when article is selected / deselected
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.history?.replaceState) return;
+    try {
+      const url = new URL(window.location.href);
+      if (selectedArticleSlug) {
+        url.searchParams.set('tab', 'knowledge');
+        url.searchParams.set('guide', selectedArticleSlug);
+      } else {
+        url.searchParams.set('tab', 'knowledge');
+        url.searchParams.delete('guide');
+        url.searchParams.delete('article');
+        url.searchParams.delete('slug');
+      }
+      window.history.replaceState({}, '', url.toString());
+    } catch (e) {
+      console.debug('URL update note:', e);
+    }
+  }, [selectedArticleSlug]);
   const [savedArticles, setSavedArticles] = useState<string[]>(() => {
     try {
       const stored = localStorage.getItem('vernunt_saved_articles');
@@ -184,15 +220,57 @@ export function KnowledgeHub({ initialSlug, onNavigateToRadar }: KnowledgeHubPro
     return (
       <div id="knowledge-article-view" className="max-w-4xl mx-auto space-y-6 pb-16">
         
+        {/* Guest Open Access Top Notice */}
+        {isGuest && (
+          <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white p-3.5 sm:p-4 rounded-2xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs animate-fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">✨</span>
+              <div>
+                <span className="font-black text-sm block">Vernunt Open Knowledge Library (1,000+ Guides)</span>
+                <span className="text-white/90 text-[11.5px]">Free access for all parents. Connect with verified neighborhood families & daycares anytime.</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {onBackToLanding && (
+                <button
+                  type="button"
+                  onClick={onBackToLanding}
+                  className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
+                >
+                  ← Home
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onStartSignUp ? onStartSignUp('Parent') : (onNavigateToRadar && onNavigateToRadar())}
+                className="bg-white text-rose-800 hover:bg-amber-50 text-xs font-black px-4 py-1.5 rounded-xl shadow transition cursor-pointer"
+              >
+                Join Vernunt Free ↗
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Back Navigation Bar */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <button
-            type="button"
-            onClick={() => setSelectedArticleSlug(null)}
-            className="flex items-center gap-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-4 py-2 rounded-xl transition cursor-pointer border border-rose-200"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Knowledge Library ({allArticlesIndex.length}+ Guides)
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSelectedArticleSlug(null)}
+              className="flex items-center gap-2 text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-4 py-2 rounded-xl transition cursor-pointer border border-rose-200"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back to Knowledge Library ({allArticlesIndex.length}+ Guides)
+            </button>
+            {isGuest && onBackToLanding && (
+              <button
+                type="button"
+                onClick={onBackToLanding}
+                className="text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-xl transition cursor-pointer border border-slate-200"
+              >
+                ← Home / Login
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-2">
             <button
@@ -409,13 +487,15 @@ export function KnowledgeHub({ initialSlug, onNavigateToRadar }: KnowledgeHubPro
             <button
               type="button"
               onClick={() => {
-                if (onNavigateToRadar) {
+                if (isGuest && onStartSignUp) {
+                  onStartSignUp('Parent');
+                } else if (onNavigateToRadar) {
                   onNavigateToRadar(currentArticle.category);
                 }
               }}
               className="bg-rose-700 hover:bg-rose-800 text-white text-xs font-black px-5 py-2.5 rounded-xl shadow-md transition cursor-pointer flex items-center gap-1.5 whitespace-nowrap"
             >
-              <Compass className="w-4 h-4" /> Find Matching Playmates
+              <Compass className="w-4 h-4" /> {isGuest ? 'Join Free & Find Playmates' : 'Find Matching Playmates'}
             </button>
           </div>
 
@@ -447,6 +527,37 @@ export function KnowledgeHub({ initialSlug, onNavigateToRadar }: KnowledgeHubPro
   return (
     <div id="knowledge-hub-container" className="space-y-6 pb-16">
       
+      {/* Guest Open Access Top Notice */}
+      {isGuest && (
+        <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 text-white p-3.5 sm:p-4 rounded-2xl shadow-md flex flex-col sm:flex-row items-center justify-between gap-3 text-xs animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <span className="text-xl">✨</span>
+            <div>
+              <span className="font-black text-sm block">Vernunt Open Knowledge Library (1,000+ Guides)</span>
+              <span className="text-white/90 text-[11.5px]">Free access for all parents & caregivers. Ready to find local playmates and daycares?</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onBackToLanding && (
+              <button
+                type="button"
+                onClick={onBackToLanding}
+                className="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition cursor-pointer"
+              >
+                ← Home / Login
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onStartSignUp ? onStartSignUp('Parent') : (onNavigateToRadar && onNavigateToRadar())}
+              className="bg-white text-rose-800 hover:bg-amber-50 text-xs font-black px-4 py-1.5 rounded-xl shadow transition cursor-pointer"
+            >
+              Join Vernunt Free ↗
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Search Header */}
       <div className="bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
         <div className="relative z-10 max-w-3xl space-y-4">

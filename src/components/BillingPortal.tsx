@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 interface BillingPortalProps {
   userProfile: ChildProfile | null;
   onUpdateUserProfile: (updated: ChildProfile) => void;
+  onNavigateToReferrals?: () => void;
 }
 
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -25,7 +26,7 @@ const loadRazorpayScript = (): Promise<boolean> => {
   });
 };
 
-export default function BillingPortal({ userProfile, onUpdateUserProfile }: BillingPortalProps) {
+export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavigateToReferrals }: BillingPortalProps) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -361,6 +362,46 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile }: Bill
           <span>⚠️ {errorMessage}</span>
         </div>
       )}
+
+      {/* Refer & Get Free Subscription Hero Card */}
+      <div id="referral-subscription-promo" className="bg-gradient-to-r from-amber-500/15 via-orange-500/20 to-amber-500/15 border-2 border-amber-400/90 rounded-3xl p-5 sm:p-6 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-5">
+        <div className="flex items-center gap-4 text-left">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-2xl shrink-0 shadow-sm">
+            🎁
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase font-black tracking-widest text-amber-900 bg-amber-200/80 px-2.5 py-0.5 rounded-full">
+                Special Parent Reward
+              </span>
+              <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                100% Free
+              </span>
+            </div>
+            <h3 className="text-base sm:text-lg font-black text-slate-900 font-serif mt-1">
+              Refer &amp; Get Free 1-Year Subscription!
+            </h3>
+            <p className="text-xs text-slate-600 font-medium mt-0.5">
+              Invite 1 parent friend or playmate family to Vernunt. When they sign up, you both unlock 1 Full Year of Vernunt Premium Connect (worth ₹2,499) completely free!
+            </p>
+          </div>
+        </div>
+        {onNavigateToReferrals ? (
+          <button
+            type="button"
+            id="btn-billing-go-to-referrals"
+            onClick={onNavigateToReferrals}
+            className="w-full sm:w-auto px-5 py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white text-xs font-black rounded-2xl transition cursor-pointer shadow-md shadow-orange-500/20 shrink-0 flex items-center justify-center gap-2 active:scale-95"
+          >
+            <Gift className="w-4 h-4" />
+            <span>Open Referral Portal</span>
+          </button>
+        ) : (
+          <div className="w-full sm:w-auto px-4 py-2.5 bg-white border border-amber-300 text-amber-950 text-xs font-black rounded-2xl shrink-0 text-center">
+            Referral Code: <span className="font-mono text-orange-600">{userProfile?.referralCode || 'VERNUNT2025'}</span>
+          </div>
+        )}
+      </div>
 
       {/* Grid: 4 Pricing Packages */}
       <div className="space-y-4">

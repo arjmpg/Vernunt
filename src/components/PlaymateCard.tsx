@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
-import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock } from 'lucide-react';
+import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 
 export function formatLastActive(timestamp?: string): string {
@@ -909,6 +909,31 @@ export default function PlaymateCard({
             </button>
           )}
         </div>
+
+        {/* Refer & Get Free Subscription Badge (When parent is not currently subscribed) */}
+        {!currentUserProfile?.subscriptionActive && (
+          <div 
+            id={`referral-promo-badge-${profile.id}`}
+            onClick={onNavigateToReferrals}
+            className="mt-2.5 p-2 bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-amber-500/10 hover:from-amber-500/20 hover:to-orange-500/20 border border-amber-300/80 rounded-xl flex items-center justify-between gap-2 cursor-pointer transition-all group"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-base group-hover:scale-110 transition-transform shrink-0">🎁</span>
+              <div className="truncate">
+                <span className="text-[10px] font-black text-amber-950 block leading-tight truncate">
+                  Refer & get Free Subscription
+                </span>
+                <span className="text-[8.5px] text-amber-700 font-semibold block leading-tight">
+                  Invite 1 parent friend to unlock 1 Year Free Access!
+                </span>
+              </div>
+            </div>
+            <span className="text-[9px] bg-gradient-to-r from-orange-500 to-amber-500 text-white font-extrabold px-2 py-0.5 rounded-lg shrink-0 shadow-2xs group-hover:shadow-xs flex items-center gap-0.5">
+              <span>Refer</span>
+              <ChevronRight className="w-2.5 h-2.5 inline" />
+            </span>
+          </div>
+        )}
 
         {/* Flag & Block Actions */}
         <div id="flag-row" className="flex items-center justify-between pt-1.5 border-t border-slate-100/50 mt-2 text-[10px] text-slate-400 font-semibold">

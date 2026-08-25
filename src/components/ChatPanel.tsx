@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChildProfile, Message } from '../types.ts';
 import { Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
 import { evaluateChildSafetyText } from '../utils/childSafetyFilter.ts';
+import { queueMessage } from '../utils/syncOutbox.ts';
 
 interface ChatPanelProps {
   playmates: ChildProfile[];
@@ -110,6 +111,13 @@ export default function ChatPanel({
       [companionId]: [...(prev[companionId] || []), userMsg]
     }));
     setInputText('');
+
+    // Push to background sync outbox (handles offline queueing and auto-sync to Firebase)
+    try {
+      queueMessage(companionId, userMsg, userProfile);
+    } catch (e) {
+      console.debug('Sync outbox note:', e);
+    }
 
     // Simulated responses from the other parent!
     setIsTyping(true);

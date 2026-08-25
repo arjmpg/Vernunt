@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
-import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark } from 'lucide-react';
+import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye } from 'lucide-react';
 
 interface PlaymateListViewProps {
   playmates: ChildProfile[];
@@ -38,6 +38,28 @@ export function PlaymateListView({
   const userLat = userProfile?.location?.lat ?? 12.9716;
   const userLng = userProfile?.location?.lng ?? 77.5946;
 
+  // Progressive rendering: initial batch of 24, increment by 24
+  const [displayCount, setDisplayCount] = useState<number>(24);
+
+  // Reset display batch if playmates length changes drastically (e.g. search changed)
+  useEffect(() => {
+    setDisplayCount(24);
+  }, [maxDistanceKm, playmates.length]);
+
+  const visiblePlaymates = useMemo(() => {
+    return playmates.slice(0, displayCount);
+  }, [playmates, displayCount]);
+
+  const hasMore = displayCount < playmates.length;
+
+  const handleLoadMore = () => {
+    setDisplayCount((prev) => Math.min(playmates.length, prev + 24));
+  };
+
+  const handleShowAll = () => {
+    setDisplayCount(playmates.length);
+  };
+
   if (!playmates || playmates.length === 0) {
     return (
       <div className="bg-white rounded-3xl p-8 border border-slate-100 text-center text-slate-400 space-y-3 shadow-xs">
@@ -53,35 +75,40 @@ export function PlaymateListView({
   return (
     <div id="playmates-list-view-container" className="space-y-4">
       {/* List Header */}
-      <div className="flex items-center justify-between bg-white px-5 py-3.5 rounded-3xl border border-slate-100 shadow-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white px-5 py-3.5 rounded-3xl border border-slate-100 shadow-xs">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-orange-50 text-orange-600 rounded-2xl border border-orange-100">
             <User className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-xs font-bold text-slate-900 font-serif uppercase tracking-wider">
-              Matching Friends ({playmates.length})
+            <h3 className="text-xs font-bold text-slate-900 font-serif uppercase tracking-wider flex items-center gap-2">
+              <span>Matching Friends</span>
+              <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-sans font-black">
+                {playmates.length}
+              </span>
             </h3>
             <p className="text-[10px] text-slate-400 font-medium">
-              Verified local families within {maxDistanceKm.toFixed(1)} km
+              Showing {visiblePlaymates.length} of {playmates.length} families within {maxDistanceKm.toFixed(1)} km
             </p>
           </div>
         </div>
 
-        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5">
-          <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
-          <span>Live Proximity</span>
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5">
+            <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+            <span>Live Proximity</span>
+          </span>
+        </div>
       </div>
 
       {/* Grid of Friends Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {playmates.map((p) => {
+        {visiblePlaymates.map((p) => {
           const isSelected = selectedPlaymateId === p.id;
           const isConnected = connectedIds.includes(p.id);
           const isSent = interestsSent.includes(p.id);
           const isReceived = interestsReceived.includes(p.id);
-          const dKm = getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
+          const dKm = (p as any)._cachedDistance ?? getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
           const proxBadge = getProximityBadge(dKm);
           const matchResult = calculateMatchScore(userProfile, p);
 
@@ -104,10 +131,11 @@ export function PlaymateListView({
                       alt={`Parent: ${p.parentName}`} 
                       className="w-14 h-14 rounded-2xl object-cover border border-slate-200/80 shadow-xs group-hover:scale-105 transition duration-200"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
                     />
                     {p.childPhotoUrl && (
                       <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full overflow-hidden border-2 border-white shadow-xs bg-slate-100" title={`Child: ${p.childName}`}>
-                        <img src={p.childPhotoUrl} alt={p.childName} className="w-full h-full object-cover" />
+                        <img src={p.childPhotoUrl} alt={p.childName} className="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
                     {p.verificationStatus === VerificationStatus.VERIFIED && (
@@ -172,38 +200,38 @@ export function PlaymateListView({
 
                   <button
                     id={`btn-like-friend-${p.id}`}
-                  type="button"
-                  title={
-                    isConnected
-                      ? "Connected Friend"
-                      : isSent
-                      ? "Connection Request Sent"
-                      : isReceived
-                      ? "Likes You - Click to Connect"
-                      : "Like & Connect with Playmate"
-                  }
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isReceived) {
-                      onAcceptConnection(p.id);
-                    } else if (!isSent && !isConnected) {
-                      onSendConnection(p.id);
+                    type="button"
+                    title={
+                      isConnected
+                        ? "Connected Friend"
+                        : isSent
+                        ? "Connection Request Sent"
+                        : isReceived
+                        ? "Likes You - Click to Connect"
+                        : "Like & Connect with Playmate"
                     }
-                  }}
-                  className={`p-2.5 rounded-2xl transition duration-200 cursor-pointer border shadow-xs flex items-center justify-center shrink-0 ${
-                    isConnected
-                      ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
-                      : isSent
-                      ? 'bg-rose-50 text-rose-500 border-rose-200'
-                      : isReceived
-                      ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 animate-bounce'
-                      : 'bg-white text-slate-400 border-slate-200 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200'
-                  }`}
-                >
-                  <Heart className={`w-5 h-5 ${isConnected || isSent || isReceived ? 'fill-current' : ''}`} />
-                </button>
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isReceived) {
+                        onAcceptConnection(p.id);
+                      } else if (!isSent && !isConnected) {
+                        onSendConnection(p.id);
+                      }
+                    }}
+                    className={`p-2.5 rounded-2xl transition duration-200 cursor-pointer border shadow-xs flex items-center justify-center shrink-0 ${
+                      isConnected
+                        ? 'bg-emerald-500 text-white border-emerald-500 hover:bg-emerald-600'
+                        : isSent
+                        ? 'bg-rose-50 text-rose-500 border-rose-200'
+                        : isReceived
+                        ? 'bg-amber-500 text-white border-amber-500 hover:bg-amber-600 animate-bounce'
+                        : 'bg-white text-slate-400 border-slate-200 hover:text-rose-500 hover:bg-rose-50 hover:border-rose-200'
+                    }`}
+                  >
+                    <Heart className={`w-5 h-5 ${isConnected || isSent || isReceived ? 'fill-current' : ''}`} />
+                  </button>
+                </div>
               </div>
-            </div>
 
               {/* Bio & Interests */}
               <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed mb-3 bg-slate-50/70 p-2.5 rounded-2xl border border-slate-150/60 font-medium">
@@ -252,6 +280,37 @@ export function PlaymateListView({
           );
         })}
       </div>
+
+      {/* Pagination & Load More Controls */}
+      {hasMore && (
+        <div id="playmates-list-load-more-bar" className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 bg-white rounded-3xl border border-slate-100 shadow-xs mt-4">
+          <div className="text-xs text-slate-500 font-medium">
+            Showing <strong className="text-slate-800">{visiblePlaymates.length}</strong> of <strong className="text-slate-800">{playmates.length}</strong> compatible playmates
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-load-more-playmates"
+              type="button"
+              onClick={handleLoadMore}
+              className="px-4 py-2 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold text-xs rounded-xl border border-orange-200/80 transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+              <span>Load More (+24)</span>
+            </button>
+
+            <button
+              id="btn-show-all-playmates"
+              type="button"
+              onClick={handleShowAll}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Eye className="w-3.5 h-3.5 text-orange-400" />
+              <span>Show All ({playmates.length})</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

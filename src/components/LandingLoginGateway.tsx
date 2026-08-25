@@ -43,6 +43,7 @@ interface LandingLoginGatewayProps {
   onQuickStart: () => void;
   onGoogleSignIn?: () => void;
   onSelectGoogleAccount?: (account: { email: string; displayName: string; photoURL?: string; role?: string }) => void;
+  onOpenKnowledgeBase?: (slug?: string) => void;
   isAuthenticating?: boolean;
   externalAuthError?: string;
   language?: LanguageCode;
@@ -57,6 +58,7 @@ export default function LandingLoginGateway({
   onQuickStart,
   onGoogleSignIn,
   onSelectGoogleAccount,
+  onOpenKnowledgeBase,
   isAuthenticating = false,
   externalAuthError = '',
   language = 'en',
@@ -629,11 +631,22 @@ export default function LandingLoginGateway({
               </div>
             </div>
 
-            <div className="flex gap-3 bg-white p-3 rounded-xl border border-orange-50/40">
-              <BookOpen className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
-              <div>
-                <h4 className="font-bold text-xs text-slate-800">1,000+ Child Growth Guides & Nutrition Blueprints</h4>
-                <p className="text-[11px] text-slate-500">Evidence-based clinical guides on toddler brain foods, psychology, homeschooling futures, and baby sports.</p>
+            <div 
+              onClick={() => onOpenKnowledgeBase && onOpenKnowledgeBase()}
+              className="flex gap-3 bg-gradient-to-r from-rose-50/80 to-amber-50/80 p-3.5 rounded-xl border border-rose-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition cursor-pointer group"
+            >
+              <BookOpen className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 group-hover:scale-110 transition" />
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-1">
+                  <h4 className="font-bold text-xs text-rose-950 flex items-center gap-1.5">
+                    <span>1,000+ Child Growth Guides & Blueprints</span>
+                    <span className="bg-rose-600 text-white text-[8px] font-extrabold px-1.5 py-0.2 rounded uppercase tracking-wider">Free Open Access</span>
+                  </h4>
+                  <span className="text-[11px] font-extrabold text-rose-700 group-hover:translate-x-0.5 transition hidden sm:inline">
+                    Read ↗
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-0.5">Evidence-based clinical guides on toddler brain foods, psychology, homeschooling, and motor development. No login required!</p>
               </div>
             </div>
           </div>

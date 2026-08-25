@@ -17,10 +17,10 @@ jobs:
       - name: Checkout Codebase
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
       - name: Install Dependencies
@@ -29,10 +29,12 @@ jobs:
       - name: Generate Fresh Daily Sitemap & Build Production Artifacts
         run: npm run build
 
-      - name: Deploy to Firebase Hosting / Cloud Run
-        uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0519197985 }}'
-          channelId: live
-          projectId: gen-lang-client-0519197985
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GEN_LANG_CLIENT_0519197985 }}
+
+      - name: Deploy to Firebase Hosting
+        run: npx firebase-tools deploy --only hosting --project gen-lang-client-0519197985 --non-interactive
+

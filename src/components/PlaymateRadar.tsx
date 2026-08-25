@@ -29,20 +29,10 @@ export default function PlaymateRadar({
   selectedPlaymateId, 
   maxDistanceKm 
 }: PlaymateRadarProps) {
-  const [sweepAngle, setSweepAngle] = useState<number>(0);
-  
   // Custom Radar Zoom state (0.5x to 2.5x, default 1.0x)
   const [zoomLevel, setZoomLevel] = useState<number>(1.0);
   const [showZoomSlider, setShowZoomSlider] = useState<boolean>(false);
   const radarScreenRef = useRef<HTMLDivElement>(null);
-
-  // Sweep animation
-  useEffect(() => {
-    const handle = setInterval(() => {
-      setSweepAngle((prev) => (prev + 2) % 360);
-    }, 30);
-    return () => clearInterval(handle);
-  }, []);
 
   // Zoom In handler (step +0.25x up to 2.5x)
   const handleZoomIn = () => {
@@ -70,10 +60,8 @@ export default function PlaymateRadar({
   // Mouse wheel zoom over radar screen
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (e.deltaY < 0) {
-      // Scrolling up -> Zoom In
       setZoomLevel((prev) => Math.min(2.5, Math.round((prev + 0.1) * 100) / 100));
     } else if (e.deltaY > 0) {
-      // Scrolling down -> Zoom Out
       setZoomLevel((prev) => Math.max(0.5, Math.round((prev - 0.1) * 100) / 100));
     }
   };
@@ -84,6 +72,39 @@ export default function PlaymateRadar({
 
   // Effective visible distance range calculated with current zoom
   const effectiveScanRadiusKm = (maxDistanceKm / zoomLevel).toFixed(1);
+
+  // Memoize rendered radar nodes and limit to top 35 nearest for silky smooth performance
+  const visibleNodes = React.useMemo(() => {
+    const subset = playmates.slice(0, 35);
+    return subset.map((p, index) => {
+      const dLat = (p.location.lat - centerLat) * 800;
+      const dLng = (p.location.lng - centerLng) * 800;
+      const rawDistKm = getHaversineDistance(
+        centerLat,
+        centerLng,
+        p.location.lat,
+        p.location.lng
+      );
+      const proxBadge = getProximityBadge(rawDistKm);
+      const baseDist = Math.sqrt(dLat * dLat + dLng * dLng);
+      const scaledRadius = Math.min(135, (baseDist * zoomLevel) + (28 * zoomLevel));
+      const angle = Math.atan2(dLat, dLng) + (index * 0.2);
+
+      const x = 160 + scaledRadius * Math.cos(angle);
+      const y = 160 + scaledRadius * Math.sin(angle);
+      const isSelected = selectedPlaymateId === p.id;
+      const distLabel = `${proxBadge.distanceText} (${proxBadge.label})`;
+
+      return {
+        profile: p,
+        x,
+        y,
+        isSelected,
+        proxBadge,
+        distLabel
+      };
+    });
+  }, [playmates, centerLat, centerLng, zoomLevel, selectedPlaymateId]);
 
   return (
     <div id="playmate-radar-section" className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col items-center text-left">
@@ -249,9 +270,10 @@ export default function PlaymateRadar({
           {/* Dynamic sweeping overlay */}
           <div 
             id="radar-sweep"
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none animate-spin"
             style={{
-              background: `conic-gradient(from ${sweepAngle}deg, rgba(249, 115, 22, 0.18) 0deg, rgba(249, 115, 22, 0.04) 90deg, transparent 180deg)`,
+              animationDuration: '4s',
+              background: `conic-gradient(from 0deg, rgba(249, 115, 22, 0.22) 0deg, rgba(249, 115, 22, 0.05) 90deg, transparent 180deg)`,
               borderRadius: '50%'
             }}
           ></div>
@@ -312,33 +334,8 @@ export default function PlaymateRadar({
             </span>
           </div>
 
-          {/* Other playmate nodes (Coordinates calculated and scaled with zoomLevel) */}
-          {playmates.map((p, index) => {
-            // Calculate relative projection
-            const dLat = (p.location.lat - centerLat) * 800; // Scaled
-            const dLng = (p.location.lng - centerLng) * 800; // Scaled
-
-            // Distance calculation
-            const rawDistKm = getHaversineDistance(
-              centerLat,
-              centerLng,
-              p.location.lat,
-              p.location.lng
-            );
-            const proxBadge = getProximityBadge(rawDistKm);
-
-            // Scale radius according to zoomLevel
-            const baseDist = Math.sqrt(dLat * dLat + dLng * dLng);
-            const scaledRadius = Math.min(135, (baseDist * zoomLevel) + (28 * zoomLevel));
-            const angle = Math.atan2(dLat, dLng) + (index * 0.2); // Add slight shift
-
-            // Coordinate calculation centered on (160, 160)
-            const x = 160 + scaledRadius * Math.cos(angle);
-            const y = 160 + scaledRadius * Math.sin(angle);
-
-            const isSelected = selectedPlaymateId === p.id;
-            const distLabel = `${proxBadge.distanceText} (${proxBadge.label})`;
-
+          {/* Other playmate nodes (Scaled and memoized for ultra-fast response) */}
+          {visibleNodes.map(({ profile: p, x, y, isSelected, proxBadge, distLabel }) => {
             return (
               <button
                 id={`radar-node-${p.id}`}

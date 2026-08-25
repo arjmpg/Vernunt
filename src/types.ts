@@ -87,6 +87,8 @@ export interface ChildProfile {
   capturedLng?: number; // Exact GPS / network longitude
   capturedLocationInfo?: string; // Capture method / accuracy description
   capturedAt?: string; // Timestamp of IP & location capture
+  createdAt?: string; // ISO 8601 registration / creation timestamp
+  registeredAt?: string; // Alias timestamp for user onboarding date
 
   criminalRecordChecked?: boolean;
   positiveReviewsCount?: number;

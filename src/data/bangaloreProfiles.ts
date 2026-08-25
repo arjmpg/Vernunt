@@ -821,6 +821,8 @@ export function generateBangaloreProfiles(): ChildProfile[] {
         activityStatus: k % 3 === 0 ? 'Currently Active' : 'Available for Play',
         lookingForImmediatePlaydate: k % 4 === 0,
         lastActiveAt: new Date(Date.now() - (k % 24) * 3600 * 1000).toISOString(),
+        createdAt: new Date(Date.now() - ((globalIndex * 71329) % (90 * 24 * 3600 * 1000))).toISOString(),
+        registeredAt: new Date(Date.now() - ((globalIndex * 71329) % (90 * 24 * 3600 * 1000))).toISOString(),
         
         // Babysitting
         offersBabysitting,
