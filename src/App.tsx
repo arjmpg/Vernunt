@@ -256,7 +256,7 @@ export default function App() {
 
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [authErrorMessage, setAuthErrorMessage] = useState<string>('');
-  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional'>('Parent');
+  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>('Parent');
 
   // Dynamic Navigation Tab Placements configured via Admin & Firestore
   const [tabsConfig, setTabsConfig] = useState<{ [key: string]: 'header' | 'side' }>(DEFAULT_TABS_CONFIG);
@@ -1703,7 +1703,7 @@ export default function App() {
 
   // Handle Sign Up with optional pre-verified details
   const handleStartSignUp = (
-    role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional',
+    role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer',
     details?: { phone?: string; email?: string; phoneVerified?: boolean; parentName?: string; photoUrl?: string }
   ) => {
     setIsLoading(true);
@@ -1714,6 +1714,8 @@ export default function App() {
         ? 'Loading Daycare & Creche Center registration workspace...'
         : role === 'Event Organizer'
         ? 'Loading events, class and activities host registration workspace...'
+        : role === 'Influencer'
+        ? 'Loading Creator & Influencer Ambassador registration workspace...'
         : 'Loading professional specialist workspace...'
     );
     setSuggestedRegisterRole(role);

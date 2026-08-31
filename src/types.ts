@@ -111,7 +111,6 @@ export interface ChildProfile {
   positiveReviewsCount?: number;
   attendedEventsCount?: number;
   checkedInEvents?: string[];
-  userRole?: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
   availableDays?: string[];
   availableTimes?: string[];
   

@@ -1174,6 +1174,7 @@ export default function AdminDashboard({
   const pendingCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.PENDING).length;
   const organizerCount = allUsers.filter(u => u.userRole === 'Event Organizer').length;
   const specialistCount = allUsers.filter(u => u.userRole === 'Portfolio Professional').length;
+  const influencerCount = allUsers.filter(u => u.userRole === 'Influencer').length;
   const adminCount = allUsers.filter(u => u.userRole === 'Admin').length;
 
   const filteredUsers = allUsers.filter(u => {
@@ -2701,6 +2702,7 @@ export default function AdminDashboard({
                                 u.userRole === 'Admin' ? 'bg-purple-100 text-purple-800' :
                                 u.userRole === 'Event Organizer' ? 'bg-blue-100 text-blue-800' :
                                 u.userRole === 'Portfolio Professional' ? 'bg-orange-100 text-orange-800' :
+                                u.userRole === 'Influencer' ? 'bg-pink-100 text-pink-800 border border-pink-200' :
                                 'bg-slate-100 text-slate-700'
                               }`}>
                                 {u.userRole || 'Parent'}

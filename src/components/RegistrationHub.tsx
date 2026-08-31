@@ -48,7 +48,7 @@ interface RegistrationHubProps {
   onCompleteSignup: (profile: ChildProfile) => void;
   onCancel: () => void;
   language?: LanguageCode;
-  initialRole?: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional';
+  initialRole?: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer';
   initialPhone?: string;
   initialEmail?: string;
   initialParentName?: string;

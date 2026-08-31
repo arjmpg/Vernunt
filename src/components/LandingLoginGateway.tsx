@@ -37,7 +37,7 @@ import RoleSelectionModal, { UserPlatformRole } from './RoleSelectionModal.tsx';
 
 interface LandingLoginGatewayProps {
   onStartSignUp: (
-    role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional', 
+    role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer', 
     details?: { phone?: string; email?: string; phoneVerified?: boolean }
   ) => void;
   onQuickStart: () => void;
@@ -1151,14 +1151,14 @@ export default function LandingLoginGateway({
                 </div>
               )}
 
-              {/* 3 Separate Registration Pathways */}
+              {/* 5 Distinct Registration Pathways */}
               <div className="pt-2 space-y-3.5 animate-fade-in" id="fallback-login-options">
                 <div className="text-center">
                   <span className="text-[9px] uppercase font-black tracking-widest text-slate-400">— CREATE REPUTABLE COMMUNITY SESSIONS —</span>
                   <div className="text-2xl font-black text-slate-900 tracking-tight mt-1 font-sans">Register as</div>
                 </div>
                 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5">
                   <button
                     type="button"
                     onClick={() => onStartSignUp('Parent')}
@@ -1224,6 +1224,23 @@ export default function LandingLoginGateway({
                     <div className="mt-2">
                       <h4 className="font-extrabold text-[10.5px] leading-none text-slate-800">Specialist Pro</h4>
                       <p className="text-[8.5px] text-slate-500 leading-tight mt-1">Clinics, consulting & schedules. Free listing for 6 Months!</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onStartSignUp('Influencer')}
+                    className="p-3 bg-gradient-to-br from-pink-50 via-rose-50/40 to-purple-50/50 hover:from-pink-100/80 hover:to-purple-100/80 text-pink-950 border border-pink-200/80 rounded-xl transition-all duration-300 text-left flex flex-col justify-between min-h-[120px] cursor-pointer shadow-xs hover:shadow active:scale-97 text-xs relative overflow-hidden"
+                  >
+                    <div className="flex justify-between items-center w-full">
+                      <span className="text-xl">⭐</span>
+                      <span className="text-[8px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500 to-rose-600 text-white px-2 py-0.5 rounded-full shadow-2xs whitespace-nowrap">
+                        🎁 1 Year VIP
+                      </span>
+                    </div>
+                    <div className="mt-2">
+                      <h4 className="font-extrabold text-[10.5px] leading-none text-slate-800">Influencer Ambassador</h4>
+                      <p className="text-[8.5px] text-slate-500 leading-tight mt-1">0% Ticketing Commission, Spotlight feature & 1-Yr Free Pass for followers!</p>
                     </div>
                   </button>
                 </div>
