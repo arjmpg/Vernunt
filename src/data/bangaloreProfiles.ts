@@ -1,4 +1,5 @@
 import { ChildProfile, VerificationStatus, LocationSharing } from '../types.ts';
+import { PARENTS_INCOME_OPTIONS, INDIAN_RELIGIONS, INDIAN_CASTES, CHILD_AVAILABILITY_OPTIONS } from './indianDemographics.ts';
 
 // ============================================================================
 // BANGALORE LOCALITIES & MAJOR GATED COMMUNITIES
@@ -808,6 +809,14 @@ export function generateBangaloreProfiles(): ChildProfile[] {
 
         interests,
         preferredActivities: ['Park Play', 'Indoor Games', 'Art & Craft Activities'],
+        generalAvailability: [
+          CHILD_AVAILABILITY_OPTIONS[(globalIndex + k) % CHILD_AVAILABILITY_OPTIONS.length],
+          CHILD_AVAILABILITY_OPTIONS[(globalIndex + k + 1) % CHILD_AVAILABILITY_OPTIONS.length]
+        ],
+        childPrivacySetting: k % 6 === 0 ? 'first_name_only' : (k % 12 === 0 ? 'connections_only' : 'full'),
+        parentsIncome: PARENTS_INCOME_OPTIONS[(globalIndex + k) % PARENTS_INCOME_OPTIONS.length],
+        religion: INDIAN_RELIGIONS[(globalIndex + k) % (INDIAN_RELIGIONS.length - 1)],
+        caste: INDIAN_CASTES[(globalIndex * 3 + k) % (INDIAN_CASTES.length - 1)],
         photoUrl: parentPhotoUrl,
         parentPhotoUrl,
         childPhotoUrl,

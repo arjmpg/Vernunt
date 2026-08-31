@@ -347,6 +347,153 @@ async function startServer() {
     'Bandra West', 'Powai', 'South Delhi', 'Gurgaon DLF', 'Gachibowli', 'Kothrud', 'Adyar'
   ];
 
+  // =========================================================================
+  // CUSTOM PUBLISHED ARTICLES & DYNAMIC SEO INDEXING STORE
+  // =========================================================================
+  const CUSTOM_ARTICLES_FILE = path.join(process.cwd(), "uploads", "custom-articles.json");
+  const TICKETING_CONFIG_FILE = path.join(process.cwd(), "uploads", "ticketing-config.json");
+
+  const serverCustomArticles: Map<string, any> = new Map();
+  try {
+    if (fs.existsSync(CUSTOM_ARTICLES_FILE)) {
+      const raw = fs.readFileSync(CUSTOM_ARTICLES_FILE, "utf-8");
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        list.forEach((art: any) => {
+          if (art?.slug) serverCustomArticles.set(art.slug, art);
+        });
+      }
+    }
+  } catch (e) {
+    console.warn("[Server Articles Load Warning]:", e);
+  }
+
+  const persistServerArticles = () => {
+    try {
+      const arr = Array.from(serverCustomArticles.values());
+      fs.writeFileSync(CUSTOM_ARTICLES_FILE, JSON.stringify(arr, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[Persist Articles Error]:", err);
+    }
+  };
+
+  // Endpoint to publish or update an article with auto-indexing
+  app.post("/api/knowledge/publish", (req, res) => {
+    try {
+      const { article } = req.body || {};
+      if (!article || !article.slug) {
+        return res.status(400).json({ success: false, error: "Valid article object with slug is required." });
+      }
+
+      serverCustomArticles.set(article.slug, {
+        ...article,
+        publishedDate: article.publishedDate || new Date().toISOString(),
+        lastModified: new Date().toISOString()
+      });
+      persistServerArticles();
+
+      console.log(`[Auto-Indexing & Google SEO] Published & indexed post: "${article.title}" (/knowledge/${article.slug})`);
+
+      // Trigger automatic sitemap generation refresh
+      const today = new Date().toISOString().split("T")[0];
+      const staticXml = buildSitemapXml(today);
+      const publicDir = path.join(process.cwd(), "public");
+      if (fs.existsSync(publicDir)) {
+        fs.writeFileSync(path.join(publicDir, "sitemap.xml"), staticXml, "utf-8");
+      }
+
+      return res.json({
+        success: true,
+        message: `✓ Article "${article.title}" published and registered in Google sitemap generator!`,
+        slug: article.slug,
+        canonicalUrl: `https://app.vernunt.com/knowledge/${article.slug}`,
+        deepLinkUrl: `https://app.vernunt.com/#knowledge/${article.slug}`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("[Knowledge Publish Error]:", err);
+      return res.status(500).json({ success: false, error: err.message || "Failed to publish article." });
+    }
+  });
+
+  app.get("/api/knowledge/articles", (req, res) => {
+    return res.json({
+      success: true,
+      articles: Array.from(serverCustomArticles.values())
+    });
+  });
+
+  app.delete("/api/knowledge/articles/:slug", (req, res) => {
+    const slug = req.params.slug;
+    if (serverCustomArticles.has(slug)) {
+      serverCustomArticles.delete(slug);
+      persistServerArticles();
+    }
+    return res.json({ success: true, message: `Article ${slug} removed from indexing cache.` });
+  });
+
+  // =========================================================================
+  // ADMIN EVENT TICKETING & COMMISSION POLICY ENGINE ENDPOINTS
+  // =========================================================================
+  let serverTicketingConfig: any = {
+    defaultStandardFreeTicketsLimit: 30,
+    defaultStandardCommissionRate: 8.0,
+    defaultInfluencerFreeTicketsLimit: 1000,
+    defaultInfluencerCommissionRate: 2.5,
+    enableTieredCommission: true,
+    influencerTiers: [
+      { minTickets: 1, maxTickets: 1000, commissionPercent: 0.0, label: '0% Free Influencer Quota (First 1,000 Tickets)' },
+      { minTickets: 1001, maxTickets: 3000, commissionPercent: 2.0, label: 'Super Creator Tier (2% Platform Commission)' },
+      { minTickets: 3001, maxTickets: 10000, commissionPercent: 3.5, label: 'High-Volume Mega Tier (3.5% Commission)' },
+      { minTickets: 10001, maxTickets: 999999, commissionPercent: 5.0, label: 'Enterprise Arena Tier (5% Commission)' }
+    ],
+    hostOverrides: {
+      'Priya Sharma (@bangalore_mommy_diaries)': {
+        hostIdOrName: 'Priya Sharma (@bangalore_mommy_diaries)',
+        freeTicketsQuota: 1000,
+        commissionRate: 2.0,
+        role: 'influencer',
+        notes: 'Official Vernunt Ambassador. 1,000 free tickets quota at 0% fee.',
+        updatedAt: new Date().toISOString()
+      }
+    },
+    eventOverrides: {},
+    lastUpdated: new Date().toISOString()
+  };
+
+  try {
+    if (fs.existsSync(TICKETING_CONFIG_FILE)) {
+      const raw = fs.readFileSync(TICKETING_CONFIG_FILE, "utf-8");
+      serverTicketingConfig = { ...serverTicketingConfig, ...JSON.parse(raw) };
+    }
+  } catch (e) {
+    console.warn("[Ticketing Config Load Warning]:", e);
+  }
+
+  app.get("/api/ticketing-config", (req, res) => {
+    return res.json({
+      success: true,
+      config: serverTicketingConfig
+    });
+  });
+
+  app.post("/api/ticketing-config", (req, res) => {
+    try {
+      const newConfig = req.body || {};
+      serverTicketingConfig = {
+        ...serverTicketingConfig,
+        ...newConfig,
+        lastUpdated: new Date().toISOString()
+      };
+      fs.writeFileSync(TICKETING_CONFIG_FILE, JSON.stringify(serverTicketingConfig, null, 2), "utf-8");
+      console.log(`[Ticketing Policy Engine] Updated admin ticketing rules (Influencer Free Quota: ${serverTicketingConfig.defaultInfluencerFreeTicketsLimit}, Influencer Post-Quota Fee: ${serverTicketingConfig.defaultInfluencerCommissionRate}%)`);
+      return res.json({ success: true, config: serverTicketingConfig });
+    } catch (err: any) {
+      console.error("[Ticketing Config Save Error]:", err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // IndexNow Verification Token
   const INDEXNOW_KEY = "vernunt_indexnow_auth_2026";
 
@@ -504,6 +651,19 @@ async function startServer() {
       }
     }
 
+    // Dynamic Admin Published Knowledge Hub Posts
+    for (const customArt of serverCustomArticles.values()) {
+      if (customArt?.slug) {
+        const modDate = customArt.lastModified ? customArt.lastModified.split("T")[0] : dateStamp;
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/knowledge/${customArt.slug}</loc>\n`;
+        xml += `    <lastmod>${modDate}</lastmod>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.95</priority>\n`;
+        xml += `  </url>\n`;
+      }
+    }
+
     xml += `</urlset>`;
     return xml;
   };
@@ -538,6 +698,12 @@ async function startServer() {
     for (const pillar of knowledgePillars) {
       for (const age of ageSlugs) {
         xml += `  <url><loc>${baseUrl}/knowledge/${pillar}-${age}-guide</loc><lastmod>${today}</lastmod><priority>0.8</priority></url>\n`;
+      }
+    }
+    for (const customArt of serverCustomArticles.values()) {
+      if (customArt?.slug) {
+        const modDate = customArt.lastModified ? customArt.lastModified.split("T")[0] : today;
+        xml += `  <url><loc>${baseUrl}/knowledge/${customArt.slug}</loc><lastmod>${modDate}</lastmod><priority>0.95</priority></url>\n`;
       }
     }
     xml += `</urlset>`;

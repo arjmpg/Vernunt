@@ -345,6 +345,69 @@ export function KnowledgeHub({
             </span>
           </div>
 
+          {/* Influencer Creator Spotlight Banner */}
+          {currentArticle.influencerSpotlight && (
+            <div className="bg-gradient-to-r from-pink-500/10 via-rose-500/15 to-amber-500/10 border-2 border-pink-300 rounded-3xl p-4 sm:p-6 shadow-sm space-y-3.5">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="relative">
+                    <img
+                      src={currentArticle.influencerSpotlight.avatarUrl || currentArticle.author.avatar}
+                      alt={currentArticle.influencerSpotlight.name}
+                      className="w-14 h-14 rounded-2xl object-cover ring-2 ring-pink-500 shadow-md"
+                      referrerPolicy="no-referrer"
+                    />
+                    <span className="absolute -bottom-1 -right-1 bg-gradient-to-tr from-pink-500 to-rose-600 text-white text-[10px] p-1 rounded-full shadow-xs">
+                      ⭐
+                    </span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm sm:text-base font-black text-slate-900 font-serif">
+                        {currentArticle.influencerSpotlight.name}
+                      </h3>
+                      <span className="text-[9px] bg-pink-100 text-pink-850 font-black px-2 py-0.5 rounded-full border border-pink-200 uppercase">
+                        {currentArticle.influencerSpotlight.badgeLabel || 'Ambassador'}
+                      </span>
+                    </div>
+                    <p className="text-xs font-bold text-pink-600 font-mono">
+                      {currentArticle.influencerSpotlight.instagramHandle}
+                      {currentArticle.influencerSpotlight.followersCount && (
+                        <span className="text-slate-500 font-normal ml-2">({currentArticle.influencerSpotlight.followersCount} Followers)</span>
+                      )}
+                    </p>
+                    <p className="text-[11px] text-slate-600 mt-1 max-w-xl line-clamp-2">
+                      {currentArticle.influencerSpotlight.bio}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                  {currentArticle.influencerSpotlight.instagramUrl && (
+                    <a
+                      href={currentArticle.influencerSpotlight.instagramUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
+                    >
+                      <span>📸 Instagram</span>
+                    </a>
+                  )}
+                  {onNavigateToRadar && (
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToRadar()}
+                      className="flex-1 sm:flex-initial px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition shadow-xs flex items-center justify-center gap-1.5"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>Find on Radar</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Table of Contents */}
           {currentArticle.tableOfContents && currentArticle.tableOfContents.length > 0 && (
             <div className="bg-rose-50/50 rounded-2xl p-5 border border-rose-100 space-y-3">

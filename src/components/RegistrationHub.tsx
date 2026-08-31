@@ -35,6 +35,14 @@ import AadhaarUploadField from './AadhaarUploadField.tsx';
 import { captureUserTelemetry } from '../utils/telemetry.ts';
 import { generateSynchronizedContactsList } from '../utils/contactsSync.ts';
 import { sendAdminKycPendingNotification } from '../utils/notifications.ts';
+import { 
+  PARENTS_INCOME_OPTIONS, 
+  INDIAN_RELIGIONS, 
+  INDIAN_CASTES, 
+  CHILD_AVAILABILITY_OPTIONS, 
+  CHILD_INTERESTS_OPTIONS, 
+  CHILD_PRIVACY_OPTIONS 
+} from '../data/indianDemographics.ts';
 
 interface RegistrationHubProps {
   onCompleteSignup: (profile: ChildProfile) => void;
@@ -112,11 +120,11 @@ export default function RegistrationHub({
   const [errors, setErrors] = useState<Record<string, string>>({});
   
   // Preferred platform access role pre-populated dynamically
-  const [preferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional'>(
-    initialRole || 'Parent'
+  const [preferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>(
+    (initialRole as any) || 'Parent'
   );
 
-  const maxSteps = preferredRole === 'Parent' ? 2 : 3;
+  const maxSteps = (preferredRole === 'Parent' || preferredRole === 'Influencer') ? 2 : 3;
 
   // Clean initial phone number
   const formattedInitialPhone = initialPhone ? initialPhone.replace('+91', '').trim() : '';
@@ -262,6 +270,12 @@ export default function RegistrationHub({
       setIsSyncingContacts(false);
     }
   };
+
+  // --- INFLUENCER / AMBASSADOR STATES ---
+  const [instagramHandle, setInstagramHandle] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [influencerFollowers, setInfluencerFollowers] = useState('10K+');
+  const [influencerBio, setInfluencerBio] = useState('');
 
   // --- PROFILE PHOTO & SELFIE STATES & HANDLERS ---
   const [parentProfilePhoto, setParentProfilePhoto] = useState(initialPhotoUrl || '');
@@ -538,10 +552,16 @@ export default function RegistrationHub({
     }, 450);
   };
 
-  // Indian demographics
+  // Indian demographics & Mandatory Matchmaking Profiles
   const [parentsIncome, setParentsIncome] = useState('');
   const [caste, setCaste] = useState('');
+  const [customCaste, setCustomCaste] = useState('');
   const [religion, setReligion] = useState('');
+  const [generalAvailability, setGeneralAvailability] = useState<string[]>([
+    'Weekdays After School',
+    'Weekends (Sat & Sun)'
+  ]);
+  const [childPrivacySetting, setChildPrivacySetting] = useState<'full' | 'first_name_only' | 'connections_only'>('full');
   const [parentProfession, setParentProfession] = useState('');
   const [motherTongue, setMotherTongue] = useState('');
   const [languagesKnown, setLanguagesKnown] = useState<string[]>([]);
@@ -1575,10 +1595,21 @@ export default function RegistrationHub({
           newErrors.address = 'Primary neighborhood or locality is required (e.g. Indiranagar, Bangalore)';
         }
         if (!childName.trim()) {
-          newErrors.childName = "Child's name or moniker is required";
+          newErrors.childName = "Child's name or nickname is required";
         }
         if (!childAge || childAge < 1) {
           newErrors.childAge = "Valid child age is required";
+        }
+        if (!parentsIncome || !parentsIncome.trim()) {
+          newErrors.parentsIncome = 'Please select parents annual income bracket (Mandatory for confidential matching)';
+        }
+        if (!religion || !religion.trim()) {
+          newErrors.religion = 'Please select religion (Mandatory for community preference matching)';
+        }
+        if (!caste || !caste.trim()) {
+          newErrors.caste = 'Please select caste / community (Mandatory for community preference matching)';
+        } else if (caste === 'Other / Community Not Listed' && !customCaste.trim()) {
+          newErrors.customCaste = 'Please specify your community name';
         }
       }
     } else if (preferredRole === 'Event Organizer') {
@@ -1705,13 +1736,13 @@ export default function RegistrationHub({
     let finalProfile: ChildProfile;
 
     const now = new Date();
-    // Free App Usage Promotion: 1 Year (365 days) for Parents, 6 Months (180 days) for Hosts & Specialists
-    const freeDurationDays = preferredRole === 'Parent' ? 365 : 180;
+    // Free App Usage Promotion: 1 Year (365 days) for Parents & Influencers, 6 Months (180 days) for Hosts & Specialists
+    const freeDurationDays = (preferredRole === 'Parent' || preferredRole === 'Influencer') ? 365 : 180;
     const initialExpiry = new Date(now);
     initialExpiry.setDate(now.getDate() + freeDurationDays);
     const initialExpiryDateStr = initialExpiry.toISOString().split('T')[0];
 
-    if (preferredRole === 'Parent') {
+    if (preferredRole === 'Parent' || preferredRole === 'Influencer') {
       finalProfile = {
         id: `user-${Date.now()}`,
         parentName: parentName.trim(),
@@ -1743,8 +1774,10 @@ export default function RegistrationHub({
         faceVerificationTimestamp: new Date().toISOString(),
         ageUnit,
         parentsIncome: parentsIncome.trim(),
-        caste: caste.trim(),
+        caste: caste === 'Other / Community Not Listed' && customCaste.trim() ? customCaste.trim() : caste.trim(),
         religion: religion.trim(),
+        generalAvailability: generalAvailability.length > 0 ? generalAvailability : ['Weekdays After School', 'Weekends (Sat & Sun)'],
+        childPrivacySetting: childPrivacySetting || 'full',
         parentProfession: parentProfession.trim() || 'Professional',
         motherTongue: motherTongue.trim() || 'English, Hindi',
         languagesKnown: languagesKnown.length > 0 ? languagesKnown : ['English', 'Hindi'],
@@ -1769,12 +1802,21 @@ export default function RegistrationHub({
         addressProofDocSize: addressProofDocSize || undefined,
         kycSubmitted: false,
 
-        // 1-Year Free Membership for Parents
-        subscriptionActive: false, // Activated upon KYC review or referral!
+        // 1-Year Free Membership for Parents & Influencers
+        subscriptionActive: preferredRole === 'Influencer', // Instant VIP access for Influencer Partners!
         subscriptionPlan: 'yearly',
         subscriptionExpiryDate: initialExpiryDateStr,
-        contactViewCredits: 10,
+        contactViewCredits: preferredRole === 'Influencer' ? 100 : 10,
         
+        // Influencer Ambassador Specific Attributes
+        instagramHandle: instagramHandle.trim() || undefined,
+        instagramUrl: instagramUrl.trim() || (instagramHandle.trim() ? `https://instagram.com/${instagramHandle.trim().replace('@', '')}` : undefined),
+        influencerFollowers: influencerFollowers.trim() || undefined,
+        influencerBio: influencerBio.trim() || undefined,
+        isInfluencerSpotlight: preferredRole === 'Influencer',
+        freeTicketsQuota: preferredRole === 'Influencer' ? 1000 : undefined,
+        freeTicketsUsed: 0,
+
         // Admin-Only Telemetry
         ipAddress: telemetry.ipAddress,
         capturedLat: resolvedLat,
@@ -2079,6 +2121,7 @@ export default function RegistrationHub({
           </div>
           <h2 id="reg-title" className="text-lg sm:text-xl font-bold font-serif leading-tight">
             {preferredRole === 'Parent' && 'Configure Family Playmate Profile'}
+            {preferredRole === 'Influencer' && 'Register as Community Influencer & Ambassador'}
             {preferredRole === 'Daycare Center' && 'Register Verified Daycare & Creche Center'}
             {preferredRole === 'Event Organizer' && 'Register as Events, Class and Activities Host'}
             {preferredRole === 'Portfolio Professional' && 'Register as Community Specialist'}
@@ -2115,9 +2158,9 @@ export default function RegistrationHub({
       <form id="reg-form" noValidate onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-5">
         
         {/* ============================================================== */}
-        {/* FLOW 1: LOCAL FAMILIES & PARENTS FLOW                          */}
+        {/* FLOW 1: LOCAL FAMILIES, PARENTS & INFLUENCERS FLOW             */}
         {/* ============================================================== */}
-        {preferredRole === 'Parent' && (
+        {(preferredRole === 'Parent' || preferredRole === 'Influencer') && (
           <>
             {step === 1 && (
               <div id="parent-step-1" className="space-y-4 animate-fade-in">
@@ -2382,12 +2425,92 @@ export default function RegistrationHub({
                     <User className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-xs sm:text-sm text-slate-900">Step 2 of 2: Family & Child Info</h3>
+                    <h3 className="font-bold text-xs sm:text-sm text-slate-900">
+                      {preferredRole === 'Influencer' ? 'Step 2 of 2: Influencer & Family Profile' : 'Step 2 of 2: Family & Child Info'}
+                    </h3>
                     <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                      Tell us about your family so neighborhood playmates can discover and match with you.
+                      {preferredRole === 'Influencer' 
+                        ? 'Connect your Instagram creator details for priority matching boost, spotlight placement & 0% commission event ticketing.'
+                        : 'Tell us about your family so neighborhood playmates can discover and match with you.'}
                     </p>
                   </div>
                 </div>
+
+                {/* Influencer Specific Fields Box */}
+                {preferredRole === 'Influencer' && (
+                  <div className="bg-gradient-to-br from-pink-50 via-purple-50 to-amber-50 border-2 border-pink-200 p-4 sm:p-5 rounded-2xl space-y-3.5 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-7 w-7 rounded-xl bg-gradient-to-tr from-pink-500 to-rose-600 text-white items-center justify-center text-xs font-bold shadow-xs">
+                          ⭐
+                        </span>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-slate-900">Instagram Creator & Ambassador Info</h4>
+                          <p className="text-[10px] text-slate-600">Cross-promoted in Knowledge Hub & highlighted on Radar</p>
+                        </div>
+                      </div>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-pink-100 text-pink-850 px-2 py-0.5 rounded-md border border-pink-200">
+                        VIP Creator
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700">Instagram Handle *</label>
+                        <input
+                          type="text"
+                          value={instagramHandle}
+                          onChange={(e) => {
+                            const val = e.target.value.trim();
+                            setInstagramHandle(val.startsWith('@') ? val : `@${val}`);
+                          }}
+                          placeholder="@bangalore_mommy_diaries"
+                          className="px-3.5 py-2.5 bg-white border border-pink-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-pink-300 font-mono"
+                        />
+                      </div>
+
+                      <div className="flex flex-col space-y-1">
+                        <label className="text-[11px] font-bold text-slate-700">Followers Count</label>
+                        <input
+                          type="text"
+                          value={influencerFollowers}
+                          onChange={(e) => setInfluencerFollowers(e.target.value)}
+                          placeholder="e.g. 25.4K Followers"
+                          className="px-3.5 py-2.5 bg-white border border-pink-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-pink-300"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Instagram Profile URL (Optional)</label>
+                      <input
+                        type="url"
+                        value={instagramUrl}
+                        onChange={(e) => setInstagramUrl(e.target.value)}
+                        placeholder="https://instagram.com/bangalore_mommy_diaries"
+                        className="px-3.5 py-2 bg-white border border-pink-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-pink-300 font-mono text-[11px]"
+                      />
+                    </div>
+
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700">Creator Bio & Content Specialty</label>
+                      <textarea
+                        rows={2}
+                        value={influencerBio}
+                        onChange={(e) => setInfluencerBio(e.target.value)}
+                        placeholder="e.g. Mom of 2 sharing screen-free toddler activities, Montessori sensory setups, and neighborhood playdate ideas in Bangalore."
+                        className="px-3.5 py-2 bg-white border border-pink-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-pink-300 resize-none"
+                      />
+                    </div>
+
+                    <div className="p-2.5 bg-white/90 border border-pink-150 rounded-xl flex items-center justify-between text-[10.5px] text-pink-900">
+                      <span className="font-semibold">🎟️ 0% Commission Ticketing Quota:</span>
+                      <span className="font-extrabold text-pink-700 bg-pink-50 px-2 py-0.5 rounded-md border border-pink-200">
+                        1,000 Free Tickets Included
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Parent Name */}
                 <div className="flex flex-col space-y-1.5">
@@ -2568,14 +2691,14 @@ export default function RegistrationHub({
                   </div>
                 </div>
 
-                {/* Interests Selection */}
+                {/* Child Interests Selection */}
                 <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-2">
                   <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
                     <span>Child's Playmate Interests</span>
                     <span className="text-[10px] text-slate-400 font-normal">Select tags</span>
                   </label>
                   <div className="flex flex-wrap gap-1.5">
-                    {['Lego Building', 'Drawing & Painting', 'Outdoor Play', 'Board Games', 'Storytelling', 'Sports & Cycling', 'Music & Dance', 'STEM & Science'].map((interest) => {
+                    {CHILD_INTERESTS_OPTIONS.map((interest) => {
                       const isSelected = selectedInterests.includes(interest);
                       return (
                         <button
@@ -2599,6 +2722,254 @@ export default function RegistrationHub({
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Child General Availability */}
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-2">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>General Availability for Playdates</span>
+                    <span className="text-[10px] text-orange-600 font-bold">Matching Factor</span>
+                  </label>
+                  <p className="text-[10px] text-slate-500">
+                    Select when your child is usually free to meet neighborhood playmates:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {CHILD_AVAILABILITY_OPTIONS.map((avail) => {
+                      const isSelected = generalAvailability.includes(avail);
+                      return (
+                        <button
+                          key={avail}
+                          type="button"
+                          onClick={() => {
+                            if (isSelected) {
+                              if (generalAvailability.length > 1) {
+                                setGeneralAvailability(generalAvailability.filter(a => a !== avail));
+                              }
+                            } else {
+                              setGeneralAvailability([...generalAvailability, avail]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1 ${
+                            isSelected
+                              ? 'bg-emerald-600 text-white shadow-xs font-bold'
+                              : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <span>{isSelected ? '✓' : '🕒'}</span>
+                          <span>{avail}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Child Privacy Settings */}
+                <div className="bg-slate-50/70 p-4 rounded-2xl border border-slate-200/80 space-y-2.5">
+                  <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>Child Information Visibility</span>
+                    <span className="text-[10px] text-slate-400 font-normal">Privacy Control</span>
+                  </label>
+                  <div className="space-y-2">
+                    {CHILD_PRIVACY_OPTIONS.map((opt) => (
+                      <label
+                        key={opt.id}
+                        onClick={() => setChildPrivacySetting(opt.id as any)}
+                        className={`flex items-start gap-3 p-2.5 rounded-xl border transition cursor-pointer ${
+                          childPrivacySetting === opt.id
+                            ? 'bg-orange-50/70 border-orange-300 text-slate-800'
+                            : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="childPrivacySetting"
+                          checked={childPrivacySetting === opt.id}
+                          onChange={() => setChildPrivacySetting(opt.id as any)}
+                          className="mt-0.5 text-orange-500 focus:ring-orange-400"
+                        />
+                        <div className="text-left">
+                          <span className="text-xs font-bold text-slate-800 block">{opt.label}</span>
+                          <span className="text-[10.5px] text-slate-500 leading-tight block">{opt.desc}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Mandatory Parents' Income Radio Field (Strictly Confidential - Matchmaking Only) */}
+                <div className={`p-4 rounded-2xl border space-y-3 ${errors.parentsIncome ? 'bg-red-50/40 border-red-300' : 'bg-slate-50/70 border-slate-200/80'}`}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Lock className="w-4 h-4 text-orange-500" />
+                      <span>Parents' Annual Household Income</span>
+                    </label>
+                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
+                      Mandatory • Hidden
+                    </span>
+                  </div>
+
+                  {/* Mandatory Note for Parents */}
+                  <div className="p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl text-[11px] text-amber-900 leading-relaxed space-y-1">
+                    <p className="font-bold flex items-center gap-1 text-amber-950">
+                      <span>🔒 100% Private & Confidential Notice</span>
+                    </p>
+                    <p>
+                      <strong>Note:</strong> This information is strictly confidential, 100% private, and will <strong>never be shown on your public profile or visible to any other users</strong>. It is used exclusively by our smart matchmaking algorithm to suggest compatible family playmates. If none of the profiles match or if parents would like broader options, the system progressively introduces compatible playmate families from other income brackets as well.
+                    </p>
+                  </div>
+
+                  {/* 7 Radio Options */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                    {PARENTS_INCOME_OPTIONS.map((inc) => (
+                      <label
+                        key={inc}
+                        onClick={() => {
+                          setParentsIncome(inc);
+                          if (errors.parentsIncome) {
+                            setErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.parentsIncome;
+                              return copy;
+                            });
+                          }
+                        }}
+                        className={`flex items-center gap-2.5 p-2.5 rounded-xl border transition cursor-pointer ${
+                          parentsIncome === inc
+                            ? 'bg-orange-500 text-white border-orange-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:border-orange-200 hover:bg-orange-50/30'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="parentsIncome"
+                          value={inc}
+                          checked={parentsIncome === inc}
+                          onChange={() => {
+                            setParentsIncome(inc);
+                            if (errors.parentsIncome) {
+                              setErrors(prev => {
+                                const copy = { ...prev };
+                                delete copy.parentsIncome;
+                                return copy;
+                              });
+                            }
+                          }}
+                          className="text-orange-600 focus:ring-orange-400"
+                        />
+                        <span className={`text-xs ${parentsIncome === inc ? 'font-bold text-white' : 'font-medium text-slate-700'}`}>
+                          {inc}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.parentsIncome && (
+                    <p className="text-[11px] text-red-500 font-semibold">{errors.parentsIncome}</p>
+                  )}
+                </div>
+
+                {/* Mandatory Religion & Caste Select Fields */}
+                <div className={`p-4 rounded-2xl border space-y-3.5 ${errors.religion || errors.caste ? 'bg-red-50/40 border-red-300' : 'bg-slate-50/70 border-slate-200/80'}`}>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-orange-500" />
+                      <span>Religion & Caste / Community</span>
+                    </label>
+                    <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
+                      Mandatory
+                    </span>
+                  </div>
+
+                  {/* Privacy & Matching Note */}
+                  <div className="p-3 bg-blue-50/80 border border-blue-200/80 rounded-xl text-[11px] text-blue-900 leading-relaxed space-y-1">
+                    <p className="font-bold flex items-center gap-1 text-blue-950">
+                      <span>🛡️ Community & Culture Affinity Matching Note</span>
+                    </p>
+                    <p>
+                      <strong>Note:</strong> Caste and religion details are collected for community preference matching. Your privacy is paramount, and your demographic preferences remain secure.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Religion Select */}
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Select Religion *</span>
+                      </label>
+                      <select
+                        id="select-religion"
+                        value={religion}
+                        onChange={(e) => {
+                          setReligion(e.target.value);
+                          if (errors.religion) {
+                            setErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.religion;
+                              return copy;
+                            });
+                          }
+                        }}
+                        className={`px-3 py-2.5 bg-white border ${errors.religion ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200 font-medium`}
+                      >
+                        <option value="">-- Choose Religion --</option>
+                        {INDIAN_RELIGIONS.map((rel) => (
+                          <option key={rel} value={rel}>{rel}</option>
+                        ))}
+                      </select>
+                      {errors.religion && <p className="text-[10px] text-red-500 font-semibold">{errors.religion}</p>}
+                    </div>
+
+                    {/* Caste Select */}
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Select Caste / Community *</span>
+                      </label>
+                      <select
+                        id="select-caste"
+                        value={caste}
+                        onChange={(e) => {
+                          setCaste(e.target.value);
+                          if (errors.caste) {
+                            setErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.caste;
+                              return copy;
+                            });
+                          }
+                        }}
+                        className={`px-3 py-2.5 bg-white border ${errors.caste ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200 font-medium`}
+                      >
+                        <option value="">-- Choose Caste / Community --</option>
+                        {INDIAN_CASTES.map((cst) => (
+                          <option key={cst} value={cst}>{cst}</option>
+                        ))}
+                      </select>
+                      {errors.caste && <p className="text-[10px] text-red-500 font-semibold">{errors.caste}</p>}
+                    </div>
+                  </div>
+
+                  {/* Custom Subcaste field if "Other" is selected */}
+                  {caste === 'Other / Community Not Listed' && (
+                    <div className="flex flex-col space-y-1 pt-1 animate-fade-in">
+                      <label className="text-[11px] font-bold text-slate-700">Specify Community / Subcaste *</label>
+                      <input
+                        type="text"
+                        value={customCaste}
+                        onChange={(e) => {
+                          setCustomCaste(e.target.value);
+                          if (errors.customCaste) {
+                            setErrors(prev => {
+                              const copy = { ...prev };
+                              delete copy.customCaste;
+                              return copy;
+                            });
+                          }
+                        }}
+                        placeholder="e.g. Specific sub-caste or community name"
+                        className={`px-3.5 py-2 bg-white border ${errors.customCaste ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200`}
+                      />
+                      {errors.customCaste && <p className="text-[10px] text-red-500 font-semibold">{errors.customCaste}</p>}
+                    </div>
+                  )}
                 </div>
 
                 {/* Easy KYC Postponement Information Banner */}

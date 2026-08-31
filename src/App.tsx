@@ -16,7 +16,7 @@ import LandingLoginGateway from './components/LandingLoginGateway.tsx';
 import RegistrationHub from './components/RegistrationHub.tsx';
 import PlaymateRadar from './components/PlaymateRadar.tsx';
 import PlaymateMap from './components/PlaymateMap.tsx';
-import PlaymateCard from './components/PlaymateCard.tsx';
+import PlaymateCard, { calculateMatchScore } from './components/PlaymateCard.tsx';
 import { PlaymateListView } from './components/PlaymateListView.tsx';
 import { PlaymateDetailModal } from './components/PlaymateDetailModal.tsx';
 import ChatPanel from './components/ChatPanel.tsx';
@@ -2109,11 +2109,19 @@ export default function App() {
       results.push({ ...p, _cachedDistance: distanceKm });
     }
 
-    // Sort ascending by distance
-    results.sort((a, b) => a._cachedDistance - b._cachedDistance);
+    // Sort by compatibility score (interests, availability, proximity, age, and demographic fallback)
+    results.sort((a, b) => {
+      const matchA = calculateMatchScore(userProfile, a, userLat, userLng).score;
+      const matchB = calculateMatchScore(userProfile, b, userLat, userLng).score;
+      if (matchB !== matchA) {
+        return matchB - matchA;
+      }
+      return a._cachedDistance - b._cachedDistance;
+    });
     return results;
   }, [
     playmates,
+    userProfile,
     deferredMaxDistanceKm,
     userLat,
     userLng,
@@ -2984,15 +2992,15 @@ export default function App() {
                       {/* Search Bar Input */}
                       <div className="flex flex-col space-y-1.5" id="filter-search-container">
                         <label className="text-[11px] font-extrabold text-rose-900 uppercase tracking-wider">Search Name / Language / Interest</label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600" />
+                        <div className="relative group">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-rose-600 group-focus-within:text-rose-700 group-focus-within:scale-110 transition-all duration-300 z-10 pointer-events-none" />
                           <input
                             id="input-radar-search-query"
                             type="text"
                             value={filterSearchQuery}
                             onChange={(e) => setFilterSearchQuery(e.target.value)}
                             placeholder="e.g. Ayaan, Lego, Hindi, Soccer, Doctor..."
-                            className="w-full pl-9 pr-4 py-2 bg-rose-50/30 border border-rose-200 rounded-xl text-xs outline-none focus:ring-4 focus:ring-rose-100 focus:bg-white transition"
+                            className="w-full pl-9 pr-4 py-2 bg-rose-50/30 border border-rose-200 hover:border-rose-300 rounded-xl text-xs outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 focus:bg-white focus:scale-[1.01] focus:shadow-md transition-all duration-300 ease-out origin-left"
                           />
                         </div>
                       </div>

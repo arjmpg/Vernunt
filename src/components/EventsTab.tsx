@@ -607,7 +607,7 @@ export default function EventsTab({
       if (newEventCat === 'Event') {
         categoryPic = 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600';
       } else if (newEventCat === 'Activity') {
-        categoryPic = 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=600';
+        categoryPic = 'https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&fit=crop&q=80&w=600';
       } else if (newEventCat === 'Competition') {
         categoryPic = 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?auto=format&fit=crop&q=80&w=600';
       } else { // Class

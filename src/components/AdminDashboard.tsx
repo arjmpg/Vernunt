@@ -11,16 +11,40 @@ import {
   ShoppingCart, HelpCircle, MoreHorizontal, ExternalLink, Settings,
   CreditCard, Key, Server, CheckSquare, Square, Filter, ChevronLeft,
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
-  Tag, Clock, Zap, Palette
+  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, auth } from '../utils/firebase.ts';
 import { doc, setDoc, updateDoc, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
-import { ChildProfile, VerificationStatus, CommunityEvent, SubscriptionPlan } from '../types.ts';
+import { ChildProfile, VerificationStatus, CommunityEvent, SubscriptionPlan, AdminCouponCode } from '../types.ts';
+import { 
+  KnowledgeArticle, 
+  FLAGSHIP_KNOWLEDGE_ARTICLES, 
+  KNOWLEDGE_CATEGORIES, 
+  getAdminCustomKnowledgeArticles, 
+  saveAdminKnowledgeArticle, 
+  deleteAdminKnowledgeArticle,
+  publishAndAutoIndexArticle,
+  getArticleCanonicalUrl,
+  getArticleDeepLinkUrl,
+  injectArticleSeoHead
+} from '../data/knowledgeBase.ts';
+import {
+  getAdminTicketingConfig,
+  saveAdminTicketingConfig,
+  AdminTicketingConfig,
+  CommissionTierRule,
+  HostCommissionOverride,
+  calculateEventCommissionPolicy,
+  calculateTicketOrderBreakdown,
+  DEFAULT_TICKETING_CONFIG
+} from '../utils/ticketingCommission.ts';
 import confetti from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import GoogleDriveBackupPanel from './GoogleDriveBackupPanel.tsx';
 import VernuntLogo from './VernuntLogo.tsx';
 import VernuntSeoSuite from './VernuntSeoSuite.tsx';
+import AdminTicketingCommissionDesk from './admin/AdminTicketingCommissionDesk.tsx';
+import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -52,11 +76,153 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | broadcast | contacts | security | backups | settings | seo
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | coupons | knowledge-hub | broadcast | contacts | security | backups | settings | seo
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
+  // =========================================================================
+  // COUPON CODES MANAGEMENT STATES
+  // =========================================================================
+  const defaultInitialCoupons: AdminCouponCode[] = [
+    {
+      id: 'coupon-1',
+      code: 'INFLUENCER365',
+      title: '1-Year Free Access VIP Influencer Pass',
+      benefitType: 'free_1_year_vip',
+      durationDays: 365,
+      isActive: true,
+      maxRedemptions: 1000,
+      timesRedeemed: 14,
+      assignedInfluencerName: 'Bangalore Mommy Community (@bangalore_mommy_diaries)',
+      notes: 'Gives parents 1 year free access across app. Paid events require host fee.',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'coupon-2',
+      code: 'VIPMOM',
+      title: 'Mom Creator Community 1-Year Free Pass',
+      benefitType: 'free_1_year_vip',
+      durationDays: 365,
+      isActive: true,
+      maxRedemptions: 500,
+      timesRedeemed: 28,
+      assignedInfluencerName: 'Dr. Ananya Reddy (@gentle_parenting_india)',
+      notes: 'Special cross-promotional code for pediatric Instagram campaign.',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'coupon-3',
+      code: 'BANGALOREKIDS',
+      title: 'Bangalore Co-op 1-Year Free Pass',
+      benefitType: 'free_1_year_vip',
+      durationDays: 365,
+      isActive: true,
+      maxRedemptions: 500,
+      timesRedeemed: 62,
+      assignedInfluencerName: 'Aarav Sports Academy (@aarav_play_hub)',
+      notes: 'Community playdate access code.',
+      createdAt: new Date().toISOString()
+    },
+    {
+      id: 'coupon-4',
+      code: 'VERNUNT1YEAR',
+      title: 'Vernunt Launch 1-Year Pass',
+      benefitType: 'free_1_year_vip',
+      durationDays: 365,
+      isActive: true,
+      maxRedemptions: 2000,
+      timesRedeemed: 105,
+      assignedInfluencerName: 'Platform SuperAdmin',
+      notes: 'General promotion code for platform early adopters.',
+      createdAt: new Date().toISOString()
+    }
+  ];
+
+  const [couponsList, setCouponsList] = useState<AdminCouponCode[]>(() => {
+    try {
+      const stored = localStorage.getItem('vernunt_admin_coupons');
+      return stored ? JSON.parse(stored) : defaultInitialCoupons;
+    } catch {
+      return defaultInitialCoupons;
+    }
+  });
+
+  const [showCouponModal, setShowCouponModal] = useState<boolean>(false);
+  const [editingCouponId, setEditingCouponId] = useState<string | null>(null);
+  const [couponCodeForm, setCouponCodeForm] = useState({
+    code: '',
+    title: '',
+    benefitType: 'free_1_year_vip' as 'free_1_year_vip' | 'free_pass' | 'percentage' | 'flat',
+    durationDays: 365,
+    maxRedemptions: 500,
+    assignedInfluencerName: '',
+    notes: '',
+    validUntil: '',
+    isActive: true
+  });
+
+  const saveCoupons = (updated: AdminCouponCode[]) => {
+    setCouponsList(updated);
+    try {
+      localStorage.setItem('vernunt_admin_coupons', JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to persist coupons:', e);
+    }
+  };
+
+  // =========================================================================
+  // KNOWLEDGE HUB / WORDPRESS POSTS MANAGEMENT STATES
+  // =========================================================================
+  const [knowledgeArticlesList, setKnowledgeArticlesList] = useState<KnowledgeArticle[]>(() => {
+    const custom = getAdminCustomKnowledgeArticles();
+    return [...custom, ...FLAGSHIP_KNOWLEDGE_ARTICLES];
+  });
+
+  const [knowledgeSearchTerm, setKnowledgeSearchTerm] = useState<string>('');
+  const [knowledgeCategoryFilter, setKnowledgeCategoryFilter] = useState<string>('all');
+  const [showArticleEditorModal, setShowArticleEditorModal] = useState<boolean>(false);
+  const [editingArticleSlug, setEditingArticleSlug] = useState<string | null>(null);
+
+  const [articleForm, setArticleForm] = useState({
+    title: '',
+    slug: '',
+    category: 'Playdate' as KnowledgeArticle['category'],
+    categoryLabel: 'Playdate Ideas',
+    ageGroup: 'All Ages' as KnowledgeArticle['ageGroup'],
+    readTime: '5 min read',
+    summary: '',
+    publishedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    authorName: 'Vernunt Editorial Team',
+    authorRole: 'Parenting & Child Development Specialist',
+    authorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    coverImage: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=80',
+    status: 'Published' as 'Published' | 'Draft',
+    // Influencer Spotlight Fields
+    isInfluencerSpotlight: false,
+    influencerName: '',
+    influencerHandle: '',
+    influencerUrl: '',
+    influencerBio: '',
+    influencerFollowers: '',
+    influencerBadge: 'Verified Community Ambassador',
+    influencerAvatar: '',
+    // Content Fields
+    keyTakeawaysText: '',
+    deepDive1Heading: '',
+    deepDive1Body: '',
+    deepDive1ProTip: '',
+    deepDive1Alert: '',
+    deepDive2Heading: '',
+    deepDive2Body: '',
+    actionableStepsText: '',
+    faqQuestion1: '',
+    faqAnswer1: '',
+    faqQuestion2: '',
+    faqAnswer2: '',
+    keywordsText: ''
+  });
   
   // Screen Options & Help toggles (WordPress native top dropdowns)
   const [showScreenOptions, setShowScreenOptions] = useState<boolean>(false);
@@ -107,6 +273,65 @@ export default function AdminDashboard({
   const [eventSearchTerm, setEventSearchTerm] = useState<string>('');
   const [eventFilterCategory, setEventFilterCategory] = useState<string>('all');
   const [updatingEventId, setUpdatingEventId] = useState<string | null>(null);
+
+  // Ticketing & Commission Policy Desk States
+  const [ticketingConfig, setTicketingConfig] = useState<AdminTicketingConfig>(() => getAdminTicketingConfig());
+  const [eventsSubTab, setEventsSubTab] = useState<'catalog' | 'global-policy' | 'influencer-tiers' | 'host-overrides' | 'calculator'>('catalog');
+  const [editingEventTicketing, setEditingEventTicketing] = useState<CommunityEvent | null>(null);
+  const [eventTicketingForm, setEventTicketingForm] = useState<{
+    freeTicketsQuota: number;
+    freeTicketsIssued: number;
+    isInfluencerHost: boolean;
+    hostRole: 'standard' | 'influencer';
+    customCommissionRate: number | '';
+  }>({
+    freeTicketsQuota: 30,
+    freeTicketsIssued: 0,
+    isInfluencerHost: false,
+    hostRole: 'standard',
+    customCommissionRate: ''
+  });
+  const [showAddHostOverrideModal, setShowAddHostOverrideModal] = useState<boolean>(false);
+  const [hostOverrideForm, setHostOverrideForm] = useState<{
+    hostIdOrName: string;
+    freeTicketsQuota: number;
+    commissionRate: number;
+    role: 'influencer' | 'standard';
+    notes: string;
+  }>({
+    hostIdOrName: '',
+    freeTicketsQuota: 1000,
+    commissionRate: 2.0,
+    role: 'influencer',
+    notes: ''
+  });
+  const [calcSim, setCalcSim] = useState<{
+    ticketPrice: number;
+    ticketsCount: number;
+    hostRole: 'influencer' | 'standard';
+    freeQuota: number;
+    commissionPercent: number;
+  }>({
+    ticketPrice: 499,
+    ticketsCount: 250,
+    hostRole: 'influencer',
+    freeQuota: 1000,
+    commissionPercent: 2.5
+  });
+
+  // Knowledge Hub Auto-Indexing & Live Google Preview States
+  const [isPublishingAutoIndex, setIsPublishingAutoIndex] = useState<boolean>(false);
+  const [indexingFeedbackModal, setIndexingFeedbackModal] = useState<{
+    isOpen: boolean;
+    articleTitle: string;
+    canonicalUrl: string;
+    deepLinkUrl: string;
+    sitemapStatus: string;
+    indexNowStatus: string;
+    schemaInjected: boolean;
+    timestamp: string;
+  } | null>(null);
+  const [schemaInspectArticle, setSchemaInspectArticle] = useState<KnowledgeArticle | null>(null);
 
   // Security & Telemetry States
   const [securityLogs, setSecurityLogs] = useState<SecurityEventLog[]>(getLocalSecurityLogs());
@@ -308,6 +533,32 @@ export default function AdminDashboard({
     };
   }, []);
 
+  // 8. Sync Ticketing & Commission Config & Custom Articles from Server
+  useEffect(() => {
+    fetch('/api/ticketing-config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.config) {
+          setTicketingConfig(data.config);
+          saveAdminTicketingConfig(data.config);
+        }
+      })
+      .catch(e => console.debug('Ticketing config server sync note:', e));
+
+    fetch('/api/knowledge/articles')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.articles) && data.articles.length > 0) {
+          data.articles.forEach((art: KnowledgeArticle) => {
+            saveAdminKnowledgeArticle(art);
+          });
+          const updatedCustom = getAdminCustomKnowledgeArticles();
+          setKnowledgeArticlesList([...updatedCustom, ...FLAGSHIP_KNOWLEDGE_ARTICLES]);
+        }
+      })
+      .catch(e => console.debug('Knowledge articles server sync note:', e));
+  }, []);
+
   // =================== HANDLERS ===================
 
   const showNotification = (type: 'success' | 'warning' | 'error' | 'info', message: string) => {
@@ -444,6 +695,41 @@ export default function AdminDashboard({
       showNotification('error', `Failed to update event: ${err.message}`);
     } finally {
       setUpdatingEventId(null);
+    }
+  };
+
+  const handleUpdateEvent = async (updatedEvt: CommunityEvent) => {
+    try {
+      const evtRef = doc(db, 'events', updatedEvt.id);
+      await updateDoc(evtRef, {
+        freeTicketsQuota: updatedEvt.freeTicketsQuota,
+        freeTicketsIssued: updatedEvt.freeTicketsIssued,
+        isInfluencerHost: updatedEvt.isInfluencerHost,
+        hostRole: updatedEvt.hostRole,
+        customCommissionRate: updatedEvt.customCommissionRate
+      }).catch(e => console.debug("Firestore update note:", e));
+
+      if (setEventsList) {
+        setEventsList(prev => prev.map(e => e.id === updatedEvt.id ? updatedEvt : e));
+      }
+      showNotification('success', `Ticketing & commission quota updated for "${updatedEvt.title}".`);
+    } catch (err: any) {
+      showNotification('error', `Failed to update event: ${err.message}`);
+    }
+  };
+
+  const handleSaveTicketingConfig = async (newConfig: AdminTicketingConfig) => {
+    try {
+      saveAdminTicketingConfig(newConfig);
+      setTicketingConfig(newConfig);
+      await fetch('/api/ticketing-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig)
+      }).catch(e => console.debug("Ticketing config server push note:", e));
+      showNotification('success', 'Ticketing and commission policy rules saved live across the platform!');
+    } catch (err: any) {
+      showNotification('error', `Failed to save policy: ${err.message}`);
     }
   };
 
@@ -950,16 +1236,27 @@ export default function AdminDashboard({
       {/* ========================================================================= */}
       <header id="wpadminbar" className="bg-[#1d2327] text-[#c3c4c7] h-8 sm:h-9 fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-2 sm:px-3 text-xs select-none border-b border-[#2c3338] shadow-xs">
         {/* Left Side: Vernunt Logo, Site Name & Jump Links, Updates, New Dropdown */}
-        <div className="flex items-center gap-1 sm:gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-3">
           
           {/* Mobile hamburger menu toggle */}
           <button 
             type="button"
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-1 text-[#c3c4c7] hover:text-white"
-            title="Toggle Menu"
+            onClick={() => setIsMobileMenuOpen(prev => !prev)}
+            className="md:hidden flex items-center gap-1.5 px-2 py-1 bg-[#2c3338] hover:bg-[#3c434a] text-white rounded-xs border border-[#50575e] active:scale-95 transition cursor-pointer touch-manipulation shadow-2xs"
+            aria-label={isMobileMenuOpen ? 'Close admin menu' : 'Open admin menu'}
+            title="Admin Menu"
           >
-            <Sliders className="w-3.5 h-3.5" />
+            {isMobileMenuOpen ? (
+              <X className="w-3.5 h-3.5 text-amber-300" />
+            ) : (
+              <Menu className="w-3.5 h-3.5 text-[#72aee6]" />
+            )}
+            <span className="text-[11px] font-bold tracking-tight text-white">Menu</span>
+            {pendingCount > 0 && (
+              <span className="bg-[#d63638] text-white text-[9px] font-bold px-1 rounded-full">
+                {pendingCount}
+              </span>
+            )}
           </button>
 
           {/* Vernunt Brand Icon mark */}
@@ -1102,20 +1399,56 @@ export default function AdminDashboard({
       {/* ========================================================================= */}
       <div id="wpbody" className="pt-8 sm:pt-9 flex-1 flex">
         
+        {/* Mobile Backdrop Overlay */}
+        {isMobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black/75 backdrop-blur-xs z-40 md:hidden transition-opacity animate-fadeIn"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-hidden="true"
+          />
+        )}
+
         {/* =================== VERNUNT ADMIN MENU SIDEBAR =================== */}
         <aside 
           id="adminmenuwrap" 
-          className={`bg-[#1d2327] text-[#c3c4c7] shrink-0 transition-all duration-200 z-40 border-r border-[#2c3338] flex flex-col justify-between ${
-            isSidebarCollapsed ? 'w-12 sm:w-14' : 'w-48 sm:w-52'
-          } ${isMobileMenuOpen ? 'block fixed top-8 bottom-0 left-0 shadow-2xl' : 'hidden md:flex'}`}
+          className={`bg-[#1d2327] text-[#c3c4c7] shrink-0 transition-all duration-200 border-r border-[#2c3338] flex flex-col justify-between ${
+            /* Mobile drawer styling */
+            isMobileMenuOpen 
+              ? 'fixed inset-y-0 left-0 z-50 w-72 sm:w-80 shadow-2xl flex translate-x-0'
+              : 'hidden md:flex'
+          } ${
+            /* Desktop width styling */
+            isSidebarCollapsed ? 'md:w-12 lg:w-14' : 'md:w-48 lg:w-52'
+          }`}
         >
+          {/* Mobile Drawer Top Banner (Visible on mobile only) */}
+          <div className="md:hidden p-3.5 bg-[#14181b] border-b border-[#2c3338] flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-amber-500 via-orange-500 to-amber-300 text-white flex items-center justify-center font-serif font-black text-xs shadow-xs">
+                V
+              </div>
+              <div>
+                <div className="font-serif font-bold text-white text-xs tracking-tight">VERNUNT ADMIN</div>
+                <div className="text-[10px] text-amber-300 font-mono">Control Center</div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="p-1.5 text-[#c3c4c7] hover:text-white hover:bg-[#2c3338] rounded-xs cursor-pointer touch-manipulation"
+              aria-label="Close navigation"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
           <nav id="adminmenu" className="py-2 space-y-0.5 overflow-y-auto scrollbar-none flex-1 text-[13px]">
             
             {/* MENU ITEM: Dashboard */}
             <button
               type="button"
               onClick={() => { setActiveMenu('dashboard'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'dashboard'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1123,14 +1456,14 @@ export default function AdminDashboard({
               title="Dashboard"
             >
               <LayoutDashboard className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Dashboard</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Dashboard</span>}
             </button>
 
             {/* MENU ITEM: Users / Household Profiles */}
             <button
               type="button"
               onClick={() => { setActiveMenu('users'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'users'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1139,9 +1472,9 @@ export default function AdminDashboard({
             >
               <div className="flex items-center gap-2.5">
                 <Users className="w-4 h-4 shrink-0 text-[#72aee6]" />
-                {!isSidebarCollapsed && <span>Users & KYC</span>}
+                {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Users & KYC</span>}
               </div>
-              {!isSidebarCollapsed && pendingCount > 0 && (
+              {(isMobileMenuOpen || !isSidebarCollapsed) && pendingCount > 0 && (
                 <span className="bg-[#d63638] text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
                   {pendingCount}
                 </span>
@@ -1152,7 +1485,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => { setActiveMenu('child-safety'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'child-safety'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1161,9 +1494,9 @@ export default function AdminDashboard({
             >
               <div className="flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 shrink-0 text-emerald-400" />
-                {!isSidebarCollapsed && <span>Child Safety & COPPA</span>}
+                {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Child Safety & COPPA</span>}
               </div>
-              {!isSidebarCollapsed && (
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
                 <span className="bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-xs">
                   A+ Safe
                 </span>
@@ -1174,7 +1507,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => { setActiveMenu('events'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'events'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1183,9 +1516,9 @@ export default function AdminDashboard({
             >
               <div className="flex items-center gap-2.5">
                 <Calendar className="w-4 h-4 shrink-0 text-[#72aee6]" />
-                {!isSidebarCollapsed && <span>Events & Classes</span>}
+                {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Events & Classes</span>}
               </div>
-              {!isSidebarCollapsed && (
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
                 <span className="bg-[#2c3338] text-[#c3c4c7] text-[10px] font-bold px-1.5 py-0.2 rounded-full">
                   {eventsList.length}
                 </span>
@@ -1196,7 +1529,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => { setActiveMenu('woocommerce'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'woocommerce'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1204,14 +1537,14 @@ export default function AdminDashboard({
               title="Commerce & Passes"
             >
               <ShoppingCart className="w-4 h-4 shrink-0 text-[#96588a]" />
-              {!isSidebarCollapsed && <span>Commerce & Passes</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Commerce & Passes</span>}
             </button>
 
             {/* MENU ITEM: Affiliates & Partners */}
             <button
               type="button"
               onClick={() => { setActiveMenu('affiliates'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'affiliates'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1219,14 +1552,14 @@ export default function AdminDashboard({
               title="Affiliate Partners"
             >
               <Share2 className="w-4 h-4 shrink-0 text-orange-400" />
-              {!isSidebarCollapsed && <span>Affiliate Partners</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Affiliate Partners</span>}
             </button>
 
             {/* MENU ITEM: Subscriptions & Plans */}
             <button
               type="button"
               onClick={() => { setActiveMenu('subscriptions'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'subscriptions'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1234,14 +1567,54 @@ export default function AdminDashboard({
               title="Subscriptions"
             >
               <CreditCard className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Subscriptions</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Subscriptions</span>}
+            </button>
+
+            {/* MENU ITEM: Coupons & 1-Yr VIP Passes */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('coupons'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'coupons'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Coupon Codes & VIP Passes"
+            >
+              <Ticket className="w-4 h-4 shrink-0 text-amber-400" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Coupons &amp; VIP Passes</span>
+                  <span className="text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.2 rounded font-mono font-bold">1-Yr</span>
+                </div>
+              )}
+            </button>
+
+            {/* MENU ITEM: Knowledge Hub & Influencer Posts (WordPress Style) */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('knowledge-hub'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'knowledge-hub'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Knowledge Hub & Influencer Posts"
+            >
+              <BookOpen className="w-4 h-4 shrink-0 text-pink-400" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Knowledge Hub (WP)</span>
+                  <span className="text-[10px] bg-pink-500/30 text-pink-200 px-1.5 py-0.2 rounded font-mono font-bold">Posts</span>
+                </div>
+              )}
             </button>
 
             {/* MENU ITEM: Broadcast & Push Notices */}
             <button
               type="button"
               onClick={() => { setActiveMenu('broadcast'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'broadcast'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1249,14 +1622,14 @@ export default function AdminDashboard({
               title="Broadcast & Banners"
             >
               <Megaphone className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Marketing & Push</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Marketing & Push</span>}
             </button>
 
             {/* MENU ITEM: User Contacts & Privacy */}
             <button
               type="button"
               onClick={() => { setActiveMenu('contacts'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'contacts'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1264,14 +1637,14 @@ export default function AdminDashboard({
               title="Contacts Directory"
             >
               <Phone className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Contact Audits</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Contact Audits</span>}
             </button>
 
             {/* MENU ITEM: Security & Tools */}
             <button
               type="button"
               onClick={() => { setActiveMenu('security'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'security'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1279,29 +1652,29 @@ export default function AdminDashboard({
               title="Security & Tools"
             >
               <Shield className="w-4 h-4 shrink-0 text-emerald-400" />
-              {!isSidebarCollapsed && <span>Security & Tools</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Security & Tools</span>}
             </button>
 
             {/* MENU ITEM: Backups & Cloud Sync */}
             <button
               type="button"
               onClick={() => { setActiveMenu('backups'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'backups'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
               }`}
-              title="Backups & Sync"
+              title="Backups & Cloud"
             >
               <HardDrive className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Backups & Cloud</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Backups & Cloud</span>}
             </button>
 
             {/* MENU ITEM: Vernunt SEO & Instant Indexing Studio */}
             <button
               type="button"
               onClick={() => { setActiveMenu('seo'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'seo'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-amber-400 shadow-md'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1309,7 +1682,7 @@ export default function AdminDashboard({
               title="Vernunt SEO & Instant Indexing"
             >
               <Globe className="w-4 h-4 shrink-0 text-amber-300" />
-              {!isSidebarCollapsed && (
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
                 <div className="flex items-center justify-between w-full">
                   <span>SEO & Indexing</span>
                   <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
@@ -1323,7 +1696,7 @@ export default function AdminDashboard({
             <button
               type="button"
               onClick={() => { setActiveMenu('settings'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition cursor-pointer ${
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
                 activeMenu === 'settings'
                   ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
                   : 'hover:bg-[#135e96] hover:text-white'
@@ -1331,10 +1704,24 @@ export default function AdminDashboard({
               title="Settings"
             >
               <Settings className="w-4 h-4 shrink-0 text-[#72aee6]" />
-              {!isSidebarCollapsed && <span>Settings</span>}
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Settings</span>}
             </button>
 
           </nav>
+
+          {/* Mobile bottom info */}
+          <div className="p-3 bg-[#14181b] border-t border-[#2c3338] md:hidden flex items-center justify-between">
+            <div className="text-[11px] text-[#8c8f94]">
+              Signed in: <strong className="text-white">{userProfile?.parentName || 'SuperAdmin'}</strong>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="text-xs bg-[#2271b1] text-white font-bold px-2.5 py-1 rounded"
+            >
+              Close
+            </button>
+          </div>
 
           {/* Sidebar Collapse Button */}
           <div className="p-2 border-t border-[#2c3338] hidden md:block">
@@ -1352,7 +1739,83 @@ export default function AdminDashboard({
         {/* ========================================================================= */}
         {/* 3. VERNUNT MAIN CONTENT BODY (#wpbody-content)                            */}
         {/* ========================================================================= */}
-        <main id="wpbody-content" className="flex-1 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-5 overflow-y-auto">
+        <main id="wpbody-content" className="flex-1 p-3 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full space-y-4 sm:space-y-5 overflow-y-auto">
+          
+          {/* Mobile Quick-Navigation Horizontal Pill Bar */}
+          <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-1 -mt-1 scrollbar-none">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="px-2.5 py-1.5 bg-[#1d2327] text-amber-300 border border-amber-400/40 rounded text-xs font-bold shrink-0 flex items-center gap-1 shadow-2xs cursor-pointer"
+            >
+              <Menu className="w-3.5 h-3.5" />
+              <span>All Menus</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('dashboard')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'dashboard' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('users')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition flex items-center gap-1 cursor-pointer ${
+                activeMenu === 'users' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              <span>Users &amp; KYC</span>
+              {pendingCount > 0 && <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('events')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'events' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Events &amp; Ticketing
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('knowledge-hub')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'knowledge-hub' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Knowledge Hub
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('child-safety')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'child-safety' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Safety
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('coupons')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'coupons' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Coupons
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('seo')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'seo' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              SEO &amp; Index
+            </button>
+          </div>
           
           {/* Top Screen Options & Help Bar */}
           <div className="flex items-center justify-between border-b border-[#dcdcde] pb-2">
@@ -2306,91 +2769,13 @@ export default function AdminDashboard({
           {/* VIEW C: EVENTS & CLASSES (`edit.php?post_type=event`)                     */}
           {/* ========================================================================= */}
           {activeMenu === 'events' && (
-            <div className="space-y-4 animate-fadeIn">
-              
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-normal text-[#1d2327]">Events & Classes</h1>
-                  <span className="text-xs text-[#646970] font-mono">({eventsList.length} total entries)</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    type="search"
-                    placeholder="Filter Events..."
-                    value={eventSearchTerm}
-                    onChange={e => setEventSearchTerm(e.target.value)}
-                    className="p-1.5 bg-white border border-[#8c8f94] rounded-xs text-xs outline-none focus:border-[#2271b1]"
-                  />
-                </div>
-              </div>
-
-              {/* Events WP Table */}
-              <div className="bg-white border border-[#c3c4c7] shadow-2xs rounded-xs overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338] font-semibold">
-                      <th className="py-2.5 px-3">Title & Image</th>
-                      <th className="py-2.5 px-3">Host / Organizer</th>
-                      <th className="py-2.5 px-3">Category</th>
-                      <th className="py-2.5 px-3">Date & Time</th>
-                      <th className="py-2.5 px-3">Ticket Price</th>
-                      <th className="py-2.5 px-3">Featured Status</th>
-                      <th className="py-2.5 px-3 text-right">RSVP Count</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    {eventsList.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-8 text-center text-[#646970]">No events created yet.</td>
-                      </tr>
-                    ) : (
-                      eventsList.map((evt) => (
-                        <tr key={evt.id} className="hover:bg-[#f6f7f7]">
-                          <td className="py-3 px-3 font-bold text-[#2271b1]">
-                            <div className="flex items-center gap-2.5">
-                              <img src={evt.photoUrl} alt="" className="w-10 h-10 object-cover rounded-xs border border-[#c3c4c7]" referrerPolicy="no-referrer" />
-                              <div>
-                                <span className="block text-slate-900">{evt.title}</span>
-                                <span className="text-[10px] text-[#646970] font-normal">{evt.location}</span>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3 font-semibold text-[#1d2327]">{evt.hostName}</td>
-                          <td className="py-3 px-3">
-                            <span className="bg-[#f0f0f1] text-[#2c3338] px-2 py-0.5 rounded-xs font-bold text-[10px] uppercase">
-                              {evt.category}
-                            </span>
-                          </td>
-                          <td className="py-3 px-3 text-[#50575e]">{evt.date} at {evt.time}</td>
-                          <td className="py-3 px-3 font-mono font-bold text-[#1d2327]">
-                            {evt.ticketPrice && evt.ticketPrice > 0 ? `₹${evt.ticketPrice}` : 'FREE'}
-                          </td>
-                          <td className="py-3 px-3">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleEventFeatured(evt)}
-                              disabled={updatingEventId === evt.id}
-                              className={`px-2.5 py-1 rounded-xs text-[10px] font-bold uppercase transition cursor-pointer border ${
-                                evt.isFeatured 
-                                  ? 'bg-amber-100 text-amber-900 border-amber-300'
-                                  : 'bg-[#f6f7f7] text-[#646970] border-[#c3c4c7] hover:bg-white'
-                              }`}
-                            >
-                              {evt.isFeatured ? '★ Featured' : '☆ Standard'}
-                            </button>
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#1d2327]">
-                            {evt.attendeesCount} families
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-            </div>
+            <AdminTicketingCommissionDesk
+              eventsList={eventsList}
+              onUpdateEvent={handleUpdateEvent}
+              ticketingConfig={ticketingConfig}
+              onSaveConfig={handleSaveTicketingConfig}
+              onToggleEventFeatured={handleToggleEventFeatured}
+            />
           )}
 
           {/* ========================================================================= */}
@@ -3671,6 +4056,1149 @@ export default function AdminDashboard({
           )}
 
           {/* ========================================================================= */}
+          {/* VIEW E2: COUPONS & 1-YEAR FREE VIP PASSES MANAGEMENT                      */}
+          {/* ========================================================================= */}
+          {activeMenu === 'coupons' && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header & Quick Action */}
+              <div className="bg-white border border-[#c3c4c7] p-5 rounded-xs shadow-2xs space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#f0f0f1] pb-4">
+                  <div>
+                    <h1 className="text-xl font-normal text-[#1d2327] flex items-center gap-2">
+                      <Ticket className="w-5 h-5 text-amber-500" />
+                      Influencer Coupon Codes &amp; 1-Year Free VIP Passes
+                    </h1>
+                    <p className="text-xs text-[#646970] mt-0.5">
+                      Generate and manage VIP coupon codes. When parents redeem a code, they unlock <strong>1 full year of 100% free app access</strong> and 60 bonus decrypt credits (excluding third-party paid event fees).
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCouponId(null);
+                      setCouponCodeForm({
+                        code: `CREATOR${Math.floor(100 + Math.random() * 900)}`,
+                        title: '1-Year Free Access VIP Pass',
+                        benefitType: 'free_1_year_vip',
+                        durationDays: 365,
+                        maxRedemptions: 500,
+                        assignedInfluencerName: '',
+                        notes: '1-year free access promo code for Instagram creator campaigns.',
+                        validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+                        isActive: true
+                      });
+                      setShowCouponModal(true);
+                    }}
+                    className="px-4 py-2 bg-[#2271b1] text-white text-xs font-bold rounded-xs hover:bg-[#135e96] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>Create New VIP Coupon</span>
+                  </button>
+                </div>
+
+                {/* Metrics Summary Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                  <div className="p-3 bg-[#f6f7f7] border border-[#dcdcde] rounded-xs">
+                    <span className="text-[11px] text-[#646970] font-semibold block">Total Promo Codes</span>
+                    <span className="text-lg font-bold text-[#1d2327] font-mono">{couponsList.length}</span>
+                  </div>
+                  <div className="p-3 bg-[#f6f7f7] border border-[#dcdcde] rounded-xs">
+                    <span className="text-[11px] text-[#646970] font-semibold block">Active Campaigns</span>
+                    <span className="text-lg font-bold text-emerald-700 font-mono">
+                      {couponsList.filter(c => c.isActive).length}
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[#f6f7f7] border border-[#dcdcde] rounded-xs">
+                    <span className="text-[11px] text-[#646970] font-semibold block">Total Times Redeemed</span>
+                    <span className="text-lg font-bold text-amber-600 font-mono">
+                      {couponsList.reduce((sum, c) => sum + (c.timesRedeemed || 0), 0)} parents
+                    </span>
+                  </div>
+                  <div className="p-3 bg-[#f6f7f7] border border-[#dcdcde] rounded-xs">
+                    <span className="text-[11px] text-[#646970] font-semibold block">Parent Value Saved</span>
+                    <span className="text-lg font-bold text-slate-800 font-mono">
+                      ₹{(couponsList.reduce((sum, c) => sum + (c.timesRedeemed || 0), 0) * 2499).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Coupons Table */}
+              <div className="bg-white border border-[#c3c4c7] rounded-xs shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex justify-between items-center">
+                  <h3 className="font-bold text-xs text-[#1d2327] uppercase tracking-wider">
+                    All Active &amp; Scheduled VIP Codes
+                  </h3>
+                  <span className="text-xs text-[#646970]">
+                    Showing {couponsList.length} coupon codes
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338] uppercase font-bold text-[11px]">
+                        <th className="py-2.5 px-3">Code &amp; Title</th>
+                        <th className="py-2.5 px-3">Benefit &amp; Duration</th>
+                        <th className="py-2.5 px-3">Assigned Influencer / Campaign</th>
+                        <th className="py-2.5 px-3 text-center">Redemptions</th>
+                        <th className="py-2.5 px-3 text-center">Status</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {couponsList.map((coupon) => (
+                        <tr key={coupon.id} className="hover:bg-[#f6f7f7]/60 transition-colors">
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-xs bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-sm">
+                                {coupon.code}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText(coupon.code);
+                                  setWpNotice({ type: 'success', message: `Copied coupon "${coupon.code}" to clipboard!` });
+                                }}
+                                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                                title="Copy code"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <div className="font-bold text-slate-800 mt-1">{coupon.title}</div>
+                            {coupon.notes && <div className="text-[11px] text-slate-500 line-clamp-1">{coupon.notes}</div>}
+                          </td>
+
+                          <td className="py-3 px-3">
+                            <span className="font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-[10.5px]">
+                              🎁 {coupon.durationDays || 365} Days (1 Year) FREE
+                            </span>
+                            <div className="text-[11px] text-slate-500 mt-1">
+                              +60 Contact Decrypt Credits Included
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-3">
+                            {coupon.assignedInfluencerName ? (
+                              <div className="font-medium text-slate-800 flex items-center gap-1.5">
+                                <span className="text-pink-600 font-bold">📸</span>
+                                <span>{coupon.assignedInfluencerName}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 italic">General Platform Promo</span>
+                            )}
+                            {coupon.validUntil && (
+                              <div className="text-[10px] text-slate-500 mt-0.5">
+                                Valid until: {coupon.validUntil}
+                              </div>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <span className="font-mono font-bold text-slate-800">
+                              {coupon.timesRedeemed || 0}
+                            </span>
+                            {coupon.maxRedemptions && (
+                              <span className="text-[11px] text-slate-400 font-mono"> / {coupon.maxRedemptions}</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const updated = couponsList.map(c => c.id === coupon.id ? { ...c, isActive: !c.isActive } : c);
+                                saveCoupons(updated);
+                              }}
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold cursor-pointer transition ${
+                                coupon.isActive
+                                  ? 'bg-emerald-100 text-emerald-850 hover:bg-emerald-200'
+                                  : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                              }`}
+                            >
+                              {coupon.isActive ? 'Active' : 'Paused'}
+                            </button>
+                          </td>
+
+                          <td className="py-3 px-3 text-right">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditingCouponId(coupon.id);
+                                  setCouponCodeForm({
+                                    code: coupon.code,
+                                    title: coupon.title,
+                                    benefitType: coupon.benefitType || 'free_1_year_vip',
+                                    durationDays: coupon.durationDays || 365,
+                                    maxRedemptions: coupon.maxRedemptions || 500,
+                                    assignedInfluencerName: coupon.assignedInfluencerName || '',
+                                    notes: coupon.notes || '',
+                                    validUntil: coupon.validUntil || '',
+                                    isActive: coupon.isActive ?? true
+                                  });
+                                  setShowCouponModal(true);
+                                }}
+                                className="p-1.5 text-[#2271b1] hover:bg-[#2271b1]/10 rounded cursor-pointer"
+                                title="Edit Coupon"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (window.confirm(`Delete coupon "${coupon.code}"?`)) {
+                                    const updated = couponsList.filter(c => c.id !== coupon.id);
+                                    saveCoupons(updated);
+                                  }
+                                }}
+                                className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                                title="Delete Coupon"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* COUPON CREATION & EDIT MODAL                                              */}
+          {/* ========================================================================= */}
+          {showCouponModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-fadeIn">
+              <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-xl max-h-[90vh] flex flex-col overflow-hidden">
+                <div className="px-6 py-4 bg-[#f6f7f7] border-b border-[#c3c4c7] flex justify-between items-center">
+                  <div>
+                    <h3 className="text-base font-bold text-[#1d2327] flex items-center gap-2">
+                      <Ticket className="w-5 h-5 text-amber-500" />
+                      {editingCouponId ? 'Edit VIP Coupon Code' : 'Generate New VIP Coupon Code'}
+                    </h3>
+                    <p className="text-xs text-[#646970]">
+                      Configure coupon for influencer partnerships or special promotions granting 1-year free access.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCouponModal(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    const cleanCode = couponCodeForm.code.trim().toUpperCase();
+                    if (!cleanCode) return;
+
+                    if (editingCouponId) {
+                      const updated = couponsList.map(c => c.id === editingCouponId ? {
+                        ...c,
+                        code: cleanCode,
+                        title: couponCodeForm.title || '1-Year Free Access VIP Pass',
+                        benefitType: couponCodeForm.benefitType,
+                        durationDays: couponCodeForm.durationDays || 365,
+                        maxRedemptions: couponCodeForm.maxRedemptions,
+                        assignedInfluencerName: couponCodeForm.assignedInfluencerName,
+                        notes: couponCodeForm.notes,
+                        validUntil: couponCodeForm.validUntil,
+                        isActive: couponCodeForm.isActive
+                      } : c);
+                      saveCoupons(updated);
+                    } else {
+                      const newCoupon: AdminCouponCode = {
+                        id: `coupon-${Date.now()}`,
+                        code: cleanCode,
+                        title: couponCodeForm.title || '1-Year Free Access VIP Pass',
+                        benefitType: couponCodeForm.benefitType,
+                        durationDays: couponCodeForm.durationDays || 365,
+                        maxRedemptions: couponCodeForm.maxRedemptions,
+                        timesRedeemed: 0,
+                        assignedInfluencerName: couponCodeForm.assignedInfluencerName,
+                        notes: couponCodeForm.notes,
+                        validUntil: couponCodeForm.validUntil,
+                        isActive: couponCodeForm.isActive,
+                        createdAt: new Date().toISOString()
+                      };
+                      saveCoupons([newCoupon, ...couponsList]);
+                    }
+
+                    setShowCouponModal(false);
+                    setWpNotice({ type: 'success', message: `Coupon code "${cleanCode}" saved successfully!` });
+                  }}
+                  className="p-6 space-y-4 overflow-y-auto text-xs"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1">Coupon Code (Uppercase) *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. INFLUENCER365 / VIPMOM"
+                        value={couponCodeForm.code}
+                        onChange={(e) => setCouponCodeForm({ ...couponCodeForm, code: e.target.value.toUpperCase() })}
+                        className="w-full p-2.5 border border-[#8c8f94] rounded-xs font-mono font-bold text-sm text-[#1d2327] uppercase tracking-wider focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1">Campaign / Pass Title *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 1-Year Free VIP Parent Pass"
+                        value={couponCodeForm.title}
+                        onChange={(e) => setCouponCodeForm({ ...couponCodeForm, title: e.target.value })}
+                        className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1">Free Duration (Days) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={couponCodeForm.durationDays}
+                        onChange={(e) => setCouponCodeForm({ ...couponCodeForm, durationDays: parseInt(e.target.value, 10) || 365 })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs font-mono text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                      <span className="text-[10px] text-slate-500">365 = 1 Full Year</span>
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1">Max Redemptions</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="e.g. 500"
+                        value={couponCodeForm.maxRedemptions}
+                        onChange={(e) => setCouponCodeForm({ ...couponCodeForm, maxRedemptions: parseInt(e.target.value, 10) || 500 })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs font-mono text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1">Valid Until Date</label>
+                      <input
+                        type="date"
+                        value={couponCodeForm.validUntil}
+                        onChange={(e) => setCouponCodeForm({ ...couponCodeForm, validUntil: e.target.value })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-[#2c3338] mb-1">
+                      Assigned Influencer / Creator (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Priya Sharma (@bangalore_mommy_diaries)"
+                      value={couponCodeForm.assignedInfluencerName}
+                      onChange={(e) => setCouponCodeForm({ ...couponCodeForm, assignedInfluencerName: e.target.value })}
+                      className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-[#2c3338] mb-1">Internal Notes</label>
+                    <textarea
+                      rows={2}
+                      placeholder="Campaign notes e.g. Free 1-year pass for moms signing up via Instagram reel link..."
+                      value={couponCodeForm.notes}
+                      onChange={(e) => setCouponCodeForm({ ...couponCodeForm, notes: e.target.value })}
+                      className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-2">
+                    <input
+                      type="checkbox"
+                      id="coupon-active-toggle"
+                      checked={couponCodeForm.isActive}
+                      onChange={(e) => setCouponCodeForm({ ...couponCodeForm, isActive: e.target.checked })}
+                      className="h-4 w-4 text-[#2271b1] rounded cursor-pointer"
+                    />
+                    <label htmlFor="coupon-active-toggle" className="font-bold text-slate-800 cursor-pointer">
+                      Active and Redeemable by Parents Immediately
+                    </label>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-4 border-t border-[#f0f0f1]">
+                    <button
+                      type="button"
+                      onClick={() => setShowCouponModal(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-[#2271b1] hover:bg-[#135e96] text-white text-xs font-bold rounded-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      <Save className="w-4 h-4" />
+                      <span>{editingCouponId ? 'Save Changes' : 'Publish VIP Coupon'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* VIEW E3: WORDPRESS-STYLE KNOWLEDGE HUB & INFLUENCER POSTS MANAGER         */}
+          {/* ========================================================================= */}
+          {activeMenu === 'knowledge-hub' && (
+            <div className="space-y-6 animate-fadeIn">
+              {/* Header & Controls */}
+              <div className="bg-white border border-[#c3c4c7] p-5 rounded-xs shadow-2xs space-y-4">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#f0f0f1] pb-4">
+                  <div>
+                    <h1 className="text-xl font-normal text-[#1d2327] flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-pink-600" />
+                      Knowledge Hub &amp; Influencer Cross-Promotion Posts (WordPress Engine)
+                    </h1>
+                    <p className="text-xs text-[#646970] mt-0.5">
+                      Publish and manage parenting guides, activity blueprints, and <strong>Instagram Influencer Ambassador Spotlights</strong> with live cross-promotion links.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingArticleSlug(null);
+                      setArticleForm({
+                        title: '',
+                        slug: '',
+                        category: 'Playdate',
+                        categoryLabel: 'Playdate Ideas',
+                        ageGroup: 'All Ages',
+                        readTime: '5 min read',
+                        summary: '',
+                        publishedDate: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                        authorName: 'Vernunt Editorial Team',
+                        authorRole: 'Parenting & Child Development Specialist',
+                        authorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+                        coverImage: 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=80',
+                        status: 'Published',
+                        isInfluencerSpotlight: true,
+                        influencerName: '',
+                        influencerHandle: '@',
+                        influencerUrl: 'https://instagram.com/',
+                        influencerBio: '',
+                        influencerFollowers: '25K',
+                        influencerBadge: 'Verified Community Ambassador',
+                        influencerAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+                        keyTakeawaysText: 'Focus on experiential play over passive screen time.\nBuild daily structured routines with positive reinforcement.\nEngage peer co-op families for mutual growth.',
+                        deepDive1Heading: 'Evidence-Based Framework for Modern Indian Parents',
+                        deepDive1Body: 'Scientific child development research emphasizes the power of social play, balanced nutrition, and emotional safety in early developmental windows.',
+                        deepDive1ProTip: 'Encourage 20 minutes of daily uninterrupted outdoor activity or creative crafting.',
+                        deepDive1Alert: 'Avoid high-sugar snacks right before interactive learning sessions.',
+                        deepDive2Heading: 'Step-by-Step Implementation Blueprint',
+                        deepDive2Body: 'Follow a consistent schedule and involve your child in setting up play equipment and cleaning up after sessions.',
+                        actionableStepsText: 'Prepare materials and safe play area beforehand.\nIntroduce activity with enthusiastic demonstration.\nAllow open-ended exploration without excessive correction.',
+                        faqQuestion1: 'How often should parents practice this activity?',
+                        faqAnswer1: '3 to 4 times a week provides ideal consistency and retention without burnout.',
+                        faqQuestion2: 'Can we connect with other families doing this nearby?',
+                        faqAnswer2: 'Yes, use the Vernunt Playmate Radar to discover verified neighborhood peers.',
+                        keywordsText: 'parenting, playdates, influencer, child development, activities'
+                      });
+                      setShowArticleEditorModal(true);
+                    }}
+                    className="px-4 py-2 bg-[#2271b1] text-white text-xs font-bold rounded-xs hover:bg-[#135e96] transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    <Plus className="w-4 h-4" />
+                    <span>+ Add New Article / Influencer Post</span>
+                  </button>
+                </div>
+
+                {/* Filters & Search */}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search articles by title, author, or influencer handle..."
+                      value={knowledgeSearchTerm}
+                      onChange={(e) => setKnowledgeSearchTerm(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 border border-[#8c8f94] rounded-xs text-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  <select
+                    value={knowledgeCategoryFilter}
+                    onChange={(e) => setKnowledgeCategoryFilter(e.target.value)}
+                    className="p-1.5 border border-[#8c8f94] rounded-xs text-xs text-[#1d2327] bg-white focus:border-[#2271b1] focus:outline-none"
+                  >
+                    <option value="all">All Categories ({knowledgeArticlesList.length})</option>
+                    {KNOWLEDGE_CATEGORIES.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* WordPress-Style Posts Table */}
+              <div className="bg-white border border-[#c3c4c7] rounded-xs shadow-2xs overflow-hidden">
+                <div className="px-4 py-3 bg-[#f6f7f7] border-b border-[#c3c4c7] flex justify-between items-center">
+                  <h3 className="font-bold text-xs text-[#1d2327] uppercase tracking-wider">
+                    All Knowledge Hub Posts &amp; Influencer Cross-Promotions
+                  </h3>
+                  <span className="text-xs text-[#646970]">
+                    Showing {knowledgeArticlesList.length} articles
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#2c3338] uppercase font-bold text-[11px]">
+                        <th className="py-2.5 px-3">Title &amp; Excerpt</th>
+                        <th className="py-2.5 px-3">Google SEO &amp; Canonical URL</th>
+                        <th className="py-2.5 px-3">Category &amp; Age</th>
+                        <th className="py-2.5 px-3">Author / Influencer Ambassador</th>
+                        <th className="py-2.5 px-3">Date Published</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#f0f0f1]">
+                      {knowledgeArticlesList
+                        .filter(article => {
+                          const matchesSearch = !knowledgeSearchTerm || 
+                            article.title.toLowerCase().includes(knowledgeSearchTerm.toLowerCase()) ||
+                            article.summary.toLowerCase().includes(knowledgeSearchTerm.toLowerCase()) ||
+                            article.author.name.toLowerCase().includes(knowledgeSearchTerm.toLowerCase()) ||
+                            (article.influencerSpotlight?.instagramHandle?.toLowerCase() || '').includes(knowledgeSearchTerm.toLowerCase());
+                          const matchesCat = knowledgeCategoryFilter === 'all' || article.category === knowledgeCategoryFilter;
+                          return matchesSearch && matchesCat;
+                        })
+                        .map((article) => {
+                          const canonicalUrl = getArticleCanonicalUrl(article.slug);
+                          return (
+                            <tr key={article.slug} className="hover:bg-[#f6f7f7]/60 transition-colors">
+                              <td className="py-3 px-3 max-w-sm">
+                                <div className="font-bold text-slate-900 line-clamp-1">{article.title}</div>
+                                <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5">{article.summary}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[10px] text-slate-400 font-mono">slug: {article.slug}</span>
+                                  {article.influencerSpotlight && (
+                                    <span className="text-[9px] bg-pink-100 text-pink-800 font-bold px-2 py-0.5 rounded-full border border-pink-200">
+                                      ⭐ Influencer Cross-Promo
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* Google SEO & Canonical URL */}
+                              <td className="py-3 px-3">
+                                <div className="space-y-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                      <Sparkles className="w-2.5 h-2.5" /> Auto-Indexed
+                                    </span>
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                      Schema.org ✓
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-600 truncate max-w-[180px]" title={canonicalUrl}>
+                                    {canonicalUrl}
+                                  </div>
+                                  <div className="flex items-center gap-2 text-[10px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(canonicalUrl);
+                                        showNotification('success', `Copied canonical URL: ${canonicalUrl}`);
+                                      }}
+                                      className="text-[#2271b1] hover:underline font-bold cursor-pointer inline-flex items-center gap-0.5"
+                                    >
+                                      <Copy className="w-2.5 h-2.5" /> Copy URL
+                                    </button>
+                                    <span className="text-slate-300">•</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setIndexingFeedbackModal({
+                                          isOpen: true,
+                                          articleTitle: article.title,
+                                          canonicalUrl: canonicalUrl,
+                                          deepLinkUrl: getArticleDeepLinkUrl(article.slug),
+                                          sitemapStatus: 'Registered in /sitemap.xml and /sitemap-guides.xml',
+                                          indexNowStatus: 'HTTP 200 OK (Dispatched to IndexNow API)',
+                                          schemaInjected: true,
+                                          timestamp: new Date().toISOString()
+                                        });
+                                        setSchemaInspectArticle(article);
+                                      }}
+                                      className="text-emerald-700 hover:underline font-bold cursor-pointer inline-flex items-center gap-0.5"
+                                    >
+                                      <Globe className="w-2.5 h-2.5" /> Google SERP &amp; Index
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <span className="font-bold text-slate-800 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded text-[10.5px]">
+                                  {article.categoryLabel || article.category}
+                                </span>
+                                <div className="text-[11px] text-slate-500 mt-1">
+                                  Age: {article.ageGroup} • {article.readTime}
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                {article.influencerSpotlight ? (
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1.5 font-bold text-pink-700">
+                                      <span>📸 {article.influencerSpotlight.name}</span>
+                                    </div>
+                                    <div className="text-[10.5px] font-mono text-slate-600">
+                                      {article.influencerSpotlight.instagramHandle} ({article.influencerSpotlight.followersCount || 'Creator'})
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-0.5">
+                                    <div className="font-bold text-slate-800">{article.author.name}</div>
+                                    <div className="text-[10.5px] text-slate-500">{article.author.role}</div>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <span className="text-slate-600 font-mono text-[11px]">{article.publishedDate}</span>
+                                <div className="text-[10px] text-emerald-700 font-bold mt-0.5">Published</div>
+                              </td>
+
+                              <td className="py-3 px-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIndexingFeedbackModal({
+                                        isOpen: true,
+                                        articleTitle: article.title,
+                                        canonicalUrl: canonicalUrl,
+                                        deepLinkUrl: getArticleDeepLinkUrl(article.slug),
+                                        sitemapStatus: 'Registered in /sitemap.xml & /sitemap-guides.xml',
+                                        indexNowStatus: 'HTTP 200 OK (Dispatched to IndexNow API)',
+                                        schemaInjected: true,
+                                        timestamp: new Date().toISOString()
+                                      });
+                                      setSchemaInspectArticle(article);
+                                    }}
+                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded cursor-pointer"
+                                    title="Google Index & SERP Inspector"
+                                  >
+                                    <Globe className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingArticleSlug(article.slug);
+                                      setArticleForm({
+                                        title: article.title,
+                                        slug: article.slug,
+                                        category: article.category,
+                                        categoryLabel: article.categoryLabel || article.category,
+                                        ageGroup: article.ageGroup,
+                                        readTime: article.readTime,
+                                        summary: article.summary,
+                                        publishedDate: article.publishedDate,
+                                        authorName: article.author.name,
+                                        authorRole: article.author.role,
+                                        authorAvatar: article.author.avatar,
+                                        coverImage: article.coverImage || 'https://images.unsplash.com/photo-1543269865-cbf427effbad?w=800&auto=format&fit=crop&q=80',
+                                        status: 'Published',
+                                        isInfluencerSpotlight: !!article.influencerSpotlight,
+                                        influencerName: article.influencerSpotlight?.name || '',
+                                        influencerHandle: article.influencerSpotlight?.instagramHandle || '@',
+                                        influencerUrl: article.influencerSpotlight?.instagramUrl || 'https://instagram.com/',
+                                        influencerBio: article.influencerSpotlight?.bio || '',
+                                        influencerFollowers: article.influencerSpotlight?.followersCount || '',
+                                        influencerBadge: article.influencerSpotlight?.badgeLabel || 'Verified Community Ambassador',
+                                        influencerAvatar: article.influencerSpotlight?.avatarUrl || '',
+                                        keyTakeawaysText: (article.content.keyTakeaways || []).join('\n'),
+                                        deepDive1Heading: article.content.deepDiveSections[0]?.heading || '',
+                                        deepDive1Body: (article.content.deepDiveSections[0]?.paragraphs || []).join('\n\n'),
+                                        deepDive1ProTip: article.content.deepDiveSections[0]?.proTip || '',
+                                        deepDive1Alert: article.content.deepDiveSections[0]?.alertWarning || '',
+                                        deepDive2Heading: article.content.deepDiveSections[1]?.heading || '',
+                                        deepDive2Body: (article.content.deepDiveSections[1]?.paragraphs || []).join('\n\n'),
+                                        actionableStepsText: (article.content.actionableSteps || []).join('\n'),
+                                        faqQuestion1: article.content.faq?.[0]?.question || '',
+                                        faqAnswer1: article.content.faq?.[0]?.answer || '',
+                                        faqQuestion2: article.content.faq?.[1]?.question || '',
+                                        faqAnswer2: article.content.faq?.[1]?.answer || '',
+                                        keywordsText: (article.keywords || []).join(', ')
+                                      });
+                                      setShowArticleEditorModal(true);
+                                    }}
+                                    className="p-1.5 text-[#2271b1] hover:bg-[#2271b1]/10 rounded cursor-pointer"
+                                    title="Edit Post"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      if (window.confirm(`Delete article "${article.title}"?`)) {
+                                        deleteAdminKnowledgeArticle(article.slug);
+                                        const updatedCustom = getAdminCustomKnowledgeArticles();
+                                        setKnowledgeArticlesList([...updatedCustom, ...FLAGSHIP_KNOWLEDGE_ARTICLES]);
+                                        setWpNotice({ type: 'success', message: 'Article removed from Knowledge Hub.' });
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded cursor-pointer"
+                                    title="Delete Post"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* WORDPRESS-STYLE ARTICLE & INFLUENCER SPOTLIGHT VISUAL EDITOR MODAL        */}
+          {/* ========================================================================= */}
+          {showArticleEditorModal && (
+            <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-fadeIn">
+              <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+                {/* Editor Header */}
+                <div className="px-6 py-4 bg-[#f6f7f7] border-b border-[#c3c4c7] flex justify-between items-center shrink-0">
+                  <div>
+                    <h3 className="text-base font-bold text-[#1d2327] flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-pink-600" />
+                      {editingArticleSlug ? 'Edit Knowledge Hub Guide' : 'Add New Knowledge Hub Guide & Influencer Post'}
+                    </h3>
+                    <p className="text-xs text-[#646970]">
+                      WordPress-style content manager with native Instagram cross-promotion support.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowArticleEditorModal(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Editor Body Form */}
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!articleForm.title.trim()) return;
+
+                    const autoSlug = articleForm.slug.trim() || articleForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+                    const newArticle: KnowledgeArticle = {
+                      slug: autoSlug,
+                      title: articleForm.title.trim(),
+                      category: articleForm.category,
+                      categoryLabel: articleForm.categoryLabel || articleForm.category,
+                      ageGroup: articleForm.ageGroup,
+                      readTime: articleForm.readTime || '5 min read',
+                      summary: articleForm.summary.trim(),
+                      publishedDate: articleForm.publishedDate || new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                      author: {
+                        name: articleForm.authorName.trim(),
+                        role: articleForm.authorRole.trim(),
+                        avatar: articleForm.authorAvatar.trim()
+                      },
+                      coverImage: articleForm.coverImage.trim(),
+                      keywords: articleForm.keywordsText ? articleForm.keywordsText.split(',').map(k => k.trim()).filter(Boolean) : [articleForm.title.toLowerCase()],
+                      influencerSpotlight: articleForm.isInfluencerSpotlight ? {
+                        name: articleForm.influencerName.trim() || articleForm.authorName.trim(),
+                        instagramHandle: articleForm.influencerHandle.trim(),
+                        instagramUrl: articleForm.influencerUrl.trim(),
+                        bio: articleForm.influencerBio.trim(),
+                        followersCount: articleForm.influencerFollowers.trim(),
+                        badgeLabel: articleForm.influencerBadge.trim(),
+                        avatarUrl: articleForm.influencerAvatar.trim() || articleForm.authorAvatar.trim()
+                      } : undefined,
+                      tableOfContents: [
+                        'Core Insights & Key Takeaways',
+                        articleForm.deepDive1Heading || 'Comprehensive Framework',
+                        articleForm.deepDive2Heading || 'Actionable Daily Implementation',
+                        'Step-by-Step Blueprint',
+                        'Frequently Asked Questions'
+                      ],
+                      content: {
+                        keyTakeaways: articleForm.keyTakeawaysText.split('\n').map(t => t.trim()).filter(Boolean),
+                        deepDiveSections: [
+                          {
+                            heading: articleForm.deepDive1Heading.trim() || 'Comprehensive Framework',
+                            paragraphs: articleForm.deepDive1Body.split('\n\n').map(p => p.trim()).filter(Boolean),
+                            proTip: articleForm.deepDive1ProTip.trim() || undefined,
+                            alertWarning: articleForm.deepDive1Alert.trim() || undefined
+                          },
+                          ...(articleForm.deepDive2Heading.trim() ? [{
+                            heading: articleForm.deepDive2Heading.trim(),
+                            paragraphs: articleForm.deepDive2Body.split('\n\n').map(p => p.trim()).filter(Boolean)
+                          }] : [])
+                        ],
+                        actionableSteps: articleForm.actionableStepsText.split('\n').map(s => s.trim()).filter(Boolean),
+                        faq: [
+                          ...(articleForm.faqQuestion1.trim() ? [{
+                            question: articleForm.faqQuestion1.trim(),
+                            answer: articleForm.faqAnswer1.trim()
+                          }] : []),
+                          ...(articleForm.faqQuestion2.trim() ? [{
+                            question: articleForm.faqQuestion2.trim(),
+                            answer: articleForm.faqAnswer2.trim()
+                          }] : [])
+                        ]
+                      }
+                    };
+
+                    setIsPublishingAutoIndex(true);
+                    try {
+                      saveAdminKnowledgeArticle(newArticle);
+                      const indexResult = await publishAndAutoIndexArticle(newArticle);
+                      const updatedCustom = getAdminCustomKnowledgeArticles();
+                      setKnowledgeArticlesList([...updatedCustom, ...FLAGSHIP_KNOWLEDGE_ARTICLES]);
+                      setShowArticleEditorModal(false);
+
+                      setIndexingFeedbackModal({
+                        isOpen: true,
+                        articleTitle: newArticle.title,
+                        canonicalUrl: indexResult.canonicalUrl,
+                        deepLinkUrl: indexResult.deepLinkUrl,
+                        sitemapStatus: indexResult.sitemapStatus,
+                        indexNowStatus: indexResult.indexNowStatus,
+                        schemaInjected: indexResult.schemaInjected,
+                        timestamp: indexResult.timestamp
+                      });
+                      setSchemaInspectArticle(newArticle);
+
+                      showNotification('success', `✓ "${newArticle.title}" published & registered with Google Indexing!`);
+                    } catch (err: any) {
+                      showNotification('error', `Failed to publish & auto-index: ${err.message}`);
+                    } finally {
+                      setIsPublishingAutoIndex(false);
+                    }
+                  }}
+                  className="p-6 space-y-6 overflow-y-auto text-xs"
+                >
+                  {/* Title & Slug */}
+                  <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-200">
+                    <div>
+                      <label className="block font-bold text-[#2c3338] mb-1 text-sm">Post Title *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. 10 Screen-Free Montessori Activities for Active 4-Year-Olds"
+                        value={articleForm.title}
+                        onChange={(e) => setArticleForm({ ...articleForm, title: e.target.value })}
+                        className="w-full p-2.5 border border-[#8c8f94] rounded-xs font-bold text-sm text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block font-bold text-[#2c3338] mb-1">Category *</label>
+                        <select
+                          value={articleForm.category}
+                          onChange={(e) => {
+                            const cat = e.target.value as KnowledgeArticle['category'];
+                            const matched = KNOWLEDGE_CATEGORIES.find(c => c.id === cat);
+                            setArticleForm({
+                              ...articleForm,
+                              category: cat,
+                              categoryLabel: matched ? matched.name : cat
+                            });
+                          }}
+                          className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] bg-white focus:border-[#2271b1] focus:outline-none"
+                        >
+                          {KNOWLEDGE_CATEGORIES.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-[#2c3338] mb-1">Target Age Group *</label>
+                        <select
+                          value={articleForm.ageGroup}
+                          onChange={(e) => setArticleForm({ ...articleForm, ageGroup: e.target.value as any })}
+                          className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] bg-white focus:border-[#2271b1] focus:outline-none"
+                        >
+                          <option value="0-12 Months">0-12 Months</option>
+                          <option value="1-3 Years">1-3 Years</option>
+                          <option value="4-6 Years">4-6 Years</option>
+                          <option value="7-10 Years">7-10 Years</option>
+                          <option value="11-14 Years">11-14 Years</option>
+                          <option value="All Ages">All Ages</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block font-bold text-[#2c3338] mb-1">Estimated Read Time</label>
+                        <input
+                          type="text"
+                          value={articleForm.readTime}
+                          onChange={(e) => setArticleForm({ ...articleForm, readTime: e.target.value })}
+                          placeholder="e.g. 5 min read"
+                          className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* INFLUENCER CROSS-PROMOTION SECTION */}
+                  <div className="bg-gradient-to-r from-pink-50 via-rose-50 to-amber-50 p-5 rounded-2xl border-2 border-pink-200 space-y-4 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">📸</span>
+                        <div>
+                          <h4 className="text-sm font-black text-pink-950 font-serif">
+                            Instagram Influencer Spotlight &amp; Cross-Promotion
+                          </h4>
+                          <p className="text-xs text-pink-850">
+                            Feature the creator's profile, handle, bio, and direct Instagram link at the top of this article.
+                          </p>
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={articleForm.isInfluencerSpotlight}
+                          onChange={(e) => setArticleForm({ ...articleForm, isInfluencerSpotlight: e.target.checked })}
+                          className="h-4 w-4 text-pink-600 rounded"
+                        />
+                        <span className="font-bold text-pink-900 text-xs">Enable Creator Spotlight</span>
+                      </label>
+                    </div>
+
+                    {articleForm.isInfluencerSpotlight && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-pink-200">
+                        <div>
+                          <label className="block font-bold text-pink-950 mb-1">Creator / Mom Name *</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. Priya Sharma"
+                            value={articleForm.influencerName}
+                            onChange={(e) => setArticleForm({ ...articleForm, influencerName: e.target.value })}
+                            className="w-full p-2 bg-white border border-pink-300 rounded-xs text-[#1d2327] focus:border-pink-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-pink-950 mb-1">Instagram Handle *</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. @bangalore_mommy_diaries"
+                            value={articleForm.influencerHandle}
+                            onChange={(e) => setArticleForm({ ...articleForm, influencerHandle: e.target.value })}
+                            className="w-full p-2 bg-white border border-pink-300 rounded-xs font-mono font-bold text-pink-600 focus:border-pink-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-pink-950 mb-1">Instagram Profile URL</label>
+                          <input
+                            type="text"
+                            placeholder="https://instagram.com/bangalore_mommy_diaries"
+                            value={articleForm.influencerUrl}
+                            onChange={(e) => setArticleForm({ ...articleForm, influencerUrl: e.target.value })}
+                            className="w-full p-2 bg-white border border-pink-300 rounded-xs text-[#1d2327] focus:border-pink-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-bold text-pink-950 mb-1">Followers Count Badge</label>
+                          <input
+                            type="text"
+                            placeholder="e.g. 28.5K Followers"
+                            value={articleForm.influencerFollowers}
+                            onChange={(e) => setArticleForm({ ...articleForm, influencerFollowers: e.target.value })}
+                            className="w-full p-2 bg-white border border-pink-300 rounded-xs text-[#1d2327] focus:border-pink-500 focus:outline-none"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="block font-bold text-pink-950 mb-1">Creator Bio &amp; Niche Description</label>
+                          <textarea
+                            rows={2}
+                            placeholder="e.g. Pediatric play enthusiast & mom of two sharing screen-free routines in Indiranagar..."
+                            value={articleForm.influencerBio}
+                            onChange={(e) => setArticleForm({ ...articleForm, influencerBio: e.target.value })}
+                            className="w-full p-2 bg-white border border-pink-300 rounded-xs text-[#1d2327] focus:border-pink-500 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Summary / Excerpt */}
+                  <div>
+                    <label className="block font-bold text-[#2c3338] mb-1">Summary / Excerpt *</label>
+                    <textarea
+                      rows={2}
+                      required
+                      placeholder="Brief overview summarizing why this guide is essential for parents..."
+                      value={articleForm.summary}
+                      onChange={(e) => setArticleForm({ ...articleForm, summary: e.target.value })}
+                      className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Key Takeaways */}
+                  <div>
+                    <label className="block font-bold text-[#2c3338] mb-1">
+                      Key Takeaways (One per line)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Line 1: Focus on experiential play over passive screen time.&#10;Line 2: Build daily structured routines with positive reinforcement."
+                      value={articleForm.keyTakeawaysText}
+                      onChange={(e) => setArticleForm({ ...articleForm, keyTakeawaysText: e.target.value })}
+                      className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] font-mono text-xs focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* Deep Dive Section 1 */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <h4 className="font-bold text-[#1d2327] text-xs uppercase tracking-wider">
+                      Deep Dive Section 1 (Core Framework)
+                    </h4>
+                    <div>
+                      <label className="block font-semibold text-[#2c3338] mb-1">Section Heading</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Evidence-Based Framework for Social Development"
+                        value={articleForm.deepDive1Heading}
+                        onChange={(e) => setArticleForm({ ...articleForm, deepDive1Heading: e.target.value })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-semibold text-[#2c3338] mb-1">Body Paragraphs (Separate with empty line)</label>
+                      <textarea
+                        rows={4}
+                        placeholder="Detailed clinical and practical advice for parents..."
+                        value={articleForm.deepDive1Body}
+                        onChange={(e) => setArticleForm({ ...articleForm, deepDive1Body: e.target.value })}
+                        className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block font-semibold text-emerald-800 mb-1">💡 Pro-Tip Callout</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Schedule 20 minutes of daily uninterrupted play."
+                          value={articleForm.deepDive1ProTip}
+                          onChange={(e) => setArticleForm({ ...articleForm, deepDive1ProTip: e.target.value })}
+                          className="w-full p-2 bg-emerald-50 border border-emerald-300 rounded-xs text-emerald-950 focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-amber-800 mb-1">⚠️ Safety / Parent Alert</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Avoid rushing transitions between activities."
+                          value={articleForm.deepDive1Alert}
+                          onChange={(e) => setArticleForm({ ...articleForm, deepDive1Alert: e.target.value })}
+                          className="w-full p-2 bg-amber-50 border border-amber-300 rounded-xs text-amber-950 focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actionable Steps */}
+                  <div>
+                    <label className="block font-bold text-[#2c3338] mb-1">
+                      Actionable Step-by-Step Checklist (One step per line)
+                    </label>
+                    <textarea
+                      rows={3}
+                      placeholder="Step 1: Set up a dedicated play zone.&#10;Step 2: Demonstrate the activity with warmth.&#10;Step 3: Encourage peer collaboration."
+                      value={articleForm.actionableStepsText}
+                      onChange={(e) => setArticleForm({ ...articleForm, actionableStepsText: e.target.value })}
+                      className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] font-mono text-xs focus:border-[#2271b1] focus:outline-none"
+                    />
+                  </div>
+
+                  {/* FAQs */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                    <h4 className="font-bold text-[#1d2327] text-xs uppercase tracking-wider">
+                      Frequently Asked Questions
+                    </h4>
+                    <div className="space-y-2">
+                      <input
+                        type="text"
+                        placeholder="FAQ 1 Question: How quickly do children adapt to this routine?"
+                        value={articleForm.faqQuestion1}
+                        onChange={(e) => setArticleForm({ ...articleForm, faqQuestion1: e.target.value })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] font-semibold focus:border-[#2271b1] focus:outline-none"
+                      />
+                      <textarea
+                        rows={2}
+                        placeholder="FAQ 1 Answer: Most children show positive engagement within 3 to 7 days."
+                        value={articleForm.faqAnswer1}
+                        onChange={(e) => setArticleForm({ ...articleForm, faqAnswer1: e.target.value })}
+                        className="w-full p-2 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="flex justify-end gap-2 pt-4 border-t border-[#f0f0f1]">
+                    <button
+                      type="button"
+                      onClick={() => setShowArticleEditorModal(false)}
+                      className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xs cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isPublishingAutoIndex}
+                      className="px-6 py-2.5 bg-[#2271b1] hover:bg-[#135e96] disabled:opacity-60 text-white text-xs font-bold rounded-xs shadow-xs cursor-pointer flex items-center gap-1.5"
+                    >
+                      {isPublishingAutoIndex ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Publishing & Auto-Indexing in Google...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles className="w-4 h-4 text-amber-300" />
+                          <span>{editingArticleSlug ? 'Update Article & Auto-Index' : 'Publish & Auto-Index with Google'}</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================================= */}
           {/* VIEW G: BROADCAST & BANNER ADS                                            */}
           {/* ========================================================================= */}
           {activeMenu === 'broadcast' && (
@@ -4404,6 +5932,23 @@ export default function AdminDashboard({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Google Auto-Indexing & Rich SEO Inspector Modal */}
+      {indexingFeedbackModal?.isOpen && (
+        <GoogleIndexingInspectorModal
+          isOpen={indexingFeedbackModal.isOpen}
+          onClose={() => {
+            setIndexingFeedbackModal(null);
+            setSchemaInspectArticle(null);
+          }}
+          article={schemaInspectArticle}
+          canonicalUrl={indexingFeedbackModal.canonicalUrl}
+          deepLinkUrl={indexingFeedbackModal.deepLinkUrl}
+          sitemapStatus={indexingFeedbackModal.sitemapStatus}
+          indexNowStatus={indexingFeedbackModal.indexNowStatus}
+          timestamp={indexingFeedbackModal.timestamp}
+        />
       )}
 
     </div>

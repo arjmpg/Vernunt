@@ -30,6 +30,12 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // --- COUPON REDEMPTION STATES ---
+  const [couponCodeInput, setCouponCodeInput] = useState('');
+  const [isRedeemingCoupon, setIsRedeemingCoupon] = useState(false);
+  const [couponSuccessMsg, setCouponSuccessMsg] = useState<string | null>(null);
+  const [couponErrorMsg, setCouponErrorMsg] = useState<string | null>(null);
+
   const defaultPlans: SubscriptionPlan[] = [
     {
       id: 'yearly',
@@ -307,6 +313,150 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
     return Math.max(0, Math.ceil(diffTime / (1000 * 60 * 60 * 24)));
   };
 
+  const handleRedeemCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = couponCodeInput.trim().toUpperCase();
+    if (!cleanCode) {
+      setCouponErrorMsg('Please enter a valid coupon code.');
+      return;
+    }
+
+    if (!userProfile) {
+      setCouponErrorMsg('Please sign in or complete your profile first.');
+      return;
+    }
+
+    setIsRedeemingCoupon(true);
+    setCouponErrorMsg(null);
+    setCouponSuccessMsg(null);
+
+    try {
+      // 1. Retrieve coupons from localStorage admin store and system defaults
+      let storedCoupons: any[] = [];
+      try {
+        const raw = localStorage.getItem('vernunt_admin_coupons');
+        if (raw) storedCoupons = JSON.parse(raw);
+      } catch {
+        storedCoupons = [];
+      }
+
+      // Default system influencer & promo coupons
+      const systemCoupons = [
+        {
+          code: 'INFLUENCER365',
+          description: '1 Year Free Access VIP Creator Pass',
+          freeDurationDays: 365,
+          grantPlan: 'yearly',
+          bonusCredits: 60,
+          isActive: true
+        },
+        {
+          code: 'VIPMOM',
+          description: 'Bangalore Mom Ambassador 1-Year Free Access',
+          freeDurationDays: 365,
+          grantPlan: 'yearly',
+          bonusCredits: 60,
+          isActive: true
+        },
+        {
+          code: 'BANGALOREKIDS',
+          description: 'Bangalore Community 1-Year Free Access',
+          freeDurationDays: 365,
+          grantPlan: 'yearly',
+          bonusCredits: 60,
+          isActive: true
+        },
+        {
+          code: 'VERNUNT1YEAR',
+          description: 'Full 1-Year Platform Free Access Pass',
+          freeDurationDays: 365,
+          grantPlan: 'yearly',
+          bonusCredits: 60,
+          isActive: true
+        },
+        {
+          code: 'CREATORVIP',
+          description: 'Verified Influencer Ambassador Pass',
+          freeDurationDays: 365,
+          grantPlan: 'yearly',
+          bonusCredits: 100,
+          isActive: true
+        }
+      ];
+
+      const allCoupons = [...storedCoupons, ...systemCoupons];
+      const matchedCoupon = allCoupons.find(c => (c.code || '').trim().toUpperCase() === cleanCode);
+
+      if (!matchedCoupon) {
+        throw new Error(`Coupon code "${cleanCode}" is invalid or does not exist.`);
+      }
+
+      if (matchedCoupon.isActive === false) {
+        throw new Error(`Coupon code "${cleanCode}" has been paused or expired.`);
+      }
+
+      if (matchedCoupon.validUntil && new Date(matchedCoupon.validUntil) < new Date()) {
+        throw new Error(`Coupon code "${cleanCode}" expired on ${matchedCoupon.validUntil}.`);
+      }
+
+      const freeDays = matchedCoupon.freeDurationDays || matchedCoupon.discountDurationDays || 365;
+      const bonusCredits = matchedCoupon.bonusCredits || 60;
+
+      // 2. Calculate new expiry
+      const today = new Date();
+      const expiryDate = new Date(today);
+      expiryDate.setDate(today.getDate() + freeDays);
+
+      const updatedProfile: ChildProfile = {
+        ...userProfile,
+        subscriptionActive: true,
+        subscriptionPlan: (matchedCoupon.grantPlan as any) || 'yearly',
+        subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
+        contactViewCredits: (userProfile.contactViewCredits || 0) + bonusCredits,
+        usedCouponCode: cleanCode
+      };
+
+      // 3. Persist locally and in Firestore
+      onUpdateUserProfile(updatedProfile);
+
+      if (auth.currentUser) {
+        const userRef = doc(db, 'users', auth.currentUser.uid);
+        await setDoc(userRef, updatedProfile, { merge: true });
+      }
+
+      // Update redemption count in admin store if applicable
+      if (storedCoupons.length > 0) {
+        const idx = storedCoupons.findIndex(c => (c.code || '').trim().toUpperCase() === cleanCode);
+        if (idx !== -1) {
+          storedCoupons[idx].timesRedeemed = (storedCoupons[idx].timesRedeemed || 0) + 1;
+          if (!storedCoupons[idx].redeemedByUsers) storedCoupons[idx].redeemedByUsers = [];
+          if (!storedCoupons[idx].redeemedByUsers.includes(userProfile.id)) {
+            storedCoupons[idx].redeemedByUsers.push(userProfile.id);
+          }
+          localStorage.setItem('vernunt_admin_coupons', JSON.stringify(storedCoupons));
+        }
+      }
+
+      // 4. Confetti & Success Feedback
+      try {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      } catch (confettiErr) {
+        console.debug('Confetti animation bypassed', confettiErr);
+      }
+
+      setCouponSuccessMsg(`🎉 Success! Coupon "${cleanCode}" applied! You now have ${freeDays} Days (1 Year) of FREE VIP Access for all app features!`);
+      setCouponCodeInput('');
+    } catch (err: any) {
+      setCouponErrorMsg(err.message || 'Failed to apply coupon.');
+    } finally {
+      setIsRedeemingCoupon(false);
+    }
+  };
+
   return (
     <div id="billing-payment-portal" className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8 animate-fade-in">
       
@@ -401,6 +551,93 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
             Referral Code: <span className="font-mono text-orange-600">{userProfile?.referralCode || 'VERNUNT2025'}</span>
           </div>
         )}
+      </div>
+
+      {/* Influencer & Admin Coupon Code Redemption Card */}
+      <div id="coupon-redemption-card" className="bg-white border-2 border-dashed border-orange-300 rounded-3xl p-5 sm:p-6 shadow-sm space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 rounded-2xl bg-orange-100 text-orange-600 items-center justify-center text-lg shadow-xs">
+              🎟️
+            </span>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 font-serif">
+                Have an Influencer Partner or Admin Coupon Code?
+              </h3>
+              <p className="text-xs text-slate-500">
+                Redeem your code for <strong className="text-orange-600">1 Full Year of 100% Free VIP Access</strong> across the entire app.
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] uppercase font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200 w-fit">
+            1-Year Free Pass
+          </span>
+        </div>
+
+        <form onSubmit={handleRedeemCoupon} className="flex flex-col sm:flex-row items-stretch gap-2.5 pt-1">
+          <div className="relative flex-1">
+            <input
+              type="text"
+              id="input-coupon-code"
+              value={couponCodeInput}
+              onChange={(e) => setCouponCodeInput(e.target.value.toUpperCase())}
+              placeholder="e.g. INFLUENCER365 / VIPMOM / BANGALOREKIDS"
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 focus:border-orange-500 rounded-2xl text-xs font-mono font-bold tracking-wider uppercase outline-none focus:ring-2 focus:ring-orange-200 transition"
+            />
+          </div>
+          <button
+            type="submit"
+            id="btn-redeem-coupon"
+            disabled={isRedeemingCoupon || !couponCodeInput.trim()}
+            className="px-6 py-3 bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-black rounded-2xl transition cursor-pointer shadow-sm hover:shadow flex items-center justify-center gap-2 shrink-0"
+          >
+            {isRedeemingCoupon ? (
+              <span>Validating...</span>
+            ) : (
+              <>
+                <Zap className="w-4 h-4 text-amber-400" />
+                <span>Apply VIP Code</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {couponSuccessMsg && (
+          <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-2xl text-xs font-semibold flex items-start gap-2 animate-fade-in">
+            <span className="text-base">✅</span>
+            <div className="space-y-1">
+              <p>{couponSuccessMsg}</p>
+              <p className="text-[10.5px] text-emerald-700 font-normal">
+                * Note: App features and zero-cost activities are 100% free. If an event or class has third-party ticket charges set by hosts, you pay the organizer ticket fee with 0% platform surcharge.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {couponErrorMsg && (
+          <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-semibold flex items-center gap-2 animate-fade-in">
+            <span>⚠️</span>
+            <span>{couponErrorMsg}</span>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-slate-500">
+          <span className="font-semibold text-slate-700">Quick Test Coupons:</span>
+          {['INFLUENCER365', 'VIPMOM', 'BANGALOREKIDS', 'VERNUNT1YEAR'].map((quickCode) => (
+            <button
+              key={quickCode}
+              type="button"
+              onClick={() => {
+                setCouponCodeInput(quickCode);
+                setCouponErrorMsg(null);
+                setCouponSuccessMsg(null);
+              }}
+              className="px-2.5 py-1 bg-slate-100 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-300 border border-slate-200 rounded-lg font-mono font-bold transition cursor-pointer text-[10px]"
+            >
+              {quickCode}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Grid: 4 Pricing Packages */}

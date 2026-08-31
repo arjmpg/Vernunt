@@ -64,7 +64,11 @@ export function PlaymateDetailModal({
             </div>
             <div>
               <h3 className="text-sm font-bold leading-tight font-serif">
-                {profile.childName}'s Full Profile
+                {(!isConnected && profile.childPrivacySetting === 'connections_only')
+                  ? `${profile.parentName}'s Family Profile`
+                  : (!isConnected && profile.childPrivacySetting === 'first_name_only')
+                  ? `${profile.childName.split(' ')[0]}'s Profile`
+                  : `${profile.childName}'s Profile`}
               </h3>
               <p className="text-[10px] text-slate-400 font-medium">
                 Parent: {profile.parentName}

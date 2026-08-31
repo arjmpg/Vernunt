@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { ChildProfile, VerificationStatus, LocationSharing } from '../types.ts';
-import { ShieldCheck, User, Camera, Save, X } from 'lucide-react';
+import { ShieldCheck, User, Camera, Save, X, Lock, Users } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import { db, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot } from 'firebase/firestore';
+import { 
+  PARENTS_INCOME_OPTIONS, 
+  INDIAN_RELIGIONS, 
+  INDIAN_CASTES, 
+  CHILD_AVAILABILITY_OPTIONS, 
+  CHILD_PRIVACY_OPTIONS 
+} from '../data/indianDemographics.ts';
 
 interface EditProfileModalProps {
   currentProfile: ChildProfile;
@@ -29,6 +36,15 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
   const [languagesStr, setLanguagesStr] = useState((currentProfile.languagesKnown || ['English']).join(', '));
   const [availableDays, setAvailableDays] = useState<string[]>(currentProfile.availableDays || ['Saturday', 'Sunday']);
   const [availableTimes, setAvailableTimes] = useState<string[]>(currentProfile.availableTimes || ['Afternoon']);
+  const [generalAvailability, setGeneralAvailability] = useState<string[]>(
+    currentProfile.generalAvailability || ['Weekdays After School', 'Weekends (Sat & Sun)']
+  );
+  const [childPrivacySetting, setChildPrivacySetting] = useState<'full' | 'first_name_only' | 'connections_only'>(
+    currentProfile.childPrivacySetting || 'full'
+  );
+  const [parentsIncome, setParentsIncome] = useState(currentProfile.parentsIncome || '');
+  const [religion, setReligion] = useState(currentProfile.religion || '');
+  const [caste, setCaste] = useState(currentProfile.caste || '');
   const [isLockedSelf, setIsLockedSelf] = useState(!!currentProfile.isLocked);
 
   const [errorMsg, setErrorMsg] = useState('');
@@ -79,6 +95,11 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
       languagesKnown: languagesStr.split(',').map(l => l.trim()).filter(Boolean),
       availableDays: availableDays,
       availableTimes: availableTimes,
+      generalAvailability: generalAvailability,
+      childPrivacySetting: childPrivacySetting,
+      parentsIncome: parentsIncome,
+      religion: religion,
+      caste: caste,
       phonePrivacyOption: phonePrivacyOption,
       customFields: customFieldsData,
       isLocked: isLockedSelf
@@ -303,6 +324,158 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
               onChange={(e) => setLanguagesStr(e.target.value)}
               className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs text-slate-700"
             />
+          </div>
+
+          {/* Child Information Visibility Setting */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
+              <span>🛡️ Child Profile Privacy Setting:</span>
+              <span className="text-[9px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full font-semibold">Active</span>
+            </label>
+            <div className="space-y-2">
+              {CHILD_PRIVACY_OPTIONS.map((opt) => (
+                <label
+                  key={opt.id}
+                  onClick={() => setChildPrivacySetting(opt.id as any)}
+                  className={`flex items-start gap-3 p-2.5 rounded-xl border transition cursor-pointer ${
+                    childPrivacySetting === opt.id
+                      ? 'bg-orange-50 border-orange-300 text-slate-800'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="editChildPrivacySetting"
+                    checked={childPrivacySetting === opt.id}
+                    onChange={() => setChildPrivacySetting(opt.id as any)}
+                    className="mt-0.5 text-orange-500 focus:ring-orange-400"
+                  />
+                  <div className="text-left">
+                    <span className="text-xs font-bold text-slate-800 block">{opt.label}</span>
+                    <span className="text-[10px] text-slate-500 leading-tight block">{opt.desc}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Child General Availability */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2">
+            <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide">
+              🕒 Playdate General Availability:
+            </label>
+            <p className="text-[10.5px] text-slate-500">Select when your child is usually free to play:</p>
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {CHILD_AVAILABILITY_OPTIONS.map((avail) => {
+                const isSelected = generalAvailability.includes(avail);
+                return (
+                  <button
+                    key={avail}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        if (generalAvailability.length > 1) {
+                          setGeneralAvailability(generalAvailability.filter(a => a !== avail));
+                        }
+                      } else {
+                        setGeneralAvailability([...generalAvailability, avail]);
+                      }
+                    }}
+                    className={`px-3 py-1.5 text-[10px] font-bold rounded-xl border transition cursor-pointer flex items-center gap-1 ${
+                      isSelected
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-xs'
+                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    <span>{isSelected ? '✓' : '🕒'}</span>
+                    <span>{avail}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Parents' Household Income (Strictly Confidential - Matchmaking Only) */}
+          <div className="p-4 bg-amber-50/50 border border-amber-200/80 rounded-2xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-orange-500" />
+                <span>Parents' Annual Household Income (Confidential)</span>
+              </label>
+              <span className="text-[9px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">
+                Hidden in Frontend
+              </span>
+            </div>
+
+            <div className="p-2.5 bg-amber-100/60 rounded-xl text-[10.5px] text-amber-900 leading-relaxed">
+              <strong>🔒 Privacy Note:</strong> This field is strictly confidential and <strong>never visible on public profile cards</strong>. It is used exclusively by our smart matchmaking algorithm to suggest compatible family playmates.
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {PARENTS_INCOME_OPTIONS.map((inc) => (
+                <label
+                  key={inc}
+                  onClick={() => setParentsIncome(inc)}
+                  className={`flex items-center gap-2 p-2 rounded-xl border transition cursor-pointer ${
+                    parentsIncome === inc
+                      ? 'bg-orange-500 text-white border-orange-600 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-200 hover:border-orange-200'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="editParentsIncome"
+                    value={inc}
+                    checked={parentsIncome === inc}
+                    onChange={() => setParentsIncome(inc)}
+                    className="text-orange-600 focus:ring-orange-400"
+                  />
+                  <span className={`text-[11px] ${parentsIncome === inc ? 'font-bold text-white' : 'font-medium text-slate-700'}`}>
+                    {inc}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Religion & Caste Community Preferences */}
+          <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-orange-500" />
+                <span>Religion & Caste Preferences</span>
+              </label>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Religion</label>
+                <select
+                  value={religion}
+                  onChange={(e) => setReligion(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+                >
+                  <option value="">-- Select Religion --</option>
+                  {INDIAN_RELIGIONS.map((rel) => (
+                    <option key={rel} value={rel}>{rel}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="block text-[11px] font-bold text-slate-700">Caste / Community</label>
+                <select
+                  value={caste}
+                  onChange={(e) => setCaste(e.target.value)}
+                  className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-700 outline-none"
+                >
+                  <option value="">-- Select Caste / Community --</option>
+                  {INDIAN_CASTES.map((cst) => (
+                    <option key={cst} value={cst}>{cst}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Guardian Phone Privacy Preferences */}

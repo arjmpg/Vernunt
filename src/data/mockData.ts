@@ -33,7 +33,7 @@ export const MOCK_EVENTS: CommunityEvent[] = [
     attendeesCount: 26,
     joined: false,
     category: 'Activity',
-    photoUrl: 'https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=600',
+    photoUrl: 'https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&fit=crop&q=80&w=600',
     tags: ['Football', 'Fitness', 'HSR Layout', 'Sports'],
     iconEmoji: '⚽',
     ticketPrice: 0,

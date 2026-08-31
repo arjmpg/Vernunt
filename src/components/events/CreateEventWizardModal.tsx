@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import AestheticImageUploader from '../AestheticImageUploader.tsx';
 import { sendEventPublishedNotification } from '../../utils/notifications.ts';
+import { calculateEventCommissionPolicy } from '../../utils/ticketingCommission.ts';
 
 interface CreateEventWizardModalProps {
   userProfile: any;
@@ -129,6 +130,14 @@ export default function CreateEventWizardModal({
 
     const basePrice = ticketTiers[0]?.price || 0;
     const totalCapacity = ticketTiers.reduce((acc, t) => acc + (t.capacity || 0), 0);
+    const hostRole = (userProfile?.role === 'influencer' || userProfile?.isInfluencer) ? 'influencer' : 'standard';
+    const isInfluencer = hostRole === 'influencer';
+    const policy = calculateEventCommissionPolicy({
+      id: `evt-${Date.now()}`,
+      hostName: userProfile?.parentName || 'Community Organizer',
+      hostRole: hostRole,
+      isInfluencerHost: isInfluencer
+    } as any, userProfile);
 
     const newEvent: CommunityEvent = {
       id: `evt-${Date.now()}`,
@@ -154,6 +163,10 @@ export default function CreateEventWizardModal({
       scheduleAgenda: scheduleAgenda,
       isRecurring: isRecurring,
       recurringSlots: isRecurring ? recurringSlots : undefined,
+      freeTicketsQuota: policy.freeTicketsQuota,
+      freeTicketsIssued: 0,
+      isInfluencerHost: isInfluencer,
+      hostRole: hostRole,
       organizerContact: {
         name: userProfile?.parentName || 'Organizer',
         phone: userProfile?.phoneNumber,

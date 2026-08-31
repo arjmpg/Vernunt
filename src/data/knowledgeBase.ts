@@ -1,20 +1,34 @@
 import { LucideIcon } from 'lucide-react';
 
+export interface InfluencerSpotlight {
+  name: string;
+  instagramHandle: string; // e.g. "@bangalore_mommy_diaries"
+  instagramUrl?: string; // e.g. "https://instagram.com/bangalore_mommy_diaries"
+  avatarUrl?: string;
+  bio: string;
+  followersCount?: string; // e.g. "28.5K"
+  badgeLabel?: string; // e.g. "Verified Community Ambassador"
+  location?: string;
+}
+
 export interface KnowledgeArticle {
   slug: string;
   title: string;
-  category: 'Nutrition' | 'Psychology' | 'Education' | 'Sports' | 'Care' | 'Future';
+  category: 'Nutrition' | 'Psychology' | 'Education' | 'Sports' | 'Care' | 'Future' | 'Parenting & Play' | string;
   categoryLabel: string;
-  ageGroup: '0-12 Months' | '1-3 Years' | '4-6 Years' | '7-10 Years' | '11-14 Years' | 'All Ages';
+  ageGroup: '0-12 Months' | '1-3 Years' | '4-6 Years' | '7-10 Years' | '11-14 Years' | 'All Ages' | string;
   readTime: string;
   summary: string;
   keywords: string[];
   publishedDate: string;
+  coverImageUrl?: string;
+  status?: 'Published' | 'Draft';
   author: {
     name: string;
     role: string;
     avatar: string;
   };
+  influencerSpotlight?: InfluencerSpotlight;
   tableOfContents: string[];
   content: {
     overview: string;
@@ -92,6 +106,91 @@ export const KNOWLEDGE_CATEGORIES: KnowledgeCategoryMeta[] = [
 
 // High-impact flagship encyclopedic articles
 export const FLAGSHIP_KNOWLEDGE_ARTICLES: KnowledgeArticle[] = [
+  {
+    slug: 'screen-free-sensory-playdate-guide-bangalore-mommy',
+    title: '10 Screen-Free Sensory Playdate Setups That Keep Kids Engaged for Hours',
+    category: 'Parenting & Play',
+    categoryLabel: 'Parenting & Playdates',
+    ageGroup: '2-6 Years',
+    readTime: '5 min read',
+    summary: 'Curated by Bangalore\'s top parenting creator @bangalore_mommy_diaries. Discover tactile sensory bins, cooperative Montessori STEM challenges, and easy cleanup recipes for apartment playdates.',
+    keywords: ['screen free play', 'sensory bins', 'toddler playdates', 'montessori activities', 'apartment games kids', 'bangalore parenting'],
+    publishedDate: '2026-08-28',
+    coverImageUrl: 'https://images.unsplash.com/photo-1545558014-8692077e9b5c?w=800&auto=format&fit=crop&q=80',
+    status: 'Published',
+    author: {
+      name: 'Priya Sharma (@bangalore_mommy_diaries)',
+      role: 'Featured Parenting Creator & Montessori Mom of 2',
+      avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80'
+    },
+    influencerSpotlight: {
+      name: 'Priya Sharma',
+      instagramHandle: '@bangalore_mommy_diaries',
+      instagramUrl: 'https://instagram.com/bangalore_mommy_diaries',
+      avatarUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&auto=format&fit=crop&q=80',
+      bio: 'Mom of 2, Montessori certified educator, and Bangalore community playdate advocate. Sharing realistic parenting hacks and screen-free developmental play setups for modern apartment families.',
+      followersCount: '48.2K Followers',
+      badgeLabel: '⭐ Verified Founding Ambassador',
+      location: 'Whitefield, Bangalore'
+    },
+    tableOfContents: [
+      'The Power of Tactical Sensory Play',
+      '1. Colored Rice & Wooden Spoon Sorting Bin',
+      '2. Kitchen Baking Soda & Vinegar Volcano Lab',
+      '3. Nature Scavenger Hunt & Leaf Printing',
+      '4. DIY Scented Cloud Dough (Zero Toxin)',
+      '5. Cooperative Cardboard Fort Engineering',
+      'How to Host a Zero-Stress Apartment Playdate',
+      'Frequently Asked Questions'
+    ],
+    content: {
+      overview: 'Replacing passive tablet screens with high-tactile sensory play fosters dopamine regulation, prolonged focus spans, and natural social problem solving between children. Here are five low-prep, high-engagement setups you can prepare in 5 minutes.',
+      keyTakeaways: [
+        'Sensory play strengthens fine motor pinch-grips needed for early handwriting.',
+        'Shared bin play naturally teaches children non-verbal turn-taking and conflict resolution.',
+        'Using kitchen staples (flour, rice, vinegar) keeps setups 100% non-toxic and cost-free.'
+      ],
+      deepDiveSections: [
+        {
+          heading: '1. Colored Rice & Wooden Spoon Sorting Bin',
+          body: [
+            'Dye 1kg of raw rice with 2 drops of food coloring and a teaspoon of white vinegar. Once dry, pour into a wide shallow storage container with measuring cups, funnel cones, and hidden toy figurines.',
+            'Children will happily scoop, transfer, and sort colors for 45+ minutes in focused silence or collaborative conversation.'
+          ],
+          proTip: 'Place a large bedsheet or yoga mat underneath the sensory tray for a 10-second cleanup!'
+        },
+        {
+          heading: '2. Kitchen Baking Soda & Vinegar Volcano Lab',
+          body: [
+            'Fill muffin tins with baking soda drops mixed with food coloring. Hand kids droppers or small syringes filled with vinegar.',
+            'The instant bubbling reaction sparks excitement, scientific curiosity, and sensory exploration.'
+          ],
+          warningOrAlert: 'Use gentle white vinegar and ensure kids wear playful chef goggles if they are prone to rubbing their eyes.'
+        },
+        {
+          heading: '3. DIY Scented Cloud Dough (Zero Toxin)',
+          body: [
+            'Mix 4 cups of whole wheat flour with 1/2 cup of melted coconut oil and a drop of vanilla or lavender extract. The resulting dough is super soft, moldable like wet sand, and completely edible-safe.'
+          ]
+        }
+      ],
+      actionableSteps: [
+        'Save delivery cardboard boxes for Friday afternoon collaborative box painting.',
+        'Create a dedicated "Sensory Caddy" with tongs, measuring spoons, and plastic tweezers.',
+        'Coordinate with nearby Vernunt playmates to rotate hosting duties every Saturday.'
+      ],
+      faq: [
+        {
+          question: 'What age group is best for sensory playdates?',
+          answer: 'Sensory bins are loved by toddlers as young as 18 months all the way to 8-year-olds when combined with STEM challenges.'
+        },
+        {
+          question: 'How do you prevent sibling fighting over sensory tools?',
+          answer: 'Provide duplicate scoops/tongs and designate individual "baking stations" using cafeteria trays.'
+        }
+      ]
+    }
+  },
   {
     slug: 'brain-boosting-foods-for-toddlers-neurodevelopment',
     title: 'Top 12 Brain-Boosting Superfoods for Toddlers: The Neurodevelopment Guide',
@@ -460,18 +559,35 @@ export function generateProgrammaticKnowledgeIndex(): Array<{
     keywords: string[];
   }> = [];
 
-  // Add the hand-curated flagship articles first
-  for (const art of FLAGSHIP_KNOWLEDGE_ARTICLES) {
+  // Add custom admin published articles first (highest priority)
+  const customArticles = getAdminCustomKnowledgeArticles();
+  for (const art of customArticles) {
     result.push({
       slug: art.slug,
       title: art.title,
       category: art.category,
-      categoryLabel: art.categoryLabel,
+      categoryLabel: art.categoryLabel || art.category,
       ageGroup: art.ageGroup,
-      readTime: art.readTime,
-      summary: art.summary,
-      keywords: art.keywords
+      readTime: art.readTime || '5 min read',
+      summary: art.summary || art.title,
+      keywords: art.keywords || []
     });
+  }
+
+  // Add the hand-curated flagship articles next
+  for (const art of FLAGSHIP_KNOWLEDGE_ARTICLES) {
+    if (!result.some(r => r.slug === art.slug)) {
+      result.push({
+        slug: art.slug,
+        title: art.title,
+        category: art.category,
+        categoryLabel: art.categoryLabel,
+        ageGroup: art.ageGroup,
+        readTime: art.readTime,
+        summary: art.summary,
+        keywords: art.keywords
+      });
+    }
   }
 
   // Programmatic generation across 6 primary pillars
@@ -681,6 +797,10 @@ export function generateProgrammaticKnowledgeIndex(): Array<{
 
 // Generate dynamic article on demand if slug is programmatic
 export function getKnowledgeArticleBySlug(slug: string): KnowledgeArticle | null {
+  const customArticles = getAdminCustomKnowledgeArticles();
+  const foundCustom = customArticles.find(a => a.slug === slug);
+  if (foundCustom) return foundCustom;
+
   const foundFlagship = FLAGSHIP_KNOWLEDGE_ARTICLES.find(a => a.slug === slug);
   if (foundFlagship) return foundFlagship;
 
@@ -755,3 +875,251 @@ export function getKnowledgeArticleBySlug(slug: string): KnowledgeArticle | null
     }
   };
 }
+
+// Local storage key for Admin WordPress-style Knowledge Hub posts
+export const ADMIN_KNOWLEDGE_ARTICLES_KEY = 'vernunt_custom_knowledge_articles';
+
+/**
+ * Generate standard canonical public URL for any Knowledge Hub article
+ */
+export function getArticleCanonicalUrl(slug: string): string {
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://app.vernunt.com';
+  return `${origin}/knowledge/${slug}`;
+}
+
+/**
+ * Generate shareable deep-link URL for web app iframe / routing
+ */
+export function getArticleDeepLinkUrl(slug: string): string {
+  const origin = typeof window !== 'undefined' && window.location.origin
+    ? window.location.origin
+    : 'https://app.vernunt.com';
+  return `${origin}/#knowledge/${slug}`;
+}
+
+export function getAdminCustomKnowledgeArticles(): KnowledgeArticle[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(ADMIN_KNOWLEDGE_ARTICLES_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Dynamically inject Google Schema.org JSON-LD and OpenGraph tags into document head
+ */
+export function injectArticleSeoHead(article: KnowledgeArticle): void {
+  if (typeof document === 'undefined') return;
+
+  const canonicalUrl = getArticleCanonicalUrl(article.slug);
+
+  // 1. Update Title & Meta Tags
+  document.title = `${article.title} | Vernunt Parenting Knowledge Hub`;
+
+  const setMeta = (name: string, content: string, isProp = false) => {
+    let el = document.querySelector(isProp ? `meta[property="${name}"]` : `meta[name="${name}"]`);
+    if (!el) {
+      el = document.createElement('meta');
+      if (isProp) el.setAttribute('property', name);
+      else el.setAttribute('name', name);
+      document.head.appendChild(el);
+    }
+    el.setAttribute('content', content);
+  };
+
+  setMeta('description', article.summary || article.title);
+  setMeta('keywords', (article.keywords || []).join(', '));
+  setMeta('robots', 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1');
+  
+  // OpenGraph
+  setMeta('og:title', article.title, true);
+  setMeta('og:description', article.summary || article.title, true);
+  setMeta('og:url', canonicalUrl, true);
+  setMeta('og:type', 'article', true);
+  setMeta('og:site_name', 'Vernunt', true);
+  if (article.coverImageUrl) {
+    setMeta('og:image', article.coverImageUrl, true);
+  }
+
+  // Twitter Card
+  setMeta('twitter:card', 'summary_large_image');
+  setMeta('twitter:title', article.title);
+  setMeta('twitter:description', article.summary || article.title);
+  if (article.coverImageUrl) {
+    setMeta('twitter:image', article.coverImageUrl);
+  }
+
+  // Canonical Link
+  let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+  if (!link) {
+    link = document.createElement('link');
+    link.setAttribute('rel', 'canonical');
+    document.head.appendChild(link);
+  }
+  link.setAttribute('href', canonicalUrl);
+
+  // 2. Inject Schema.org Article & FAQ JSON-LD
+  const schemaId = 'vernunt-article-schema';
+  let script = document.getElementById(schemaId) as HTMLScriptElement;
+  if (!script) {
+    script = document.createElement('script');
+    script.id = schemaId;
+    script.type = 'application/ld+json';
+    document.head.appendChild(script);
+  }
+
+  const faqItems = article.content?.faq || [];
+  const faqSchema = faqItems.length > 0 ? {
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map(f => ({
+      '@type': 'Question',
+      name: f.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: f.answer
+      }
+    }))
+  } : null;
+
+  const schemaGraph: any[] = [
+    {
+      '@type': 'Article',
+      '@id': `${canonicalUrl}#article`,
+      isPartOf: { '@type': 'WebSite', name: 'Vernunt', url: 'https://app.vernunt.com' },
+      headline: article.title,
+      description: article.summary,
+      image: article.coverImageUrl || 'https://app.vernunt.com/vernunt-logo.png',
+      datePublished: article.publishedDate || new Date().toISOString(),
+      dateModified: new Date().toISOString(),
+      author: {
+        '@type': 'Person',
+        name: article.influencerSpotlight?.name || article.author?.name || 'Vernunt Editorial Board',
+        jobTitle: article.author?.role || 'Parenting Specialist'
+      },
+      publisher: {
+        '@type': 'Organization',
+        name: 'Vernunt',
+        logo: {
+          '@type': 'ImageObject',
+          url: 'https://app.vernunt.com/vernunt-logo.png'
+        }
+      },
+      mainEntityOfPage: canonicalUrl,
+      keywords: (article.keywords || []).join(', ')
+    },
+    {
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Home', item: 'https://app.vernunt.com' },
+        { '@type': 'ListItem', position: 2, name: 'Knowledge Hub', item: 'https://app.vernunt.com/knowledge' },
+        { '@type': 'ListItem', position: 3, name: article.title, item: canonicalUrl }
+      ]
+    }
+  ];
+
+  if (faqSchema) {
+    schemaGraph.push(faqSchema);
+  }
+
+  script.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': schemaGraph
+  }, null, 2);
+}
+
+/**
+ * Save article and trigger immediate automated indexing pipeline to Google and search engines
+ */
+export async function publishAndAutoIndexArticle(article: KnowledgeArticle): Promise<{
+  success: boolean;
+  canonicalUrl: string;
+  deepLinkUrl: string;
+  indexingResults: any[];
+}> {
+  // 1. Save to client storage
+  saveAdminKnowledgeArticle(article);
+
+  // 2. Inject SEO tags & JSON-LD schema
+  injectArticleSeoHead(article);
+
+  const canonicalUrl = getArticleCanonicalUrl(article.slug);
+  const deepLinkUrl = getArticleDeepLinkUrl(article.slug);
+
+  // 3. Dispatch to server backend for dynamic sitemap inclusion & disk persistence
+  try {
+    await fetch('/api/knowledge/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ article })
+    }).catch(err => console.debug('Knowledge server sync note:', err));
+  } catch (err) {
+    console.debug('Knowledge publish dispatch note:', err);
+  }
+
+  // 4. Dispatch Instant Indexing Payload to Google Indexing API, Google Search Console, and IndexNow
+  let indexingResults: any[] = [];
+  try {
+    const res = await fetch('/api/seo/instant-index', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        urls: [canonicalUrl, deepLinkUrl],
+        engine: 'all',
+        host: typeof window !== 'undefined' ? window.location.host : 'app.vernunt.com'
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      indexingResults = data.results || [];
+    }
+  } catch (err) {
+    console.debug('Instant indexing response note:', err);
+  }
+
+  return {
+    success: true,
+    canonicalUrl,
+    deepLinkUrl,
+    indexingResults
+  };
+}
+
+export function saveAdminKnowledgeArticle(article: KnowledgeArticle): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getAdminCustomKnowledgeArticles();
+    const filtered = existing.filter(a => a.slug !== article.slug);
+    filtered.unshift(article);
+    localStorage.setItem(ADMIN_KNOWLEDGE_ARTICLES_KEY, JSON.stringify(filtered));
+
+    // Also auto-sync to server
+    fetch('/api/knowledge/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ article })
+    }).catch(() => {});
+  } catch (e) {
+    console.error('Failed to save custom article:', e);
+  }
+}
+
+export function deleteAdminKnowledgeArticle(slug: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const existing = getAdminCustomKnowledgeArticles();
+    const filtered = existing.filter(a => a.slug !== slug);
+    localStorage.setItem(ADMIN_KNOWLEDGE_ARTICLES_KEY, JSON.stringify(filtered));
+
+    fetch(`/api/knowledge/articles/${encodeURIComponent(slug)}`, {
+      method: 'DELETE'
+    }).catch(() => {});
+  } catch (e) {
+    console.error('Failed to delete custom article:', e);
+  }
+}
+
+

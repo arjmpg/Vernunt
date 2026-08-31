@@ -13,12 +13,15 @@ import {
   Layers,
   Building2,
   Baby,
-  FileCheck
+  FileCheck,
+  Star,
+  Ticket,
+  Instagram
 } from 'lucide-react';
 import VernuntLogo from './VernuntLogo.tsx';
 import { LanguageCode } from '../utils/dictionary.ts';
 
-export type UserPlatformRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional';
+export type UserPlatformRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer';
 
 interface RoleSelectionModalProps {
   isOpen: boolean;
@@ -251,6 +254,47 @@ export default function RoleSelectionModal({
                   <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-white/90 border border-slate-200/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-[11px] whitespace-nowrap shadow-2xs">
                     <Users className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                     <span>Booking Portal</span>
+                  </span>
+                </div>
+              </div>
+            </button>
+
+            {/* Option 5: Community Influencer & Ambassador */}
+            <button
+              id="role-btn-influencer"
+              type="button"
+              onClick={() => onSelectRole('Influencer')}
+              className="w-full text-left p-3.5 sm:p-4 md:p-5 rounded-xl sm:rounded-2xl border-2 border-pink-200 hover:border-pink-500 bg-gradient-to-br from-white via-pink-50/30 to-purple-50/30 hover:from-pink-50/70 hover:to-purple-50/70 transition-all duration-200 shadow-sm hover:shadow-md group flex items-start gap-3 sm:gap-4 cursor-pointer"
+            >
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-gradient-to-br from-pink-500 via-rose-500 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-md group-hover:scale-105 transition-transform mt-0.5">
+                <Star className="w-5 h-5 sm:w-6 sm:h-6 fill-amber-300 text-amber-200" />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap min-w-0">
+                    <h3 className="text-sm sm:text-base md:text-lg font-bold text-slate-900 group-hover:text-pink-700 transition leading-snug">
+                      Community Influencer & Ambassador
+                    </h3>
+                    <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-pink-500 to-rose-600 text-white px-2 py-0.5 rounded-md shadow-2xs whitespace-nowrap">
+                      VIP Creator
+                    </span>
+                  </div>
+                  <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-slate-400 group-hover:text-pink-600 group-hover:translate-x-1 transition-all shrink-0 mt-0.5" />
+                </div>
+                <p className="text-[11.5px] sm:text-xs text-slate-600 leading-relaxed">
+                  Partner as a parenting/lifestyle creator. Enjoy priority matching, spotlight radar placement, host activities with 0% ticketing commission (up to 1,000 tickets), and share custom 1-year free VIP access passes.
+                </p>
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1 w-full">
+                  <span className="inline-flex items-center gap-1 font-bold text-pink-800 bg-pink-50 border border-pink-200 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-[11px] whitespace-nowrap shadow-2xs">
+                    🎟️ 0% Commission (1,000 Tickets)
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-medium text-purple-800 bg-purple-50 border border-purple-200 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-[11px] whitespace-nowrap shadow-2xs">
+                    <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-400 shrink-0" />
+                    <span>Priority Matching Boost</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 font-medium text-slate-700 bg-white/90 border border-slate-200/90 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-md sm:rounded-lg text-[10.5px] sm:text-[11px] whitespace-nowrap shadow-2xs">
+                    <Instagram className="w-3.5 h-3.5 text-pink-500 shrink-0" />
+                    <span>Knowledge Hub Cross-Promotion</span>
                   </span>
                 </div>
               </div>

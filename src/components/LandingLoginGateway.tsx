@@ -578,16 +578,16 @@ export default function LandingLoginGateway({
             <div id="landing-featured-promo-banner" className="w-full bg-white border border-orange-100/60 rounded-2xl overflow-hidden shadow-xs text-left">
               <div className="relative h-40 w-full bg-slate-950">
                 <img 
-                  src="https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&q=80&w=1200" 
-                  alt="Monsoon Play Festival 2026" 
-                  className="w-full h-full object-cover opacity-60"
+                  src="https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=1200" 
+                  alt="Monsoon Play Festival 2026 - Kids Playmate & Parent Gathering" 
+                  className="w-full h-full object-cover opacity-75"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-transparent flex flex-col justify-end p-4">
-                  <span className="flex items-center gap-1 bg-slate-800 text-slate-205 border border-slate-700 text-white text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md w-max mb-1.5 shadow-sm">
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/30 to-transparent flex flex-col justify-end p-4">
+                  <span className="flex items-center gap-1 bg-amber-500 text-slate-950 border border-amber-400/60 text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md w-max mb-1.5 shadow-sm">
                     ✨ Featured Highlight
                   </span>
-                  <h4 className="text-white text-xs font-serif font-black leading-snug tracking-wide select-none animate-fade-in">
+                  <h4 className="text-white text-xs font-serif font-black leading-snug tracking-wide select-none animate-fade-in drop-shadow-md">
                     Join the Bengaluru Monsoon Play Festival 2026! Book passes from approved event organizers.
                   </h4>
                 </div>

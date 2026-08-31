@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
-import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight } from 'lucide-react';
+import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 
 export function formatLastActive(timestamp?: string): string {
@@ -17,36 +17,53 @@ export function formatLastActive(timestamp?: string): string {
   return 'Over a month ago';
 }
 
-export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile): {
+const incomeTierWeights: Record<string, number> = {
+  'No income': 0,
+  '0 to 3 lakhs': 1,
+  '3 to 8 lakhs': 2,
+  '8 to 12 lakhs': 3,
+  '12 to 20 lakhs': 4,
+  '20 to 26 lakhs': 5,
+  '26 lakhs and above': 6
+};
+
+export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile, currentUserLat?: number, currentUserLng?: number): {
   score: number;
-  breakdown: { interests: number; age: number; playStyle: number };
+  breakdown: { interests: number; proximity: number; availability: number; age: number; playStyle: number };
   matchingInterests: string[];
+  matchingAvailability: string[];
   isSimulated: boolean;
 } {
   // If no user profile exists, we provide a consistent simulated/default match score based on names
   if (!p1) {
     const seedStr = (p2.id || '') + (p2.childName || '') + (p2.parentName || '');
     const charSum = seedStr.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    const simulatedScore = 70 + (charSum % 26); // stable value between 70% and 95%
+    const simulatedScore = 72 + (charSum % 24); // stable value between 72% and 96%
     
-    // Pick 1-2 fallback interests from the child profile for UI relevance
     const displayInterests = p2.interests && p2.interests.length > 0
       ? p2.interests.slice(0, Math.min(2, p2.interests.length))
       : ['Playtime Hobbies'];
 
+    const displayAvail = p2.generalAvailability && p2.generalAvailability.length > 0
+      ? p2.generalAvailability.slice(0, 1)
+      : ['Weekends'];
+
     return {
       score: simulatedScore,
       breakdown: { 
-        interests: Math.min(40, 20 + (charSum % 16)), 
-        age: 25, 
-        playStyle: Math.min(30, 20 + (charSum % 11)) 
+        interests: 25, 
+        proximity: 25, 
+        availability: 20, 
+        age: 15, 
+        playStyle: 10 
       },
       matchingInterests: displayInterests,
+      matchingAvailability: displayAvail,
       isSimulated: true
     };
   }
 
-  // 1. Interests Overlap Score (Max 40 points)
+  // 1. Interests Overlap Score (Max 30 points)
   let matchingInterests: string[] = [];
   if (p1.interests && p2.interests) {
     matchingInterests = p2.interests.filter(i => 
@@ -59,52 +76,89 @@ export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile): 
   }
   
   const interestOverlapCount = matchingInterests.length;
-  let interestsScore = 10; // default base for potential compatibility
-  if (interestOverlapCount > 0) {
-    interestsScore = Math.min(20 + interestOverlapCount * 10, 40);
+  let interestsScore = 10;
+  if (interestOverlapCount >= 3) {
+    interestsScore = 30;
+  } else if (interestOverlapCount === 2) {
+    interestsScore = 24;
+  } else if (interestOverlapCount === 1) {
+    interestsScore = 18;
   }
 
-  // 2. Age Group Score (Max 30 points)
+  // 2. Geographic Proximity Score (Max 25 points)
+  const uLat = currentUserLat || (p1.location && p1.location.lat) || 12.9716;
+  const uLng = currentUserLng || (p1.location && p1.location.lng) || 77.5946;
+  const distKm = getHaversineDistance(uLat, uLng, p2.location.lat, p2.location.lng);
+  let proximityScore = 10;
+  if (distKm <= 1.5) {
+    proximityScore = 25; // Same building or immediate walking circle
+  } else if (distKm <= 3.5) {
+    proximityScore = 20; // Walking / quick scooter distance
+  } else if (distKm <= 7.0) {
+    proximityScore = 15; // Short neighbourhood drive
+  }
+
+  // 3. General Availability Overlap Score (Max 20 points)
+  let matchingAvailability: string[] = [];
+  if (p1.generalAvailability && p2.generalAvailability) {
+    matchingAvailability = p2.generalAvailability.filter(a =>
+      p1.generalAvailability!.some(ca => ca.toLowerCase() === a.toLowerCase())
+    );
+  }
+  let availabilityScore = 10;
+  if (matchingAvailability.length >= 2) {
+    availabilityScore = 20;
+  } else if (matchingAvailability.length === 1) {
+    availabilityScore = 16;
+  }
+
+  // 4. Age Proximity Score (Max 15 points)
   const age1 = p1.childAge * (p1.ageUnit === 'months' ? 1/12 : 1);
   const age2 = p2.childAge * (p2.ageUnit === 'months' ? 1/12 : 1);
   const ageDiff = Math.abs(age1 - age2);
   let ageScore = 5;
   if (ageDiff <= 1) {
-    ageScore = 30; // Perfect age peer match
-  } else if (ageDiff <= 2) {
-    ageScore = 20; // Very close age peer
-  } else if (ageDiff <= 3.5) {
-    ageScore = 15; // Moderate age peer compatibility
+    ageScore = 15; // Exact peer age
+  } else if (ageDiff <= 2.5) {
+    ageScore = 11;
+  } else if (ageDiff <= 4) {
+    ageScore = 8;
   }
 
-  // 3. Play Style Score (Max 30 points)
-  const ps1 = (p1.playStyle || '').toLowerCase().trim();
-  const ps2 = (p2.playStyle || '').toLowerCase().trim();
-  let playStyleScore = 10;
-  if (ps1 === ps2 && ps1.length > 0) {
-    playStyleScore = 30;
-  } else if (
-    (ps1.includes('social') && ps2.includes('social')) ||
-    (ps1.includes('active') && ps2.includes('active')) ||
-    (ps1.includes('creative') && ps2.includes('creative')) ||
-    (ps1.includes('sporty') && ps2.includes('sporty')) ||
-    (ps1.includes('educational') && ps2.includes('educational'))
-  ) {
-    playStyleScore = 25;
-  } else if (
-    (ps1.includes('social') && ps2.includes('active')) ||
-    (ps1.includes('active') && ps2.includes('sporty')) ||
-    (ps1.includes('creative') && ps2.includes('educational')) ||
-    (ps1.includes('cooperative') && ps2.includes('social'))
-  ) {
-    playStyleScore = 20;
+  // 5. Psychological Demographic & Income Affinity with Progressive Fallback (Max 10 points)
+  // Income is hidden in frontend, used only to prioritize peer cohorts with smooth fallback
+  let incomeAffinityScore = 6;
+  if (p1.parentsIncome && p2.parentsIncome) {
+    const tier1 = incomeTierWeights[p1.parentsIncome] ?? 2;
+    const tier2 = incomeTierWeights[p2.parentsIncome] ?? 2;
+    const diff = Math.abs(tier1 - tier2);
+    if (diff === 0) {
+      incomeAffinityScore = 10; // Exact tier match
+    } else if (diff === 1) {
+      incomeAffinityScore = 8;  // Adjacent bracket
+    } else if (diff === 2) {
+      incomeAffinityScore = 6;  // Nearby bracket
+    } else {
+      incomeAffinityScore = 5;  // Seamless fallback so parents still discover great families
+    }
   }
 
-  const finalScore = Math.min(100, Math.max(30, interestsScore + ageScore + playStyleScore));
+  // Influencer / Community Ambassador Priority Boost
+  const isInfluencer = p2.userRole === 'Influencer' || p2.isInfluencerSpotlight;
+  const influencerBoost = isInfluencer ? 10 : 0;
+
+  const finalScore = Math.min(99, Math.max(45, interestsScore + proximityScore + availabilityScore + ageScore + incomeAffinityScore + influencerBoost));
   return {
     score: finalScore,
-    breakdown: { interests: interestsScore, age: ageScore, playStyle: playStyleScore },
+    breakdown: { 
+      interests: interestsScore, 
+      proximity: proximityScore, 
+      availability: availabilityScore, 
+      age: ageScore, 
+      playStyle: incomeAffinityScore + influencerBoost
+    },
     matchingInterests,
+    matchingAvailability,
     isSimulated: false
   };
 }
@@ -391,6 +445,47 @@ export default function PlaymateCard({
 
       {/* Main Details Body */}
       <div id="card-body-content" className="p-5 flex-1 flex flex-col space-y-3.5 bg-[#FAF8F6]">
+        {/* Influencer & Ambassador Spotlight Banner */}
+        {(profile.userRole === 'Influencer' || profile.isInfluencerSpotlight) && (
+          <div className="bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-amber-500/10 border-2 border-pink-300 rounded-2xl p-2.5 px-3 flex items-center justify-between gap-2 shadow-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-6 w-6 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 text-white items-center justify-center text-xs shrink-0 shadow-xs">
+                ⭐
+              </span>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-pink-900 bg-pink-100 px-1.5 py-0.5 rounded-md">
+                    Spotlight Ambassador
+                  </span>
+                  {profile.influencerFollowers && (
+                    <span className="text-[9.5px] font-extrabold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded-md border border-purple-200">
+                      {profile.influencerFollowers}
+                    </span>
+                  )}
+                </div>
+                {profile.instagramHandle && (
+                  <p className="text-[11px] font-bold text-pink-700 truncate mt-0.5">
+                    {profile.instagramHandle}
+                  </p>
+                )}
+              </div>
+            </div>
+            {profile.instagramUrl && (
+              <a
+                href={profile.instagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="shrink-0 p-1.5 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white text-[10px] font-black rounded-xl flex items-center gap-1 shadow-xs active:scale-95 transition cursor-pointer"
+                title="View Instagram Profile"
+              >
+                <span>Instagram</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Primary Row: Name, grade, age */}
         <div id="card-basics" className="flex justify-between items-start">
           <div>

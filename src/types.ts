@@ -11,7 +11,7 @@ export enum LocationSharing {
   HIDDEN = 'HIDDEN'
 }
 
-export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Admin';
+export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Admin';
 
 export interface ChildProfile {
   id: string;
@@ -35,9 +35,11 @@ export interface ChildProfile {
   parentPhotoUrl?: string; // Parent/Guardian photo (MANDATORY for trust & safety)
   childPhotoUrl?: string; // Child photo (OPTIONAL for child COPPA/DPDP privacy)
   ageUnit?: 'years' | 'months';
-  parentsIncome?: string; // Hidden in frontend
+  parentsIncome?: string; // Hidden in frontend - used strictly for intelligent matching
   caste?: string;
   religion?: string;
+  generalAvailability?: string[]; // e.g. ['Weekdays After School', 'Weekends']
+  childPrivacySetting?: 'full' | 'first_name_only' | 'connections_only'; // Child info privacy control
   parentProfession?: string;
   motherTongue?: string;
   languagesKnown?: string[];
@@ -56,6 +58,17 @@ export interface ChildProfile {
   aadhaarDocName?: string; // Uploaded Aadhaar card document filename
   aadhaarDocSize?: number; // File size in bytes (max 3MB)
   userRole?: UserRole;
+  
+  // Influencer & Community Ambassador specific fields
+  instagramHandle?: string; // e.g. "@bangalore_mommy_diaries"
+  instagramUrl?: string; // e.g. "https://instagram.com/bangalore_mommy_diaries"
+  influencerFollowers?: string; // e.g. "24.5K"
+  influencerBio?: string;
+  isInfluencerSpotlight?: boolean;
+  freeTicketsQuota?: number; // Quota for 0% commission event ticketing (up to 1,000 tickets)
+  freeTicketsUsed?: number;
+  assignedCouponCodes?: string[]; // Coupon codes created for or managed by this influencer
+  usedCouponCode?: string; // Coupon code applied by user to activate free pass
   
   // Address & Community parameters (Indian standard KYC)
   currentAddress?: string;
@@ -332,6 +345,29 @@ export interface EventCoupon {
   description?: string;
 }
 
+export interface AdminCouponCode {
+  id: string;
+  code: string; // e.g. "INFLUENCER365", "VIPMOM", "VERNUNT1YEAR"
+  title: string; // e.g. "1-Year Free VIP Parent Pass"
+  benefitType: 'free_1_year_vip' | 'free_pass' | 'percentage' | 'flat';
+  durationDays: number; // e.g. 365 days
+  discountValue?: number;
+  isActive: boolean;
+  maxRedemptions?: number; // e.g. 500
+  timesRedeemed: number;
+  redeemedByUsers?: {
+    userId: string;
+    userName: string;
+    userEmail?: string;
+    redeemedAt: string;
+  }[];
+  validUntil?: string; // ISO date
+  creatorRole?: string;
+  assignedInfluencerName?: string; // e.g. "Priya Sharma (@bangalore_mommy)"
+  notes?: string;
+  createdAt: string;
+}
+
 export interface EventAttendee {
   id: string;
   ticketNumber: string; // e.g. "VERN-EVT-8924-819"
@@ -374,6 +410,11 @@ export interface CommunityEvent {
   tags?: string[];
   ticketPrice?: number; // Base Price in INR (0 means FREE)
   commissionPercentage?: number; // Custom admin override percentage (default e.g. 10%)
+  freeTicketsQuota?: number; // Admin-configured number of free tickets (0% platform commission)
+  freeTicketsIssued?: number; // Count of free tickets issued/claimed so far
+  isInfluencerHost?: boolean; // Whether hosted by verified influencer ambassador
+  hostRole?: 'influencer' | 'parent' | 'daycare' | 'specialist' | string;
+  customCommissionRate?: number; // Granular admin commission rate override (e.g. 2.5%)
   lat?: number;
   lng?: number;
   iconEmoji?: string;
