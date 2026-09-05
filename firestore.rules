@@ -286,5 +286,12 @@ service cloud.firestore {
       allow read, list: if true;
       allow create, update, delete: if isAdmin();
     }
+
+    // Community Events, Classes and Activities Collection: Public Read, Signed-in Write
+    match /events/{eventId} {
+      allow read, list: if true;
+      allow create, update: if isSignedIn();
+      allow delete: if isAdmin();
+    }
   }
 }

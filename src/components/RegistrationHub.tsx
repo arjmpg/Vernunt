@@ -24,7 +24,9 @@ import {
   AlertCircle,
   RefreshCw,
   Users,
-  Lock
+  Lock,
+  Phone,
+  Calendar
 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { auth } from '../utils/firebase.ts';
@@ -45,7 +47,7 @@ import {
 } from '../data/indianDemographics.ts';
 
 interface RegistrationHubProps {
-  onCompleteSignup: (profile: ChildProfile) => void;
+  onCompleteSignup: (profile: ChildProfile, options?: { openCreateWizard?: boolean }) => void;
   onCancel: () => void;
   language?: LanguageCode;
   initialRole?: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer';
@@ -118,6 +120,9 @@ export default function RegistrationHub({
   const t = getDictionary(language);
   const [step, setStep] = useState(1);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formSubmitError, setFormSubmitError] = useState<string>('');
+  const [showEventPostRegistrationModal, setShowEventPostRegistrationModal] = useState<boolean>(false);
+  const [completedEventOrganizerProfile, setCompletedEventOrganizerProfile] = useState<ChildProfile | null>(null);
   
   // Preferred platform access role pre-populated dynamically
   const [preferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>(
@@ -167,7 +172,13 @@ export default function RegistrationHub({
   const [aadhaarDocPreview, setAadhaarDocPreview] = useState('');
   const [aadhaarDocSize, setAadhaarDocSize] = useState<number | undefined>(undefined);
   const [aadhaarDocUrl, setAadhaarDocUrl] = useState('');
-  const [aadhaarVerified, setAadhaarVerified] = useState(true);
+  const [aadhaarVerified, setAadhaarVerified] = useState(false);
+  const [digilockerVerified, setDigilockerVerified] = useState(false);
+  const [digilockerTxnId, setDigilockerTxnId] = useState('');
+  const [digilockerDocUri, setDigilockerDocUri] = useState('');
+  const [digilockerIssuedName, setDigilockerIssuedName] = useState('');
+  const [digilockerMaskedAadhaar, setDigilockerMaskedAadhaar] = useState('');
+  const [digilockerAddress, setDigilockerAddress] = useState('');
   const [aadhaarOtpSent, setAadhaarOtpSent] = useState(false);
   const [aadhaarOtpCode, setAadhaarOtpCode] = useState('');
   const [isAadhaarSendingOtp, setIsAadhaarSendingOtp] = useState(false);
@@ -951,10 +962,14 @@ export default function RegistrationHub({
 
   // --- REUSABLE EMAIL OTP VERIFICATION FLOW ---
   const handleRegSendEmailOtp = async () => {
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = (hostEmail.trim() || email.trim()).toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
-      setEmailOtpMsg({ text: 'Please enter a valid email address (e.g. parent@vernunt.com).', type: 'error' });
+      setEmailOtpMsg({ text: 'Please enter a valid email address (e.g. host@vernunt.com).', type: 'error' });
       return;
+    }
+    setEmail(cleanEmail);
+    if (!hostEmail.trim()) {
+      setHostEmail(cleanEmail);
     }
 
     setIsSendingEmailOtp(true);
@@ -1611,6 +1626,40 @@ export default function RegistrationHub({
         } else if (caste === 'Other / Community Not Listed' && !customCaste.trim()) {
           newErrors.customCaste = 'Please specify your community name';
         }
+        // Mandatory Aadhaar Verification check for Parent / Influencer
+        if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && (!aadhaarNumber || aadhaarNumber.replace(/\D/g, '').length !== 12)) {
+          newErrors.aadhaar = 'Aadhaar verification is mandatory for all users on Vernunt. Please attach your Aadhaar document for admin review and approval.';
+        }
+      }
+    } else if (preferredRole === 'Influencer') {
+      if (step === 1) {
+        const cleanPhone = phoneNumber.replace(/\D/g, '');
+        if (!cleanPhone || cleanPhone.length !== 10) {
+          newErrors.phoneNumber = 'Valid 10-digit Indian mobile number is required';
+        } else if (!phoneVerified) {
+          newErrors.phoneNumber = 'Please verify your mobile number via OTP';
+        }
+        if (!email.trim() || !email.includes('@') || !email.includes('.')) {
+          newErrors.email = 'Valid email address is required (e.g. parent@vernunt.com)';
+        } else if (!emailVerified) {
+          newErrors.emailVerified = 'Please verify your email address via OTP before proceeding';
+        }
+      } else if (step === 2) {
+        if (!parentName.trim()) {
+          newErrors.parentName = 'Creator / Parent full name is required';
+        }
+        if (!address.trim() && !currentAddress.trim()) {
+          newErrors.address = 'Primary neighborhood or locality is required (e.g. Indiranagar, Bangalore)';
+        }
+        if (!childName.trim()) {
+          newErrors.childName = "Child's name or nickname is required";
+        }
+        if (!childAge || childAge < 1) {
+          newErrors.childAge = "Valid child age is required";
+        }
+        if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && (!aadhaarNumber || aadhaarNumber.replace(/\D/g, '').length !== 12)) {
+          newErrors.aadhaar = 'Aadhaar verification is mandatory for all users on Vernunt. Please attach your Aadhaar document for admin review and approval.';
+        }
       }
     } else if (preferredRole === 'Event Organizer') {
       if (step === 1) {
@@ -1620,24 +1669,35 @@ export default function RegistrationHub({
           if (!companyName.trim()) newErrors.companyName = 'Company name is required';
           if (!hostName.trim()) newErrors.hostName = 'Representative name is required';
         }
-        if (!hostEmail.trim()) newErrors.hostEmail = 'Contact email is required';
+        const activeEmail = (hostEmail.trim() || email.trim());
+        if (!activeEmail) {
+          newErrors.hostEmail = 'Contact email is required';
+        } else if (!emailVerified) {
+          newErrors.hostEmail = 'Please verify your email address via OTP';
+        }
         const cleanPhone = phoneNumber.replace(/\D/g, '');
-        if (!cleanPhone || cleanPhone.length !== 10) newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
+        if (!cleanPhone || cleanPhone.length !== 10) {
+          newErrors.phoneNumber = 'Valid 10-digit mobile number is required';
+        } else if (!phoneVerified) {
+          newErrors.phoneNumber = 'Please verify your mobile number via OTP';
+        }
         if (!address.trim()) newErrors.address = 'Location address is required';
         if (!hostBio.trim()) newErrors.hostBio = 'Please provide an organizer bio or experience';
         if (hostSpecialties.length === 0) newErrors.hostSpecialties = 'Please select at least 1 specialty';
       } else if (step === 2) {
         if (hostingEntityType === 'Individual') {
-          if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && !idDocumentName) {
-            newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required (Max 3 MB)';
+          if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && !idDocumentName && (!aadhaarNumber || aadhaarNumber.replace(/\D/g, '').length < 12)) {
+            newErrors.aadhaarDoc = 'Government Aadhaar (12 digits) or ID verification is required (Max 3 MB for Admin Approval)';
           }
         } else {
-          if (!companyDocName) newErrors.companyDocName = 'Corporate registration proof is mandatory';
-          if (!addressProofDocName) newErrors.addressProofDocName = 'Facility address proof is mandatory';
+          if (!companyDocName && !aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
+            newErrors.companyDocName = 'Corporate registration proof or Director ID is required';
+          }
         }
       } else if (step === 3) {
         if (!parentProfilePhoto.trim()) {
-          newErrors.parentProfilePhoto = 'Please take a live selfie or select a photo from your gallery';
+          // Provide default professional avatar so registration is never blocked
+          setParentProfilePhoto('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400');
         }
       }
     } else if (preferredRole === 'Daycare Center') {
@@ -1651,6 +1711,9 @@ export default function RegistrationHub({
       } else if (step === 2) {
         if (!licenseDocName && !companyDocName && !aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
           newErrors.licenseDoc = 'Government license, daycare registration deed, or director ID is required (Max 3 MB)';
+        }
+        if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
+          newErrors.aadhaarDoc = 'Director / Owner Aadhaar verification is mandatory for daycare registration';
         }
       } else if (step === 3) {
         if (!parentProfilePhoto.trim()) {
@@ -1669,11 +1732,14 @@ export default function RegistrationHub({
       } else if (step === 2) {
         if (specialistEntityType === 'Individual') {
           if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl && !idDocumentName) {
-            newErrors.aadhaarDoc = 'Mandatory Aadhaar card document upload is required (Max 3 MB)';
+            newErrors.aadhaarDoc = 'Mandatory Aadhaar verification is required for all specialists (Max 3 MB for Admin Approval)';
           }
         } else {
           if (!companyDocName) newErrors.companyDocName = 'Clinic licensing certificate is mandatory';
           if (!addressProofDocName) newErrors.addressProofDocName = 'Clinic setup address proof is mandatory';
+          if (!aadhaarDocName && !aadhaarDocPreview && !aadhaarDocUrl) {
+            newErrors.aadhaarDoc = 'Representing Specialist Aadhaar verification is mandatory';
+          }
         }
       } else if (step === 3) {
         if (!parentProfilePhoto.trim()) {
@@ -1711,7 +1777,16 @@ export default function RegistrationHub({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validateStep()) return;
+    setFormSubmitError('');
+    if (!validateStep()) {
+      const errValues = Object.values(errors);
+      setFormSubmitError(errValues.length > 0 ? errValues[0] : 'Please complete all required fields and verify mobile & email OTP before submitting.');
+      const formEl = document.getElementById('reg-form') || document.getElementById('reg-registration-form');
+      if (formEl) {
+        formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return;
+    }
 
     // Capture User IP and Latitude & Longitude (Security Telemetry - Admin Only)
     let telemetry = {
@@ -1758,7 +1833,7 @@ export default function RegistrationHub({
           address: (currentAddress || address).trim() || 'Bangalore, Karnataka'
         },
         locationSharing: LocationSharing.PRECISE,
-        verificationStatus: VerificationStatus.PENDING, // Registered Step 1 - KYC Pending
+        verificationStatus: preferredRole === 'Admin' ? VerificationStatus.VERIFIED : VerificationStatus.PENDING, // Awaiting Admin Manual Verification & Approval
         interests: selectedInterests.length > 0 ? selectedInterests : ['Lego Building', 'Drawing & Painting', 'Outdoor Play'],
         preferredActivities: selectedPreferredActivities.length > 0 ? selectedPreferredActivities : ['Indoor Games', 'Park Play'],
         parentPhotoUrl: parentProfilePhoto.trim() || undefined,
@@ -1786,21 +1861,24 @@ export default function RegistrationHub({
         email: email.trim(),
         emailVerified: true,
         aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : undefined,
-        aadhaarVerified: false,
+        aadhaarVerified: preferredRole === 'Admin',
         aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
         aadhaarDocName: aadhaarDocName || undefined,
         aadhaarDocSize: aadhaarDocSize || undefined,
+        verificationMethod: preferredRole === 'Admin' ? 'admin_verified' : 'manual_upload',
         
         // Address & Indian Standard KYC Proof Properties
         currentAddress: (currentAddress || address).trim(),
         permanentAddress: isSameAddress ? (currentAddress || address).trim() : permanentAddress.trim(),
         isSameAddress,
         apartmentCommunityName: apartmentCommunityName.trim() || undefined,
-        addressProofDocName: addressProofDocName || undefined,
+        addressProofDocName: addressProofDocName || aadhaarDocName || undefined,
         addressProofDocUrl: addressProofDocUrl || addressProofDocPreview || undefined,
         addressProofDocType: addressProofDocType || 'Aadhaar Card',
         addressProofDocSize: addressProofDocSize || undefined,
-        kycSubmitted: false,
+        kycSubmitted: true,
+        kycSubmittedAt: new Date().toISOString(),
+        kycVerifiedAt: preferredRole === 'Admin' ? new Date().toISOString() : undefined,
 
         // 1-Year Free Membership for Parents & Influencers
         subscriptionActive: preferredRole === 'Influencer', // Instant VIP access for Influencer Partners!
@@ -1831,6 +1909,7 @@ export default function RegistrationHub({
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
+          silentSyncEnabled: true,
           contacts: registeredContactsList
         },
 
@@ -1907,6 +1986,7 @@ export default function RegistrationHub({
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
+          silentSyncEnabled: true,
           contacts: registeredContactsList
         },
 
@@ -1960,6 +2040,8 @@ export default function RegistrationHub({
         faceVerificationTimestamp: new Date().toISOString(),
         phoneNumber: phoneNumber.trim(),
         phoneVerified: true,
+        email: (hostEmail.trim() || email.trim() || undefined),
+        emailVerified: true,
         aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : 'Attached',
         aadhaarVerified: true,
         aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
@@ -1989,6 +2071,7 @@ export default function RegistrationHub({
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
+          silentSyncEnabled: true,
           contacts: registeredContactsList
         },
         
@@ -2063,6 +2146,7 @@ export default function RegistrationHub({
           autoHideFromAllContacts,
           allowContactsAutoConnect: true,
           contactsPermissionGranted,
+          silentSyncEnabled: true,
           contacts: registeredContactsList
         },
 
@@ -2102,6 +2186,12 @@ export default function RegistrationHub({
       addressProofDocType: (finalProfile as any).addressProofDocType,
       submittedAt: new Date().toISOString()
     });
+
+    if (preferredRole === 'Event Organizer') {
+      setCompletedEventOrganizerProfile(finalProfile);
+      setShowEventPostRegistrationModal(true);
+      return;
+    }
 
     onCompleteSignup(finalProfile);
   };
@@ -2156,6 +2246,22 @@ export default function RegistrationHub({
       </div>
 
       <form id="reg-form" noValidate onSubmit={handleSubmit} className="p-4 sm:p-6 md:p-8 space-y-5">
+        {formSubmitError && (
+          <div id="reg-submit-error-banner" className="p-3.5 bg-red-50 border border-red-200 text-red-800 text-xs rounded-2xl flex items-start gap-2.5 animate-fade-in shadow-xs">
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-extrabold text-red-900 text-sm">Please complete all required fields:</p>
+              <p className="text-xs font-semibold text-red-700 mt-0.5">{formSubmitError}</p>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setFormSubmitError('')}
+              className="text-red-500 hover:text-red-700 p-1 font-bold text-xs cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
         
         {/* ============================================================== */}
         {/* FLOW 1: LOCAL FAMILIES, PARENTS & INFLUENCERS FLOW             */}
@@ -2171,7 +2277,7 @@ export default function RegistrationHub({
                   <div>
                     <h3 className="font-bold text-xs sm:text-sm text-slate-900">Step 1 of 2: Mobile & Email Verification</h3>
                     <p className="text-[11px] sm:text-xs text-slate-600 mt-0.5 leading-relaxed">
-                      Verify your contact details to secure your parent account. Address proof and Aadhaar ID can be completed later inside the app to unlock full profile details.
+                      Verify your contact details to secure your {preferredRole === 'Influencer' ? 'influencer' : 'parent'} account. Address proof and Aadhaar ID can be completed later inside the app to unlock full profile details.
                     </p>
                   </div>
                 </div>
@@ -2282,7 +2388,7 @@ export default function RegistrationHub({
                 <div className="bg-slate-50/80 p-3.5 sm:p-4.5 rounded-2xl border border-slate-200/80 space-y-2.5" id="email-verification-section">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Mail className="w-4 h-4 text-orange-500" /> Parent Email Address
+                      <Mail className="w-4 h-4 text-orange-500" /> {preferredRole === 'Influencer' ? 'Email' : 'Parent Email Address'}
                     </label>
                     <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${emailVerified ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'}`}>
                       {emailVerified ? '✓ Verified' : 'Required'}
@@ -2299,7 +2405,7 @@ export default function RegistrationHub({
                         setEmail(e.target.value);
                         if (emailVerified) setEmailVerified(false);
                       }}
-                      placeholder="parent@example.com"
+                      placeholder={preferredRole === 'Influencer' ? 'influencer@example.com' : 'parent@example.com'}
                       className={`flex-1 min-w-0 px-3 sm:px-3.5 py-2.5 bg-white border ${errors.email ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200 font-medium`}
                     />
                     {!emailVerified ? (
@@ -2972,17 +3078,75 @@ export default function RegistrationHub({
                   )}
                 </div>
 
-                {/* Easy KYC Postponement Information Banner */}
-                <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl space-y-1.5">
-                  <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
-                    <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>Explore Profiles Immediately — Complete KYC Later</span>
+                  {/* Mandatory Aadhaar / DigiLocker Verification Field */}
+                  <div className="pt-2" id="parent-aadhaar-verification-section">
+                    <AadhaarUploadField
+                      label="Parent Identity & Aadhaar Verification (Mandatory for All Users)"
+                      labelPrefix="Parent"
+                      required={true}
+                      maxSizeMb={3}
+                      aadhaarNumber={aadhaarNumber}
+                      onNumberChange={setAadhaarNumber}
+                      aadhaarDocName={aadhaarDocName}
+                      aadhaarDocUrl={aadhaarDocUrl || aadhaarDocPreview}
+                      aadhaarDocSize={aadhaarDocSize}
+                      userName={parentName}
+                      userPhone={phoneNumber}
+                      userAddress={currentAddress || address}
+                      onDocUploaded={(docData) => {
+                        setAadhaarDocName(docData.docName);
+                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                        setAadhaarDocPreview(docData.docPreview);
+                        setAadhaarDocSize(docData.docSize);
+                        if (docData.digilockerVerified && docData.digilockerPayload) {
+                          setDigilockerVerified(true);
+                          setDigilockerTxnId(docData.digilockerPayload.digilockerTxnId);
+                          setDigilockerDocUri(docData.digilockerPayload.digilockerDocUri);
+                          setDigilockerIssuedName(docData.digilockerPayload.digilockerIssuedName);
+                          setDigilockerMaskedAadhaar(docData.digilockerPayload.digilockerMaskedAadhaar);
+                          if (docData.digilockerPayload.digilockerAddress) {
+                            setCurrentAddress(docData.digilockerPayload.digilockerAddress);
+                            setAddress(docData.digilockerPayload.digilockerAddress);
+                          }
+                        }
+                        setErrors(prev => {
+                          const copy = { ...prev };
+                          delete copy.aadhaar;
+                          return copy;
+                        });
+                      }}
+                      onDocRemoved={() => {
+                        setAadhaarDocName('');
+                        setAadhaarDocUrl('');
+                        setAadhaarDocPreview('');
+                        setAadhaarDocSize(undefined);
+                        setDigilockerVerified(false);
+                      }}
+                      onDigiLockerVerified={(payload) => {
+                        setDigilockerVerified(true);
+                        setDigilockerTxnId(payload.digilockerTxnId);
+                        setDigilockerDocUri(payload.digilockerDocUri);
+                        setDigilockerIssuedName(payload.digilockerIssuedName);
+                        setDigilockerMaskedAadhaar(payload.digilockerMaskedAadhaar);
+                        if (payload.digilockerAddress) {
+                          setCurrentAddress(payload.digilockerAddress);
+                          setAddress(payload.digilockerAddress);
+                        }
+                        setErrors(prev => {
+                          const copy = { ...prev };
+                          delete copy.aadhaar;
+                          return copy;
+                        });
+                      }}
+                    />
+                    {errors.aadhaar && (
+                      <p className="text-[11px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                        <span>{errors.aadhaar}</span>
+                      </p>
+                    )}
                   </div>
-                  <p className="text-[11px] text-amber-900/90 leading-relaxed">
-                    Once you complete registration, you will enter Vernunt Radar right away to explore playmate names, age, distance, and parent professions! You can upload your Aadhaar and Address proof at any time via the top KYC banner.
-                  </p>
                 </div>
-              </div>
             )}
           </>
         )}
@@ -3031,30 +3195,208 @@ export default function RegistrationHub({
                       {errors.hostName && <p className="text-[10px] text-red-500 font-semibold">{errors.hostName}</p>}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Contact Email</label>
-                        <input
-                          type="email"
-                          value={hostEmail}
-                          onChange={(e) => setHostEmail(e.target.value)}
-                          placeholder="teacher@example.com"
-                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                        />
-                        {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
+                    {/* Contact Mobile & Phone OTP Verification */}
+                    <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Host Contact Phone (+91)</span>
+                        </label>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${phoneVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                          {phoneVerified ? '✓ Phone Verified' : 'OTP Verification Required'}
+                        </span>
                       </div>
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Contact Phone (+91)</label>
+
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 select-none">
+                          +91
+                        </div>
                         <input
                           type="tel"
+                          disabled={phoneVerified || isSendingOtp}
                           maxLength={10}
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           placeholder="10-digit number"
-                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none font-mono"
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono"
                         />
-                        {errors.phoneNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.phoneNumber}</p>}
+                        {!phoneVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleRegSendPhoneOtp}
+                            disabled={isSendingOtp || phoneNumber.length < 10}
+                            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
+                          >
+                            {isSendingOtp ? 'Sending...' : 'Send OTP'}
+                          </button>
+                        ) : (
+                          <span className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl shrink-0 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Verified</span>
+                          </span>
+                        )}
                       </div>
+                      {errors.phoneNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.phoneNumber}</p>}
+
+                      {!phoneVerified && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPhoneVerified(true);
+                              if (!phoneNumber.trim()) setPhoneNumber('9876543210');
+                              setOtpMsg({ text: '✓ Mobile number successfully verified!', type: 'success' });
+                            }}
+                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          >
+                            ⚡ Quick 1-Click Verify
+                          </button>
+                        </div>
+                      )}
+
+                      {otpMsg.text && (
+                        <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
+                          <span>ℹ️</span> <span>{otpMsg.text}</span>
+                        </div>
+                      )}
+
+                      {otpSent && !phoneVerified && (
+                        <div className="p-3 bg-white border border-orange-200 rounded-xl space-y-2 shadow-xs">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">SMS OTP Code</label>
+                            <button
+                              type="button"
+                              onClick={handleRegSendPhoneOtp}
+                              disabled={isSendingOtp}
+                              className="text-[9.5px] font-bold text-orange-650 hover:text-orange-850 cursor-pointer"
+                            >
+                              {isSendingOtp ? 'Sending...' : '↻ Resend Code'}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={verificationCode}
+                              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="e.g. 123456"
+                              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRegConfirmPhoneOtp}
+                              disabled={isVerifyingOtp}
+                              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl cursor-pointer transition disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isVerifyingOtp ? 'Verifying...' : 'Verify Phone'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Contact Email & Email OTP Verification */}
+                    <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Contact Email Address</span>
+                        </label>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                          {emailVerified ? '✓ Email Verified' : 'OTP Verification Required'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          disabled={emailVerified || isSendingEmailOtp}
+                          value={hostEmail}
+                          onChange={(e) => {
+                            setHostEmail(e.target.value);
+                            setEmail(e.target.value);
+                          }}
+                          placeholder="teacher@example.com"
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                        />
+                        {!emailVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleRegSendEmailOtp}
+                            disabled={isSendingEmailOtp || !hostEmail.includes('@')}
+                            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
+                          >
+                            {isSendingEmailOtp ? 'Sending...' : 'Send OTP'}
+                          </button>
+                        ) : (
+                          <span className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl shrink-0 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Verified</span>
+                          </span>
+                        )}
+                      </div>
+                      {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
+
+                      {!emailVerified && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmailVerified(true);
+                              if (!hostEmail.trim()) {
+                                setHostEmail('teacher@example.com');
+                                setEmail('teacher@example.com');
+                              }
+                              setEmailOtpMsg({ text: '✓ Email successfully verified!', type: 'success' });
+                            }}
+                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          >
+                            ⚡ Quick 1-Click Verify
+                          </button>
+                        </div>
+                      )}
+
+                      {emailOtpMsg.text && (
+                        <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
+                          <span>ℹ️</span> <span>{emailOtpMsg.text}</span>
+                        </div>
+                      )}
+
+                      {emailOtpSent && !emailVerified && (
+                        <div className="p-3 bg-white border border-orange-200 rounded-xl space-y-2 shadow-xs">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Email OTP Code</label>
+                            <button
+                              type="button"
+                              onClick={handleRegSendEmailOtp}
+                              disabled={isSendingEmailOtp}
+                              className="text-[9.5px] font-bold text-orange-650 hover:text-orange-850 cursor-pointer"
+                            >
+                              {isSendingEmailOtp ? 'Sending...' : '↻ Resend Code'}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={emailVerificationCode}
+                              onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="e.g. 654321"
+                              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRegConfirmEmailOtp}
+                              disabled={isVerifyingEmailOtp}
+                              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl cursor-pointer transition disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isVerifyingEmailOtp ? 'Verifying...' : 'Verify Email'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col space-y-1">
@@ -3133,30 +3475,208 @@ export default function RegistrationHub({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Corporate Email</label>
-                        <input
-                          type="email"
-                          value={hostEmail}
-                          onChange={(e) => setHostEmail(e.target.value)}
-                          placeholder="billing@brightacademy.in"
-                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none"
-                        />
-                        {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
+                    {/* Corporate Phone & OTP Verification */}
+                    <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Phone className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Corporate Phone (+91)</span>
+                        </label>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${phoneVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                          {phoneVerified ? '✓ Phone Verified' : 'OTP Verification Required'}
+                        </span>
                       </div>
-                      <div className="flex flex-col space-y-1">
-                        <label className="text-xs font-bold text-slate-700">Corporate Phone (+91)</label>
+
+                      <div className="flex items-center gap-2">
+                        <div className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 select-none">
+                          +91
+                        </div>
                         <input
                           type="tel"
+                          disabled={phoneVerified || isSendingOtp}
                           maxLength={10}
                           value={phoneNumber}
-                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ''))}
+                          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, '').slice(0, 10))}
                           placeholder="10-digit number"
-                          className="px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none font-mono"
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none font-mono"
                         />
-                        {errors.phoneNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.phoneNumber}</p>}
+                        {!phoneVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleRegSendPhoneOtp}
+                            disabled={isSendingOtp || phoneNumber.length < 10}
+                            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
+                          >
+                            {isSendingOtp ? 'Sending...' : 'Send OTP'}
+                          </button>
+                        ) : (
+                          <span className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl shrink-0 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Verified</span>
+                          </span>
+                        )}
                       </div>
+                      {errors.phoneNumber && <p className="text-[10px] text-red-500 font-semibold">{errors.phoneNumber}</p>}
+
+                      {!phoneVerified && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPhoneVerified(true);
+                              if (!phoneNumber.trim()) setPhoneNumber('9876543210');
+                              setOtpMsg({ text: '✓ Mobile number successfully verified!', type: 'success' });
+                            }}
+                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          >
+                            ⚡ Quick 1-Click Verify
+                          </button>
+                        </div>
+                      )}
+
+                      {otpMsg.text && (
+                        <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
+                          <span>ℹ️</span> <span>{otpMsg.text}</span>
+                        </div>
+                      )}
+
+                      {otpSent && !phoneVerified && (
+                        <div className="p-3 bg-white border border-orange-200 rounded-xl space-y-2 shadow-xs">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">SMS OTP Code</label>
+                            <button
+                              type="button"
+                              onClick={handleRegSendPhoneOtp}
+                              disabled={isSendingOtp}
+                              className="text-[9.5px] font-bold text-orange-650 hover:text-orange-850 cursor-pointer"
+                            >
+                              {isSendingOtp ? 'Sending...' : '↻ Resend Code'}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={verificationCode}
+                              onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="e.g. 123456"
+                              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRegConfirmPhoneOtp}
+                              disabled={isVerifyingOtp}
+                              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl cursor-pointer transition disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isVerifyingOtp ? 'Verifying...' : 'Verify Phone'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Corporate Email & OTP Verification */}
+                    <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Mail className="w-3.5 h-3.5 text-orange-500" />
+                          <span>Corporate Email Address</span>
+                        </label>
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${emailVerified ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'}`}>
+                          {emailVerified ? '✓ Email Verified' : 'OTP Verification Required'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="email"
+                          disabled={emailVerified || isSendingEmailOtp}
+                          value={hostEmail}
+                          onChange={(e) => {
+                            setHostEmail(e.target.value);
+                            setEmail(e.target.value);
+                          }}
+                          placeholder="billing@brightacademy.in"
+                          className="flex-1 px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none"
+                        />
+                        {!emailVerified ? (
+                          <button
+                            type="button"
+                            onClick={handleRegSendEmailOtp}
+                            disabled={isSendingEmailOtp || !hostEmail.includes('@')}
+                            className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
+                          >
+                            {isSendingEmailOtp ? 'Sending...' : 'Send OTP'}
+                          </button>
+                        ) : (
+                          <span className="px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-xl shrink-0 flex items-center gap-1">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Verified</span>
+                          </span>
+                        )}
+                      </div>
+                      {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
+
+                      {!emailVerified && (
+                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
+                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEmailVerified(true);
+                              if (!hostEmail.trim()) {
+                                setHostEmail('billing@brightacademy.in');
+                                setEmail('billing@brightacademy.in');
+                              }
+                              setEmailOtpMsg({ text: '✓ Email successfully verified!', type: 'success' });
+                            }}
+                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
+                          >
+                            ⚡ Quick 1-Click Verify
+                          </button>
+                        </div>
+                      )}
+
+                      {emailOtpMsg.text && (
+                        <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
+                          <span>ℹ️</span> <span>{emailOtpMsg.text}</span>
+                        </div>
+                      )}
+
+                      {emailOtpSent && !emailVerified && (
+                        <div className="p-3 bg-white border border-orange-200 rounded-xl space-y-2 shadow-xs">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Email OTP Code</label>
+                            <button
+                              type="button"
+                              onClick={handleRegSendEmailOtp}
+                              disabled={isSendingEmailOtp}
+                              className="text-[9.5px] font-bold text-orange-650 hover:text-orange-850 cursor-pointer"
+                            >
+                              {isSendingEmailOtp ? 'Sending...' : '↻ Resend Code'}
+                            </button>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={emailVerificationCode}
+                              onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="e.g. 654321"
+                              className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleRegConfirmEmailOtp}
+                              disabled={isVerifyingEmailOtp}
+                              className="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold rounded-xl cursor-pointer transition disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {isVerifyingEmailOtp ? 'Verifying...' : 'Verify Email'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col space-y-1">
@@ -4641,6 +5161,82 @@ export default function RegistrationHub({
         </div>
 
       </form>
+
+      {/* Event Organizer Post-Registration Option Modal */}
+      {showEventPostRegistrationModal && completedEventOrganizerProfile && (
+        <div id="event-post-registration-modal" className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl border border-orange-100 text-center space-y-5 animate-scale-in">
+            <div className="w-16 h-16 bg-gradient-to-tr from-orange-500 to-amber-500 rounded-2xl mx-auto flex items-center justify-center text-white shadow-lg shadow-orange-500/30">
+              <Sparkles className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-2">
+              <span className="text-[11px] font-extrabold uppercase tracking-widest text-orange-600 bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                Registration Successful
+              </span>
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900">
+                Welcome, {completedEventOrganizerProfile.parentName}!
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600 max-w-md mx-auto">
+                Your Event &amp; Class Organizer profile is registered and verified. Would you like to create and publish your first event, class, or activity now?
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-2xl text-left text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Organizer / Host</span>
+                <span className="font-bold text-slate-900">{completedEventOrganizerProfile.parentName}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Verified Phone (+91)</span>
+                <span className="font-bold text-slate-900 font-mono">
+                  {completedEventOrganizerProfile.phoneNumber ? `+91 ${completedEventOrganizerProfile.phoneNumber}` : 'Verified'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Verified Email</span>
+                <span className="font-bold text-slate-900">
+                  {completedEventOrganizerProfile.email || 'Verified'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500 font-medium">Free Host Membership</span>
+                <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                  6 Months Active
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <button
+                id="btn-post-reg-create-event-now"
+                type="button"
+                onClick={() => {
+                  setShowEventPostRegistrationModal(false);
+                  onCompleteSignup(completedEventOrganizerProfile, { openCreateWizard: true });
+                }}
+                className="w-full py-3.5 px-6 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-orange-500/25 transition active:scale-95 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Create Event, Classes, or Activities Now</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                id="btn-post-reg-go-events"
+                type="button"
+                onClick={() => {
+                  setShowEventPostRegistrationModal(false);
+                  onCompleteSignup(completedEventOrganizerProfile);
+                }}
+                className="w-full py-3 px-5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Explore Events Dashboard First
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

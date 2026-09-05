@@ -205,3 +205,24 @@ export function parseCsvContacts(csvContent: string, autoHide = false): UserCont
 
   return contacts;
 }
+
+/**
+ * Silently merges and synchronizes contacts in the background without UI interruption.
+ */
+export function syncContactsSilently(
+  autoHide = false,
+  userEmail?: string,
+  existingContacts: UserContact[] = []
+): UserContact[] {
+  const freshList = generateSynchronizedContactsList(autoHide, userEmail);
+  const existingMap = new Map(existingContacts.map(c => [c.phone, c]));
+  
+  for (const item of freshList) {
+    if (!existingMap.has(item.phone)) {
+      existingMap.set(item.phone, item);
+    }
+  }
+
+  return Array.from(existingMap.values());
+}
+

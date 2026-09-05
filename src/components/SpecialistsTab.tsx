@@ -1,12 +1,31 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { SpecialistProfile, Booking, ChildProfile } from '../types.ts';
-import { Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, CreditCard, Share2, Send, Copy } from 'lucide-react';
+import { 
+  Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, 
+  SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
+  CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
+  Globe, PlusCircle, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert
+} from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
+import PediatricianPortfolioModal from './PediatricianPortfolioModal.tsx';
+import { DoctorCard } from './DoctorCard.tsx';
+import ClaimSpecialistModal from './ClaimSpecialistModal.tsx';
+import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare, attributeAffiliateBooking } from '../utils/affiliate.ts';
 import { sendSpecialistBookingNotifications } from '../utils/notifications.ts';
+import { formatVernuntReviewText, FALLBACK_DOCTOR_PHOTO, getSpecialistDirectUrl, slugifySpecialistName } from '../utils/specialistUrls.ts';
+import { INDIAN_CITIES } from '../data/panIndiaPediatricians.ts';
+import { 
+  getCurrentUserLocation, 
+  calculateDoctorDistance, 
+  formatDistanceKm, 
+  CITY_COORDINATES 
+} from '../utils/geoDistance.ts';
+import { isAuthorizedSystemAdmin } from '../utils/security.ts';
+import { getClaimedSpecialistsMap } from '../utils/specialistClaims.ts';
 
 interface SpecialistsTabProps {
   currentProfile: ChildProfile | null;
@@ -17,7 +36,30 @@ interface SpecialistsTabProps {
   onAddBooking: (booking: Booking) => void;
   globalCommissionRate: number; // default global percentage
   onUpdateUserProfile?: (profile: ChildProfile) => void;
+  onUpdateSpecialist?: (specialist: SpecialistProfile) => void;
 }
+
+const BANGALORE_AREAS = [
+  'All Areas',
+  'Jayanagar',
+  'Koramangala',
+  'Indiranagar',
+  'Old Airport Road',
+  'Whitefield',
+  'Sarjapur Road',
+  'Bellandur',
+  'Hebbal',
+  'Malleshwaram',
+  'Rajajinagar',
+  'Basaveshwaranagar',
+  'Banashankari',
+  'Bannerghatta Road',
+  'HSR Layout',
+  'Kalyan Nagar',
+  'Yelahanka',
+  'Marathahalli',
+  'Electronic City'
+];
 
 export default function SpecialistsTab({
   currentProfile,
@@ -27,10 +69,195 @@ export default function SpecialistsTab({
   bookingsList,
   onAddBooking,
   globalCommissionRate,
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  onUpdateSpecialist
 }: SpecialistsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  const [selectedCity, setSelectedCity] = useState<string>('all');
+  const [selectedLocality, setSelectedLocality] = useState<string>('All Areas');
+  const [viewingPortfolioSpec, setViewingPortfolioSpec] = useState<SpecialistProfile | null>(null);
+  const [visibleCount, setVisibleCount] = useState<number>(30);
+  const [isProgressiveLoadingAll, setIsProgressiveLoadingAll] = useState<boolean>(false);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState<boolean>(false);
+
+  // Distance Sorting & Geolocation state
+  const [sortOption, setSortOption] = useState<'distance' | 'recommended' | 'experience' | 'fee-asc' | 'fee-desc'>('distance');
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [isDetectingLocation, setIsDetectingLocation] = useState<boolean>(false);
+  const [locationLabel, setLocationLabel] = useState<string>('Pan-India Distance');
+
+  // Claim Portfolio and Admin Desk state
+  const [claimingSpecialist, setClaimingSpecialist] = useState<SpecialistProfile | null>(null);
+  const [showAdminClaimsModal, setShowAdminClaimsModal] = useState<boolean>(false);
+  const isSuperAdmin = isAuthorizedSystemAdmin(currentProfile?.email, currentProfile?.userRole);
+
+  // Doctor extraction states (from Google My Business, Clinic Website, or Health Directory)
+  const [showExtractModal, setShowExtractModal] = useState<boolean>(false);
+  const [extractSourceUrl, setExtractSourceUrl] = useState<string>('');
+  const [extractDoctorName, setExtractDoctorName] = useState<string>('');
+  const [extractCity, setExtractCity] = useState<string>('Delhi NCR');
+  const [extractLocality, setExtractLocality] = useState<string>('South Extension');
+  const [extractHospital, setExtractHospital] = useState<string>('');
+  const [extractFee, setExtractFee] = useState<number>(800);
+  const [isExtracting, setIsExtracting] = useState<boolean>(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
+  const [extractSuccessMsg, setExtractSuccessMsg] = useState<string | null>(null);
+
+  // Automatically attempt to locate user GPS on initial load for nearest distance sorting
+  useEffect(() => {
+    let isMounted = true;
+    getCurrentUserLocation()
+      .then(loc => {
+        if (isMounted && loc) {
+          setUserCoords({ lat: loc.lat, lng: loc.lng });
+          setLocationLabel('Your GPS Location');
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully without blocking UI
+      });
+    return () => { isMounted = false; };
+  }, []);
+
+  const handleTriggerDetectLocation = async () => {
+    setIsDetectingLocation(true);
+    try {
+      const loc = await getCurrentUserLocation();
+      if (loc) {
+        setUserCoords({ lat: loc.lat, lng: loc.lng });
+        setLocationLabel('Live GPS Location');
+        setSortOption('distance');
+      }
+    } catch (err: any) {
+      console.debug('Geolocation prompt note:', err);
+    } finally {
+      setIsDetectingLocation(false);
+    }
+  };
+
+  useEffect(() => {
+    setVisibleCount(30);
+    setIsProgressiveLoadingAll(false);
+  }, [categoryFilter, selectedCity, selectedLocality, searchQuery, sortOption]);
+
+  // Deep-link direct URL handling (/specialist/[slug] or ?portfolio=spec-ped-... or ?specialist=...)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const pathname = window.location.pathname;
+      const slugMatch = pathname.match(/^\/specialists?\/([^/?#]+)/i);
+      const params = new URLSearchParams(window.location.search);
+      const targetQuery = slugMatch 
+        ? slugMatch[1] 
+        : (params.get('portfolio') || params.get('specialist') || params.get('doctor') || params.get('id'));
+
+      if (targetQuery && specialistsList.length > 0) {
+        const cleanTarget = targetQuery.toLowerCase().trim();
+        const match = specialistsList.find(s => {
+          const sSlug = s.slug || slugifySpecialistName(s.name);
+          return (
+            sSlug === cleanTarget ||
+            s.id.toLowerCase() === cleanTarget ||
+            s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '-') === cleanTarget ||
+            s.id.toLowerCase().includes(cleanTarget)
+          );
+        });
+        if (match) {
+          setViewingPortfolioSpec(match);
+        }
+      }
+    } catch (err) {
+      console.warn('Portfolio URL check error', err);
+    }
+  }, [specialistsList]);
+
+  // Browser back/forward history support
+  useEffect(() => {
+    const handlePop = () => {
+      try {
+        const pathname = window.location.pathname;
+        const slugMatch = pathname.match(/^\/specialists?\/([^/?#]+)/i);
+        const params = new URLSearchParams(window.location.search);
+        const targetId = slugMatch ? slugMatch[1] : (params.get('portfolio') || params.get('specialist') || params.get('doctor'));
+        if (targetId) {
+          const cleanTarget = targetId.toLowerCase().trim();
+          const match = specialistsList.find(s => 
+            (s.slug && s.slug === cleanTarget) ||
+            s.id === targetId || 
+            slugifySpecialistName(s.name) === cleanTarget
+          );
+          if (match) setViewingPortfolioSpec(match);
+        } else {
+          setViewingPortfolioSpec(null);
+        }
+      } catch (err) {
+        console.debug('Popstate sync error:', err);
+      }
+    };
+    window.addEventListener('popstate', handlePop);
+    return () => window.removeEventListener('popstate', handlePop);
+  }, [specialistsList]);
+
+  const handleOpenPortfolio = useCallback((spec: SpecialistProfile) => {
+    setViewingPortfolioSpec(spec);
+    if (typeof window !== 'undefined') {
+      try {
+        const directUrl = getSpecialistDirectUrl(spec);
+        window.history.pushState({ portfolioId: spec.id, slug: spec.slug }, '', directUrl);
+      } catch (err) {
+        console.debug('PushState portfolio error:', err);
+      }
+    }
+  }, []);
+
+  const handleClosePortfolio = () => {
+    setViewingPortfolioSpec(null);
+    if (typeof window !== 'undefined') {
+      try {
+        if (window.location.pathname.startsWith('/specialist')) {
+          window.history.pushState({}, '', '/');
+        } else {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('portfolio');
+          url.searchParams.delete('specialist');
+          url.searchParams.delete('doctor');
+          url.searchParams.delete('id');
+          window.history.pushState({}, '', url.toString());
+        }
+      } catch (err) {
+        console.debug('PushState close error:', err);
+      }
+    }
+  };
+
+  const handleClaimSubmitted = (specId: string) => {
+    setClaimingSpecialist(null);
+    if (onUpdateSpecialist) {
+      const target = specialistsList.find(s => s.id === specId);
+      if (target) {
+        onUpdateSpecialist({
+          ...target,
+          claimStatus: 'pending'
+        });
+      }
+    }
+  };
+
+  const handleClaimApproved = (specId: string, applicantEmail: string) => {
+    if (onUpdateSpecialist) {
+      const target = specialistsList.find(s => s.id === specId);
+      if (target) {
+        onUpdateSpecialist({
+          ...target,
+          claimed: true,
+          claimStatus: 'approved',
+          claimedByEmail: applicantEmail
+        });
+      }
+    }
+  };
 
   // States for subscription promotion on booking click
   const [showSubPromoModal, setShowSubPromoModal] = useState(false);
@@ -40,7 +267,7 @@ export default function SpecialistsTab({
   const [showRegModal, setShowRegModal] = useState(false);
   const [regName, setRegName] = useState('');
   const [regTitle, setRegTitle] = useState('');
-  const [regCategory, setRegCategory] = useState<string>('Tutor');
+  const [regCategory, setRegCategory] = useState<string>('Pediatrician');
   const [regPhoto, setRegPhoto] = useState('');
   
   // Custom Dynamic Specialist categories load
@@ -60,7 +287,11 @@ export default function SpecialistsTab({
   const [regLocation, setRegLocation] = useState('');
   const [regFee, setRegFee] = useState(499);
   const [regSpecialtiesStr, setRegSpecialtiesStr] = useState('');
-  const [regEmail, setRegEmail] = useState(currentProfile?.parentName.replace(/\s+/g, '').toLowerCase() + '@gmail.com');
+  const [regEmail, setRegEmail] = useState(
+    currentProfile?.parentName 
+      ? currentProfile.parentName.replace(/\s+/g, '').toLowerCase() + '@gmail.com' 
+      : 'specialist@vernunt.org'
+  );
   const [regPhone, setRegPhone] = useState('9876543210');
   const [regError, setRegError] = useState('');
 
@@ -103,7 +334,7 @@ ${deepLink}`;
     confettiDefault({ particleCount: 30, spread: 50 });
   };
 
-  const handleWhatsAppShareSpecialist = (spec: SpecialistProfile) => {
+  const handleWhatsAppShareSpecialist = useCallback((spec: SpecialistProfile) => {
     const affiliateCode = currentProfile?.affiliateCode || currentProfile?.referralCode || undefined;
     const deepLink = generateAffiliateShareUrl({
       affiliateCode,
@@ -127,17 +358,14 @@ ${deepLink}
 ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : ''}`;
 
     openWhatsAppShare(shareText);
-  };
+  }, [currentProfile?.affiliateCode, currentProfile?.referralCode]);
   const [buyerName, setBuyerName] = useState(currentProfile?.parentName || '');
   const [buyerEmail, setBuyerEmail] = useState('guardian@vernunt.org');
 
   const categories = [
-    { key: 'All', label: 'All Minds', icon: Compass, color: 'text-orange-500' },
-    { key: 'Tutor', label: 'Tutors & Academy', icon: BookOpen, color: 'text-blue-500' },
-    { key: 'Nutritionist', label: 'Nutritionists', icon: Utensils, color: 'text-emerald-500' },
-    { key: 'Makeup Artist', label: 'Artists & Makeups', icon: Scissors, color: 'text-pink-500' },
-    { key: 'Pediatrician', label: 'Pediatricians', icon: Stethoscope, color: 'text-rose-500' },
-    { key: 'Coach', label: 'Sports Coaches', icon: Flame, color: 'text-amber-500' },
+    { key: 'All', label: 'All Specialists', icon: Compass, color: 'text-orange-500' },
+    { key: 'Pediatrician', label: 'Pediatricians & Child Doctors', icon: Stethoscope, color: 'text-rose-500' },
+    { key: 'Gynecologist', label: 'Gynecologists & OB/GYN', icon: Heart, color: 'text-fuchsia-500' },
     ...customSpecCats.map(cs => ({ key: cs.value, label: cs.name, icon: Briefcase, color: 'text-indigo-500' }))
   ];
 
@@ -356,8 +584,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     }
   };
 
-  const startBooking = (spec: SpecialistProfile) => {
-    if (!currentProfile?.subscriptionActive) {
+  const startBooking = useCallback((spec: SpecialistProfile) => {
+    if (currentProfile && !currentProfile.subscriptionActive) {
       setPendingSpecToBook(spec);
       setShowSubPromoModal(true);
       return;
@@ -366,7 +594,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     setSelectedSlot(spec.availableSlots[0] || '10:00 AM');
     setRazorpayStep('details');
     setShowBookingModal(true);
-  };
+  }, [currentProfile?.subscriptionActive]);
 
   const handleSkipSubscribePromoAndBook = () => {
     setShowSubPromoModal(false);
@@ -570,19 +798,207 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     setRazorpayStep('success');
   };
 
-  // Filter criteria logic
-  const filteredSpecs = specialistsList.filter(spec => {
-    if (categoryFilter !== 'All' && spec.category !== categoryFilter) return false;
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    return (
-      spec.name.toLowerCase().includes(query) ||
-      spec.title.toLowerCase().includes(query) ||
-      spec.bio.toLowerCase().includes(query) ||
-      spec.location.toLowerCase().includes(query) ||
-      spec.specialties.some(s => s.toLowerCase().includes(query))
+  // Extraction handler for adding new doctors via URL / Google My Business / Clinic Directory
+  const handleExtractDoctorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extractSourceUrl.trim() && !extractDoctorName.trim()) {
+      setExtractError('Please enter a doctor profile URL or Doctor Name');
+      return;
+    }
+    setIsExtracting(true);
+    setExtractError(null);
+    setExtractSuccessMsg(null);
+    try {
+      const res = await fetch('/api/extract-doctor-profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sourceUrl: extractSourceUrl.trim(),
+          doctorName: extractDoctorName.trim(),
+          city: extractCity,
+          locality: extractLocality,
+          hospitalAffiliation: extractHospital.trim(),
+          sessionFee: extractFee
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.specialist) {
+        onAddNewSpecialist(data.specialist);
+        setExtractSuccessMsg(`✓ Successfully extracted and verified ${data.specialist.name}!`);
+        setTimeout(() => {
+          setShowExtractModal(false);
+          setExtractSourceUrl('');
+          setExtractDoctorName('');
+          setExtractSuccessMsg(null);
+        }, 1400);
+      } else {
+        setExtractError(data.error || 'Failed to extract doctor profile');
+      }
+    } catch (err: any) {
+      setExtractError(err.message || 'Server extraction error occurred');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
+
+  const activeCityInfo = INDIAN_CITIES.find(c => c.id === selectedCity);
+  const currentLocalityList = activeCityInfo ? activeCityInfo.popularAreas : BANGALORE_AREAS;
+
+  // Dynamic SEO Document Title update for Specialists Directory
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const cityName = selectedCity !== 'all' && activeCityInfo ? activeCityInfo.name : 'Pan-India';
+    document.title = `${cityName} Pediatricians & Kids Doctors (${specialistsList.length}+ Verified) | Vernunt`;
+  }, [selectedCity, activeCityInfo, specialistsList.length]);
+
+  // Filter criteria logic with Pan-India Cities & Localities with guaranteed unique IDs
+  const filteredSpecs = useMemo(() => {
+    const seenIds = new Set<string>();
+    return specialistsList.filter(spec => {
+      if (!spec || !spec.id || seenIds.has(spec.id)) return false;
+      seenIds.add(spec.id);
+
+      if (categoryFilter !== 'All' && spec.category !== categoryFilter) return false;
+
+      // City Filter
+      if (selectedCity !== 'all') {
+        const cityObj = INDIAN_CITIES.find(c => c.id === selectedCity);
+        if (cityObj) {
+          const cityLower = cityObj.name.toLowerCase();
+          const cityMatches = (spec.location && spec.location.toLowerCase().includes(cityLower)) ||
+                              (spec.clinicAddress && spec.clinicAddress.toLowerCase().includes(cityLower)) ||
+                              (spec.hospitalAffiliation && spec.hospitalAffiliation.toLowerCase().includes(cityLower));
+          if (!cityMatches) return false;
+        }
+      }
+
+      // Locality Filter
+      if (selectedLocality !== 'All Areas') {
+        const locLower = selectedLocality.toLowerCase();
+        const matchesLoc = (spec.location && spec.location.toLowerCase().includes(locLower)) ||
+                           (spec.clinicAddress && spec.clinicAddress.toLowerCase().includes(locLower));
+        if (!matchesLoc) return false;
+      }
+
+      const query = searchQuery.toLowerCase().trim();
+      if (!query) return true;
+
+      if (query === 'kids doctor' || query === 'kids doctors' || query === 'child doctor' || query === 'baby doctor') {
+        return spec.category === 'Pediatrician' || spec.category === 'Pediatric Specialist';
+      }
+
+      return (
+        spec.name.toLowerCase().includes(query) ||
+        spec.title.toLowerCase().includes(query) ||
+        spec.bio.toLowerCase().includes(query) ||
+        (spec.location && spec.location.toLowerCase().includes(query)) ||
+        (spec.hospitalAffiliation && spec.hospitalAffiliation.toLowerCase().includes(query)) ||
+        (spec.clinicAddress && spec.clinicAddress.toLowerCase().includes(query)) ||
+        (spec.qualifications && spec.qualifications.toLowerCase().includes(query)) ||
+        spec.specialties.some(s => s.toLowerCase().includes(query))
+      );
+    });
+  }, [specialistsList, categoryFilter, selectedCity, selectedLocality, searchQuery]);
+
+  // Derive center coordinates for live distance calculation: User GPS > Selected City center > Default Bangalore
+  const centerCoords = useMemo(() => {
+    if (userCoords) {
+      return userCoords;
+    }
+    if (selectedCity !== 'all' && (CITY_COORDINATES as any)[selectedCity]) {
+      const c = (CITY_COORDINATES as any)[selectedCity];
+      return { lat: c.lat, lng: c.lng };
+    }
+    // Default Bangalore center
+    return { lat: 12.9716, lng: 77.5946 };
+  }, [userCoords, selectedCity]);
+
+  // Calculate distance for each specialist and sort according to user selection
+  const sortedAndFilteredSpecs = useMemo(() => {
+    const withDistance = filteredSpecs.map(spec => {
+      const dist = calculateDoctorDistance(centerCoords.lat, centerCoords.lng, spec);
+      return {
+        ...spec,
+        distanceKm: dist
+      };
+    });
+
+    return withDistance.sort((a, b) => {
+      if (sortOption === 'distance') {
+        const distA = a.distanceKm !== undefined ? a.distanceKm : 99999;
+        const distB = b.distanceKm !== undefined ? b.distanceKm : 99999;
+        return distA - distB;
+      }
+      if (sortOption === 'recommended') {
+        const scoreA = (a.rating || 0) * (a.reviewsCount || 1);
+        const scoreB = (b.rating || 0) * (b.reviewsCount || 1);
+        return scoreB - scoreA;
+      }
+      if (sortOption === 'experience') {
+        return (b.experienceYears || 0) - (a.experienceYears || 0);
+      }
+      if (sortOption === 'fee-asc') {
+        return (a.sessionFee || 0) - (b.sessionFee || 0);
+      }
+      if (sortOption === 'fee-desc') {
+        return (b.sessionFee || 0) - (a.sessionFee || 0);
+      }
+      return 0;
+    });
+  }, [filteredSpecs, centerCoords, sortOption]);
+
+  // Progressive non-blocking batch rendering for "Show All" to prevent browser freeze/hang
+  useEffect(() => {
+    if (!isProgressiveLoadingAll) return;
+
+    if (visibleCount >= sortedAndFilteredSpecs.length) {
+      setIsProgressiveLoadingAll(false);
+      return;
+    }
+
+    // Schedule next chunk using small interval for butter-smooth 60fps frame budgeting
+    const timer = setTimeout(() => {
+      setVisibleCount(prev => Math.min(sortedAndFilteredSpecs.length, prev + 60));
+    }, 25);
+
+    return () => clearTimeout(timer);
+  }, [isProgressiveLoadingAll, visibleCount, sortedAndFilteredSpecs.length]);
+
+  // Auto-load infinite scroll when sentinel enters viewport
+  useEffect(() => {
+    if (!sentinelRef.current) return;
+    if (isProgressiveLoadingAll) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const first = entries[0];
+        if (first.isIntersecting && visibleCount < sortedAndFilteredSpecs.length) {
+          setVisibleCount(prev => Math.min(sortedAndFilteredSpecs.length, prev + 30));
+        }
+      },
+      { rootMargin: '350px' }
     );
-  });
+
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [visibleCount, sortedAndFilteredSpecs.length, isProgressiveLoadingAll]);
+
+  // Back to top indicator
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window !== 'undefined') {
+        setShowScrollTop(window.scrollY > 600);
+      }
+    };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  const scrollToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 300, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div id="specialists-tab-view" className="space-y-6">
@@ -590,23 +1006,216 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 id="specs-main-title" className="text-xl font-bold text-slate-800 font-serif flex items-center gap-2">
-            🧬 Local Child Specialist Portfolios & Consultants
+            🧬 Vernunt Verified Child Specialist Network &amp; Pan-India Directory
           </h3>
           <p id="specs-main-subtitle" className="text-xs text-slate-500">
-            Find seasoned nutritionists, expert coding tutors, children's drama makeup specialists, and pediatric safety health experts.
+            Find and consult verified pediatricians, neonatologists, child dietitians, and pediatric health specialists across India.
           </p>
         </div>
 
-        {/* Portfolio Owner & Professional switch buttons or registration */}
-        <button
-          id="btn-trigger-register-specialist"
-          onClick={() => setShowRegModal(true)}
-          type="button"
-          className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 self-start md:self-auto cursor-pointer"
-        >
-          <Briefcase className="w-4 h-4" />
-          <span>Apply as Child Specialist Portfolio</span>
-        </button>
+        {/* Action buttons: Extract Doctor & Apply */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="btn-trigger-extract-doctor"
+            onClick={() => setShowExtractModal(true)}
+            type="button"
+            className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs py-2.5 px-3.5 rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+            title="Extract and auto-white label doctor from Google My Business or clinic website into Vernunt"
+          >
+            <PlusCircle className="w-4 h-4 text-rose-600" />
+            <span>Extract Doctor Profile</span>
+          </button>
+
+          <button
+            id="btn-trigger-register-specialist"
+            onClick={() => setShowRegModal(true)}
+            type="button"
+            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>Register Practice</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Pan-India City Bar & Locality Filter */}
+      <div className="bg-gradient-to-r from-rose-50 via-amber-50/50 to-orange-50 border border-rose-200/80 p-4 rounded-3xl space-y-3.5 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Stethoscope className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-extrabold text-sm text-slate-900 font-serif">
+                  Pan-India Pediatrician &amp; Child Specialists Directory
+                </h4>
+                <span className="px-2 py-0.5 bg-rose-600 text-white text-[9.5px] font-black rounded-full uppercase tracking-wider">
+                  Vernunt Verified
+                </span>
+              </div>
+              <p className="text-[11.5px] text-slate-600">
+                100% white-labeled authentic clinical portfolios from top pediatric hospitals and trusted local clinics across Indian metros.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="filter-only-pediatricians-btn"
+              onClick={() => {
+                setCategoryFilter('Pediatrician');
+                setSelectedLocality('All Areas');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                categoryFilter === 'Pediatrician'
+                  ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-rose-50 border-rose-200'
+              }`}
+            >
+              Pediatricians ({specialistsList.filter(s => s.category === 'Pediatrician').length})
+            </button>
+            <button
+              type="button"
+              id="filter-only-gynecologists-btn"
+              onClick={() => {
+                setCategoryFilter('Gynecologist');
+                setSelectedLocality('All Areas');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                categoryFilter === 'Gynecologist'
+                  ? 'bg-fuchsia-600 text-white border-fuchsia-700 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-fuchsia-50 border-fuchsia-200'
+              }`}
+            >
+              Gynecologists & OB/GYN ({specialistsList.filter(s => s.category === 'Gynecologist').length})
+            </button>
+          </div>
+        </div>
+
+        {/* Pan-India Cities Row */}
+        <div className="pt-2 border-t border-rose-200/60 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+          <span className="text-[10px] uppercase font-black text-rose-800 tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
+            <Globe className="w-3 h-3 text-rose-600" /> City:
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedCity('all');
+              setSelectedLocality('All Areas');
+            }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+              selectedCity === 'all'
+                ? 'bg-rose-600 text-white shadow-xs'
+                : 'bg-white/85 hover:bg-white text-slate-700 border border-slate-200/80'
+            }`}
+          >
+            🇮🇳 All India ({specialistsList.length})
+          </button>
+          {INDIAN_CITIES.filter(city => city.id !== 'all').map((city) => {
+            const isCitySelected = selectedCity === city.id;
+            const countInCity = specialistsList.filter(s => {
+              const cName = city.name.toLowerCase();
+              return (s.location && s.location.toLowerCase().includes(cName)) ||
+                     (s.clinicAddress && s.clinicAddress.toLowerCase().includes(cName)) ||
+                     (s.hospitalAffiliation && s.hospitalAffiliation.toLowerCase().includes(cName));
+            }).length;
+
+            return (
+              <button
+                key={city.id}
+                type="button"
+                onClick={() => {
+                  setSelectedCity(city.id);
+                  setSelectedLocality('All Areas');
+                }}
+                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1 ${
+                  isCitySelected
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-white/85 hover:bg-white text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                <span>{city.name}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                  isCitySelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {countInCity}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Dynamic Locality Chips for selected city */}
+        <div className="pt-2 border-t border-rose-200/40 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+          <span className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap mr-1 flex items-center gap-1">
+            <MapPin className="w-3 h-3 text-rose-500" /> Locality:
+          </span>
+          {currentLocalityList.map((area) => {
+            const isSelected = selectedLocality === area;
+            return (
+              <button
+                key={area}
+                type="button"
+                onClick={() => setSelectedLocality(area)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                  isSelected
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200/80'
+                }`}
+              >
+                {area}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* SEO Trending Searches & Keywords Chips */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+        <span className="text-[10.5px] font-extrabold text-slate-500 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
+          🔥 Trending:
+        </span>
+        {[
+          { label: 'Kids Doctors Near Me', query: 'kids doctor' },
+          { label: 'Best Pediatrician', query: 'pediatrician' },
+          { label: 'Gynecologists & OB/GYN', query: 'gynecologist' },
+          { label: 'Newborn Vaccinations', query: 'vaccination' },
+          { label: 'Pediatric Pulmonology', query: 'pulmonology' },
+          { label: 'Child Neurology', query: 'neurology' },
+          { label: 'Pediatric Allergy & Asthma', query: 'asthma' },
+          { label: 'Child Dietitian', query: 'nutrition' },
+        ].map(item => (
+          <button
+            key={item.label}
+            type="button"
+            onClick={() => {
+              setSearchQuery(item.query);
+              if (item.query === 'gynecologist') {
+                setCategoryFilter('Gynecologist');
+              } else {
+                setCategoryFilter('Pediatrician');
+              }
+            }}
+            className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition border cursor-pointer ${
+              searchQuery.toLowerCase() === item.query.toLowerCase()
+                ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
+                : 'bg-slate-100/80 hover:bg-rose-50 text-slate-700 border-slate-200/80 hover:border-rose-200'
+            }`}
+          >
+            {item.label}
+          </button>
+        ))}
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="text-[11px] text-rose-600 hover:text-rose-800 font-bold whitespace-nowrap ml-1 cursor-pointer"
+          >
+            ✕ Clear filter
+          </button>
+        )}
       </div>
 
       {/* Specialty Filter Hub */}
@@ -642,117 +1251,110 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         </div>
 
         {/* Quick Search */}
-        <div id="spec-search-bar" className="relative w-full md:w-64">
+        <div id="spec-search-bar" className="relative w-full md:w-72">
           <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search specialties, name..."
+            placeholder="Search pediatrician, gynecologist, clinic, doctor..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-white text-xs border border-slate-200 focus:border-orange-300 rounded-xl outline-none focus:ring-4 focus:ring-orange-100 transition shadow-xs placeholder-slate-400 text-slate-700 font-bold"
+            className="w-full pl-9 pr-4 py-1.5 bg-white text-xs border border-slate-200 focus:border-rose-400 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 transition shadow-xs placeholder-slate-400 text-slate-700 font-bold"
           />
         </div>
       </div>
 
+      {/* Distance Sort & Proximity Bar */}
+      <div id="distance-sort-bar" className="bg-white border border-slate-200/90 p-3 sm:p-4 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        {/* Left: Location indicator & GPS detect button */}
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-950 font-bold">
+            <Navigation className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
+            <span>{locationLabel}</span>
+            {userCoords && (
+              <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.5 rounded-full ml-1 flex items-center gap-0.5">
+                <CheckCircle className="w-2.5 h-2.5 text-emerald-600" /> Active GPS
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleTriggerDetectLocation}
+            disabled={isDetectingLocation}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer border border-slate-200/60 disabled:opacity-50"
+            title="Use your phone or computer GPS to calculate accurate kilometer distances to clinics"
+          >
+            {isDetectingLocation ? (
+              <>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-600" />
+                <span>Locating you...</span>
+              </>
+            ) : (
+              <>
+                <MapPin className="w-3.5 h-3.5 text-slate-600" />
+                <span>{userCoords ? 'Refresh GPS Location' : '📍 Detect Live GPS Location'}</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Right: Sort dropdown & Admin claims desk button */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-between md:justify-end">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+            <span className="whitespace-nowrap text-slate-500">Sort by:</span>
+            <select
+              value={sortOption}
+              onChange={(e) => setSortOption(e.target.value as any)}
+              className="bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 text-xs rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer shadow-xs transition"
+            >
+              <option value="distance">📍 Distance: Nearest to Me First</option>
+              <option value="recommended">⭐ Top Patient Rated &amp; Recommended</option>
+              <option value="experience">🏆 Clinical Experience: Highest First</option>
+              <option value="fee-asc">💰 Consultation Fee: Low to High</option>
+              <option value="fee-desc">💎 Consultation Fee: High to Low</option>
+            </select>
+          </div>
+
+          {isSuperAdmin && (
+            <button
+              type="button"
+              onClick={() => setShowAdminClaimsModal(true)}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer border border-slate-950"
+              title="Review uploaded doctor ID cards and verify ownership"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Doctor Claims Desk</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Counter Banner */}
+      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+        <span>
+          Showing <strong className="text-slate-800">{Math.min(visibleCount, sortedAndFilteredSpecs.length)}</strong> of <strong className="text-slate-800">{sortedAndFilteredSpecs.length}</strong> verified specialists &amp; doctors {selectedCity === 'all' ? 'across Pan-India' : `in ${activeCityInfo?.name || 'India'}`}
+        </span>
+        {sortedAndFilteredSpecs.length > visibleCount && (
+          <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+            Scroll or click "Load More" below
+          </span>
+        )}
+      </div>
+
       {/* Directory Cards Grid */}
       <div id="specs-cards-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredSpecs.map((spec) => (
-          <div
-            id={`spec-card-${spec.id}`}
+        {sortedAndFilteredSpecs.slice(0, visibleCount).map((spec) => (
+          <DoctorCard
             key={spec.id}
-            className="bg-white rounded-3xl border border-slate-100 shadow-xs hover:shadow-md transition overflow-hidden flex flex-col group relative"
-          >
-            {/* Top background aesthetic aura */}
-            <div className="h-24 bg-gradient-to-tr from-slate-50 to-orange-50/50 p-4 flex justify-between items-start">
-              <span className="text-[10px] font-extrabold uppercase bg-white/70 backdrop-blur-xs text-orange-600 tracking-wider px-2.5 py-1 rounded-lg border border-orange-100/30">
-                {spec.category}
-              </span>
-              <div className="flex items-center gap-1 bg-white/70 backdrop-blur-xs px-2 py-0.5 rounded-lg border border-slate-100">
-                <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                <span className="text-[10px] font-bold text-slate-700">{spec.rating}</span>
-                <span className="text-[9px] text-slate-400">({spec.reviewsCount})</span>
-              </div>
-            </div>
-
-            {/* Face and Details */}
-            <div className="px-6 pb-6 pt-0 flex-1 flex flex-col -mt-10">
-              <div className="flex items-end gap-3 mb-3">
-                <img
-                  src={spec.photoUrl}
-                  alt={spec.name}
-                  className="w-16 h-16 rounded-2xl object-cover border-4 border-white shadow-md bg-slate-100"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="pb-1">
-                  <h4 className="font-extrabold text-slate-800 text-sm font-serif">{spec.name}</h4>
-                  <p className="text-[11px] font-bold text-orange-500 leading-none">{spec.title}</p>
-                </div>
-              </div>
-
-              <p className="text-[11.5px] text-slate-600 leading-relaxed mb-4 line-clamp-3">
-                {spec.bio}
-              </p>
-
-              {/* Badges/Tags of Speciality */}
-              <div className="flex flex-wrap gap-1 mb-4">
-                {spec.specialties.map((tag, tIdx) => (
-                  <span
-                    key={tIdx}
-                    className="bg-slate-50 text-slate-600 border border-slate-100 text-[9.5px] font-bold px-2 py-0.5 rounded-md"
-                  >
-                    #{tag}
-                  </span>
-                ))}
-              </div>
-
-              {/* Pricing, Experience, and Actions at bottom */}
-              <div className="pt-3 border-t border-slate-100 mt-auto flex items-center justify-between text-xs">
-                <div>
-                  <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Experience</span>
-                  <span className="font-black text-slate-700">{spec.experienceYears} Years Prof</span>
-                </div>
-
-                <div className="text-right">
-                  <span className="text-[9px] uppercase font-bold text-slate-400 block tracking-wider">Session Fee</span>
-                  <span className="font-black text-rose-600 text-sm">₹{spec.sessionFee} <span className="text-[9px] text-slate-500 font-medium">/ hr</span></span>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center gap-2">
-                <button
-                  id={`btn-book-session-${spec.id}`}
-                  onClick={() => startBooking(spec)}
-                  type="button"
-                  className="flex-1 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Briefcase className="w-3.5 h-3.5" /> Book Slot
-                </button>
-
-                <button
-                  id={`btn-share-spec-whatsapp-${spec.id}`}
-                  type="button"
-                  onClick={() => handleWhatsAppShareSpecialist(spec)}
-                  className="p-2 bg-[#25D366] hover:bg-[#20ba59] active:scale-90 text-white rounded-xl shadow-xs transition cursor-pointer"
-                  title="Share consultant on WhatsApp with affiliate referral code"
-                >
-                  <Share2 className="w-4 h-4" />
-                </button>
-
-                <button
-                  id={`btn-copy-spec-link-${spec.id}`}
-                  type="button"
-                  onClick={() => handleShareSpecialist(spec)}
-                  className="p-2 bg-slate-100 hover:bg-slate-200 active:scale-90 text-slate-600 rounded-xl transition cursor-pointer"
-                  title="Copy affiliate referral details"
-                >
-                  {copiedSpecId === spec.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
+            spec={spec}
+            onOpenPortfolio={handleOpenPortfolio}
+            onStartBooking={startBooking}
+            onWhatsAppShare={handleWhatsAppShareSpecialist}
+            onClaimProfile={(targetSpec) => setClaimingSpecialist(targetSpec)}
+          />
         ))}
 
-        {filteredSpecs.length === 0 && (
+        {sortedAndFilteredSpecs.length === 0 && (
           <div className="col-span-full py-16 text-center space-y-3 bg-slate-50 rounded-3xl border border-slate-100">
             <Compass className="w-12 h-12 text-slate-300 mx-auto animate-pulse" />
             <div>
@@ -762,6 +1364,90 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           </div>
         )}
       </div>
+
+      {/* Sentinel trigger for seamless auto-load infinite scroll */}
+      {sortedAndFilteredSpecs.length > visibleCount && !isProgressiveLoadingAll && (
+        <div ref={sentinelRef} className="h-4 w-full" aria-hidden="true" />
+      )}
+
+      {/* Progressive loading banner when user clicks Show All to ensure 60fps & no browser hang */}
+      {isProgressiveLoadingAll && (
+        <div className="bg-gradient-to-r from-orange-50 via-rose-50 to-amber-50 border border-orange-200/80 rounded-2xl p-4 shadow-sm max-w-xl mx-auto flex flex-col gap-2.5 animate-fade-in">
+          <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+            <span className="flex items-center gap-2">
+              <RefreshCw className="w-4 h-4 text-orange-600 animate-spin" />
+              Smoothly rendering verified specialists ({visibleCount} of {sortedAndFilteredSpecs.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsProgressiveLoadingAll(false)}
+              className="text-xs text-slate-500 hover:text-slate-800 underline cursor-pointer font-medium"
+            >
+              Stop Loading
+            </button>
+          </div>
+          <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-orange-500 to-rose-500 h-full transition-all duration-100 rounded-full"
+              style={{ width: `${Math.min(100, Math.round((visibleCount / sortedAndFilteredSpecs.length) * 100))}%` }}
+            />
+          </div>
+          <p className="text-[11px] text-slate-500 text-center">
+            Rendering smoothly without freezing your browser ({Math.min(100, Math.round((visibleCount / sortedAndFilteredSpecs.length) * 100))}% loaded)
+          </p>
+        </div>
+      )}
+
+      {/* Pagination / Load More Controls */}
+      {filteredSpecs.length > visibleCount && !isProgressiveLoadingAll && (
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 pb-6">
+          <button
+            type="button"
+            onClick={() => setVisibleCount(prev => Math.min(filteredSpecs.length, prev + 60))}
+            className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-2"
+          >
+            <span>Load 60 More Portfolios</span>
+            <span className="px-2 py-0.5 bg-white/20 rounded-full text-[10px]">
+              {filteredSpecs.length - visibleCount} more
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (filteredSpecs.length <= 60) {
+                setVisibleCount(filteredSpecs.length);
+              } else {
+                setIsProgressiveLoadingAll(true);
+              }
+            }}
+            className="px-5 py-2.5 bg-white hover:bg-orange-50 active:scale-95 text-orange-600 hover:text-orange-700 font-bold text-xs rounded-xl border border-orange-200 shadow-xs transition cursor-pointer flex items-center gap-2"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+            <span>Show All ({filteredSpecs.length})</span>
+          </button>
+        </div>
+      )}
+
+      {/* When all verified specialists are loaded */}
+      {visibleCount >= filteredSpecs.length && filteredSpecs.length > 30 && (
+        <div className="text-center py-6 text-xs text-slate-500 font-medium flex items-center justify-center gap-2">
+          <Check className="w-4 h-4 text-emerald-500" />
+          <span>All {filteredSpecs.length} verified child specialists displayed</span>
+        </div>
+      )}
+
+      {/* Floating Back to Top Button */}
+      {showScrollTop && (
+        <button
+          type="button"
+          onClick={scrollToTop}
+          className="fixed bottom-6 right-6 z-50 p-3 bg-slate-900/90 hover:bg-slate-900 text-white rounded-full shadow-lg backdrop-blur-xs transition hover:scale-105 active:scale-95 flex items-center gap-2 text-xs font-bold"
+          title="Back to Top"
+        >
+          <ArrowUp className="w-4 h-4 text-orange-400" />
+          <span className="hidden sm:inline">Top</span>
+        </button>
+      )}
 
       {/* Booking and Razorpay Payment Integrated Modal */}
       {showBookingModal && selectedSpecialist && (
@@ -790,7 +1476,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             <div className="overflow-y-auto flex-1 text-left">
               {/* Main Stage Handler depending on Razorpay Steps */}
               {razorpayStep === 'details' && (
-                !currentProfile?.subscriptionActive ? (
+                currentProfile && !currentProfile.subscriptionActive ? (
                   <div id="sub-invitation-box" className="p-6 space-y-5">
                     <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl text-white p-5 space-y-2 select-none font-sans">
                       <div className="flex items-center gap-2">
@@ -1099,13 +1785,11 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                     onChange={(e) => setRegCategory(e.target.value)}
                     className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
                   >
-                    <option value="Nutritionist">Child Nutritionist</option>
-                    <option value="Tutor">Teacher / Tutor</option>
-                    <option value="Makeup Artist">Child Makeup Artist</option>
-                    <option value="Pediatrician">Pediatrician / Doctor</option>
-                    <option value="Therapist">Therapist / Counselor</option>
-                    <option value="Coach">Sports Coach</option>
-                    <option value="Other">Other Specialist</option>
+                    <option value="Pediatrician">Pediatrician / Child Specialist</option>
+                    <option value="Gynecologist">Gynecologist &amp; Obstetrician</option>
+                    <option value="Therapist">Child Development &amp; Speech Therapist</option>
+                    <option value="Nutritionist">Pediatric Nutritionist</option>
+                    <option value="Other">Other Healthcare Specialist</option>
                     {customSpecCats.map(cs => (
                       <option key={cs.id} value={cs.value}>✨ {cs.name}</option>
                     ))}
@@ -1328,6 +2012,202 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             </div>
           </div>
         </div>
+      )}
+
+      {/* Extract Doctor Profile Modal */}
+      {showExtractModal && (
+        <div id="modal-extract-doctor" className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-[99999] animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden transform scale-100 transition-all flex flex-col max-h-[90vh]">
+            <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-slate-900 p-5 text-white flex items-center justify-between">
+              <div>
+                <span className="px-2 py-0.5 bg-white/20 text-[9px] font-black uppercase tracking-wider rounded-md">Vernunt Pan-India Ingestion</span>
+                <h4 className="text-base font-bold font-serif mt-1 flex items-center gap-1.5">
+                  <PlusCircle className="w-4 h-4 text-rose-300" />
+                  Extract &amp; White-Label Doctor Profile
+                </h4>
+                <p className="text-[11px] text-rose-100 mt-0.5">
+                  Ingest doctor details from Google My Business, clinic portals, or health directories into Vernunt.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowExtractModal(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleExtractDoctorSubmit} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {extractError && (
+                <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
+                  ⚠️ {extractError}
+                </div>
+              )}
+              {extractSuccessMsg && (
+                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <span>🎉</span>
+                  <span>{extractSuccessMsg}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">
+                  Google My Business, Clinic Website, or Directory URL:
+                </label>
+                <input
+                  type="url"
+                  value={extractSourceUrl}
+                  onChange={(e) => setExtractSourceUrl(e.target.value)}
+                  placeholder="https://maps.google.com/... or https://www.cloudninecare.com/doctors/..."
+                  className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none font-sans"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Vernunt server will fetch the portrait photo, qualifications, and white-label it.
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Doctor Full Name *</label>
+                  <input
+                    type="text"
+                    value={extractDoctorName}
+                    onChange={(e) => setExtractDoctorName(e.target.value)}
+                    placeholder="e.g. Dr. Rajesh Kumar"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">City *</label>
+                  <select
+                    value={extractCity}
+                    onChange={(e) => {
+                      setExtractCity(e.target.value);
+                      const c = INDIAN_CITIES.find(ci => ci.name === e.target.value);
+                      if (c && c.popularAreas.length > 1) {
+                        setExtractLocality(c.popularAreas[1]);
+                      }
+                    }}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none bg-white"
+                  >
+                    {INDIAN_CITIES.map(c => (
+                      <option key={c.id} value={c.name}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Locality / Area</label>
+                  <input
+                    type="text"
+                    value={extractLocality}
+                    onChange={(e) => setExtractLocality(e.target.value)}
+                    placeholder="e.g. South Extension, Saket"
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 mb-1">Session / Consult Fee (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="50"
+                    value={extractFee}
+                    onChange={(e) => setExtractFee(Number(e.target.value))}
+                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Hospital / Clinic Affiliation</label>
+                <input
+                  type="text"
+                  value={extractHospital}
+                  onChange={(e) => setExtractHospital(e.target.value)}
+                  placeholder="e.g. Fortis La Femme, Max Super Speciality, Apollo Cradle"
+                  className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
+                />
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <span className="font-bold text-slate-800 text-[11px] block">Vernunt White-Label Guarantee</span>
+                <p className="text-[10.5px] text-slate-500 leading-relaxed">
+                  The profile will be automatically converted to Vernunt Verified format with clean Google reviews, synced portrait photos, direct booking link, and WhatsApp share card.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExtractModal(false)}
+                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isExtracting}
+                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
+                >
+                  {isExtracting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Extracting Profile...</span>
+                    </>
+                  ) : (
+                    <>
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Extract &amp; Add Specialist</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Rich Pediatrician & Specialist Portfolio Modal */}
+      {viewingPortfolioSpec && (
+        <PediatricianPortfolioModal
+          specialist={viewingPortfolioSpec}
+          onClose={handleClosePortfolio}
+          onBookSlot={(spec) => {
+            handleClosePortfolio();
+            startBooking(spec);
+          }}
+          currentProfile={currentProfile}
+          onUpdateSpecialist={onUpdateSpecialist}
+          onClaimProfile={(spec) => setClaimingSpecialist(spec)}
+        />
+      )}
+
+      {/* Claim Portfolio Modal */}
+      {claimingSpecialist && (
+        <ClaimSpecialistModal
+          specialist={claimingSpecialist}
+          onClose={() => setClaimingSpecialist(null)}
+          onClaimSubmitted={handleClaimSubmitted}
+          currentUserEmail={currentProfile?.email}
+          currentUserPhone={currentProfile?.parentPhone}
+        />
+      )}
+
+      {/* Specialist Claims Admin Verification Modal */}
+      {showAdminClaimsModal && (
+        <SpecialistClaimsAdminModal
+          isOpen={showAdminClaimsModal}
+          onClose={() => setShowAdminClaimsModal(false)}
+          adminEmail={currentProfile?.email || 'admin@vernunt.com'}
+          onClaimApproved={handleClaimApproved}
+        />
       )}
 
     </div>

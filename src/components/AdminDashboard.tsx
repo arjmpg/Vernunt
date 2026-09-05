@@ -44,7 +44,10 @@ import GoogleDriveBackupPanel from './GoogleDriveBackupPanel.tsx';
 import VernuntLogo from './VernuntLogo.tsx';
 import VernuntSeoSuite from './VernuntSeoSuite.tsx';
 import AdminTicketingCommissionDesk from './admin/AdminTicketingCommissionDesk.tsx';
+import { AdminVernuntCommerceDesk } from './admin/AdminVernuntCommerceDesk.tsx';
 import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.tsx';
+import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
+import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -76,11 +79,12 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | coupons | knowledge-hub | broadcast | contacts | security | backups | settings | seo
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [showClaimsModal, setShowClaimsModal] = useState<boolean>(false);
 
   // =========================================================================
   // COUPON CODES MANAGEMENT STATES
@@ -1343,6 +1347,17 @@ export default function AdminDashboard({
             </div>
           </div>
 
+          {/* Doctor Portfolio Claims Desk Quick Access */}
+          <button
+            type="button"
+            onClick={() => setShowClaimsModal(true)}
+            className="flex items-center gap-1.5 px-2.5 py-1 bg-[#135e96] hover:bg-[#2271b1] text-white rounded-xs text-xs font-semibold transition cursor-pointer shadow-2xs"
+            title="Review doctor and specialist ID cards submitted to claim public directory portfolios"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
+            <span className="hidden md:inline">Doctor Claims Desk</span>
+          </button>
+
         </div>
 
         {/* Right Side: Howdy, Admin & Gravatar */}
@@ -1607,6 +1622,26 @@ export default function AdminDashboard({
                 <div className="flex items-center justify-between w-full">
                   <span>Knowledge Hub (WP)</span>
                   <span className="text-[10px] bg-pink-500/30 text-pink-200 px-1.5 py-0.2 rounded font-mono font-bold">Posts</span>
+                </div>
+              )}
+            </button>
+
+            {/* MENU ITEM: Kid Stories (YourStory for Kids) */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('kid-stories'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'kid-stories'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Kid Stories & Achievers Review (YourStory for Kids)"
+            >
+              <Sparkles className="w-4 h-4 shrink-0 text-amber-400" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Kid Stories</span>
+                  <span className="text-[10px] bg-amber-500/30 text-amber-200 px-1.5 py-0.2 rounded font-mono font-bold">Review</span>
                 </div>
               )}
             </button>
@@ -2628,7 +2663,11 @@ export default function AdminDashboard({
                             {/* KYC / Uploaded Documents (Admin Only) */}
                             <td className="py-3 px-3">
                               <div className="space-y-1">
-                                {u.aadhaarDocUrl ? (
+                                {u.digilockerVerified ? (
+                                  <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-300 px-2 py-0.5 rounded-xs font-bold text-[10px]" title={`DigiLocker Txn: ${u.digilockerTxnId || 'Verified'}`}>
+                                    <Zap className="w-3 h-3 text-blue-600" /> DigiLocker Verified
+                                  </span>
+                                ) : u.aadhaarDocUrl ? (
                                   <a
                                     href={u.aadhaarDocUrl}
                                     target="_blank"
@@ -3087,71 +3126,10 @@ export default function AdminDashboard({
           )}
 
           {/* ========================================================================= */}
-          {/* VIEW D: COMMERCE & PASSES LEDGER                                          */}
+          {/* VIEW D: VERNUNT COMMERCE & STORE INVENTORY DESK                           */}
           {/* ========================================================================= */}
           {activeMenu === 'woocommerce' && (
-            <div className="space-y-4 animate-fadeIn">
-              <h1 className="text-xl font-normal text-[#1d2327] flex items-center gap-2">
-                <ShoppingCart className="w-5 h-5 text-[#96588a]" /> Commerce Orders & Event Ticket Passes
-              </h1>
-
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-white p-4 border border-[#c3c4c7] rounded-xs shadow-2xs">
-                  <span className="text-[10px] text-[#646970] uppercase font-bold block">Net Sales This Month</span>
-                  <span className="text-2xl font-bold text-[#1d2327] block mt-1">₹42,800.00</span>
-                  <span className="text-[10px] text-emerald-600 font-semibold">+18.4% vs last period</span>
-                </div>
-                <div className="bg-white p-4 border border-[#c3c4c7] rounded-xs shadow-2xs">
-                  <span className="text-[10px] text-[#646970] uppercase font-bold block">Total Passes Completed</span>
-                  <span className="text-2xl font-bold text-[#1d2327] block mt-1">64</span>
-                  <span className="text-[10px] text-[#646970]">Razorpay & UPI settlements</span>
-                </div>
-                <div className="bg-white p-4 border border-[#c3c4c7] rounded-xs shadow-2xs">
-                  <span className="text-[10px] text-[#646970] uppercase font-bold block">Average Order Value</span>
-                  <span className="text-2xl font-bold text-[#1d2327] block mt-1">₹668.75</span>
-                  <span className="text-[10px] text-[#646970]">Family ticket average</span>
-                </div>
-                <div className="bg-white p-4 border border-[#c3c4c7] rounded-xs shadow-2xs">
-                  <span className="text-[10px] text-[#646970] uppercase font-bold block">Commission Retained</span>
-                  <span className="text-2xl font-bold text-emerald-600 block mt-1">₹4,280.00</span>
-                  <span className="text-[10px] text-emerald-600 font-semibold">10% Platform fee</span>
-                </div>
-              </div>
-
-              <div className="bg-white border border-[#c3c4c7] rounded-xs p-4 space-y-3">
-                <h3 className="font-bold text-xs text-[#1d2327] uppercase">Recent Ticket & Order Transactions</h3>
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-[#c3c4c7] text-[#646970] font-semibold text-[11px]">
-                      <th className="py-2">Order</th>
-                      <th className="py-2">Purchased Item / Pass</th>
-                      <th className="py-2">Buyer</th>
-                      <th className="py-2">Payment Method</th>
-                      <th className="py-2">Total</th>
-                      <th className="py-2 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#f0f0f1]">
-                    <tr className="hover:bg-[#f6f7f7]">
-                      <td className="py-2.5 font-mono font-bold text-[#2271b1]">#ORD-9021</td>
-                      <td className="py-2.5 font-semibold text-[#1d2327]">Kids Lego Robotics Championship</td>
-                      <td className="py-2.5">Rohit Sen (rohit@example.com)</td>
-                      <td className="py-2.5 font-mono text-[11px]">Razorpay UPI</td>
-                      <td className="py-2.5 font-mono font-bold">₹1,500.00</td>
-                      <td className="py-2.5 text-right"><span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-xs">Processing</span></td>
-                    </tr>
-                    <tr className="hover:bg-[#f6f7f7]">
-                      <td className="py-2.5 font-mono font-bold text-[#2271b1]">#ORD-9020</td>
-                      <td className="py-2.5 font-semibold text-[#1d2327]">Clay Sculpting & Pottery Pass</td>
-                      <td className="py-2.5">Pooja Sharma (pooja@example.com)</td>
-                      <td className="py-2.5 font-mono text-[11px]">Card / NetBanking</td>
-                      <td className="py-2.5 font-mono font-bold">₹900.00</td>
-                      <td className="py-2.5 text-right"><span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-xs">Completed</span></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <AdminVernuntCommerceDesk />
           )}
 
           {/* ========================================================================= */}
@@ -5201,6 +5179,15 @@ export default function AdminDashboard({
           )}
 
           {/* ========================================================================= */}
+          {/* VIEW: KID STORIES & LITTLE ACHIEVERS EDITORIAL DESK                        */}
+          {/* ========================================================================= */}
+          {activeMenu === 'kid-stories' && (
+            <div className="space-y-6 animate-fadeIn">
+              <AdminKidStoriesDesk />
+            </div>
+          )}
+
+          {/* ========================================================================= */}
           {/* VIEW G: BROADCAST & BANNER ADS                                            */}
           {/* ========================================================================= */}
           {activeMenu === 'broadcast' && (
@@ -5571,6 +5558,45 @@ export default function AdminDashboard({
               </div>
             )}
 
+            {/* Government DigiLocker e-KYC Verification Panel */}
+            {selectedUser.digilockerVerified && (
+              <div className="p-3.5 bg-blue-50/80 border border-blue-200 rounded-xs space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-blue-950 text-xs">
+                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                    <span>Government DigiLocker e-KYC (Official UIDAI Integration)</span>
+                  </div>
+                  <span className="bg-blue-600 text-white font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    100% Certified
+                  </span>
+                </div>
+                <div className="bg-white p-3 border border-blue-200 rounded-xs space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-[#646970] text-[11px]">Issued Name:</span>
+                    <span className="font-bold text-[#1d2327]">{selectedUser.digilockerIssuedName || selectedUser.parentName}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#646970] text-[11px]">Masked Aadhaar:</span>
+                    <span className="font-mono font-bold text-blue-700">{selectedUser.digilockerMaskedAadhaar || selectedUser.aadhaarNumber || 'XXXX-XXXX-8924'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#646970] text-[11px]">Document URI:</span>
+                    <span className="font-mono text-[10px] text-slate-500">{selectedUser.digilockerDocUri || 'in.gov.uidai-adhr'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[#646970] text-[11px]">Txn ID:</span>
+                    <span className="font-mono text-[10px] text-slate-500">{selectedUser.digilockerTxnId || 'DL-TXN-VERIFIED'}</span>
+                  </div>
+                  {selectedUser.digilockerAddress && (
+                    <div className="pt-1.5 border-t border-slate-100 text-[11px]">
+                      <span className="text-[#646970] block font-medium">UIDAI Verified Address:</span>
+                      <span className="text-[#1d2327] font-medium leading-snug">{selectedUser.digilockerAddress}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Uploaded Aadhaar Card Document (Mandatory 3MB File) */}
             <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-xs space-y-2">
               <div className="flex items-center justify-between">
@@ -5605,16 +5631,42 @@ export default function AdminDashboard({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <a
                       href={selectedUser.aadhaarDocUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xs font-bold text-[10.5px] flex items-center gap-1 transition"
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xs font-bold text-[10.5px] flex items-center gap-1 transition shadow-xs"
                     >
                       <Eye className="w-3.5 h-3.5" />
                       <span>Inspect Aadhaar</span>
                     </a>
+                    {selectedUser.verificationStatus !== VerificationStatus.VERIFIED && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const userRef = doc(db, 'users', selectedUser.id);
+                            await updateDoc(userRef, {
+                              verificationStatus: VerificationStatus.VERIFIED,
+                              aadhaarVerified: true,
+                              verificationMethod: 'admin_verified',
+                              adminVerifiedAt: new Date().toISOString()
+                            });
+                            setTargetVerification(VerificationStatus.VERIFIED);
+                            setTargetAadhaarVerified(true);
+                            await sendApprovalNotification(selectedUser);
+                            showNotification('success', `Aadhaar document verified and approved for ${selectedUser.parentName}!`);
+                          } catch (e: any) {
+                            showNotification('error', e.message);
+                          }
+                        }}
+                        className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xs font-bold text-[10.5px] flex items-center gap-1 transition shadow-xs cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Verify &amp; Approve</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -5950,6 +6002,18 @@ export default function AdminDashboard({
           sitemapStatus={indexingFeedbackModal.sitemapStatus}
           indexNowStatus={indexingFeedbackModal.indexNowStatus}
           timestamp={indexingFeedbackModal.timestamp}
+        />
+      )}
+
+      {/* Specialist Claims Admin Verification Modal */}
+      {showClaimsModal && (
+        <SpecialistClaimsAdminModal
+          isOpen={showClaimsModal}
+          onClose={() => setShowClaimsModal(false)}
+          adminEmail={userProfile?.email || 'admin@vernunt.com'}
+          onClaimApproved={(specId, applicantEmail) => {
+            showNotification('success', `Specialist claim approved for doctor (${specId}) and linked to account: ${applicantEmail}`);
+          }}
         />
       )}
 

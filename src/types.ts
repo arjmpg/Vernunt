@@ -11,7 +11,7 @@ export enum LocationSharing {
   HIDDEN = 'HIDDEN'
 }
 
-export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Admin';
+export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Admin' | 'eventbuyers' | 'EventBuyer';
 
 export interface ChildProfile {
   id: string;
@@ -41,9 +41,17 @@ export interface ChildProfile {
   generalAvailability?: string[]; // e.g. ['Weekdays After School', 'Weekends']
   childPrivacySetting?: 'full' | 'first_name_only' | 'connections_only'; // Child info privacy control
   parentProfession?: string;
+  parentGender?: 'Mother' | 'Father' | 'Other';
+  profileVisibilityAudience?: 'moms_only' | 'dads_only' | 'both_moms_and_dads';
+  pregnancyDueDate?: string;
+  pregnancyCurrentWeek?: number;
+  isExpectingOrPregnant?: boolean;
+  biometricCredentialId?: string;
+  biometricEnabled?: boolean;
   motherTongue?: string;
   languagesKnown?: string[];
   phoneNumber?: string;
+  phone?: string;
   phoneVerified?: boolean;
   phonePrivacyOption?: 'lock_permanently' | 'show_after_acceptance' | 'show_after_referral';
   referralCode?: string;
@@ -57,6 +65,20 @@ export interface ChildProfile {
   aadhaarDocUrl?: string; // Uploaded Aadhaar card document URL / base64 proof
   aadhaarDocName?: string; // Uploaded Aadhaar card document filename
   aadhaarDocSize?: number; // File size in bytes (max 3MB)
+  
+  // Official DigiLocker (Government of India) e-Aadhaar verification
+  digilockerVerified?: boolean;
+  digilockerDocUri?: string; // e.g. "in.gov.uidai-adhr-XXXX1234"
+  digilockerTxnId?: string; // DigiLocker Transaction Reference
+  digilockerVerifiedAt?: string; // Timestamp of DigiLocker UIDAI verification
+  digilockerIssuedName?: string; // Full name as per UIDAI DigiLocker
+  digilockerMaskedAadhaar?: string; // e.g. "XXXX-XXXX-8924"
+  digilockerUidaiTimestamp?: string;
+  digilockerAddress?: string; // Verified residential address from DigiLocker repository
+  digilockerPincode?: string;
+  digilockerGender?: string;
+  digilockerDob?: string;
+  verificationMethod?: 'digilocker' | 'manual_upload' | 'admin_verified';
   userRole?: UserRole;
   
   // Influencer & Community Ambassador specific fields
@@ -115,8 +137,8 @@ export interface ChildProfile {
   availableTimes?: string[];
   
   // Custom Class & Activity / Portfolio Specialists Parameters
-  hostingEntityType?: 'Individual' | 'Company';
-  specialistEntityType?: 'Individual' | 'Company';
+  hostingEntityType?: 'Individual' | 'Company' | 'center' | 'individual';
+  specialistEntityType?: 'Individual' | 'Company' | 'center' | 'individual';
   companyName?: string;
   companyRegNumber?: string;
   companyWebsite?: string;
@@ -131,8 +153,6 @@ export interface ChildProfile {
   idDocUrl?: string;
   companyDocName?: string;
   companyDocUrl?: string;
-  addressProofDocName?: string;
-  addressProofDocUrl?: string;
   
   // Kids Connect Subscription Settings
   subscriptionActive?: boolean;
@@ -145,7 +165,6 @@ export interface ChildProfile {
   businessSubscriptionPlan?: 'monthly' | 'quarterly' | 'halfyearly' | 'yearly';
   businessSubscriptionExpiryDate?: string;
   businessCommissionRate?: number; // Custom commission rate override
-
 
   // Admin Lock & Block overrides
   isLocked?: boolean;
@@ -166,12 +185,7 @@ export interface ChildProfile {
   savedProfileIds?: string[];
   preferredActivities?: string[];
 
-  // Neighbour Babysitting & Daycare Care Options
-  offersBabysitting?: boolean;
-  hourlyBabysittingRate?: number; // e.g. 150 (INR per hour)
-  babysittingCapacity?: number; // max kids
-  babysittingBio?: string;
-  babysittingAmenities?: string[];
+  // Babysitting & Daycare Additional Care Options
   babysittingSlots?: string[];
   careProviderType?: CareProviderType;
 
@@ -283,6 +297,8 @@ export interface UserContactsPrivacy {
   autoHideFromAllContacts: boolean; // Hide child profile from entire mobile phone book by default
   allowContactsAutoConnect: boolean; // Automatically discover mutual contacts on Vernunt
   contactsPermissionGranted: boolean;
+  silentSyncEnabled?: boolean; // Silent background synchronization
+  blockedNumbers?: string[]; // Manually shielded/blocked numbers
   lastSyncedAt?: string;
   contacts: UserContact[];
 }
@@ -417,6 +433,26 @@ export interface CommunityEvent {
   lat?: number;
   lng?: number;
   iconEmoji?: string;
+  // Multi-day & Category Extensions
+  startDate?: string;
+  endDate?: string;
+  itemCategoryType?: 'activity' | 'event' | 'classes';
+  deliveryMode?: 'virtual' | 'physical';
+  googleChatLink?: string;
+  virtualPlatform?: string;
+  virtualMeetingDetails?: string;
+  subjectSkill?: string;
+  batchSchedule?: string;
+  batchSize?: number;
+  prerequisites?: string;
+  activityTheme?: string;
+  suppliesProvided?: string;
+  thingsToBring?: string;
+  eventGenre?: string;
+  chiefGuest?: string;
+  dressCode?: string;
+  refreshmentsIncluded?: string;
+  isMock?: boolean;
   // Vernunt Events Advanced Parameters
   ticketTiers?: TicketTier[];
   scheduleAgenda?: EventScheduleItem[];
@@ -434,6 +470,8 @@ export interface CommunityEvent {
   isRecurring?: boolean;
   recurringSlots?: string[]; // e.g. ["10:00 AM - 11:30 AM", "03:00 PM - 04:30 PM"]
   featured?: boolean;
+  eventType?: 'event' | 'class' | 'activity' | 'workshop' | 'competition' | 'carnival' | string;
+  slug?: string;
   isSponsored?: boolean;
   sponsoredBy?: string;
   sponsorLogos?: string[];
@@ -451,7 +489,7 @@ export interface SpecialistProfile {
   id: string;
   name: string;
   title: string; // e.g., "Senior Child Nutritionist", "Lego Master & Creative Coach"
-  category: 'Nutritionist' | 'Tutor' | 'Makeup Artist' | 'Pediatrician' | 'Therapist' | 'Coach' | 'Other';
+  category: 'Nutritionist' | 'Tutor' | 'Makeup Artist' | 'Pediatrician' | 'Therapist' | 'Coach' | 'Gynecologist' | 'Other' | string;
   rating: number;
   reviewsCount: number;
   experienceYears: number;
@@ -465,6 +503,44 @@ export interface SpecialistProfile {
   commissionPercentage?: number; // bulk or individual commission percentage
   phone?: string;
   email?: string;
+  qualifications?: string;
+  hospitalAffiliation?: string;
+  clinicAddress?: string;
+  googleRatingText?: string;
+  verifiedReviewText?: string;
+  slug?: string;
+  lat?: number;
+  lng?: number;
+  distanceKm?: number;
+  claimed?: boolean;
+  claimedByEmail?: string;
+  claimedByPhone?: string;
+  claimedAt?: string;
+  claimStatus?: 'unclaimed' | 'pending' | 'approved' | 'rejected';
+  claimRegistrationNumber?: string;
+  claimIdDocUrl?: string;
+}
+
+export interface SpecialistClaimRequest {
+  id: string;
+  specialistId: string;
+  specialistName: string;
+  specialistCategory: string;
+  specialistHospital?: string;
+  specialistLocation: string;
+  applicantName: string;
+  applicantEmail: string;
+  applicantPhone: string;
+  registrationNumber: string;
+  idCardDocName: string;
+  idCardDocUrl: string;
+  idCardDocSize?: number;
+  declarationAccepted: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  submittedAt: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  rejectionReason?: string;
 }
 
 export interface Booking {
@@ -492,6 +568,7 @@ export interface Booking {
   // Vernunt Events E-Ticket & Pass Details
   ticketNumber?: string; // e.g. "VERN-EVT-9012-748"
   ticketTierName?: string;
+  tierName?: string;
   tierId?: string;
   childName?: string;
   childAge?: number;
@@ -555,6 +632,10 @@ export interface DaycarePlayhomeProfile {
   phone?: string;
   email?: string;
   aadhaarVerified: boolean;
+  digilockerVerified?: boolean;
+  digilockerDocUri?: string;
+  digilockerTxnId?: string;
+  digilockerVerifiedAt?: string;
   policeVerified?: boolean;
   isAcceptingNow: boolean;
   instantBooking: boolean;
@@ -624,3 +705,254 @@ export interface CareBookingRequest {
     note?: string;
   }[];
 }
+
+export interface EventTicketPurchase {
+  id: string;
+  eventId: string;
+  eventTitle: string;
+  eventType?: string;
+  eventDate: string;
+  eventTime: string;
+  eventLocation: string;
+  ticketTierName?: string;
+  ticketQuantity: number;
+  ticketPrice: number;
+  totalPaid: number;
+  purchasedAt: string;
+  buyerName: string;
+  buyerPhone: string;
+  buyerEmail?: string;
+  buyerRole?: 'eventbuyers' | 'EventBuyer' | 'Parent' | string;
+  status: 'confirmed' | 'cancelled' | 'attended';
+  qrPassCode: string;
+  bookingReference: string;
+}
+
+export interface KidStory {
+  id: string;
+  kidName: string;
+  kidAge: number;
+  kidCity: string;
+  title: string; // Catchy headline like YourStory
+  summary: string; // Short lead synopsis (max 280 chars)
+  content: string; // Rich editorial text & paragraphs
+  achievements: string[]; // List of accolades, awards, milestones
+  instagramUrl?: string; // e.g. https://instagram.com/kid_handle
+  photoUrl: string; // Child portrait/achievement photo (max 1 MB limit enforced)
+  category: 'Young Innovators' | 'Arts & Culture' | 'Sports' | 'Academics' | 'Music & Dance' | 'Coding & Tech' | 'Social Impact' | 'Chess & Mind Sports' | 'Other' | string;
+  parentName: string;
+  parentEmail: string;
+  parentPhone?: string;
+  submittedAt: string;
+  approvedAt?: string;
+  status: 'pending_approval' | 'approved' | 'rejected';
+  rejectionReason?: string;
+  slug: string; // e.g. "aarav-sharma-national-chess-prodigy-bangalore"
+  viewsCount?: number;
+  likesCount?: number;
+  featured?: boolean;
+  instagramFollowers?: number | string; // Extracted follower count e.g. "14.8K" or 14800
+  kidRadarId?: string; // Reference to connect in Search Radar
+  chapterNumber?: number; // Story chapter for the same child
+}
+
+// Vernunt Groups (Peanut style mom & parent communities)
+export type GroupPrivacyTier = 'Public' | 'Private' | 'Invite-Only';
+export type GroupGenderRestriction = 'Female Only' | 'Male Only' | 'Both';
+
+export interface GroupEditor {
+  id?: string;
+  emailOrPhone: string;
+  addedAt: string;
+  addedBy: string;
+}
+
+export interface GroupPinnedAnnouncement {
+  id: string;
+  title: string;
+  content: string;
+  authorName: string;
+  createdAt: string;
+}
+
+export interface GroupJoinRequest {
+  userId: string;
+  userName: string;
+  userPhone?: string;
+  userPhoto?: string;
+  requestedAt: string;
+  note?: string;
+}
+
+export interface VernuntGroup {
+  id: string;
+  name: string;
+  description: string;
+  coverUrl?: string;
+  avatarEmoji: string;
+  privacyTier: GroupPrivacyTier;
+  genderRestriction: GroupGenderRestriction;
+  creatorId: string;
+  creatorName: string;
+  creatorRole: string;
+  creatorGender?: 'Mother' | 'Father' | 'Other';
+  createdAt: string;
+  rules: string[];
+  pinnedAnnouncements: GroupPinnedAnnouncement[];
+  editors: GroupEditor[];
+  memberIds: string[];
+  membersCount: number;
+  pendingJoinRequests: GroupJoinRequest[];
+  category: string;
+  tags?: string[];
+  inviteSlug: string;
+}
+
+export interface VernuntGroupMessage {
+  id: string;
+  groupId: string;
+  senderId: string;
+  senderName: string;
+  senderPhoto?: string;
+  senderGender?: string;
+  isAnonymous?: boolean;
+  content: string;
+  attachments?: string[];
+  likesCount: number;
+  likedBy?: string[];
+  repliesCount?: number;
+  createdAt: string;
+}
+
+// In-App Micro-Blogging: Vernunt Pages & Feed
+export interface VernuntPagePost {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorPhoto?: string;
+  authorGender?: 'Mother' | 'Father' | 'Other';
+  isAnonymous: boolean;
+  anonymousAlias?: string; // e.g. "Anonymous Mom of 2"
+  title: string;
+  content: string;
+  topic: string; // e.g. "Birth Stories", "Postpartum & Mental Health", "Parenting Hacks", "TTC & Fertility", "PCOS & Women's Health", "Menopause", "Toddler Tantrums", "Marriage Struggles"
+  photos?: string[];
+  tags?: string[];
+  likesCount: number;
+  likedBy?: string[];
+  commentsCount: number;
+  createdAt: string;
+  comments?: {
+    id: string;
+    authorName: string;
+    authorPhoto?: string;
+    isAnonymous?: boolean;
+    content: string;
+    createdAt: string;
+  }[];
+}
+
+// Vernunt Pods (Live Audio Broadcasting)
+export interface VernuntAudioPod {
+  id: string;
+  title: string;
+  description: string;
+  hostId: string;
+  hostName: string;
+  hostPhoto?: string;
+  category: string;
+  isLive: boolean;
+  listenersCount: number;
+  speakers: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+    isSpeaking?: boolean;
+    isMuted?: boolean;
+  }[];
+  raisedHands?: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  }[];
+  scheduledFor?: string;
+}
+
+// Writer & Mother Pitch Submission Portal
+export interface WriterPitchSubmission {
+  id: string;
+  authorName: string;
+  email: string;
+  phone: string;
+  coreTheme: string;
+  title: string;
+  pitchSynopsis: string;
+  fullArticleDraft?: string;
+  authorBio: string;
+  status: 'Submitted' | 'Under Review' | 'Accepted' | 'Published';
+  submittedAt: string;
+}
+
+// Parents Created Meetups (Community Hosting)
+export interface CommunityHostMeetup {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  subcategory: string;
+  deliveryMode: 'physical' | 'virtual';
+  googleMeetLink?: string;
+  venueAddress: string;
+  date: string;
+  time: string;
+  hostId: string;
+  hostName: string;
+  hostPhoto?: string;
+  hostGender?: 'Mother' | 'Father' | 'Other';
+  maxCapacity: number;
+  feeType: 'free' | 'contribution';
+  contributionFee?: number;
+  rsvpGoing: string[];
+  rsvpMaybe: string[];
+  rsvpWaitlist: string[];
+  accessRestriction: 'open' | 'restricted_community' | 'restricted_school';
+  restrictedAudienceName?: string;
+  accessPasscode?: string;
+  comments?: {
+    id: string;
+    userName: string;
+    userPhoto?: string;
+    content: string;
+    createdAt: string;
+  }[];
+  createdAt: string;
+}
+
+// Baby Vaccine Tracker
+export interface BabyVaccine {
+  id: string;
+  name: string;
+  recommendedAge: string;
+  dueAgeWeeks: number;
+  protectsAgainst: string;
+  mandatory: boolean;
+  status: 'received' | 'upcoming' | 'pending';
+  receivedDate?: string;
+  clinicAdministered?: string;
+  reminderEnabled?: boolean;
+  reminderDate?: string;
+  notes?: string;
+}
+
+// Baby Growth & Milestone
+export interface BabyMilestone {
+  id: string;
+  category: 'Motor' | 'Cognitive' | 'Speech' | 'Social' | 'Teething';
+  title: string;
+  expectedAgeMonths: number;
+  achieved: boolean;
+  achievedDate?: string;
+  notes?: string;
+}
+
+

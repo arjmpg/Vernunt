@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { ChildProfile } from '../types.ts';
-import { Award, ShieldCheck, Sparkles, Activity } from 'lucide-react';
+import { Award, ShieldCheck, Sparkles, Activity, Stethoscope, Building2, Star, ArrowRight, CheckCircle2 } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
+import { BANGALORE_PEDIATRICIANS } from '../data/bangalorePediatricians.ts';
+import { FALLBACK_DOCTOR_PHOTO } from '../utils/specialistUrls.ts';
 
 interface PortfoliosTabProps {
   currentProfile: ChildProfile | null;
+  onNavigateToPediatricians?: () => void;
 }
 
-export default function PortfoliosTab({ currentProfile }: PortfoliosTabProps) {
+export default function PortfoliosTab({ currentProfile, onNavigateToPediatricians }: PortfoliosTabProps) {
   const childName = currentProfile?.childName || 'Your Child';
   const gradeLevel = currentProfile?.gradeLevel || 'Kindergarten';
   const childAge = currentProfile?.childAge || 5;
@@ -191,6 +194,72 @@ export default function PortfoliosTab({ currentProfile }: PortfoliosTabProps) {
                 <div className="text-right">
                   <span className="text-slate-400 font-medium block text-[10px] uppercase">Height / Weight</span>
                   <span className="font-black text-indigo-700 text-base">{log.height} • {log.weight}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Card 4: Bangalore Pediatricians for Immunizations & Clearances */}
+        <div id="pediatrician-clearance-card" className="bg-gradient-to-r from-rose-900 via-slate-900 to-amber-950 text-white rounded-3xl p-6 shadow-md space-y-4 lg:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold">
+                  <Stethoscope className="w-4 h-4" />
+                </span>
+                <h4 className="font-bold text-base font-serif text-white flex items-center gap-2">
+                  Recommended Bangalore Pediatricians for Immunization & School Clearances
+                </h4>
+              </div>
+              <p className="text-xs text-slate-300 max-w-2xl">
+                Need doctor sign-off for school admission, daycare health clearances, or milestone evaluation? Connect directly with verified child health specialists across Bangalore.
+              </p>
+            </div>
+
+            {onNavigateToPediatricians && (
+              <button
+                type="button"
+                onClick={onNavigateToPediatricians}
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center gap-2 self-start sm:self-auto cursor-pointer shadow-sm shrink-0"
+              >
+                <span>View All 150+ Pediatricians</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+            {BANGALORE_PEDIATRICIANS.slice(0, 4).map((doc) => (
+              <div
+                key={doc.id}
+                onClick={onNavigateToPediatricians}
+                className="bg-white/10 hover:bg-white/15 border border-white/10 p-3 rounded-2xl transition cursor-pointer space-y-2 flex flex-col justify-between"
+              >
+                <div className="flex items-start gap-2.5">
+                  <img
+                    src={doc.photoUrl}
+                    alt={doc.name}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = FALLBACK_DOCTOR_PHOTO;
+                    }}
+                    className="w-11 h-11 rounded-xl object-cover border border-white/20 shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="min-w-0">
+                    <h5 className="font-bold text-xs text-white truncate">{doc.name}</h5>
+                    <p className="text-[10px] text-rose-300 truncate">{doc.title}</p>
+                    <div className="flex items-center gap-1 text-[10px] text-amber-300 font-bold mt-0.5">
+                      <Star className="w-3 h-3 fill-amber-300" />
+                      <span>{doc.rating}</span>
+                      <span className="text-white/60 font-normal">({doc.reviewsCount}+)</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-300">
+                  <span className="truncate max-w-[120px]">{doc.hospitalAffiliation || doc.location}</span>
+                  <span className="font-bold text-amber-300">₹{doc.sessionFee}</span>
                 </div>
               </div>
             ))}

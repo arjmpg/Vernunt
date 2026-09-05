@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ChildProfile } from '../types.ts';
-import { Sparkles, Compass, MapPin, Clock, CalendarCheck2, Lightbulb, Users, CheckCircle2, ChevronRight, Layers, Award } from 'lucide-react';
-import Markdown from 'react-markdown';
+import { Compass, MapPin, Clock, CalendarCheck2, Lightbulb, Users, CheckCircle2, ChevronRight, Layers, Award } from 'lucide-react';
 
 interface SuggestedActivity {
   id: string;
@@ -55,11 +54,7 @@ export function PlaydateActivitySuggestions({
   const companionName = companion?.childName || 'Playmate';
   const companionAge = companion?.childAge || 5;
 
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiCustomIdeas, setAiCustomIdeas] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<string | null>(null);
-
-  // Generate algorithmic instant suggested activities based on profiles & selected resource
+  // Generate instant suggested activities based on profiles & selected resource
   const getAlgorithmicSuggestions = (): SuggestedActivity[] => {
     const combinedInterests = Array.from(new Set([
       ...(userProfile?.interests || []),
@@ -150,59 +145,6 @@ export function PlaydateActivitySuggestions({
     return suggestions.slice(0, 3);
   };
 
-  const handleGeneratePlayIdeas = async () => {
-    setAiGenerating(true);
-    setAiError(null);
-    setAiCustomIdeas(null);
-
-    const kidsPayload = [
-      {
-        childName: myChildName,
-        childAge: myChildAge,
-        interests: userProfile?.interests || [],
-        playStyle: userProfile?.playStyle || 'Cooperative'
-      }
-    ];
-
-    if (companion) {
-      kidsPayload.push({
-        childName: companionName,
-        childAge: companionAge,
-        interests: companion.interests || [],
-        playStyle: companion.playStyle || 'Friendly'
-      });
-    }
-
-    try {
-      const res = await fetch('/api/generate-play-ideas', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kids: kidsPayload,
-          category: `Nearby Resource: ${selectedResource.name}. Focus on screen-free, safe play.`
-        })
-      });
-
-      let data: any = {};
-      try {
-        const text = await res.text();
-        data = text ? JSON.parse(text) : {};
-      } catch {
-        data = { success: false, error: 'Server response could not be parsed' };
-      }
-      if (data.success && data.text) {
-        setAiCustomIdeas(data.text);
-      } else {
-        setAiError(data.error || 'Unable to generate custom AI activity right now.');
-      }
-    } catch (err: any) {
-      console.error('AI Activity Error:', err);
-      setAiError('Network error connecting to AI service. Using smart local recommendations below.');
-    } finally {
-      setAiGenerating(false);
-    }
-  };
-
   const suggestedList = getAlgorithmicSuggestions();
 
   return (
@@ -216,12 +158,9 @@ export function PlaydateActivitySuggestions({
           <div>
             <h3 className="text-base font-bold text-slate-900 font-serif flex items-center gap-1.5">
               Playdate Activity Recommender
-              <span className="text-[10px] font-sans font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
-                ✨ AI Powered
-              </span>
             </h3>
             <p className="text-xs text-slate-500 font-medium">
-              Tailored screen-free games based on kids' profiles & nearby resources
+              Curated screen-free games based on kids' profiles & nearby resources
             </p>
           </div>
         </div>
@@ -288,65 +227,6 @@ export function PlaydateActivitySuggestions({
           </select>
         </div>
       </div>
-
-      {/* AI Fresh Generator Trigger Banner */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-gradient-to-r from-orange-50 to-amber-50 rounded-2xl border border-orange-200/80">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 bg-white rounded-xl text-orange-600 border border-orange-100 shadow-2xs shrink-0">
-            <Sparkles className="w-4 h-4 animate-spin-slow" />
-          </div>
-          <p className="text-xs text-slate-700 font-medium">
-            Want a custom AI-designed activity for <strong className="text-slate-900">{myChildName}</strong> & <strong className="text-slate-900">{companionName}</strong>?
-          </p>
-        </div>
-
-        <button
-          id="btn-generate-ai-activity"
-          type="button"
-          onClick={handleGeneratePlayIdeas}
-          disabled={aiGenerating}
-          className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 shrink-0 active:scale-95 cursor-pointer disabled:opacity-50"
-        >
-          {aiGenerating ? (
-            <>
-              <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-              <span>Generating AI Plan...</span>
-            </>
-          ) : (
-            <>
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>Generate AI Activity</span>
-            </>
-          )}
-        </button>
-      </div>
-
-      {/* Render AI Custom Response if available */}
-      {aiCustomIdeas && (
-        <div className="p-5 bg-amber-50/60 rounded-2xl border border-amber-200/80 space-y-3 animate-fade-in text-xs text-slate-800">
-          <div className="flex items-center justify-between border-b border-amber-200/60 pb-2">
-            <span className="font-serif font-bold text-sm text-slate-900 flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-orange-500" /> AI Custom Activity Plan
-            </span>
-            <button
-              type="button"
-              onClick={() => setAiCustomIdeas(null)}
-              className="text-[10px] text-slate-500 font-bold hover:underline"
-            >
-              Clear AI Output
-            </button>
-          </div>
-          <div className="markdown-body text-xs leading-relaxed space-y-2">
-            <Markdown>{aiCustomIdeas}</Markdown>
-          </div>
-        </div>
-      )}
-
-      {aiError && (
-        <div className="p-3 bg-red-50 text-red-700 border border-red-200 text-xs font-semibold rounded-xl">
-          ⚠️ {aiError}
-        </div>
-      )}
 
       {/* List of Suggested Activities */}
       <div className="space-y-4">

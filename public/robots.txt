@@ -1,4 +1,28 @@
 User-agent: *
+# Strict Child & Parent Safety: Un-index and hide all sensitive child/family data from SEO
+Disallow: /radar
+Disallow: /profile
+Disallow: /playmates
+Disallow: /groups
+Disallow: /chat
+Disallow: /messages
+Disallow: /tracker
+Disallow: /vaccines
+Disallow: /api/
+Disallow: /*?token=*
+Disallow: /*?user=*
+Disallow: /*?child=*
+Disallow: /*?group=*
+
+# Allow only public educational guides, pediatric directories & verified clinic services
 Allow: /
+Allow: /knowledge
+Allow: /specialists
+Allow: /doctors/
+Allow: /events
+Allow: /safety
 
 Sitemap: https://app.vernunt.com/sitemap.xml
+Sitemap: https://app.vernunt.com/sitemap-doctors.xml
+Sitemap: https://app.vernunt.com/sitemap-guides.xml
+

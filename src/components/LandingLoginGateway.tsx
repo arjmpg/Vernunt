@@ -44,6 +44,12 @@ interface LandingLoginGatewayProps {
   onGoogleSignIn?: () => void;
   onSelectGoogleAccount?: (account: { email: string; displayName: string; photoURL?: string; role?: string }) => void;
   onOpenKnowledgeBase?: (slug?: string) => void;
+  onOpenSpecialists?: () => void;
+  onOpenKannadaVoice?: (language?: string) => void;
+  onOpenContactUs?: () => void;
+  onOpenKidStories?: () => void;
+  onOpenEvents?: () => void;
+  onOpenEventBuyerRegistration?: () => void;
   isAuthenticating?: boolean;
   externalAuthError?: string;
   language?: LanguageCode;
@@ -59,6 +65,12 @@ export default function LandingLoginGateway({
   onGoogleSignIn,
   onSelectGoogleAccount,
   onOpenKnowledgeBase,
+  onOpenSpecialists,
+  onOpenKannadaVoice,
+  onOpenContactUs,
+  onOpenKidStories,
+  onOpenEvents,
+  onOpenEventBuyerRegistration,
   isAuthenticating = false,
   externalAuthError = '',
   language = 'en',
@@ -631,22 +643,134 @@ export default function LandingLoginGateway({
               </div>
             </div>
 
-            <div 
-              onClick={() => onOpenKnowledgeBase && onOpenKnowledgeBase()}
-              className="flex gap-3 bg-gradient-to-r from-rose-50/80 to-amber-50/80 p-3.5 rounded-xl border border-rose-200/80 shadow-xs hover:shadow-md hover:border-rose-300 transition cursor-pointer group"
-            >
-              <BookOpen className="w-5 h-5 text-rose-600 shrink-0 mt-0.5 group-hover:scale-110 transition" />
-              <div className="flex-1">
-                <div className="flex items-center justify-between gap-1">
-                  <h4 className="font-bold text-xs text-rose-950 flex items-center gap-1.5">
-                    <span>1,000+ Child Growth Guides & Blueprints</span>
-                    <span className="bg-rose-600 text-white text-[8px] font-extrabold px-1.5 py-0.2 rounded uppercase tracking-wider">Free Open Access</span>
-                  </h4>
-                  <span className="text-[11px] font-extrabold text-rose-700 group-hover:translate-x-0.5 transition hidden sm:inline">
-                    Read ↗
-                  </span>
+            {/* Direct Quick Registration & Editorial Features (Below Banner) */}
+            <div id="landing-quick-access-portal" className="bg-white border border-orange-100/80 rounded-2xl p-4 shadow-sm space-y-3 text-left">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div>
+                  <span className="text-[10px] uppercase font-black tracking-wider text-rose-700 block">Fast Track Portal</span>
+                  <h4 className="text-xs font-bold text-slate-900">Registration &amp; Editorial Publishing</h4>
                 </div>
-                <p className="text-[11px] text-slate-600 mt-0.5">Evidence-based clinical guides on toddler brain foods, psychology, homeschooling, and motor development. No login required!</p>
+                <span className="text-[9px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  100% Free
+                </span>
+              </div>
+
+              {/* Action Cards */}
+              <div className="space-y-2">
+                {/* 1. Parent & Child Registration */}
+                <button
+                  type="button"
+                  id="btn-quick-reg-parent"
+                  onClick={() => onStartSignUp('Parent')}
+                  className="w-full p-3 rounded-xl border border-amber-200/80 bg-gradient-to-r from-amber-50/80 to-orange-50/70 hover:from-amber-100 hover:to-orange-100 transition text-left flex items-start gap-3 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center text-base shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition">
+                    👪
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-slate-900 group-hover:text-amber-900">
+                        Parent &amp; Child Sign Up
+                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.2 rounded">
+                        1 Year Free
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                      Discover verified playmates, plan neighborhood playdates, and access local daycare sitters safely.
+                    </p>
+                  </div>
+                </button>
+
+                {/* 2. Kids Story Publisher (YourStory style) */}
+                <button
+                  type="button"
+                  id="btn-quick-kids-stories"
+                  onClick={() => {
+                    if (onOpenKidStories) {
+                      onOpenKidStories();
+                    } else {
+                      onStartSignUp('Parent');
+                    }
+                  }}
+                  className="w-full p-3 rounded-xl border border-rose-200/80 bg-gradient-to-r from-rose-50/80 to-pink-50/70 hover:from-rose-100 hover:to-pink-100 transition text-left flex items-start gap-3 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center text-base shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition">
+                    📖
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-slate-900 group-hover:text-rose-900">
+                        Write &amp; Read Kids Stories
+                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.2 rounded">
+                        YourStory Style
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                      Publish child achievements, awards &amp; Instagram link. Read with animated flipbook and get indexed on Google!
+                    </p>
+                  </div>
+                </button>
+
+                {/* 3. Event Ticket Buyer Quick Registration */}
+                <button
+                  type="button"
+                  id="btn-quick-event-buyer"
+                  onClick={() => {
+                    if (onOpenEventBuyerRegistration) {
+                      onOpenEventBuyerRegistration();
+                    } else if (onOpenEvents) {
+                      onOpenEvents();
+                    }
+                  }}
+                  className="w-full p-3 rounded-xl border border-indigo-200/80 bg-gradient-to-r from-indigo-50/80 to-blue-50/70 hover:from-indigo-100 hover:to-blue-100 transition text-left flex items-start gap-3 group cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-base shrink-0 mt-0.5 shadow-2xs group-hover:scale-105 transition">
+                    🎟️
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="font-extrabold text-xs text-slate-900 group-hover:text-indigo-900">
+                        Event Ticket Buyer Pass
+                      </span>
+                      <span className="text-[9px] font-black uppercase tracking-wider bg-indigo-600 text-white px-1.5 py-0.2 rounded">
+                        Instant Pass
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                      Separate quick registration: Just your Name &amp; Mobile number. No login or password required!
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Quick Links for Public Events & Other Roles */}
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => onOpenEvents && onOpenEvents()}
+                  className="font-bold text-rose-700 hover:text-rose-900 inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Explore Public Events ↗</span>
+                </button>
+                <div className="flex items-center gap-3 text-slate-500 font-medium">
+                  <button
+                    type="button"
+                    onClick={() => onStartSignUp('Daycare Center')}
+                    className="hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Daycare Host
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => onStartSignUp('Influencer')}
+                    className="hover:text-slate-800 underline cursor-pointer"
+                  >
+                    Creator / Influencer
+                  </button>
+                </div>
               </div>
             </div>
           </div>

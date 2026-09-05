@@ -3,9 +3,10 @@ import { DaycarePlayhomeProfile, ChildProfile, CareProviderType } from '../types
 import { 
   X, ShieldCheck, MapPin, DollarSign, Clock, Baby, 
   Home, Check, Sparkles, Plus, Trash2, Camera, Info, Eye,
-  Navigation, UserCheck, HeartHandshake, Briefcase
+  Navigation, UserCheck, HeartHandshake, Briefcase, Zap
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import AadhaarUploadField, { DocUploadData } from './AadhaarUploadField.tsx';
 
 interface CareProviderRegistrationModalProps {
   currentUserProfile: ChildProfile | null;
@@ -76,6 +77,20 @@ export default function CareProviderRegistrationModal({
   );
   const [phone, setPhone] = useState<string>(
     existingProfile?.phone || currentUserProfile?.phoneNumber || '9820112233'
+  );
+
+  // Aadhaar Verification States for Host
+  const [aadhaarNumber, setAadhaarNumber] = useState<string>(
+    existingProfile?.aadhaarNumber || currentUserProfile?.aadhaarNumber || ''
+  );
+  const [aadhaarDocName, setAadhaarDocName] = useState<string>(
+    existingProfile?.aadhaarDocName || currentUserProfile?.aadhaarDocName || ''
+  );
+  const [aadhaarDocUrl, setAadhaarDocUrl] = useState<string>(
+    existingProfile?.aadhaarDocUrl || currentUserProfile?.aadhaarDocUrl || ''
+  );
+  const [aadhaarDocSize, setAadhaarDocSize] = useState<number | undefined>(
+    existingProfile?.aadhaarDocSize || currentUserProfile?.aadhaarDocSize
   );
 
   const [selectedAgeGroups, setSelectedAgeGroups] = useState<string[]>(
@@ -163,6 +178,10 @@ export default function CareProviderRegistrationModal({
       alert('Please select at least one care offering: Host at My Home, or Visit Parents House.');
       return;
     }
+    if (!aadhaarDocName && !aadhaarDocUrl && !aadhaarNumber) {
+      alert('Aadhaar verification is mandatory for all care providers. Please upload your Aadhaar document for manual admin verification.');
+      return;
+    }
 
     const careServiceModes: ('host_at_my_home' | 'visit_parents_home')[] = [];
     if (canHostAtHome) careServiceModes.push('host_at_my_home');
@@ -208,7 +227,11 @@ export default function CareProviderRegistrationModal({
       avatarUrl: currentUserProfile?.photoUrl || currentUserProfile?.parentPhotoUrl || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces',
       phone: phone || currentUserProfile?.phoneNumber,
       email: currentUserProfile?.email,
-      aadhaarVerified: currentUserProfile?.aadhaarVerified ?? true,
+      aadhaarVerified: currentUserProfile?.role === 'Admin',
+      aadhaarDocName: aadhaarDocName || currentUserProfile?.aadhaarDocName,
+      aadhaarDocUrl: aadhaarDocUrl || currentUserProfile?.aadhaarDocUrl,
+      aadhaarDocSize: aadhaarDocSize || currentUserProfile?.aadhaarDocSize,
+      aadhaarNumber: aadhaarNumber || currentUserProfile?.aadhaarNumber,
       policeVerified: true,
       isAcceptingNow: true,
       instantBooking: true,
@@ -569,6 +592,34 @@ export default function CareProviderRegistrationModal({
                 placeholder="e.g. Bandra West, Mumbai"
                 className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-emerald-600"
                 required
+              />
+            </div>
+
+            {/* Host Identity & Aadhaar / DigiLocker Verification */}
+            <div className="pt-2">
+              <AadhaarUploadField
+                label="Host Identity & Aadhaar Verification (Mandatory)"
+                labelPrefix="Host"
+                required={true}
+                maxSizeMb={3}
+                aadhaarNumber={aadhaarNumber}
+                onNumberChange={setAadhaarNumber}
+                aadhaarDocName={aadhaarDocName}
+                aadhaarDocUrl={aadhaarDocUrl}
+                aadhaarDocSize={aadhaarDocSize}
+                userName={hostName}
+                userPhone={phone}
+                userAddress={address}
+                onDocUploaded={(docData) => {
+                  setAadhaarDocName(docData.docName);
+                  setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                  setAadhaarDocSize(docData.docSize);
+                }}
+                onDocRemoved={() => {
+                  setAadhaarDocName('');
+                  setAadhaarDocUrl('');
+                  setAadhaarDocSize(undefined);
+                }}
               />
             </div>
           </div>

@@ -5,7 +5,7 @@ import {
   Map as MapIcon, List, Compass, Star, Calendar, Plus, Award, 
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
   Ticket, QrCode, UserCheck, CalendarDays, Wallet, Clock, ArrowRight, ShieldCheck,
-  Navigation, Flame, CheckCircle2, ArrowUpDown
+  Navigation, Flame, CheckCircle2, ArrowUpDown, Globe
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
@@ -18,17 +18,24 @@ import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.
 import EventBookingModal from './events/EventBookingModal.tsx';
 import EventInteractiveCalendar from './events/EventInteractiveCalendar.tsx';
 import CreateEventWizardModal from './events/CreateEventWizardModal.tsx';
+import EventBuyerRegistrationModal from './events/EventBuyerRegistrationModal.tsx';
+import UserPurchasesModal from './events/UserPurchasesModal.tsx';
+import EventSeoSitemapModal from './events/EventSeoSitemapModal.tsx';
+import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
+import { MOCK_EVENTS } from '../data/mockData.ts';
 
 interface EventsTabProps {
   userProfile: any;
   eventsList: CommunityEvent[];
   setEventsList: React.Dispatch<React.SetStateAction<CommunityEvent[]>>;
   onAddBooking: (booking: Booking) => void;
-  onUpdateRole: (role: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin') => void;
+  onUpdateRole: (role: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin' | 'eventbuyers') => void;
   globalCommissionRate: number;
   onUpdateUserProfile?: (profile: any) => void;
+  onOpenLogin?: () => void;
+  initialOpenCreateWizard?: boolean;
 }
 
 export default function EventsTab({
@@ -38,25 +45,40 @@ export default function EventsTab({
   onAddBooking,
   onUpdateRole,
   globalCommissionRate,
-  onUpdateUserProfile
+  onUpdateUserProfile,
+  onOpenLogin,
+  initialOpenCreateWizard = false
 }: EventsTabProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'map' | 'calendar'>('list');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(eventsList[0]?.id || null);
 
+  // Guest / Event Buyer Registration and Account Purchases
+  const [showBuyerRegistrationModal, setShowBuyerRegistrationModal] = useState<boolean>(false);
+  const [buyerRegActionLabel, setBuyerRegActionLabel] = useState<string>('Book tickets and access digital passes');
+  const [pendingBookingEvent, setPendingBookingEvent] = useState<CommunityEvent | null>(null);
+  const [showUserPurchasesModal, setShowUserPurchasesModal] = useState<boolean>(false);
+  const [showSeoSitemapModal, setShowSeoSitemapModal] = useState<boolean>(false);
+
   // WooEvents state
   const [activeTicketModalBooking, setActiveTicketModalBooking] = useState<Booking | null>(null);
   const [activeTicketEvent, setActiveTicketEvent] = useState<CommunityEvent | null>(null);
   const [checkInStationEvent, setCheckInStationEvent] = useState<CommunityEvent | null>(null);
   const [bookingModalEvent, setBookingModalEvent] = useState<CommunityEvent | null>(null);
-  const [showCreateWizard, setShowCreateWizard] = useState<boolean>(false);
+  const [showCreateWizard, setShowCreateWizard] = useState<boolean>(initialOpenCreateWizard);
   const [myTickets, setMyTickets] = useState<Booking[]>([]);
   const [showMyTicketsDrawer, setShowMyTicketsDrawer] = useState<boolean>(false);
   const [organizerRoleAlertEvent, setOrganizerRoleAlertEvent] = useState<CommunityEvent | null>(null);
   const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('featured_nearby');
   const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
   const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialOpenCreateWizard) {
+      setShowCreateWizard(true);
+    }
+  }, [initialOpenCreateWizard]);
 
   // Parent GPS coordinates (default to userProfile or Bangalore/Central location)
   const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
@@ -86,6 +108,28 @@ export default function EventsTab({
       setCheckInStationEvent(evt);
     } else {
       setOrganizerRoleAlertEvent(evt);
+    }
+  };
+
+  const handleInitiateBooking = (evt: CommunityEvent) => {
+    if (!userProfile) {
+      setPendingBookingEvent(evt);
+      setBuyerRegActionLabel(`Book passes for "${evt.title}"`);
+      setShowBuyerRegistrationModal(true);
+      return;
+    }
+    setBookingModalEvent(evt);
+  };
+
+  const handleBuyerRegistrationSuccess = (buyerProfile: ChildProfile) => {
+    setShowBuyerRegistrationModal(false);
+    if (onUpdateUserProfile) {
+      onUpdateUserProfile(buyerProfile);
+    }
+    onUpdateRole('eventbuyers');
+    if (pendingBookingEvent) {
+      setBookingModalEvent(pendingBookingEvent);
+      setPendingBookingEvent(null);
     }
   };
 
@@ -674,10 +718,20 @@ export default function EventsTab({
   };
 
   // Filter and Sort events:
-  // 1. Calculate proximity distance from current user coordinates
-  // 2. Filter by category, query keywords, and optional radius
-  // 3. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
-  const filteredEvents = eventsList
+  // 1. Filter out dummy / fake / mock data for non-admin users (Admin-only mock data access)
+  // 2. Calculate proximity distance from current user coordinates
+  // 3. Filter by category, query keywords, and optional radius
+  // 4. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
+  const isAdmin = userProfile?.userRole === 'Admin';
+  const effectiveEvents = isAdmin
+    ? eventsList
+    : eventsList.filter(evt => {
+        const isMockId = evt.id?.startsWith('blr-event-') || evt.id?.startsWith('mock-');
+        const isMockTitle = MOCK_EVENTS.some(m => m.title.toLowerCase() === evt.title.toLowerCase());
+        return !isMockId && !isMockTitle;
+      });
+
+  const filteredEvents = effectiveEvents
     .map(evt => {
       const evtLat = evt.lat || 19.0760;
       const evtLng = evt.lng || 72.8777;
@@ -887,6 +941,37 @@ ${deepLink}`;
         </div>
       )}
 
+      {/* Public Visitor Welcome Banner */}
+      {!userProfile && (
+        <div id="events-public-guest-banner" className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-600 rounded-2xl p-4 text-white shadow-md flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/25">
+              <Sparkles className="w-5 h-5 text-amber-200" />
+            </div>
+            <div>
+              <div className="font-bold text-sm flex items-center gap-2">
+                <span>Public Events &amp; Classes Directory</span>
+                <span className="bg-white/25 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full">Open to Public • No Login Required</span>
+              </div>
+              <p className="text-xs text-orange-100 mt-0.5">
+                Explore community weekend workshops, sports academies, robotics sessions, and science championships across Bangalore. Instant ticket booking available!
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            id="btn-guest-register-buyer-banner"
+            onClick={() => {
+              setBuyerRegActionLabel('Sign up to buy tickets & receive digital passes');
+              setShowBuyerRegistrationModal(true);
+            }}
+            className="px-4 py-2 bg-white hover:bg-orange-50 text-orange-600 font-extrabold text-xs rounded-xl shadow-md shrink-0 transition cursor-pointer"
+          >
+            🎟️ Quick Buyer Sign-Up
+          </button>
+        </div>
+      )}
+
       {/* Tab Header Description */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -947,8 +1032,9 @@ ${deepLink}`;
           <button
             id="btn-my-event-passes"
             type="button"
-            onClick={() => setShowMyTicketsDrawer(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+            onClick={() => setShowUserPurchasesModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            title="View your booked event tickets & passes"
           >
             <Wallet className="w-3.5 h-3.5 text-orange-400" />
             <span>My Passes</span>
@@ -957,6 +1043,21 @@ ${deepLink}`;
                 {myTickets.length}
               </span>
             )}
+          </button>
+
+          {/* Google SEO & Sitemap Portal Button */}
+          <button
+            id="btn-events-seo-sitemap"
+            type="button"
+            onClick={() => setShowSeoSitemapModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border border-blue-700/60"
+            title="View SEO URLs, Canonical Slugs & Ping Google Search Sitemap"
+          >
+            <Globe className="w-3.5 h-3.5 text-blue-400" />
+            <span>Google SEO</span>
+            <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+              Sitemap
+            </span>
           </button>
 
           {/* Dynamic Search Input Bar */}
@@ -1158,7 +1259,7 @@ ${deepLink}`;
             setSelectedEventId(evt.id);
             setViewMode('list');
           }}
-          onBookEvent={(evt) => setBookingModalEvent(evt)}
+          onBookEvent={(evt) => handleInitiateBooking(evt)}
         />
       ) : viewMode === 'list' ? (
         /* List / Grid View layout */
@@ -1260,6 +1361,31 @@ ${deepLink}`;
                     )}
 
                     <h4 id={`event-title-${evt.id}`} className="font-bold text-slate-800 font-serif text-sm leading-snug">{evt.title}</h4>
+
+                    {/* Google SEO Clean URL with title & type */}
+                    <div className="flex items-center justify-between gap-1 text-[10px] text-slate-500 bg-blue-50/60 border border-blue-100 rounded-lg px-2 py-1">
+                      <div className="flex items-center gap-1 truncate">
+                        <Globe className="w-3 h-3 text-blue-500 shrink-0" />
+                        <span className="font-mono text-[9px] text-blue-900 truncate">
+                          /events/{normalizeEventType(evt.category, evt.itemCategoryType)}/{slugifyEventTitle(evt.title)}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const directUrl = getEventDirectUrl(evt);
+                          navigator.clipboard.writeText(directUrl);
+                          setCopiedEventId(evt.id);
+                          setTimeout(() => setCopiedEventId(null), 2000);
+                        }}
+                        className="text-[9px] font-bold text-blue-600 hover:text-blue-800 shrink-0 cursor-pointer px-1 py-0.5 rounded bg-white border border-blue-200"
+                        title="Copy clean Google-indexed SEO URL"
+                      >
+                        {copiedEventId === evt.id ? 'Copied ✓' : 'SEO Link'}
+                      </button>
+                    </div>
+
                     <p id={`event-desc-${evt.id}`} className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
                       {evt.description}
                     </p>
@@ -1302,10 +1428,57 @@ ${deepLink}`;
                         <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate text-slate-700">{evt.location}</span>
                       </div>
-                      <div className="flex items-center gap-1.5">
-                        <CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="text-slate-700">{evt.date} at {evt.time}</span>
+                      <div className="flex items-start gap-1.5">
+                        <CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
+                        <div className="text-slate-700 leading-tight">
+                          {evt.startDate ? (
+                            <span>
+                              <strong className="text-slate-900 font-semibold">Start:</strong> {evt.startDate}
+                              {evt.endDate && evt.endDate !== evt.startDate && (
+                                <> • <strong className="text-slate-900 font-semibold">End:</strong> {evt.endDate}</>
+                              )}
+                              {evt.time && ` • ${evt.time}`}
+                            </span>
+                          ) : (
+                            <span>{evt.date} at {evt.time}</span>
+                          )}
+                        </div>
                       </div>
+
+                      {/* Delivery Mode & Google Chat/Meet link */}
+                      {evt.deliveryMode === 'Virtual' && (
+                        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[10px]">
+                          <span className="font-bold flex items-center gap-1">
+                            💻 Virtual {evt.itemCategoryType || 'Class'}
+                          </span>
+                          {evt.googleChatLink ? (
+                            <a 
+                              href={evt.googleChatLink} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              onClick={(e) => e.stopPropagation()}
+                              className="text-emerald-700 hover:text-emerald-900 font-black underline flex items-center gap-1"
+                            >
+                              Open Google Meet/Chat <ExternalLink className="w-3 h-3" />
+                            </a>
+                          ) : (
+                            <span className="text-emerald-600 font-semibold">Link sent on registration</span>
+                          )}
+                        </div>
+                      )}
+
+                      {evt.itemCategoryType && evt.itemCategoryType !== 'Event' && (
+                        <div className="flex items-center gap-1 text-[10px]">
+                          <span className="font-bold text-slate-500">Type:</span>
+                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-bold rounded-md uppercase tracking-wider text-[9px]">
+                            {evt.itemCategoryType}
+                          </span>
+                          {evt.subjectTaught && (
+                            <span className="text-slate-600 font-medium">({evt.subjectTaught})</span>
+                          )}
+                        </div>
+                      )}
+
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                           <PersonStanding className="w-3.5 h-3.5 text-slate-400 shrink-0" />
@@ -1373,7 +1546,7 @@ ${deepLink}`;
                         {/* WooEvents Multi-Tier Ticket Booking Modal */}
                         <button
                           id={`btn-event-book-${evt.id}`}
-                          onClick={() => setBookingModalEvent(evt)}
+                          onClick={() => handleInitiateBooking(evt)}
                           type="button"
                           className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-xl text-[10px] font-bold transition shadow-xs flex items-center gap-1 active:scale-95 cursor-pointer"
                         >
@@ -1393,19 +1566,35 @@ ${deepLink}`;
               <Search className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-800 font-serif text-base">No matching playground meets found</h4>
+              <h4 className="font-bold text-slate-800 font-serif text-base">
+                {searchQuery ? 'No matching events found' : 'No verified events, classes or activities published yet'}
+              </h4>
               <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                We couldn't find any meetups or learning packages matching "{searchQuery}" under the category "{categoryFilter}". Try toggling category filters.
+                {searchQuery 
+                  ? `We couldn't find any listings matching "${searchQuery}".` 
+                  : 'Be the first organizer or teacher to host an event, physical or virtual class, or community activity!'}
               </p>
             </div>
-            <button
-              id="btn-reset-event-filter"
-              type="button"
-              onClick={() => { setSearchQuery(''); setCategoryFilter('All'); }}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition active:scale-95"
-            >
-              Examine All Classes & Events
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2.5">
+              {searchQuery && (
+                <button
+                  id="btn-reset-event-filter"
+                  type="button"
+                  onClick={() => { setSearchQuery(''); setCategoryFilter('All'); }}
+                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer"
+                >
+                  Clear Filters
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowCreateWizard(true)}
+                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Host Event / Classes / Activity</span>
+              </button>
+            </div>
           </div>
         )
       ) : (
@@ -2420,16 +2609,60 @@ ${deepLink}`;
             {/* Footer */}
             <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-between items-center text-xs">
               <span className="text-slate-500">{myTickets.length} ticket(s) in wallet</span>
-              <button
-                onClick={() => setShowMyTicketsDrawer(false)}
-                className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition-colors"
-              >
-                Close Wallet
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setShowMyTicketsDrawer(false);
+                    setShowUserPurchasesModal(true);
+                  }}
+                  className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold rounded-xl transition-colors border border-orange-200 cursor-pointer"
+                >
+                  Full Order Ledger
+                </button>
+                <button
+                  onClick={() => setShowMyTicketsDrawer(false)}
+                  className="px-4 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold rounded-xl transition-colors cursor-pointer"
+                >
+                  Close Wallet
+                </button>
+              </div>
             </div>
 
           </div>
         </div>
+      )}
+
+      {/* Guest & Public Ticket Buyer Quick Registration Modal */}
+      {showBuyerRegistrationModal && (
+        <EventBuyerRegistrationModal
+          actionLabel={buyerRegActionLabel}
+          onClose={() => {
+            setShowBuyerRegistrationModal(false);
+            setPendingBookingEvent(null);
+          }}
+          onSuccess={(buyer) => handleBuyerRegistrationSuccess(buyer)}
+          onSwitchToLogin={() => {
+            setShowBuyerRegistrationModal(false);
+            if (onOpenLogin) onOpenLogin();
+          }}
+        />
+      )}
+
+      {/* User Event Purchases & Verified Digital Passes Ledger Modal */}
+      {showUserPurchasesModal && (
+        <UserPurchasesModal
+          userProfile={userProfile}
+          onClose={() => setShowUserPurchasesModal(false)}
+        />
+      )}
+
+      {/* Google SEO & XML Sitemap Engine Modal */}
+      {showSeoSitemapModal && (
+        <EventSeoSitemapModal
+          isOpen={showSeoSitemapModal}
+          onClose={() => setShowSeoSitemapModal(false)}
+          events={eventsList}
+        />
       )}
     </div>
   );

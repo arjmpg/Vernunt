@@ -8,6 +8,7 @@ import {
 import confetti from 'canvas-confetti';
 import { sendEventBookingNotifications, NotificationStatus } from '../../utils/notifications.ts';
 import { attributeAffiliateBooking } from '../../utils/affiliate.ts';
+import { saveEventPurchase } from '../../data/eventPurchases.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -172,6 +173,25 @@ export default function EventBookingModal({
 
     setCreatedBooking(newBooking);
     onBookingSuccess(newBooking);
+    
+    // Save to user event purchases ledger for immediate account dashboard access
+    saveEventPurchase({
+      eventId: event.id,
+      eventTitle: event.title,
+      eventType: event.category || 'Event Activity',
+      eventDate: event.date,
+      eventTime: selectedTimeSlot || event.time,
+      eventLocation: event.location,
+      ticketTierName: selectedTier?.name || 'General Pass',
+      ticketQuantity: quantity,
+      ticketPrice: unitPrice,
+      totalPaid: finalTotal,
+      buyerName: buyerName || userProfile?.parentName || 'Event Attendee',
+      buyerPhone: buyerPhone || userProfile?.phoneNumber || '+91 9876543210',
+      buyerEmail: buyerEmail || userProfile?.email || 'attendee@vernunt.com',
+      buyerRole: userProfile?.userRole || 'eventbuyers'
+    });
+
     setStep('confirmed');
 
     // Automatically trigger instant Email and SMS notification delivery

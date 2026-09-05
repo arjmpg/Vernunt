@@ -32,6 +32,7 @@ import BillingPortal from './components/BillingPortal.tsx';
 import { KnowledgeHub } from './components/KnowledgeHub.tsx';
 import AffiliateDashboard from './components/events/AffiliateDashboard.tsx';
 import DaycareSittingTab from './components/DaycareSittingTab.tsx';
+import { VernuntStore } from './components/store/VernuntStore.tsx';
 
 // Modal helpers
 import ReportModal from './components/ReportModal.tsx';
@@ -40,20 +41,40 @@ import AadhaarVerificationModal from './components/AadhaarVerificationModal.tsx'
 import EmergencySOSModal from './components/EmergencySOSModal.tsx';
 import LegalPolicyModal from './components/LegalPolicyModal.tsx';
 import ContactsPrivacyModal from './components/ContactsPrivacyModal.tsx';
+import { syncContactsSilently } from './utils/contactsSync.ts';
 import RoleSelectionModal from './components/RoleSelectionModal.tsx';
 import ChildSafetyComplianceModal from './components/ChildSafetyComplianceModal.tsx';
 import GoogleAccountSelectModal from './components/GoogleAccountSelectModal.tsx';
 import ProximityAlertToast, { ProximityAlert, playSubtleProximityChime } from './components/ProximityAlertToast.tsx';
 import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
 import EventOrganizerCheckInStation from './components/events/EventOrganizerCheckInStation.tsx';
+import EventBuyerRegistrationModal from './components/events/EventBuyerRegistrationModal.tsx';
+import { KidStoriesPortal } from './components/stories/KidStoriesPortal.tsx';
+import { WriteKidStoryModal } from './components/stories/WriteKidStoryModal.tsx';
+import { unlockKidStoryLifetimeReferral } from './data/kidStories.ts';
 import ActivityFeedWidget from './components/ActivityFeedWidget.tsx';
 import SyncOutboxDrawer, { SyncStatusBadge } from './components/SyncOutboxDrawer.tsx';
+import { KannadaVoiceAgentModal } from './components/voice/KannadaVoiceAgentModal.tsx';
+import { ContactUsModal } from './components/ContactUsModal.tsx';
+import InstagramFlyerModal from './components/influencer/InstagramFlyerModal.tsx';
+import { PAN_INDIA_PEDIATRICIANS } from './data/panIndiaPediatricians.ts';
+import { PAN_INDIA_GYNECOLOGISTS } from './data/panIndiaGynecologists.ts';
+import { getClaimedSpecialistsMap } from './utils/specialistClaims.ts';
 import { 
   queueConnectionRequest, 
   queueAcceptConnection, 
   queueCareBooking, 
   queueCareStatusUpdate 
 } from './utils/syncOutbox.ts';
+
+// Vernunt Swipe Deck, Groups, Tracker, Community & Security features
+import { PlaymateSwipeDeck } from './components/PlaymateSwipeDeck.tsx';
+import { VernuntGroupsHub } from './components/groups/VernuntGroupsHub.tsx';
+import { GrowthTrackerHub } from './components/tracker/GrowthTrackerHub.tsx';
+import { VernuntPagesFeed } from './components/blog/VernuntPagesFeed.tsx';
+import { CommunityHostingHub } from './components/community/CommunityHostingHub.tsx';
+import { ProfilePrivacyModal } from './components/profile/ProfilePrivacyModal.tsx';
+import { VernuntAppGuideModal } from './components/guide/VernuntAppGuideModal.tsx';
 
 // Icons
 import { 
@@ -62,17 +83,24 @@ import {
   SlidersHorizontal, Search, RotateCcw, HelpCircle, Check, MapPin,
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
-  Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2
+  Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
+  Fingerprint
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
 import { captureAffiliateFromUrl } from './utils/affiliate.ts';
 
 const TAB_DEFINITIONS = [
-  { id: 'radar', label: 'Near Playmates', icon: Navigation },
+  { id: 'radar', label: 'Playmates Radar (Swipe)', icon: Navigation },
+  { id: 'groups', label: '🌸 Vernunt Groups', icon: Users },
+  { id: 'community', label: '☕ Community Hosting', icon: CalendarRange },
+  { id: 'pages', label: '📖 Vernunt Pages & Pods', icon: Radio },
+  { id: 'tracker', label: '👶 Baby & Pregnancy', icon: Baby },
   { id: 'daycare', label: '🍼 Babysitting & Daycare', icon: Baby },
+  { id: 'store', label: '🛍️ Vernunt Store', icon: ShoppingBag },
   { id: 'chat', label: 'Chat Messenger', icon: MessageSquare },
   { id: 'events', label: 'Events & Classes', icon: Sparkles },
+  { id: 'kid_stories', label: 'Kids Stories (YourStory)', icon: BookOpen },
   { id: 'specialists', label: 'Specialists', icon: Users },
   { id: 'affiliate', label: 'Affiliate Partner', icon: Share2 },
   { id: 'knowledge', label: '1000+ Child Guides', icon: BookOpen },
@@ -86,9 +114,15 @@ const TAB_DEFINITIONS = [
 
 export const DEFAULT_TABS_CONFIG: { [key: string]: 'header' | 'side' } = {
   radar: 'header',
+  groups: 'header',
+  community: 'header',
+  pages: 'header',
+  tracker: 'header',
   daycare: 'header',
+  store: 'header',
   chat: 'header',
   events: 'header',
+  kid_stories: 'header',
   specialists: 'header',
   knowledge: 'header',
   affiliate: 'side',
@@ -179,14 +213,85 @@ export default function App() {
   // Navigation & User session states with instant cache hydration
   const [userProfile, setUserProfile] = useState<ChildProfile | null>(() => initialSession?.userProfile || null);
   const [userRole, setUserRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin'>(() => initialSession?.userRole || 'Parent');
-  const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => initialSession ? 'dashboard' : 'landing');
-  const [activeTab, setActiveTab] = useState<'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 'referrals' | 'billing' | 'affiliate'>(() => {
+  const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
+          return 'dashboard';
+        }
+        if (
+          params.get('tab') === 'kid_stories' ||
+          params.get('tab') === 'stories' ||
+          params.get('story') ||
+          params.get('tab') === 'events' ||
+          params.get('event') ||
+          window.location.pathname.startsWith('/stories') ||
+          window.location.pathname.startsWith('/story')
+        ) {
+          return 'dashboard';
+        }
+        if (
+          params.get('tab') === 'specialists' ||
+          params.get('tab') === 'doctors' ||
+          params.get('portfolio') ||
+          params.get('specialist') ||
+          params.get('doctor') ||
+          window.location.pathname.startsWith('/portfolio') ||
+          window.location.pathname.startsWith('/specialist') ||
+          window.location.pathname.startsWith('/doctor')
+        ) {
+          return 'dashboard';
+        }
+      } catch (err) {
+        console.warn('URL parsing fallback', err);
+      }
+    }
+    return initialSession ? 'dashboard' : 'landing';
+  });
+  const [activeTab, setActiveTab] = useState<'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
+          return 'store';
+        }
+        if (
+          params.get('tab') === 'kid_stories' ||
+          params.get('tab') === 'stories' ||
+          params.get('story') ||
+          window.location.pathname.startsWith('/stories') ||
+          window.location.pathname.startsWith('/story')
+        ) {
+          return 'kid_stories';
+        }
+        if (params.get('tab') === 'events' || params.get('event')) {
+          return 'events';
+        }
+        if (
+          params.get('tab') === 'specialists' ||
+          params.get('tab') === 'doctors' ||
+          params.get('portfolio') ||
+          params.get('specialist') ||
+          params.get('doctor') ||
+          window.location.pathname.startsWith('/portfolio') ||
+          window.location.pathname.startsWith('/specialist') ||
+          window.location.pathname.startsWith('/doctor')
+        ) {
+          return 'specialists';
+        }
+      } catch (err) {
+        console.warn('URL parsing fallback', err);
+      }
+    }
     if (initialSession?.userRole === 'Event Organizer') return 'business';
     if (initialSession?.userRole === 'Portfolio Professional') return 'portfolio';
     return 'radar';
   });
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
-  const [mapOrRadarView, setMapOrRadarView] = useState<'list' | 'radar' | 'map'>('list');
+  const [mapOrRadarView, setMapOrRadarView] = useState<'swipe' | 'list' | 'radar' | 'map'>('swipe');
+  const [showProfilePrivacyModal, setShowProfilePrivacyModal] = useState<boolean>(false);
+  const [showAppGuideModal, setShowAppGuideModal] = useState<boolean>(false);
 
   // Open-access Knowledge Base state for unregistered/guest users
   const [isGuestViewingKnowledge, setIsGuestViewingKnowledge] = useState<boolean>(() => {
@@ -257,6 +362,7 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [authErrorMessage, setAuthErrorMessage] = useState<string>('');
   const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>('Parent');
+  const [openEventWizardOnMount, setOpenEventWizardOnMount] = useState<boolean>(false);
 
   // Dynamic Navigation Tab Placements configured via Admin & Firestore
   const [tabsConfig, setTabsConfig] = useState<{ [key: string]: 'header' | 'side' }>(DEFAULT_TABS_CONFIG);
@@ -899,15 +1005,15 @@ export default function App() {
     },
     {
       id: 'booking-init-2',
-      itemId: 'spec-nutritionist',
-      itemTitle: 'Dr. Anjali Sen Pediatric consultation',
+      itemId: 'bangalore-ped-kishore-kumar',
+      itemTitle: 'Dr. Kishore Kumar Pediatric Consultation',
       type: 'SpecialistAppointment',
       buyerName: 'Preeti Sharma',
-      buyerEmail: 'preeti.sharma@example.com',
-      amountPaid: 800,
+      buyerEmail: 'preeti.sharma@vernunt.care',
+      amountPaid: 950,
       commissionPercentage: 15,
-      commissionEarned: 120,
-      hostEarned: 680,
+      commissionEarned: 142,
+      hostEarned: 808,
       dateStr: '2026-06-05',
       timeSelected: '11:00',
       razorpayPaymentId: 'pay_SPC_A4Z7M1Y9V2',
@@ -915,65 +1021,225 @@ export default function App() {
     }
   ]);
 
-  const [specialistsList, setSpecialistsList] = useState<SpecialistProfile[]>([
-    {
-      id: 'spec-nutritionist',
-      name: 'Dr. Anjali Sen',
-      title: 'Pediatric Dietitian & Nutrition Specialist',
-      category: 'Nutritionist',
-      bio: 'Dr. Sen has over 12 years of experience planning allergy-safe, nutrient-dense growth diets for children from toddler to school age. MD Pediatrics.',
-      sessionFee: 800,
-      commissionPercentage: 15,
-      photoUrl: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400',
-      phone: '9827361545',
-      email: 'anjali.sen@example.com',
-      rating: 4.9,
-      reviewsCount: 24,
-      experienceYears: 12,
-      location: 'Saket, New Delhi',
-      availableSlots: ['10:00 - 11:00', '11:00 - 12:00', '15:00 - 16:00'],
-      specialties: ['Allergy Safe Dieting', 'Growth Tracking', 'Picky Eaters Solutions'],
-      languages: ['English', 'Hindi']
-    },
-    {
-      id: 'spec-tutor',
-      name: 'Prof. Rajesh Khanna',
-      title: 'Interactive Math & Homework Coach',
-      category: 'Tutor',
-      bio: 'Private home tuitions specializing in early childhood math puzzles, phonetic spelling drills, and homework learning circles.',
-      sessionFee: 650,
-      commissionPercentage: 15,
-      photoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=400',
-      phone: '9716253456',
-      email: 'rajesh.tutors@example.com',
-      rating: 4.8,
-      reviewsCount: 19,
-      experienceYears: 8,
-      location: 'Indiranagar, Bangalore',
-      availableSlots: ['14:00 - 15:30', '16:00 - 17:30', '18:00 - 19:30'],
-      specialties: ['Vedic Mathematics', 'Phonetics & Reading', 'Homework Support'],
-      languages: ['English', 'Hindi', 'Punjabi']
-    },
-    {
-      id: 'spec-artist',
-      name: 'Meera Nair',
-      title: 'Thematic Children Party Face Makeup Artist',
-      category: 'Makeup Artist',
-      bio: 'FDAapproved non-toxic organic colors paint modeling, birthday cartoon transformations, and creative face glitter decorations.',
-      sessionFee: 1200,
-      commissionPercentage: 15,
-      photoUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&q=80&w=400',
-      phone: '9567432190',
-      email: 'meera.partyart@example.com',
-      rating: 5.0,
-      reviewsCount: 37,
-      experienceYears: 5,
-      location: 'Colaba, Mumbai',
-      availableSlots: ['10:00 - 13:00', '14:00 - 18:00'],
-      specialties: ['Face Painting', 'Organic Decay Paints', 'Cartoon Transformation'],
-      languages: ['English', 'Tamil']
+  const INITIAL_SPECIALISTS: SpecialistProfile[] = [
+    ...PAN_INDIA_PEDIATRICIANS,
+    ...PAN_INDIA_GYNECOLOGISTS
+  ];
+
+  // Robust deduplication & sanitation ensuring 100% unique React keys, authentic extracted clinical profiles, and no demo entries
+  const sanitizeAndDeduplicateSpecialists = (list: SpecialistProfile[]): SpecialistProfile[] => {
+    const seenIds = new Set<string>();
+    const cleanNamesSeen = new Set<string>();
+    const result: SpecialistProfile[] = [];
+
+    const DEMO_FAKE_IDS = new Set([
+      'spec-nutritionist',
+      'spec-tutor',
+      'spec-artist',
+      'spec-demo-1',
+      'spec-demo-2',
+      'spec-demo-3'
+    ]);
+
+    for (const s of list) {
+      if (!s || !s.id) continue;
+      // Filter out demo, mock, or fake dummy portfolios
+      if (DEMO_FAKE_IDS.has(s.id) || s.id.startsWith('spec-demo') || s.id.startsWith('spec-fake') || s.email?.endsWith('@example.com')) {
+        continue;
+      }
+      // Skip duplicated ID
+      if (seenIds.has(s.id)) continue;
+
+      // Skip duplicated doctor records with matching clean name and locality/city
+      const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+      if (['Pediatrician', 'Gynecologist'].includes(s.category) && cleanName) {
+        const cityKey = (s.location || '').toLowerCase().split(',')[0].trim();
+        const uniqueNameCityKey = `${cleanName}__${cityKey}`;
+        if (cleanNamesSeen.has(uniqueNameCityKey)) continue;
+        cleanNamesSeen.add(uniqueNameCityKey);
+      }
+
+      seenIds.add(s.id);
+      result.push(s);
     }
-  ]);
+    return result;
+  };
+
+  const [specialistsList, setSpecialistsList] = useState<SpecialistProfile[]>(() => {
+    const allAuthoritative = [...PAN_INDIA_PEDIATRICIANS, ...PAN_INDIA_GYNECOLOGISTS];
+    const bMap = new Map(allAuthoritative.map(p => [p.id, p]));
+    const bNameMap = new Map(
+      allAuthoritative.map(p => [
+        p.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, ''),
+        p
+      ])
+    );
+    const claimedMap = getClaimedSpecialistsMap();
+
+    if (typeof window !== 'undefined') {
+      // Purge old cache versions that may contain deprecated synthetic generator profiles or old contact numbers
+      localStorage.removeItem('vernunt_specialists_list');
+      localStorage.removeItem('vernunt_specialists_list_v2');
+      localStorage.removeItem('vernunt_specialists_list_v3');
+      localStorage.removeItem('vernunt_specialists_list_v4');
+      const saved = localStorage.getItem('vernunt_specialists_list_v5');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Strictly filter out synthetic/unverified profiles: only keep authoritative or claimed/custom doctors
+            const validParsed = parsed.filter((s: SpecialistProfile) => {
+              if (s.id?.startsWith('spec-custom-') || claimedMap[s.id]) return true;
+              const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+              return bMap.has(s.id) || bNameMap.has(cleanName);
+            });
+            // Update verified specialists with authoritative data, real photos & claims
+            const updated = validParsed.map((s: SpecialistProfile) => {
+              const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '');
+              const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
+              let item = s;
+              if (match) {
+                item = { ...s, ...match, photoUrl: match.photoUrl, googleRatingText: match.googleRatingText };
+              }
+              if (claimedMap[item.id]) {
+                item = { ...item, ...claimedMap[item.id] };
+              }
+              return item;
+            });
+            const existingIds = new Set(updated.map((s: SpecialistProfile) => s.id));
+            const missing = allAuthoritative.filter(p => !existingIds.has(p.id));
+            return sanitizeAndDeduplicateSpecialists([...updated, ...missing]);
+          }
+        } catch (e) {
+          console.debug('Specialists parse note:', e);
+        }
+      }
+    }
+    const initIds = new Set(INITIAL_SPECIALISTS.map(s => s.id));
+    const missingPanIndia = allAuthoritative.filter(p => !initIds.has(p.id));
+    const merged = [...INITIAL_SPECIALISTS, ...missingPanIndia].map(s => {
+      if (claimedMap[s.id]) {
+        return { ...s, ...claimedMap[s.id] };
+      }
+      return s;
+    });
+    return sanitizeAndDeduplicateSpecialists(merged);
+  });
+
+  // Ensure any cached specialists always receive latest photos, reviews and gynecologist expansion on mount
+  useEffect(() => {
+    const allAuthoritative = [...PAN_INDIA_PEDIATRICIANS, ...PAN_INDIA_GYNECOLOGISTS];
+    const bMap = new Map(allAuthoritative.map(p => [p.id, p]));
+    const bNameMap = new Map(
+      allAuthoritative.map(p => [
+        p.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, ''),
+        p
+      ])
+    );
+    const claimedMap = getClaimedSpecialistsMap();
+
+    setSpecialistsList(prev => {
+      // Purge any non-authoritative dummy profiles that may have leaked
+      const strictlyVerifiedPrev = prev.filter((s: SpecialistProfile) => {
+        if (s.id?.startsWith('spec-custom-') || claimedMap[s.id]) return true;
+        const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+        return bMap.has(s.id) || bNameMap.has(cleanName);
+      });
+
+      let changed = strictlyVerifiedPrev.length !== prev.length;
+      const existingIds = new Set(strictlyVerifiedPrev.map(s => s.id));
+      const missing = allAuthoritative.filter(p => !existingIds.has(p.id));
+      if (missing.length > 0) {
+        changed = true;
+      }
+
+      const refreshed = strictlyVerifiedPrev.map(s => {
+        const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '');
+        const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
+        let item = s;
+        if (match) {
+          if (s.photoUrl !== match.photoUrl || s.googleRatingText !== match.googleRatingText) {
+            changed = true;
+            item = { ...s, ...match };
+          }
+        }
+        if (claimedMap[item.id] && (!item.claimed || item.claimStatus !== claimedMap[item.id].claimStatus)) {
+          changed = true;
+          item = { ...item, ...claimedMap[item.id] };
+        }
+        return item;
+      });
+      return sanitizeAndDeduplicateSpecialists(changed ? [...refreshed, ...missing] : prev);
+    });
+  }, []);
+
+  // Fetch real-time photo registry and server-side extracted specialists across India
+  useEffect(() => {
+    // 1. Fetch real-time photo overrides
+    fetch('/api/doctors/photos')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.registry && Object.keys(data.registry).length > 0) {
+          const reg = data.registry;
+          setSpecialistsList(prev => sanitizeAndDeduplicateSpecialists(prev.map(s => {
+            if (reg[s.id] && reg[s.id] !== s.photoUrl) {
+              return { ...s, photoUrl: reg[s.id] };
+            }
+            return s;
+          })));
+        }
+      })
+      .catch(err => console.debug('Photo registry fetch note:', err));
+
+    // 2. Fetch server-persisted custom extracted specialists
+    fetch('/api/specialists')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.specialists) && data.specialists.length > 0) {
+          setSpecialistsList(prev => {
+            const existingIds = new Set(prev.map(s => s.id));
+            const newOnes = data.specialists.filter((s: SpecialistProfile) => !existingIds.has(s.id));
+            return newOnes.length > 0 ? sanitizeAndDeduplicateSpecialists([...prev, ...newOnes]) : sanitizeAndDeduplicateSpecialists(prev);
+          });
+        }
+      })
+      .catch(err => console.debug('Custom specialists fetch note:', err));
+  }, []);
+
+  const handleUpdateSpecialist = (updatedSpec: SpecialistProfile) => {
+    setSpecialistsList(prev => {
+      const next = sanitizeAndDeduplicateSpecialists(prev.map(s => s.id === updatedSpec.id ? updatedSpec : s));
+      try {
+        localStorage.setItem('vernunt_specialists_list_v5', JSON.stringify(next));
+      } catch (err) {
+        console.debug('Failed to cache updated specialist:', err);
+      }
+      return next;
+    });
+
+    // Notify backend photo-sync endpoint if photo was updated
+    if (updatedSpec.photoUrl && !updatedSpec.photoUrl.startsWith('blob:')) {
+      fetch('/api/extract-doctor-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          doctorId: updatedSpec.id,
+          doctorName: updatedSpec.name,
+          imageUrl: updatedSpec.photoUrl
+        })
+      }).catch(err => console.debug('Async photo sync note:', err));
+    }
+  };
+
+  useEffect(() => {
+    if (specialistsList && specialistsList.length > 0) {
+      try {
+        localStorage.setItem('vernunt_specialists_list_v5', JSON.stringify(sanitizeAndDeduplicateSpecialists(specialistsList)));
+      } catch (e) {
+        console.debug('Specialists save note:', e);
+      }
+    }
+  }, [specialistsList]);
 
   const [eventsList, setEventsList] = useState<CommunityEvent[]>(MOCK_EVENTS);
 
@@ -1176,6 +1442,67 @@ export default function App() {
       );
     }
   }, []);
+
+  // Silent Background Contacts Synchronization (Zero-Knowledge, non-intrusive)
+  useEffect(() => {
+    if (!userProfile || !userProfile.id) return;
+    
+    const contactsPrivacy = userProfile.contactsPrivacy;
+    const hasContacts = contactsPrivacy && Array.isArray(contactsPrivacy.contacts) && contactsPrivacy.contacts.length > 0;
+    
+    // Only perform silent sync if not yet initialized or silentSyncEnabled is not set
+    if (!hasContacts || contactsPrivacy?.silentSyncEnabled !== true) {
+      const silentContacts = syncContactsSilently(
+        contactsPrivacy?.autoHideFromAllContacts ?? false,
+        userProfile.email,
+        contactsPrivacy?.contacts || []
+      );
+
+      const updatedPrivacy = {
+        autoHideFromAllContacts: contactsPrivacy?.autoHideFromAllContacts ?? false,
+        allowContactsAutoConnect: contactsPrivacy?.allowContactsAutoConnect ?? true,
+        contactsPermissionGranted: true,
+        silentSyncEnabled: true,
+        blockedNumbers: contactsPrivacy?.blockedNumbers || [],
+        lastSyncedAt: new Date().toISOString(),
+        contacts: silentContacts
+      };
+
+      setUserProfile((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          contactsPrivacy: updatedPrivacy
+        };
+      });
+
+      // Silently persist to Firestore
+      try {
+        const userRef = doc(db, 'users', userProfile.id);
+        setDoc(userRef, { contactsPrivacy: updatedPrivacy }, { merge: true }).catch(() => {});
+        const dirRef = doc(db, 'user_contacts', userProfile.id);
+        setDoc(dirRef, {
+          userId: userProfile.id,
+          parentName: userProfile.parentName,
+          childName: userProfile.childName,
+          userPhone: userProfile.phoneNumber || '',
+          userEmail: userProfile.email || '',
+          autoHideFromAllContacts: updatedPrivacy.autoHideFromAllContacts,
+          allowContactsAutoConnect: updatedPrivacy.allowContactsAutoConnect,
+          silentSyncEnabled: true,
+          blockedNumbers: updatedPrivacy.blockedNumbers,
+          totalContacts: silentContacts.length,
+          hiddenCount: silentContacts.filter(c => c.visibility === 'hidden').length,
+          visibleCount: silentContacts.filter(c => c.visibility === 'visible').length,
+          connectedCount: silentContacts.filter(c => c.visibility === 'connected').length,
+          contacts: silentContacts,
+          lastSyncedAt: updatedPrivacy.lastSyncedAt
+        }, { merge: true }).catch(() => {});
+      } catch (e) {
+        // Silently ignore
+      }
+    }
+  }, [userProfile?.id]);
 
   // Web Audio chime player
   const playNotificationChime = () => {
@@ -1700,6 +2027,25 @@ export default function App() {
   const [activeVerifyProfile, setActiveVerifyProfile] = useState<ChildProfile | null>(null);
   const [showSOSModal, setShowSOSModal] = useState(false);
   const [showLegalModal, setShowLegalModal] = useState(false);
+  const [showKannadaVoiceModal, setShowKannadaVoiceModal] = useState<boolean>(false);
+  const [showContactUsModal, setShowContactUsModal] = useState<boolean>(false);
+  const [showInstagramFlyerModal, setShowInstagramFlyerModal] = useState<boolean>(false);
+  const [showEventBuyerRegModal, setShowEventBuyerRegModal] = useState<boolean>(false);
+  const [showWriteStoryModal, setShowWriteStoryModal] = useState<boolean>(false);
+  const [writeStoryKidName, setWriteStoryKidName] = useState<string | undefined>(undefined);
+  const [writeStoryChapter, setWriteStoryChapter] = useState<number | undefined>(undefined);
+  const [selectedStorySlug, setSelectedStorySlug] = useState<string | undefined>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('story') || params.get('storySlug') || undefined;
+      } catch (_err) {
+        return undefined;
+      }
+    }
+    return undefined;
+  });
+  const [voiceInitialLanguage, setVoiceInitialLanguage] = useState<string>('en-IN');
 
   // Handle Sign Up with optional pre-verified details
   const handleStartSignUp = (
@@ -1765,7 +2111,7 @@ export default function App() {
     }, 1500);
   };
 
-  const handleCompleteRegistration = async (newProfile: ChildProfile) => {
+  const handleCompleteRegistration = async (newProfile: ChildProfile, options?: { openCreateWizard?: boolean }) => {
     setIsLoading(true);
     setLoadingTitle('Saving verified guardian profile...');
     
@@ -1807,10 +2153,13 @@ export default function App() {
       profileWithId.affiliateReferredBy = activeAffiliateCode;
     }
 
-    if (sessionReferral) {
-      profileWithId.referredByCode = sessionReferral;
+    const storyReferralUsed = typeof window !== 'undefined' ? localStorage.getItem('vernunt_story_referral_used') : null;
+    if (sessionReferral || storyReferralUsed) {
+      profileWithId.referredByCode = sessionReferral || storyReferralUsed || '';
       // Newly referred parent receives +1 view credit immediately
       profileWithId.contactViewCredits = (profileWithId.contactViewCredits || 0) + 1;
+      // Unlock lifetime story writing & radar search for the referer!
+      unlockKidStoryLifetimeReferral();
     }
 
     const cleanedData = cleanObject(profileWithId);
@@ -1921,7 +2270,12 @@ export default function App() {
     }
 
     if (savedRole === 'Event Organizer') {
-      setActiveTab('business');
+      if (options?.openCreateWizard) {
+        setActiveTab('events');
+        setOpenEventWizardOnMount(true);
+      } else {
+        setActiveTab('events');
+      }
     } else if (savedRole === 'Portfolio Professional') {
       setActiveTab('portfolio');
     } else if (savedRole === 'Daycare Center') {
@@ -1965,13 +2319,23 @@ export default function App() {
   };
 
   const handleBookPlaydateTrigger = (profile: ChildProfile) => {
-    setSelectedPlaymate(profile);
-    setActiveTab('planner');
+    ensureAadhaarVerified(
+      "Aadhaar verification is mandatory to schedule and book playdates with neighborhood families.",
+      () => {
+        setSelectedPlaymate(profile);
+        setActiveTab('planner');
+      }
+    );
   };
 
   const handleOpenChatTrigger = (profile: ChildProfile) => {
-    setSelectedPlaymate(profile);
-    setActiveTab('chat');
+    ensureAadhaarVerified(
+      "Aadhaar verification is mandatory to send direct messages and connect with other parents.",
+      () => {
+        setSelectedPlaymate(profile);
+        setActiveTab('chat');
+      }
+    );
   };
 
   const handleCompleteVerification = () => {
@@ -2154,20 +2518,51 @@ export default function App() {
       
       {/* Top Banner & Emergency Bar if Logged In / In Dashboard */}
       {appMode === 'dashboard' && (
-        <div id="sos-top-banner" className="bg-slate-900 text-slate-100 py-2 sm:py-3 px-3 sm:px-4 md:px-8 border-b border-slate-800 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs w-full max-w-full overflow-hidden">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0"></span>
-            <span className="truncate">{t.loggedInAs}: <strong>{userProfile?.parentName}</strong> • Matchable with <strong>{playmates.length} {t.localPlaymatesCount}</strong>.</span>
+        userProfile ? (
+          <div id="sos-top-banner" className="bg-slate-900 text-slate-100 py-2 sm:py-3 px-3 sm:px-4 md:px-8 border-b border-slate-800 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs w-full max-w-full overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0"></span>
+              <span className="truncate">{t.loggedInAs}: <strong>{userProfile?.parentName}</strong> • Matchable with <strong>{playmates.length} {t.localPlaymatesCount}</strong>.</span>
+            </div>
+            
+            <button
+              id="btn-trigger-sos"
+              onClick={() => setShowSOSModal(true)}
+              className="px-2.5 sm:px-3 py-1 bg-red-650 hover:bg-red-700 text-white font-bold rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0 uppercase tracking-wider text-[10px]"
+            >
+              <ShieldAlert className="w-3.5 h-3.5" /> {t.safetySOSHelp}
+            </button>
           </div>
-          
-          <button
-            id="btn-trigger-sos"
-            onClick={() => setShowSOSModal(true)}
-            className="px-2.5 sm:px-3 py-1 bg-red-650 hover:bg-red-700 text-white font-bold rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0 uppercase tracking-wider text-[10px]"
-          >
-            <ShieldAlert className="w-3.5 h-3.5" /> {t.safetySOSHelp}
-          </button>
-        </div>
+        ) : (
+          <div id="guest-specialists-top-banner" className="bg-slate-900 text-slate-100 py-2 px-3 sm:px-4 md:px-8 border-b border-slate-800 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs w-full max-w-full overflow-hidden">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="w-2 h-2 bg-rose-500 rounded-full animate-ping shrink-0"></span>
+              <span className="truncate font-medium text-slate-200">
+                <strong className="text-white">Vernunt Open Directory:</strong> Verified Pediatricians, Gynecologists &amp; Child Specialists across India ({specialistsList.length}+ Doctors)
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAppMode('landing')}
+                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer"
+              >
+                ← Home
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAppMode('auth');
+                  setAuthMode('login');
+                }}
+                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        )
       )}
 
       {/* Main Header navigation */}
@@ -2211,6 +2606,9 @@ export default function App() {
             {Object.entries(tabsConfig)
               .filter(([_, placement]) => placement === 'header')
               .map(([tabId]) => {
+                // Public guest restriction
+                if (!userProfile && tabId !== 'specialists' && tabId !== 'knowledge' && tabId !== 'store' && tabId !== 'events' && tabId !== 'kid_stories') return null;
+
                 // Guards
                 if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
                 if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
@@ -2241,17 +2639,6 @@ export default function App() {
                   </button>
                 );
               })}
-
-            <a
-              id="tab-btn-store"
-              href="https://vernunt.com/store"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-3 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer hover:bg-slate-50 text-slate-600"
-            >
-              <ExternalLink className="w-4 h-4 text-orange-500" />
-              Store
-            </a>
 
             {/* More Menu Trigger Button */}
             <button
@@ -2284,7 +2671,7 @@ export default function App() {
             </select>
           </div>
 
-          {appMode === 'dashboard' ? (
+          {appMode === 'dashboard' && userProfile ? (
             <div className="flex items-center gap-2 sm:gap-3">
               {/* Background Sync Outbox Badge */}
               <SyncStatusBadge onClick={() => setIsOutboxDrawerOpen(true)} />
@@ -2386,6 +2773,33 @@ export default function App() {
                 </div>
               </div>
 
+              {/* App Step-by-Step Guide Trigger Button */}
+              <button
+                id="btn-header-app-guide"
+                type="button"
+                onClick={() => setShowAppGuideModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300/80 rounded-xl text-xs font-black transition cursor-pointer shadow-2xs transform hover:scale-102"
+                title="Open interactive step-by-step app guide"
+              >
+                <span>💡</span>
+                <span className="hidden xl:inline">App Guide</span>
+              </button>
+
+              {/* Profile Privacy & Biometrics Button */}
+              <button
+                id="btn-header-profile-privacy"
+                type="button"
+                onClick={() => setShowProfilePrivacyModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300/80 rounded-xl text-xs font-black transition cursor-pointer shadow-2xs transform hover:scale-102"
+                title="Profile visibility (Mom/Dad), Biometric login & SEO Shield"
+              >
+                <Fingerprint className="w-3.5 h-3.5 text-rose-700" />
+                <span className="hidden xl:inline">Privacy &amp; Bio</span>
+                <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-extrabold uppercase">
+                  {userProfile?.profileVisibility || 'Mom'}
+                </span>
+              </button>
+
               {/* Contacts Privacy Trigger Button */}
               <button
                 id="btn-header-contacts-privacy"
@@ -2400,9 +2814,43 @@ export default function App() {
                   <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wider">Ghost</span>
                 ) : (
                   <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wider">
-                    {userProfile?.contactsPrivacy?.contacts?.length ? `${userProfile.contactsPrivacy.contacts.length}` : 'Sync'}
+                    Shielded
                   </span>
                 )}
+              </button>
+
+              {/* For Help Contact Us Hub Button */}
+              <button
+                id="btn-header-contact-us"
+                type="button"
+                onClick={() => setShowContactUsModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3.5 sm:py-2 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300 rounded-xl text-xs sm:text-sm font-black transition cursor-pointer shadow-xs transform hover:scale-102"
+                title="For help, contact Vernunt support desk (support@vernunt.com)"
+              >
+                <span className="text-sm sm:text-base">📞</span>
+                <span className="hidden sm:inline">For Help Contact Us</span>
+                <span className="sm:hidden">Help</span>
+                <span className="text-[9px] bg-rose-600 text-white font-mono px-1.5 py-0.5 rounded-md hidden lg:inline">
+                  support@vernunt.com
+                </span>
+              </button>
+
+              {/* Multilingual Voice Call Support Button */}
+              <button
+                id="header-btn-voice-support"
+                type="button"
+                onClick={() => {
+                  setVoiceInitialLanguage('en-IN');
+                  setShowKannadaVoiceModal(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white rounded-xl text-xs sm:text-sm font-black transition cursor-pointer shadow-md border border-rose-600/80 transform hover:scale-102 ring-2 ring-rose-300/50 animate-pulse-subtle"
+                title="Call for support in English, Kannada, Hindi, Tamil, Telugu & all Indian languages"
+              >
+                <span className="text-base animate-bounce">🎙️</span>
+                <span className="tracking-tight">Call For Support</span>
+                <span className="text-[10px] bg-amber-400 text-slate-950 font-black px-1.5 py-0.5 rounded-md uppercase hidden md:inline">
+                  Helpline
+                </span>
               </button>
 
               {/* User Avatar */}
@@ -2427,12 +2875,75 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 sm:gap-3 select-none font-sans">
+            <div className="flex items-center gap-2 sm:gap-3 select-none font-sans flex-wrap">
+              {/* Public Specialists Tab Trigger */}
+              <button
+                id="header-btn-specialists-public"
+                type="button"
+                onClick={() => {
+                  setAppMode('dashboard');
+                  setActiveTab('specialists');
+                  setIsGuestViewingKnowledge(false);
+                }}
+                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                  appMode === 'dashboard' && activeTab === 'specialists'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                }`}
+                title="View verified pediatricians & child specialists portfolios across India"
+              >
+                <Users className="w-3.5 h-3.5 text-rose-600" />
+                <span>🩺 Specialists ({specialistsList.length}+)</span>
+              </button>
+
+              {/* Public Kids Stories Button */}
+              <button
+                id="header-btn-stories-public"
+                type="button"
+                onClick={() => {
+                  setAppMode('dashboard');
+                  setActiveTab('kid_stories');
+                  setIsGuestViewingKnowledge(false);
+                }}
+                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border hidden sm:flex items-center gap-1.5 transition cursor-pointer ${
+                  appMode === 'dashboard' && activeTab === 'kid_stories'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-rose-50/60 text-rose-800 border-rose-200 hover:bg-rose-100'
+                }`}
+                title="Read & publish kid achievements, awards and stories"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-rose-600" />
+                <span>📖 Kids Stories</span>
+              </button>
+
+              {/* Public Events Button */}
+              <button
+                id="header-btn-events-public"
+                type="button"
+                onClick={() => {
+                  setAppMode('dashboard');
+                  setActiveTab('events');
+                  setIsGuestViewingKnowledge(false);
+                }}
+                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border hidden md:flex items-center gap-1.5 transition cursor-pointer ${
+                  appMode === 'dashboard' && activeTab === 'events'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-indigo-50/60 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
+                }`}
+                title="Browse kids events, workshops and weekend activities"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+                <span>🎟️ Events</span>
+              </button>
+
+              {/* 1000+ Guides */}
               <button
                 id="header-btn-knowledge-guest"
                 type="button"
                 onClick={() => {
-                  if (isGuestViewingKnowledge) {
+                  if (appMode === 'dashboard') {
+                    setActiveTab('knowledge');
+                  } else if (isGuestViewingKnowledge) {
                     setIsGuestViewingKnowledge(false);
                     setGuestKnowledgeSlug(undefined);
                   } else {
@@ -2440,33 +2951,71 @@ export default function App() {
                     setGuestKnowledgeSlug(undefined);
                   }
                 }}
-                className={`text-xs font-bold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
-                  isGuestViewingKnowledge
+                className={`text-xs font-bold px-3 py-1.5 rounded-xl border hidden lg:flex items-center gap-1.5 transition cursor-pointer ${
+                  (appMode === 'dashboard' && activeTab === 'knowledge') || isGuestViewingKnowledge
                     ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                    : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                 }`}
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>{isGuestViewingKnowledge ? '← Home' : '1,000+ Guides'}</span>
               </button>
 
-              <a
-                id="header-btn-store-guest"
-                href="https://vernunt.com/store"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-orange-600 hover:text-orange-700 font-black flex items-center gap-1.5 transition hover:scale-102 cursor-pointer"
-              >
-                <ExternalLink className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
-                Store
-              </a>
-              <span className="w-px h-3 bg-slate-200 hidden sm:inline" />
+              {/* Vernunt Store */}
               <button
-                id="btn-trigger-tac"
-                onClick={() => setShowLegalModal(true)}
-                className="text-xs text-slate-400 hover:text-slate-600 font-semibold flex items-center gap-1 hover:underline cursor-pointer"
+                type="button"
+                id="header-btn-store-guest"
+                onClick={() => {
+                  setAppMode('dashboard');
+                  setActiveTab('store');
+                }}
+                className={`text-xs font-bold hidden md:flex items-center gap-1.5 transition cursor-pointer px-2.5 py-1.5 rounded-xl border ${
+                  appMode === 'dashboard' && activeTab === 'store'
+                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                    : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
+                }`}
               >
-                <Info className="w-4 h-4" /> <span className="hidden sm:inline">{t.safetyStandards}</span>
+                <ShoppingBag className="w-3.5 h-3.5 text-rose-600" />
+                <span>🛍️ Store</span>
+              </button>
+
+              {/* Call For Support Helpline Guest Button */}
+              <button
+                type="button"
+                id="header-btn-voice-support-guest"
+                onClick={() => {
+                  setVoiceInitialLanguage('en-IN');
+                  setShowKannadaVoiceModal(true);
+                }}
+                className="text-xs bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white font-black hidden sm:flex items-center gap-1.5 transition hover:scale-102 cursor-pointer px-3 py-1.5 rounded-xl border border-rose-600/80 shadow-xs"
+                title="Call for support (English, Kannada, Hindi, Tamil, Telugu & all Indian languages)"
+              >
+                <span className="text-sm animate-bounce">🎙️</span>
+                <span>Helpline</span>
+              </button>
+
+              <span className="w-px h-3 bg-slate-200 hidden sm:inline" />
+
+              {/* Sign In & Join for Guests */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAppMode('auth');
+                  setAuthMode('login');
+                }}
+                className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAppMode('auth');
+                  setAuthMode('register');
+                }}
+                className="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
+              >
+                Join Free
               </button>
             </div>
           )}
@@ -2474,7 +3023,7 @@ export default function App() {
       </header>
 
       {/* Mobile Sub-Header Bar: Brings Trust Score and Logout clearly below the header for easy one-tap access on mobile */}
-      {appMode === 'dashboard' && (
+      {appMode === 'dashboard' && userProfile && (
         <div id="mobile-user-status-bar" className="md:hidden bg-gradient-to-r from-rose-50/90 via-amber-50/60 to-rose-50/90 border-b border-rose-200/70 px-3 py-2 flex items-center justify-between gap-2 text-xs w-full max-w-full shadow-2xs">
           {/* Trust Score Button */}
           <button
@@ -2508,7 +3057,7 @@ export default function App() {
               <span className="text-[8px] bg-rose-600 text-white px-1 rounded font-black">Ghost</span>
             ) : (
               <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">
-                {userProfile?.contactsPrivacy?.contacts?.length ?? 0}
+                Active
               </span>
             )}
           </button>
@@ -2538,24 +3087,23 @@ export default function App() {
         </div>
       )}
 
-      {/* Full Length Highlighted Shop Now External Banner (Only visible after login) */}
+      {/* Full Length Highlighted Shop Now In-App Banner (Only visible after login) */}
       {(auth.currentUser || userProfile) && (
-        <a
+        <button
+          type="button"
           id="banner-shop-favourite-products"
-          href="https://vernunt.com/store"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="w-full bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:via-amber-600 hover:to-orange-700 text-white py-2.5 px-4 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 text-xs sm:text-sm font-extrabold shadow-sm transition-all duration-200 cursor-pointer border-b border-orange-600/30 group text-center"
+          onClick={() => setActiveTab('store')}
+          className="w-full bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-800 hover:to-rose-700 text-white py-2.5 px-4 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 text-xs sm:text-sm font-extrabold shadow-sm transition-all duration-200 cursor-pointer border-b border-rose-800/30 group text-center"
           title="Shop your child's favourite products on Vernunt Store"
         >
           <div className="flex items-center gap-2 whitespace-normal sm:whitespace-nowrap">
-            <ShoppingBag className="w-4 h-4 text-amber-100 group-hover:scale-110 transition-transform shrink-0" />
-            <span className="font-serif tracking-wide">Shop your child's favourite products</span>
+            <ShoppingBag className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform shrink-0" />
+            <span className="font-serif tracking-wide">Shop verified child toys, Montessori kits &amp; STEM activities</span>
           </div>
           <span className="ml-1 bg-white/20 hover:bg-white/30 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0 border border-white/30 shadow-2xs whitespace-nowrap">
-            Shop Now <ExternalLink className="w-3 h-3 text-amber-200" />
+            Vernunt Store 🛍️
           </span>
-        </a>
+        </button>
       )}
 
       {/* Mobile Sticky Tab Navigation Bar */}
@@ -2568,6 +3116,9 @@ export default function App() {
             {Object.entries(tabsConfig)
               .filter(([_, placement]) => placement === 'header')
               .map(([tabId]) => {
+                // Public guest restriction
+                if (!userProfile && tabId !== 'specialists' && tabId !== 'knowledge' && tabId !== 'store' && tabId !== 'events' && tabId !== 'kid_stories') return null;
+
                 // Guards
                 if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
                 if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
@@ -2583,8 +3134,10 @@ export default function App() {
                 let mobileLabel = def.label;
                 if (tabId === 'radar') mobileLabel = 'Radar';
                 else if (tabId === 'daycare') mobileLabel = 'Daycare & Sitter';
+                else if (tabId === 'store') mobileLabel = 'Store';
                 else if (tabId === 'chat') mobileLabel = 'Chats';
                 else if (tabId === 'events') mobileLabel = 'Events';
+                else if (tabId === 'kid_stories') mobileLabel = 'Kids Stories';
                 else if (tabId === 'specialists') mobileLabel = 'Specialists';
                 else if (tabId === 'knowledge') mobileLabel = '1000+ Guides';
                 else if (tabId === 'billing') mobileLabel = '👑 VIP';
@@ -2611,18 +3164,6 @@ export default function App() {
                   </button>
                 );
               })}
-
-            {/* Store shortcut */}
-            <a
-              id="mob-btn-store-link"
-              href="https://vernunt.com/store"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 hover:bg-orange-100 transition whitespace-nowrap cursor-pointer"
-            >
-              <ShoppingBag className="w-3.5 h-3.5 text-orange-500 shrink-0" />
-              <span>Store</span>
-            </a>
 
             {/* More menu trigger */}
             <button
@@ -2652,6 +3193,30 @@ export default function App() {
               setGuestKnowledgeSlug(slug);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onOpenSpecialists={() => {
+              setAppMode('dashboard');
+              setActiveTab('specialists');
+              setIsGuestViewingKnowledge(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenKidStories={() => {
+              setAppMode('dashboard');
+              setActiveTab('kid_stories');
+              setIsGuestViewingKnowledge(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenEvents={() => {
+              setAppMode('dashboard');
+              setActiveTab('events');
+              setIsGuestViewingKnowledge(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenEventBuyerRegistration={() => setShowEventBuyerRegModal(true)}
+            onOpenKannadaVoice={(lang) => {
+              setVoiceInitialLanguage(lang || 'en-IN');
+              setShowKannadaVoiceModal(true);
+            }}
+            onOpenContactUs={() => setShowContactUsModal(true)}
             isAuthenticating={isAuthenticating}
             externalAuthError={authErrorMessage}
             language={language}
@@ -2746,37 +3311,113 @@ export default function App() {
             {userProfile && userProfile.userRole !== 'Admin' && (userProfile.verificationStatus === VerificationStatus.PENDING || userProfile.verificationStatus === 'PENDING' || !userProfile.aadhaarVerified || userProfile.verificationStatus === VerificationStatus.UNVERIFIED) && (
               <div 
                 id="banner-kyc-pending" 
-                className="bg-gradient-to-r from-rose-900 via-red-900 to-rose-950 text-white rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-rose-700/60 animate-fade-in text-left relative overflow-hidden"
+                className="bg-gradient-to-r from-rose-900 via-red-900 to-rose-950 text-white rounded-2xl p-4 sm:p-5 shadow-xl flex flex-col gap-4 border border-rose-700/60 animate-fade-in text-left relative overflow-hidden"
               >
                 <div className="absolute top-0 right-0 w-64 h-full bg-rose-500/10 pointer-events-none blur-2xl"></div>
-                <div className="flex items-start gap-3.5 relative z-10">
-                  <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20 text-2xl shadow-inner">
-                    🛡️
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-serif font-black text-sm sm:text-base text-amber-300 tracking-wide">
-                        KYC Pending — Finish KYC to Unlock Full Profiles & Parent Photos
-                      </span>
-                      <span className="bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
-                        Action Required
+
+                {/* Visual 3-Step KYC Progress Stepper */}
+                <div className="w-full relative z-10 pb-3.5 border-b border-rose-800/80">
+                  <div className="grid grid-cols-3 gap-2 sm:gap-4 relative">
+                    {/* Connecting Progress Track */}
+                    <div className="absolute top-3.5 left-[16%] right-[16%] h-1 bg-rose-950/90 rounded-full overflow-hidden -z-0">
+                      <div 
+                        className="h-full bg-gradient-to-r from-emerald-400 via-amber-300 to-emerald-400 transition-all duration-500"
+                        style={{
+                          width: userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified
+                            ? '100%' 
+                            : (userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber) 
+                              ? '50%' 
+                              : '15%'
+                        }}
+                      />
+                    </div>
+
+                    {/* Step 1: Upload Aadhaar */}
+                    <div className="flex flex-col items-center text-center relative z-10">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md transition-all ${
+                        (userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber)
+                          ? 'bg-emerald-500 text-white ring-2 ring-emerald-300/50'
+                          : 'bg-amber-400 text-slate-950 ring-4 ring-amber-400/30 font-extrabold animate-pulse'
+                      }`}>
+                        {(userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber) ? '✓' : '1'}
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-black mt-1.5 text-white tracking-tight">1. Upload Aadhaar</span>
+                      <span className="text-[9.5px] text-rose-200/90 font-medium hidden sm:inline">
+                        {(userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber) ? 'Aadhaar Attached' : 'Attach Document'}
                       </span>
                     </div>
-                    <p className="text-rose-100/90 text-xs leading-relaxed max-w-2xl font-medium">
-                      You can freely explore nearby playmates, names, ages, distance, mother tongue, and parent professions! To view verified parent photos, initiate playdates, and unlock direct chats, please submit your Aadhaar & address proof for community verification.
-                    </p>
+
+                    {/* Step 2: Admin Verification */}
+                    <div className="flex flex-col items-center text-center relative z-10">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md transition-all ${
+                        userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified
+                          ? 'bg-emerald-500 text-white ring-2 ring-emerald-300/50'
+                          : (userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber)
+                            ? 'bg-amber-400 text-slate-950 ring-4 ring-amber-400/30 animate-pulse'
+                            : 'bg-rose-950/90 text-rose-300 border border-rose-700/60'
+                      }`}>
+                        {userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified ? '✓' : '2'}
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-black mt-1.5 text-white tracking-tight">2. Admin Verification</span>
+                      <span className="text-[9.5px] text-rose-200/90 font-medium hidden sm:inline">
+                        {userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified 
+                          ? 'Admin Approved' 
+                          : (userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName || userProfile?.aadhaarNumber) 
+                            ? 'Pending Review' 
+                            : 'Awaiting Upload'}
+                      </span>
+                    </div>
+
+                    {/* Step 3: Profile Activated */}
+                    <div className="flex flex-col items-center text-center relative z-10">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-md transition-all ${
+                        userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified
+                          ? 'bg-emerald-500 text-white ring-2 ring-emerald-300/50'
+                          : 'bg-rose-950/90 text-rose-300 border border-rose-700/60'
+                      }`}>
+                        {userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified ? '✓' : '3'}
+                      </div>
+                      <span className="text-[11px] sm:text-xs font-black mt-1.5 text-white tracking-tight">3. Profile Activated</span>
+                      <span className="text-[9.5px] text-rose-200/90 font-medium hidden sm:inline">
+                        {userProfile?.verificationStatus === VerificationStatus.VERIFIED || userProfile?.aadhaarVerified ? '100% Unlocked' : 'Full Access'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto justify-end relative z-10">
-                  <button
-                    type="button"
-                    id="btn-finish-kyc-banner"
-                    onClick={() => setShowAadhaarVerifyModal(true)}
-                    className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-serif font-black text-xs rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
-                  >
-                    <ShieldCheck className="w-4 h-4 text-slate-950" />
-                    <span>Finish KYC Verification ⚡</span>
-                  </button>
+
+                {/* Banner Content & CTA */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 relative z-10">
+                  <div className="flex items-start gap-3.5">
+                    <div className="w-11 h-11 rounded-2xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20 text-2xl shadow-inner">
+                      🛡️
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-serif font-black text-sm sm:text-base text-amber-300 tracking-wide">
+                          Aadhaar Document Upload &amp; Admin Verification
+                        </span>
+                        <span className="bg-amber-400 text-slate-950 text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shadow-xs">
+                          {userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName ? 'Under Admin Review' : 'Action Required'}
+                        </span>
+                      </div>
+                      <p className="text-rose-100/90 text-xs leading-relaxed max-w-2xl font-medium">
+                        {userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName
+                          ? 'Your Aadhaar document has been uploaded and is waiting for manual verification & approval by Vernunt System Admin.'
+                          : 'Aadhaar verification is mandatory for all parents and hosts on Vernunt. Upload your Aadhaar card for manual administrative review and approval to unlock full family profiles, playmate connections, and chats.'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      type="button"
+                      id="btn-finish-kyc-banner"
+                      onClick={() => setShowAadhaarVerifyModal(true)}
+                      className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-serif font-black text-xs rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95"
+                    >
+                      <ShieldCheck className="w-4 h-4 text-slate-950" />
+                      <span>{userProfile?.aadhaarDocUrl || userProfile?.aadhaarDocName ? 'View / Update Aadhaar Document' : 'Upload Aadhaar Document'}</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -2851,8 +3492,44 @@ export default function App() {
               </div>
             ))}
 
+            {/* Guest Private Tab Protection */}
+            {!userProfile && !['specialists', 'knowledge', 'store'].includes(activeTab) && (
+              <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm text-center space-y-5 animate-fade-in">
+                <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-3xl mx-auto border border-rose-150">
+                  🩺
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-xl font-black font-serif text-slate-900">
+                    Vernunt Pan-India Pediatricians &amp; Specialists Directory
+                  </h3>
+                  <p className="text-sm text-slate-600 max-w-md mx-auto">
+                    This section requires verified guardian sign-in. However, our <strong>Pan-India Pediatricians &amp; Specialists Directory</strong> is 100% open and accessible to the public without any login!
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('specialists')}
+                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
+                  >
+                    Explore 161+ Verified Doctors &amp; Portfolios ↗
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppMode('landing');
+                      setIsGuestViewingKnowledge(false);
+                    }}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Back to Home
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Tab: Radar Proximity Search */}
-            {activeTab === 'radar' && (
+            {activeTab === 'radar' && userProfile && (
               <div id="radar-dashboard-section" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 
                 {/* Column 1 & 2: Main Map/Radar Toggle & Grid */}
@@ -3475,7 +4152,14 @@ export default function App() {
 
                   {/* View slider controls */}
                   <div className="flex items-center justify-between bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <div id="radar-toggle" className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60">
+                    <div id="radar-toggle" className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-2xl border border-slate-200/60 flex-wrap">
+                      <button
+                        id="btn-toggle-swipe-lens"
+                        onClick={() => setMapOrRadarView('swipe')}
+                        className={`px-3 py-1.5 text-xs font-extrabold rounded-xl transition cursor-pointer flex items-center gap-1 ${mapOrRadarView === 'swipe' ? 'bg-rose-700 text-white shadow-xs' : 'hover:bg-slate-200/60 text-slate-600'}`}
+                      >
+                        <span>🎴 Swipe Deck</span>
+                      </button>
                       <button
                         id="btn-toggle-list-lens"
                         onClick={() => setMapOrRadarView('list')}
@@ -3505,7 +4189,22 @@ export default function App() {
                   </div>
 
                   {/* Projected Match Lenses */}
-                  {mapOrRadarView === 'list' ? (
+                  {mapOrRadarView === 'swipe' ? (
+                    <PlaymateSwipeDeck
+                      playmates={filteredPlaymates}
+                      userProfile={userProfile}
+                      onSelectPlaymate={handleSelectPlaymate}
+                      onOpenDetailModal={(p) => setDetailModalProfile(p)}
+                      connectedIds={connectedIds}
+                      interestsSent={interestsSent}
+                      interestsReceived={interestsReceived}
+                      savedProfileIds={savedProfileIds}
+                      onToggleSave={handleToggleSaveProfile}
+                      onSendConnection={handleSendConnectionRequest}
+                      onAcceptConnection={handleAcceptConnection}
+                      maxDistanceKm={maxDistanceKm}
+                    />
+                  ) : mapOrRadarView === 'list' ? (
                     <PlaymateListView
                       playmates={filteredPlaymates}
                       userProfile={userProfile}
@@ -3880,8 +4579,37 @@ export default function App() {
               </div>
             )}
 
+            {/* Tab: Peanut-Style Vernunt Groups & Circles */}
+            {activeTab === 'groups' && userProfile && (
+              <VernuntGroupsHub 
+                userProfile={userProfile} 
+                onOpenCommunityMeetups={() => setActiveTab('community')} 
+              />
+            )}
+
+            {/* Tab: Community Hosting (renamed from host events) */}
+            {activeTab === 'community' && userProfile && (
+              <CommunityHostingHub 
+                userProfile={userProfile} 
+              />
+            )}
+
+            {/* Tab: Vernunt Pages Micro-Blogging & Audio Pods */}
+            {activeTab === 'pages' && userProfile && (
+              <VernuntPagesFeed 
+                userProfile={userProfile} 
+              />
+            )}
+
+            {/* Tab: Pregnancy & Baby Growth/Milestones/Vaccine Tracker */}
+            {activeTab === 'tracker' && userProfile && (
+              <GrowthTrackerHub 
+                userProfile={userProfile} 
+              />
+            )}
+
             {/* Tab: Babysitting & Drop-in Daycare Marketplace */}
-            {activeTab === 'daycare' && (
+            {activeTab === 'daycare' && userProfile && (
               <DaycareSittingTab
                 daycarePlayhomes={daycarePlayhomes}
                 careBookings={careBookings}
@@ -3905,7 +4633,7 @@ export default function App() {
             )}
 
             {/* Tab: Instant chats log */}
-            {activeTab === 'chat' && (
+            {activeTab === 'chat' && userProfile && (
               <ChatPanel 
                 playmates={playmates} 
                 userProfile={userProfile} 
@@ -3921,7 +4649,7 @@ export default function App() {
             )}
 
             {/* Tab: Structured schedules */}
-            {activeTab === 'planner' && (
+            {activeTab === 'planner' && userProfile && (
               <PlaydatePlanner 
                 playmates={playmates} 
                 userProfile={userProfile} 
@@ -3935,21 +4663,45 @@ export default function App() {
                 userProfile={userProfile} 
                 eventsList={eventsList}
                 setEventsList={setEventsList}
+                initialOpenCreateWizard={openEventWizardOnMount}
                 onAddBooking={(newBooking) => {
                   setBookingsList(prev => [newBooking, ...prev]);
                   confetti({ particleCount: 150, spread: 80 });
                 }}
                 onUpdateRole={(newRole) => {
-                  setUserRole(newRole);
+                  setUserRole(newRole as any);
                   if (userProfile) {
-                    setUserProfile({ ...userProfile, userRole: newRole });
+                    setUserProfile({ ...userProfile, userRole: newRole as any });
                   }
                 }}
                 globalCommissionRate={globalCommissionRate}
                 onUpdateUserProfile={(profileObj) => {
                   setUserProfile(profileObj);
                 }}
+                onOpenLogin={() => {
+                  setAppMode('auth');
+                  setAuthMode('login');
+                }}
               />
+            )}
+
+            {/* Tab: Kids Stories (YourStory for Kids) */}
+            {activeTab === 'kid_stories' && (
+              <div className="animate-fade-in">
+                <KidStoriesPortal
+                  currentUser={userProfile}
+                  onOpenWriteModal={(kidName?: string, chapter?: number) => {
+                    setWriteStoryKidName(kidName);
+                    setWriteStoryChapter(chapter);
+                    setShowWriteStoryModal(true);
+                  }}
+                  selectedSlug={selectedStorySlug}
+                  onSelectStory={(slug) => setSelectedStorySlug(slug)}
+                  onOpenReferral={() => {
+                    setActiveTab('referrals');
+                  }}
+                />
+              </div>
             )}
 
             {/* Tab: Specialists registration & appointments booking */}
@@ -3976,11 +4728,12 @@ export default function App() {
                 onUpdateUserProfile={(profileObj) => {
                   setUserProfile(profileObj);
                 }}
+                onUpdateSpecialist={handleUpdateSpecialist}
               />
             )}
 
             {/* Tab: Consolidated Business dashboard */}
-            {activeTab === 'business' && (
+            {activeTab === 'business' && userProfile && (
               <BusinessDashboard 
                 userProfile={userProfile}
                 onUpdateProfile={(updated) => {
@@ -4005,8 +4758,13 @@ export default function App() {
             )}
 
             {/* Tab: Health vaccine records */}
-            {activeTab === 'portfolio' && (
-              <PortfoliosTab currentProfile={userProfile} />
+            {activeTab === 'portfolio' && userProfile && (
+              <PortfoliosTab 
+                currentProfile={userProfile} 
+                onNavigateToPediatricians={() => {
+                  setActiveTab('specialists');
+                }}
+              />
             )}
 
             {/* Tab: System Admin panel */}
@@ -4020,7 +4778,7 @@ export default function App() {
             )}
 
             {/* Tab: Affiliate Partner Center (WooCommerce Affiliate Model) */}
-            {activeTab === 'affiliate' && (
+            {activeTab === 'affiliate' && userProfile && (
               <AffiliateDashboard 
                 userProfile={userProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
@@ -4030,7 +4788,7 @@ export default function App() {
             )}
 
             {/* Tab: Parental Referral Rewards Center */}
-            {activeTab === 'referrals' && (
+            {activeTab === 'referrals' && userProfile && (
               <ReferralPortal 
                 userProfile={userProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
@@ -4039,7 +4797,7 @@ export default function App() {
             )}
 
             {/* Tab: Subscription & Billing Portal */}
-            {activeTab === 'billing' && (
+            {activeTab === 'billing' && userProfile && (
               <BillingPortal 
                 userProfile={userProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
@@ -4051,6 +4809,15 @@ export default function App() {
             {activeTab === 'knowledge' && (
               <KnowledgeHub 
                 onNavigateToRadar={() => setActiveTab('radar')}
+              />
+            )}
+
+            {/* Tab: Vernunt In-App E-commerce Store */}
+            {activeTab === 'store' && (
+              <VernuntStore 
+                userProfile={userProfile}
+                onNavigateToTab={(t) => setActiveTab(t as any)}
+                onContactSupport={() => setShowSupportChat(true)}
               />
             )}
 
@@ -4200,14 +4967,16 @@ export default function App() {
               🎯 Playmate Radar
             </button>
             <span>&bull;</span>
-            <a
-              href="https://vernunt.com/store"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-orange-600 hover:text-orange-700 transition font-bold"
+            <button
+              type="button"
+              onClick={() => {
+                setAppMode('dashboard');
+                setActiveTab('store');
+              }}
+              className="text-rose-700 hover:text-rose-800 transition font-black cursor-pointer"
             >
-              🛍️ Vernunt Store (vernunt.com/store)
-            </a>
+              🛍️ Vernunt Store &amp; Play Gear
+            </button>
             <span>&bull;</span>
             <button
               type="button"
@@ -4496,6 +5265,46 @@ export default function App() {
             </div>
 
             <div className="space-y-2 pt-2 border-t border-slate-100">
+              {/* For Help Contact Us in Drawer */}
+              <button 
+                id="btn-drawer-contact-us"
+                onClick={() => {
+                  setIsSideMenuOpen(false);
+                  setShowContactUsModal(true);
+                }}
+                className="w-full py-2.5 bg-rose-50 hover:bg-rose-100 border border-rose-300 text-rose-900 font-black rounded-2xl text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+              >
+                <span>📞</span>
+                <span>For Help Contact Us (support@vernunt.com)</span>
+              </button>
+
+              {/* Multilingual Voice Call Support in Drawer */}
+              <button 
+                id="btn-drawer-call-support"
+                onClick={() => {
+                  setIsSideMenuOpen(false);
+                  setVoiceInitialLanguage('en-IN');
+                  setShowKannadaVoiceModal(true);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white font-black rounded-2xl text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-md border border-rose-600"
+              >
+                <span className="text-sm">🎙️</span>
+                <span>Call For Support</span>
+              </button>
+
+              {/* Instagram Influencer Poster (Collabs) in Drawer */}
+              <button 
+                id="btn-drawer-instagram-flyer"
+                onClick={() => {
+                  setIsSideMenuOpen(false);
+                  setShowInstagramFlyerModal(true);
+                }}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-800 via-rose-800 to-amber-700 hover:from-purple-900 hover:to-amber-800 text-white font-black rounded-2xl text-xs transition cursor-pointer flex items-center justify-center gap-2 shadow-md border border-rose-500/40"
+              >
+                <span className="text-sm">📸</span>
+                <span>Instagram Post: Influencer Collabs</span>
+              </button>
+
               <button 
                 id="btn-drawer-child-safety"
                 onClick={() => {
@@ -4824,6 +5633,110 @@ export default function App() {
         isOpen={isOutboxDrawerOpen}
         onClose={() => setIsOutboxDrawerOpen(false)}
       />
+
+      {/* Contact Us & Customer Support Hub Modal */}
+      {showContactUsModal && (
+        <ContactUsModal
+          isOpen={showContactUsModal}
+          onClose={() => setShowContactUsModal(false)}
+          onOpenVoiceSupport={(lang) => {
+            setVoiceInitialLanguage(lang || 'en-IN');
+            setShowKannadaVoiceModal(true);
+          }}
+        />
+      )}
+
+      {/* Multilingual AI Voice Calling Agent & Telephony Enquiry Assistant */}
+      {showKannadaVoiceModal && (
+        <KannadaVoiceAgentModal
+          isOpen={showKannadaVoiceModal}
+          onClose={() => setShowKannadaVoiceModal(false)}
+          initialLanguage={voiceInitialLanguage}
+          onNavigateToSection={(tab) => {
+            setAppMode('dashboard');
+            setActiveTab(tab as any);
+          }}
+        />
+      )}
+
+      {/* Event Buyer Registration Modal */}
+      {showEventBuyerRegModal && (
+        <EventBuyerRegistrationModal
+          isOpen={showEventBuyerRegModal}
+          onClose={() => setShowEventBuyerRegModal(false)}
+          onSuccess={(profile) => {
+            setUserProfile(profile);
+            setUserRole('Parent');
+            setShowEventBuyerRegModal(false);
+            setAppMode('dashboard');
+            setActiveTab('events');
+            confetti({ particleCount: 120, spread: 70 });
+          }}
+          actionTitle="Event Ticket Buyer Instant Pass"
+        />
+      )}
+
+      {/* Write Kids Story (YourStory for Kids) Modal */}
+      {showWriteStoryModal && (
+        <WriteKidStoryModal
+          isOpen={showWriteStoryModal}
+          onClose={() => {
+            setShowWriteStoryModal(false);
+            setWriteStoryKidName(undefined);
+            setWriteStoryChapter(undefined);
+          }}
+          currentUser={userProfile}
+          defaultKidName={writeStoryKidName}
+          defaultChapter={writeStoryChapter}
+          onOpenParentRegistration={() => {
+            setShowWriteStoryModal(false);
+            handleStartSignUp('Parent');
+          }}
+          onStorySubmitted={() => {
+            setShowWriteStoryModal(false);
+            setWriteStoryKidName(undefined);
+            setWriteStoryChapter(undefined);
+            confetti({ particleCount: 150, spread: 80 });
+          }}
+          onOpenReferralModal={() => {
+            setShowWriteStoryModal(false);
+            setActiveTab('referrals');
+          }}
+        />
+      )}
+
+      {/* Instagram Influencer Flyer Generator Modal */}
+      {showInstagramFlyerModal && (
+        <InstagramFlyerModal
+          isOpen={showInstagramFlyerModal}
+          onClose={() => setShowInstagramFlyerModal(false)}
+          defaultAffiliateCode={userProfile?.referralCode}
+        />
+      )}
+
+      {/* Profile Privacy & Biometric Security Settings Modal */}
+      {showProfilePrivacyModal && (
+        <ProfilePrivacyModal
+          isOpen={showProfilePrivacyModal}
+          onClose={() => setShowProfilePrivacyModal(false)}
+          userProfile={userProfile}
+          onUpdateProfile={(updated) => {
+            setUserProfile(prev => prev ? { ...prev, ...updated } : null);
+          }}
+        />
+      )}
+
+      {/* In-App Step-by-Step App Walkthrough Guide Modal */}
+      {showAppGuideModal && (
+        <VernuntAppGuideModal
+          isOpen={showAppGuideModal}
+          onClose={() => setShowAppGuideModal(false)}
+          onNavigateToTab={(tabId) => {
+            setAppMode('dashboard');
+            setActiveTab(tabId as any);
+          }}
+        />
+      )}
 
       {/* Conditionally Render Animated Loader overlay */}
       {isLoading && (

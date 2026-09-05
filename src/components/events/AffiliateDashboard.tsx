@@ -10,6 +10,7 @@ import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare
 import confetti from 'canvas-confetti';
 import { db } from '../../utils/firebase.ts';
 import { collection, query, where, onSnapshot, doc, updateDoc, setDoc, increment } from 'firebase/firestore';
+import InstagramFlyerModal from '../influencer/InstagramFlyerModal.tsx';
 
 interface AffiliateDashboardProps {
   userProfile: ChildProfile | null;
@@ -28,6 +29,7 @@ export default function AffiliateDashboard({
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [copiedGeneral, setCopiedGeneral] = useState(false);
   const [isUpdatingPayout, setIsUpdatingPayout] = useState(false);
+  const [showInstagramModal, setShowInstagramModal] = useState(false);
 
   // Payout Form States
   const [payoutMethod, setPayoutMethod] = useState<'upi' | 'bank_transfer'>(
@@ -371,6 +373,37 @@ export default function AffiliateDashboard({
             <span className="block text-[10px] text-purple-600 font-bold mt-0.5">30-day cookie active</span>
           </div>
         </div>
+      </div>
+
+      {/* Instagram Influencer Promo Asset Banner */}
+      <div className="bg-gradient-to-r from-purple-900 via-rose-900 to-amber-900 rounded-3xl p-5 sm:p-6 text-white border border-rose-500/30 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-500 to-amber-500 flex items-center justify-center shrink-0 shadow-md">
+            <span className="text-2xl">📸</span>
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <h3 className="font-serif font-black text-base text-white">
+                Instagram Influencer Collaboration Flyer
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[10px] font-black uppercase">
+                Ready to Post (1080x1080)
+              </span>
+            </div>
+            <p className="text-xs text-rose-200">
+              Download high-res Instagram post graphics telling influencers & creators to register on <strong className="text-white underline">app.vernunt.com</strong> to get brand collaboration deals!
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowInstagramModal(true)}
+          className="px-5 py-3 bg-white hover:bg-rose-50 active:scale-95 text-rose-950 font-black rounded-2xl text-xs transition cursor-pointer flex items-center gap-2 shadow-md shrink-0"
+        >
+          <span>Open Instagram Post Generator</span>
+          <ArrowUpRight className="w-4 h-4 text-rose-700" />
+        </button>
       </div>
 
       {/* Navigation Tabs Header */}
@@ -910,6 +943,15 @@ export default function AffiliateDashboard({
             </button>
           </form>
         </div>
+      )}
+
+      {/* Instagram Influencer Flyer Generator Modal */}
+      {showInstagramModal && (
+        <InstagramFlyerModal
+          isOpen={showInstagramModal}
+          onClose={() => setShowInstagramModal(false)}
+          defaultAffiliateCode={affiliateCode}
+        />
       )}
 
     </div>

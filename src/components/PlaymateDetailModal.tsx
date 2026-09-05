@@ -2,7 +2,6 @@ import React from 'react';
 import { ChildProfile } from '../types.ts';
 import PlaymateCard from './PlaymateCard.tsx';
 import { X, User } from 'lucide-react';
-import { PlaydateActivitySuggestions } from './PlaydateActivitySuggestions.tsx';
 
 interface PlaymateDetailModalProps {
   profile: ChildProfile;
@@ -120,19 +119,6 @@ export function PlaymateDetailModal({
               onClose();
             }}
           />
-
-          {/* Suggested Playdate Activities for this playmate pair */}
-          <div className="pt-2 border-t border-slate-100">
-            <PlaydateActivitySuggestions 
-              userProfile={currentUserProfile || null}
-              targetChild={profile}
-              allPlaymates={[profile]}
-              onSelectActivityForPlaydate={(activityTitle, location, notes) => {
-                onInitiatePlaydate(profile);
-                onClose();
-              }}
-            />
-          </div>
         </div>
       </div>
     </div>
