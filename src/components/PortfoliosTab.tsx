@@ -7,10 +7,12 @@ import { FALLBACK_DOCTOR_PHOTO } from '../utils/specialistUrls.ts';
 
 interface PortfoliosTabProps {
   currentProfile: ChildProfile | null;
+  onNavigateToSpecialists?: () => void;
   onNavigateToPediatricians?: () => void;
 }
 
-export default function PortfoliosTab({ currentProfile, onNavigateToPediatricians }: PortfoliosTabProps) {
+export default function PortfoliosTab({ currentProfile, onNavigateToSpecialists, onNavigateToPediatricians }: PortfoliosTabProps) {
+  const navSpecialists = onNavigateToSpecialists || onNavigateToPediatricians;
   const childName = currentProfile?.childName || 'Your Child';
   const gradeLevel = currentProfile?.gradeLevel || 'Kindergarten';
   const childAge = currentProfile?.childAge || 5;
@@ -200,8 +202,8 @@ export default function PortfoliosTab({ currentProfile, onNavigateToPediatrician
           </div>
         </div>
 
-        {/* Card 4: Bangalore Pediatricians for Immunizations & Clearances */}
-        <div id="pediatrician-clearance-card" className="bg-gradient-to-r from-rose-900 via-slate-900 to-amber-950 text-white rounded-3xl p-6 shadow-md space-y-4 lg:col-span-2">
+        {/* Card 4: Recommended Specialists for Immunizations & Clearances */}
+        <div id="specialist-clearance-card" className="bg-gradient-to-r from-rose-900 via-slate-900 to-amber-950 text-white rounded-3xl p-6 shadow-md space-y-4 lg:col-span-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
@@ -209,21 +211,21 @@ export default function PortfoliosTab({ currentProfile, onNavigateToPediatrician
                   <Stethoscope className="w-4 h-4" />
                 </span>
                 <h4 className="font-bold text-base font-serif text-white flex items-center gap-2">
-                  Recommended Bangalore Pediatricians for Immunization & School Clearances
+                  Recommended Specialists for Immunization, Health &amp; School Clearances
                 </h4>
               </div>
               <p className="text-xs text-slate-300 max-w-2xl">
-                Need doctor sign-off for school admission, daycare health clearances, or milestone evaluation? Connect directly with verified child health specialists across Bangalore.
+                Need doctor sign-off for school admission, daycare health clearances, or milestone evaluation? Connect directly with verified specialists across your city.
               </p>
             </div>
 
-            {onNavigateToPediatricians && (
+            {navSpecialists && (
               <button
                 type="button"
-                onClick={onNavigateToPediatricians}
+                onClick={navSpecialists}
                 className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center gap-2 self-start sm:self-auto cursor-pointer shadow-sm shrink-0"
               >
-                <span>View All 150+ Pediatricians</span>
+                <span>View All Specialists</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             )}
@@ -233,7 +235,7 @@ export default function PortfoliosTab({ currentProfile, onNavigateToPediatrician
             {BANGALORE_PEDIATRICIANS.slice(0, 4).map((doc) => (
               <div
                 key={doc.id}
-                onClick={onNavigateToPediatricians}
+                onClick={navSpecialists}
                 className="bg-white/10 hover:bg-white/15 border border-white/10 p-3 rounded-2xl transition cursor-pointer space-y-2 flex flex-col justify-between"
               >
                 <div className="flex items-start gap-2.5">

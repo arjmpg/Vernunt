@@ -21,6 +21,7 @@ interface EditProfileModalProps {
 
 export default function EditProfileModal({ currentProfile, onSave, onClose }: EditProfileModalProps) {
   const [parentName, setParentName] = useState(currentProfile.parentName || '');
+  const [parentGender, setParentGender] = useState<'Mother' | 'Father' | 'Other'>(currentProfile.parentGender || 'Mother');
   const [childName, setChildName] = useState(currentProfile.childName || '');
   const [childAge, setChildAge] = useState(currentProfile.childAge || 5);
   const [gradeLevel, setGradeLevel] = useState(currentProfile.gradeLevel || 'Kindergarten');
@@ -91,6 +92,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
         ? 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400'
         : 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400'),
       parentProfession: parentProfession.trim(),
+      parentGender: parentGender,
       motherTongue: motherTongue.trim(),
       languagesKnown: languagesStr.split(',').map(l => l.trim()).filter(Boolean),
       availableDays: availableDays,
@@ -243,6 +245,60 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
                 onChange={(e) => setChildName(e.target.value)}
                 className="w-full p-2.5 bg-white border border-slate-200 rounded-xl outline-none text-xs text-slate-700 font-bold"
               />
+            </div>
+          </div>
+
+          {/* Parent Gender / Relationship with Community Matching Hint */}
+          <div className="bg-gradient-to-r from-rose-50/80 via-amber-50/50 to-sky-50/70 p-3 rounded-2xl border border-rose-200/90 space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-rose-600" />
+                <span>Parent Identity / Gender</span>
+              </label>
+              <span className="text-[9.5px] font-bold text-rose-700 bg-rose-100/90 px-2 py-0.5 rounded-full">
+                For Group Connections
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setParentGender('Mother')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition cursor-pointer ${
+                  parentGender === 'Mother'
+                    ? 'bg-rose-500 text-white border-rose-600 shadow-xs ring-2 ring-rose-200'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-rose-50/50'
+                }`}
+              >
+                <span>👩 Mother</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setParentGender('Father')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition cursor-pointer ${
+                  parentGender === 'Father'
+                    ? 'bg-sky-600 text-white border-sky-700 shadow-xs ring-2 ring-sky-200'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-sky-50/50'
+                }`}
+              >
+                <span>👨 Father</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setParentGender('Other')}
+                className={`py-2 px-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1 border transition cursor-pointer ${
+                  parentGender === 'Other'
+                    ? 'bg-amber-500 text-white border-amber-600 shadow-xs ring-2 ring-amber-200'
+                    : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50/50'
+                }`}
+              >
+                <span>🧑 Guardian</span>
+              </button>
+            </div>
+            <div className="flex items-start gap-1.5 bg-white/90 p-2 rounded-xl text-[10.5px] text-slate-600 leading-tight">
+              <span className="shrink-0 text-sm">💡</span>
+              <p>
+                <strong>Community hint:</strong> Helps identify you for neighborhood <span className="font-semibold text-rose-700">Moms Circles</span> or weekend <span className="font-semibold text-sky-700">Dads Playgroups</span>.
+              </p>
             </div>
           </div>
 

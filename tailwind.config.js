@@ -5,6 +5,10 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        serif: ['"Outfit"', '"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+      },
       colors: {
         brand: {
           50: '#fffbeb',

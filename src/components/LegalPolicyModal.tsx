@@ -266,7 +266,7 @@ export default function LegalPolicyModal({
 
                 <h4 className="font-bold text-slate-900 text-sm font-serif">4. Data Security &amp; Encryption</h4>
                 <p>
-                  All data transmitted across Vernunt is secured using TLS 1.3 encryption in transit and AES-256 encryption at rest. Biometric authentication (fingerprint / Face ID / device screen lock) runs locally on user devices via the standard WebAuthn API; raw biometric data never leaves your device or touches our servers.
+                  All data transmitted across Vernunt is secured using TLS 1.3 encryption in transit and AES-256 encryption at rest. Accounts are safeguarded with verified multi-factor mobile OTP and encrypted password authentication; user data and credentials are strictly stored in compliance with Indian IT and DPDP guidelines.
                 </p>
 
                 <h4 className="font-bold text-slate-900 text-sm font-serif">5. Parental Rights: Access, Export &amp; Permanent Erasure</h4>

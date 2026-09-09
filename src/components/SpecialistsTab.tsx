@@ -352,10 +352,10 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
   const categories = [
     { key: 'All', label: 'All Specialists', icon: Compass, color: 'text-orange-500' },
-    { key: 'Pediatrician', label: 'Pediatricians & Child Doctors', icon: Stethoscope, color: 'text-rose-500' },
+    { key: 'Pediatrician', label: 'Pediatrician', icon: Stethoscope, color: 'text-rose-500' },
     { key: 'Gynecologist', label: 'Gynecologists & OB/GYN', icon: Heart, color: 'text-fuchsia-500' },
-    { key: 'Nutritionist', label: 'Children Nutritionists & Dietitians', icon: Utensils, color: 'text-emerald-500' },
-    { key: 'Coach', label: 'Kids Coaches & Sports Mentors', icon: Trophy, color: 'text-amber-500' },
+    { key: 'Nutritionist', label: 'Nutritionists & Dietitians', icon: Utensils, color: 'text-emerald-500' },
+    { key: 'Coach', label: 'Sports Coaches & Mentors', icon: Trophy, color: 'text-amber-500' },
     ...customSpecCats.map(cs => ({ key: cs.value, label: cs.name, icon: Briefcase, color: 'text-indigo-500' }))
   ];
 
@@ -795,7 +795,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const cityName = selectedCity !== 'all' && activeCityInfo ? activeCityInfo.name : 'Pan-India';
-    document.title = `${cityName} Pediatricians & Kids Doctors (${specialistsList.length}+ Verified) | Vernunt`;
+    document.title = `${cityName} Specialists Portfolio (${specialistsList.length}+ Verified) | Vernunt`;
   }, [selectedCity, activeCityInfo, specialistsList.length]);
 
   // Filter criteria logic with Pan-India Cities & Localities with guaranteed unique IDs
@@ -961,10 +961,10 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 id="specs-main-title" className="text-xl font-bold text-slate-800 font-serif flex items-center gap-2">
-            🧬 Vernunt Verified Child Specialist Network &amp; Pan-India Directory
+            🧬 Vernunt Verified Specialists Network &amp; Pan-India Directory
           </h3>
           <p id="specs-main-subtitle" className="text-xs text-slate-500">
-            Find and consult verified pediatricians, neonatologists, child dietitians, and pediatric health specialists across India.
+            Find and consult verified specialists across India — including pediatricians, gynecologists, child psychologists, dietitians, and health specialists.
           </p>
         </div>
 
@@ -992,14 +992,14 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-extrabold text-sm text-slate-900 font-serif">
-                  Pan-India Pediatrician &amp; Child Specialists Directory
+                  Pan-India Specialists Directory
                 </h4>
                 <span className="px-2 py-0.5 bg-rose-600 text-white text-[9.5px] font-black rounded-full uppercase tracking-wider">
                   Vernunt Verified
                 </span>
               </div>
               <p className="text-[11.5px] text-slate-600">
-                100% white-labeled authentic clinical portfolios from top pediatric hospitals and trusted local clinics across Indian metros.
+                100% verified authentic clinical portfolios from top hospitals and trusted clinics across Indian metros.
               </p>
             </div>
           </div>
@@ -1018,7 +1018,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                   : 'bg-white text-slate-700 hover:bg-rose-50 border-rose-200'
               }`}
             >
-              Pediatricians ({specialistsList.filter(s => s.category === 'Pediatrician').length})
+              Pediatrician ({specialistsList.filter(s => s.category === 'Pediatrician').length})
             </button>
             <button
               type="button"
@@ -1153,7 +1153,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         </span>
         {[
           { label: 'Kids Doctors Near Me', query: 'kids doctor' },
-          { label: 'Best Pediatrician', query: 'pediatrician' },
+          { label: 'Pediatrician', query: 'pediatrician' },
           { label: 'Gynecologists & OB/GYN', query: 'gynecologist' },
           { label: 'Newborn Vaccinations', query: 'vaccination' },
           { label: 'Pediatric Pulmonology', query: 'pulmonology' },
@@ -1229,7 +1229,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Search pediatrician, gynecologist, clinic, doctor..."
+            placeholder="Search specialist, clinic, doctor, or specialty..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-1.5 bg-white text-xs border border-slate-200 focus:border-rose-400 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 transition shadow-xs placeholder-slate-400 text-slate-700 font-bold"
@@ -1759,12 +1759,12 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                     onChange={(e) => setRegCategory(e.target.value)}
                     className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700"
                   >
-                    <option value="Pediatrician">Pediatrician / Child Specialist</option>
+                    <option value="Pediatrician">Pediatrician</option>
                     <option value="Gynecologist">Gynecologist &amp; Obstetrician</option>
                     <option value="Nutritionist">Child Nutritionist &amp; Dietitian</option>
                     <option value="Coach">Kids Coach &amp; Sports Mentor</option>
                     <option value="Therapist">Child Development &amp; Speech Therapist</option>
-                    <option value="Other">Other Healthcare Specialist</option>
+                    <option value="Other">Other Specialist</option>
                     {customSpecCats.map(cs => (
                       <option key={cs.id} value={cs.value}>✨ {cs.name}</option>
                     ))}
@@ -1791,7 +1791,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                   value={regPhoto}
                   onChange={setRegPhoto}
                   presetSuggestions={[
-                    { name: 'Pediatric Specialist', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400&crop=faces' },
+                    { name: 'Pediatrician', url: 'https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&q=80&w=400&crop=faces' },
                     { name: 'Clinical Nutritionist', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces' },
                     { name: 'Academy Language Coach', url: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&q=80&w=400&crop=faces' }
                   ]}
@@ -1989,7 +1989,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         </div>
       )}
 
-      {/* Rich Pediatrician & Specialist Portfolio Modal */}
+      {/* Rich Specialist Portfolio Modal */}
       {viewingPortfolioSpec && (
         <PediatricianPortfolioModal
           specialist={viewingPortfolioSpec}

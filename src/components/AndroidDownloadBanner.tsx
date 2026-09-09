@@ -47,8 +47,8 @@ export const AndroidDownloadBanner: React.FC<AndroidDownloadBannerProps> = ({
   }
 
   return (
-    <aside aria-label="Mobile Apps Announcement" className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 text-white px-3 sm:px-4 py-2 text-xs relative z-40 shadow-sm border-b border-rose-800/30">
-      <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+    <aside aria-label="Mobile Apps Announcement" className="w-full bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 text-white text-xs relative z-40 shadow-xs border-b border-rose-800/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5">
         
         {/* Banner Left Info */}
         <div 

@@ -23,7 +23,7 @@ export function getPublicIosProjectUrl(): string {
 export function getWhatsAppShareIosLink(): string {
   const url = typeof window !== 'undefined' ? window.location.origin : 'https://app.vernunt.com';
   const text = encodeURIComponent(
-    `🍏 Install Vernunt on iPhone & iPad:\n${url}\n\n1. Open link in Safari on your iPhone\n2. Tap Share (square with arrow up)\n3. Tap "Add to Home Screen" OR download the iOS App Profile directly!\n\nAccess 1,000+ verified pediatricians & neighborhood playmates across India.`
+    `🍏 Install Vernunt on iPhone & iPad:\n${url}\n\n1. Open link in Safari on your iPhone\n2. Tap Share (square with arrow up)\n3. Tap "Add to Home Screen" OR download the iOS App Profile directly!\n\nAccess 1,000+ verified specialists & neighborhood playmates across India.`
   );
   return `https://api.whatsapp.com/send?text=${text}`;
 }

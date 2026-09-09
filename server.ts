@@ -54,7 +54,6 @@ async function getFirebaseAdmin() {
 
 async function startServer() {
   const app = express();
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   // Enable JSON request body reading with 50mb limit for high-resolution Aadhaar document & PDF uploads
   app.use(express.json({ limit: "50mb" }));
@@ -4008,9 +4007,31 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Vernunt Full-Stack Server] Operating securely at http://localhost:${PORT}`);
+  const defaultPort = 3000;
+  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
+  const primaryPort = isNaN(envPort) ? defaultPort : envPort;
+
+  const server = app.listen(primaryPort, "0.0.0.0", () => {
+    console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${primaryPort}`);
   });
+  server.on("error", (err: any) => {
+    console.error(`[Vernunt Full-Stack Server] Primary port ${primaryPort} error:`, err.message);
+  });
+
+  // If primary port is not 3000, also bind to port 3000 to maintain internal reverse-proxy compatibility
+  if (primaryPort !== defaultPort) {
+    try {
+      const backupServer = app.listen(defaultPort, "0.0.0.0", () => {
+        console.log(`[Vernunt Full-Stack Server] Dual-port proxy listener active on http://0.0.0.0:${defaultPort}`);
+      });
+      backupServer.on("error", (err: any) => {
+        // EADDRINUSE is expected when an internal proxy already occupies port 3000
+        console.log(`[Vernunt Full-Stack Server] Port ${defaultPort} handled: ${err.message}`);
+      });
+    } catch (e: any) {
+      console.log(`[Vernunt Full-Stack Server] Dual-port initialization note: ${e.message}`);
+    }
+  }
 }
 
 startServer();

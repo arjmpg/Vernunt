@@ -23,7 +23,7 @@ export function getDirectFileApkUrl(): string {
 export function getWhatsAppShareApkLink(): string {
   const url = getPublicApkUrl();
   const text = encodeURIComponent(
-    `📲 Download Vernunt Android App (Official APK):\n${url}\n\nInstall directly on your Android phone to consult 1,000+ verified pediatricians across India & find neighborhood playmates.`
+    `📲 Download Vernunt Android App (Official APK):\n${url}\n\nInstall directly on your Android phone to consult 1,000+ verified specialists across India & find neighborhood playmates.`
   );
   return `https://api.whatsapp.com/send?text=${text}`;
 }

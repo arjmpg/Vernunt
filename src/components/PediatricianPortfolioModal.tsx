@@ -61,7 +61,7 @@ export default function PediatricianPortfolioModal({
   useEffect(() => {
     if (!specialist) return;
     const prevTitle = document.title;
-    document.title = `${cleanDocName} (${specialist.title}) - Vernunt Child Specialists Bangalore`;
+    document.title = `${cleanDocName} (${specialist.title}) - Vernunt Specialist Portfolio`;
 
     // 1. Google SEO Canonical Tag (invisible in UI, indexed by Google)
     let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -76,7 +76,7 @@ export default function PediatricianPortfolioModal({
     canonicalLink.href = directUrl;
 
     // 2. Google SEO Schema.org Physician JSON-LD
-    const scriptId = 'seo-pediatrician-jsonld';
+    const scriptId = 'seo-specialist-jsonld';
     let scriptTag = document.getElementById(scriptId) as HTMLScriptElement | null;
     if (!scriptTag) {
       scriptTag = document.createElement('script');
@@ -90,7 +90,7 @@ export default function PediatricianPortfolioModal({
       "name": cleanDocName,
       "description": specialist.bio,
       "image": specialist.photoUrl,
-      "medicalSpecialty": "Pediatrics",
+      "medicalSpecialty": specialist.category === 'Pediatrician' ? 'Pediatrics' : specialist.category || 'Specialist',
       "telephone": specialist.phone,
       "priceRange": `₹${specialist.sessionFee}`,
       "address": {
@@ -312,16 +312,14 @@ export default function PediatricianPortfolioModal({
             <div className="space-y-1 flex-1 pr-16 sm:pr-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-rose-500/40 text-rose-100 text-[10px] font-black uppercase tracking-wider border border-rose-300/30">
-                  {specialist.category === 'Nutritionist'
-                    ? 'Verified Child Nutritionist'
-                    : specialist.category === 'Coach'
-                    ? 'Verified Kids Coach'
-                    : specialist.category === 'Gynecologist'
-                    ? 'Verified Gynecologist'
-                    : 'Vernunt Verified Pediatrician'}
+                  {specialist.category === 'Pediatrician'
+                    ? 'Verified Pediatrician'
+                    : specialist.category
+                    ? `Verified ${specialist.category}`
+                    : 'Vernunt Verified Specialist'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 text-[10px] font-black uppercase tracking-wider border border-amber-300/30">
-                  Bangalore Specialist
+                  Verified Specialist Portfolio
                 </span>
               </div>
 
@@ -788,7 +786,7 @@ export default function PediatricianPortfolioModal({
                   />
                   <div className="text-xs">
                     <span className="font-bold text-slate-800 block">Photo Target</span>
-                    <span className="text-[11px] text-slate-500">Will update across all pediatrician cards</span>
+                    <span className="text-[11px] text-slate-500">Will update across all specialist cards</span>
                   </div>
                 </div>
               )}

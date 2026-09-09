@@ -627,9 +627,9 @@ export default function App() {
               // Check if user already exists under different document key or phone/email
               let existingDocData: ChildProfile | null = null;
               try {
-                const { collection, query, where, getDocs } = await import('firebase/firestore');
+                const { collection, query, where, getDocs, limit } = await import('firebase/firestore');
                 if (emailLower) {
-                  const qEmail = query(collection(db, 'users'), where('email', '==', emailLower));
+                  const qEmail = query(collection(db, 'users'), where('email', '==', emailLower), limit(1));
                   const snapEmail = await getDocs(qEmail);
                   if (!snapEmail.empty) {
                     existingDocData = snapEmail.docs[0].data() as ChildProfile;
@@ -637,7 +637,7 @@ export default function App() {
                 }
                 if (!existingDocData && firebaseUser.phoneNumber) {
                   const rawPhone = firebaseUser.phoneNumber.replace('+91', '').trim();
-                  const qPhone = query(collection(db, 'users'), where('phoneNumber', 'in', [firebaseUser.phoneNumber, rawPhone]));
+                  const qPhone = query(collection(db, 'users'), where('phoneNumber', 'in', [firebaseUser.phoneNumber, rawPhone]), limit(1));
                   const snapPhone = await getDocs(qPhone);
                   if (!snapPhone.empty) {
                     existingDocData = snapPhone.docs[0].data() as ChildProfile;
@@ -900,12 +900,12 @@ export default function App() {
     // Check if user already exists in Firestore database
     let existingProfile: ChildProfile | null = null;
     try {
-      const { collection, query, where, getDocs, doc, getDoc } = await import('firebase/firestore');
+      const { collection, query, where, getDocs, doc, getDoc, limit } = await import('firebase/firestore');
       const directDoc = await getDoc(doc(db, 'users', assignedUid));
       if (directDoc.exists()) {
         existingProfile = directDoc.data() as ChildProfile;
       } else {
-        const qEmail = query(collection(db, 'users'), where('email', '==', emailLower));
+        const qEmail = query(collection(db, 'users'), where('email', '==', emailLower), limit(1));
         const snapEmail = await getDocs(qEmail);
         if (!snapEmail.empty) {
           existingProfile = snapEmail.docs[0].data() as ChildProfile;
@@ -1622,7 +1622,22 @@ export default function App() {
   // Dynamic QR Code Event Check-in modal state
   const [showDynamicQrModal, setShowDynamicQrModal] = useState<boolean>(false);
   const [isGeneratingQrPass, setIsGeneratingQrPass] = useState<boolean>(false);
+  const [showQrBenefitsTooltip, setShowQrBenefitsTooltip] = useState<boolean>(false);
+  const qrBenefitsRef = useRef<HTMLDivElement | null>(null);
   const [organizerGateEvent, setOrganizerGateEvent] = useState<CommunityEvent | null>(null);
+
+  useEffect(() => {
+    if (!showQrBenefitsTooltip) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (qrBenefitsRef.current && !qrBenefitsRef.current.contains(e.target as Node)) {
+        setShowQrBenefitsTooltip(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showQrBenefitsTooltip]);
 
   // Handle Event QR Generation Action with smooth loading state and immediate toast notification
   const handleGenerateEventQrAction = () => {
@@ -2196,6 +2211,21 @@ export default function App() {
     try {
       localStorage.setItem('vernunt_cached_profile_' + uid, JSON.stringify(profileWithId));
       localStorage.setItem('vernunt_active_user_id', uid);
+
+      // Register contact in ultra-fast local lookup cache
+      const rawContacts = localStorage.getItem('vernunt_known_contacts');
+      const knownSet = new Set<string>(rawContacts ? JSON.parse(rawContacts) : []);
+      if (profileWithId.phoneNumber) {
+        const cleanP = profileWithId.phoneNumber.replace(/\D/g, '').slice(-10);
+        if (cleanP) {
+          knownSet.add(cleanP);
+          knownSet.add('+91' + cleanP);
+        }
+      }
+      if (profileWithId.email) {
+        knownSet.add(profileWithId.email.trim().toLowerCase());
+      }
+      localStorage.setItem('vernunt_known_contacts', JSON.stringify(Array.from(knownSet).slice(-500)));
     } catch (e) {
       console.warn('Local storage write note:', e);
     }
@@ -2547,47 +2577,51 @@ export default function App() {
       {/* Top Banner & Emergency Bar if Logged In / In Dashboard */}
       {appMode === 'dashboard' && (
         userProfile ? (
-          <div id="sos-top-banner" className="bg-slate-900 text-slate-100 py-2 sm:py-3 px-3 sm:px-4 md:px-8 border-b border-slate-800 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs w-full max-w-full overflow-hidden">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0"></span>
-              <span className="truncate">{t.loggedInAs}: <strong>{userProfile?.parentName}</strong> • Matchable with <strong>{playmates.length} {t.localPlaymatesCount}</strong>.</span>
+          <div id="sos-top-banner" className="bg-slate-900 text-slate-100 py-2 sm:py-2.5 border-b border-slate-800 w-full overflow-hidden">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0"></span>
+                <span className="truncate">{t.loggedInAs}: <strong>{userProfile?.parentName}</strong> • Matchable with <strong>{playmates.length} {t.localPlaymatesCount}</strong>.</span>
+              </div>
+              
+              <button
+                id="btn-trigger-sos"
+                onClick={() => setShowSOSModal(true)}
+                className="px-2.5 sm:px-3 py-1 bg-red-650 hover:bg-red-700 text-white font-bold rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0 uppercase tracking-wider text-[10px]"
+              >
+                <ShieldAlert className="w-3.5 h-3.5" /> {t.safetySOSHelp}
+              </button>
             </div>
-            
-            <button
-              id="btn-trigger-sos"
-              onClick={() => setShowSOSModal(true)}
-              className="px-2.5 sm:px-3 py-1 bg-red-650 hover:bg-red-700 text-white font-bold rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0 uppercase tracking-wider text-[10px]"
-            >
-              <ShieldAlert className="w-3.5 h-3.5" /> {t.safetySOSHelp}
-            </button>
           </div>
         ) : (
-          <div id="guest-specialists-top-banner" className="bg-slate-900 text-slate-100 py-2 px-3 sm:px-4 md:px-8 border-b border-slate-800 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs w-full max-w-full overflow-hidden">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="w-2 h-2 bg-rose-500 rounded-full animate-ping shrink-0"></span>
-              <span className="truncate font-medium text-slate-200">
-                <strong className="text-white">Vernunt Open Directory:</strong> Verified Pediatricians, Gynecologists &amp; Child Specialists across India ({specialistsList.length}+ Doctors)
-              </span>
-            </div>
-            
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setAppMode('landing')}
-                className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer"
-              >
-                ← Home
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAppMode('auth');
-                  setAuthMode('login');
-                }}
-                className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer"
-              >
-                Sign In
-              </button>
+          <div id="guest-specialists-top-banner" className="bg-slate-900 text-slate-100 py-2 border-b border-slate-800 w-full overflow-hidden">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="w-2 h-2 bg-rose-500 rounded-full animate-ping shrink-0"></span>
+                <span className="truncate font-medium text-slate-200">
+                  <strong className="text-white">Vernunt Open Directory:</strong> Verified Specialists across India ({specialistsList.length}+ Specialists)
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setAppMode('landing')}
+                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer"
+                >
+                  ← Home
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppMode('auth');
+                    setAuthMode('login');
+                  }}
+                  className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer"
+                >
+                  Sign In
+                </button>
+              </div>
             </div>
           </div>
         )
@@ -2600,94 +2634,95 @@ export default function App() {
       />
 
       {/* Main Header navigation */}
-      <header id="main-navigation-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs px-3 sm:px-4 md:px-8 py-2.5 md:py-3 flex items-center justify-between gap-2 w-full max-w-full">
-        <div 
-          id="logo-branding-block" 
-          className="flex items-center gap-2 cursor-pointer group shrink-0"
-          onClick={() => {
-            if (auth.currentUser || userProfile) {
-              setAppMode('dashboard');
-              setActiveTab('radar');
-            } else {
-              setIsGuestViewingKnowledge(false);
-              setGuestKnowledgeSlug(undefined);
-              setAppMode('landing');
-            }
-          }}
-          title={auth.currentUser || userProfile ? "Go to Radar Tab" : "Back to Landing Gateway"}
-        >
-          <VernuntLogo size="xs" showText={false} animated={true} />
-          <div className="flex flex-col">
-            <span id="nav-brand-title" className="text-lg sm:text-xl font-black tracking-tight leading-none text-slate-900 font-serif flex items-center gap-1.5">
-              <span>
-                <span className="text-rose-700">vern</span>
-                <span className="text-amber-500">unt</span>
-                <span className="text-rose-800 text-[10px] sm:text-xs font-sans font-bold ml-0.5">.com</span>
-              </span>
-              {isOffline && (
-                <span className="bg-amber-100/80 border border-amber-200/60 text-amber-900 font-sans font-bold text-[8px] tracking-wide px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                  <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse inline-block" /> Offline
+      <header id="main-navigation-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 md:py-3 flex items-center justify-between gap-3 w-full">
+          <div 
+            id="logo-branding-block" 
+            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
+            onClick={() => {
+              if (auth.currentUser || userProfile) {
+                setAppMode('dashboard');
+                setActiveTab('radar');
+              } else {
+                setIsGuestViewingKnowledge(false);
+                setGuestKnowledgeSlug(undefined);
+                setAppMode('landing');
+              }
+            }}
+            title={auth.currentUser || userProfile ? "Go to Radar Tab" : "Back to Landing Gateway"}
+          >
+            <VernuntLogo size="xs" showText={false} animated={true} />
+            <div className="flex flex-col">
+              <span id="nav-brand-title" className="text-lg sm:text-xl font-black tracking-tight leading-none text-slate-900 font-serif flex items-center gap-1.5">
+                <span>
+                  <span className="text-rose-700">vern</span>
+                  <span className="text-amber-500">unt</span>
+                  <span className="text-rose-800 text-[10px] sm:text-xs font-sans font-bold ml-0.5">.com</span>
                 </span>
-              )}
-            </span>
-            <span className="block text-[7.5px] sm:text-[8px] uppercase font-black text-rose-800 tracking-wider mt-0.5">Verified Playmate Network</span>
+                {isOffline && (
+                  <span className="bg-amber-100/80 border border-amber-200/60 text-amber-900 font-sans font-bold text-[8px] tracking-wide px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
+                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse inline-block" /> Offline
+                  </span>
+                )}
+              </span>
+              <span className="block text-[7.5px] sm:text-[8px] uppercase font-black text-rose-800 tracking-wider mt-0.5">Verified Playmate Network</span>
+            </div>
           </div>
-        </div>
 
-        {/* Dynamic Nav Tabs for Dashboard */}
-        {appMode === 'dashboard' && (
-          <nav id="nav-menu-links" className="hidden lg:flex items-center gap-1.5">
-            {Object.entries(tabsConfig)
-              .filter(([_, placement]) => placement === 'header')
-              .map(([tabId]) => {
-                // Public guest restriction
-                if (!userProfile && tabId !== 'specialists' && tabId !== 'knowledge' && tabId !== 'store' && tabId !== 'events' && tabId !== 'kid_stories') return null;
+          {/* Dynamic Nav Tabs for Dashboard */}
+          {appMode === 'dashboard' && (
+            <nav id="nav-menu-links" className="hidden lg:flex items-center gap-1.5">
+              {Object.entries(tabsConfig)
+                .filter(([_, placement]) => placement === 'header')
+                .map(([tabId]) => {
+                  // Public guest restriction
+                  if (!userProfile && tabId !== 'specialists' && tabId !== 'knowledge' && tabId !== 'store' && tabId !== 'events' && tabId !== 'kid_stories') return null;
 
-                // Guards
-                if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
-                if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
+                  // Guards
+                  if (tabId === 'admin' && userProfile?.userRole !== 'Admin') return null;
+                  if (tabId === 'business' && userProfile?.userRole === 'Parent') return null;
 
-                const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
-                if (!def) return null;
+                  const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
+                  if (!def) return null;
 
-                const IconComponent = def.icon;
-                const isBilling = tabId === 'billing';
+                  const IconComponent = def.icon;
+                  const isBilling = tabId === 'billing';
 
-                return (
-                  <button
-                    key={tabId}
-                    id={`tab-btn-${tabId}`}
-                    onClick={() => setActiveTab(tabId as any)}
-                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
-                      activeTab === tabId
-                        ? isBilling
-                          ? 'bg-amber-500 text-slate-950 font-black shadow-md'
-                          : 'bg-rose-700 text-white shadow-md shadow-rose-700/20 font-black'
-                        : isBilling
-                        ? 'hover:bg-amber-100/40 text-amber-800 bg-amber-500/10 border border-amber-200/60'
-                        : 'hover:bg-rose-50 text-slate-700 hover:text-rose-800'
-                    }`}
-                  >
-                    <IconComponent className={`w-4 h-4 ${isBilling ? 'text-amber-600 animate-pulse' : activeTab === tabId ? 'text-white' : 'text-rose-700'}`} />
-                    {tabId === 'billing' ? '👑 VIP Club' : def.label === 'Near Playmates' ? t.nearPlaymates : def.label === 'Chat Messenger' ? 'Messages' : def.label === 'Events & Classes' ? 'Play Events' : def.label === 'Specialists' ? 'Specialists' : def.label}
-                  </button>
-                );
-              })}
+                  return (
+                    <button
+                      key={tabId}
+                      id={`tab-btn-${tabId}`}
+                      onClick={() => setActiveTab(tabId as any)}
+                      className={`px-3.5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                        activeTab === tabId
+                          ? isBilling
+                            ? 'bg-amber-500 text-slate-950 font-black shadow-md'
+                            : 'bg-rose-700 text-white shadow-md shadow-rose-700/20 font-black'
+                          : isBilling
+                          ? 'hover:bg-amber-100/40 text-amber-800 bg-amber-500/10 border border-amber-200/60'
+                          : 'hover:bg-rose-50 text-slate-700 hover:text-rose-800'
+                      }`}
+                    >
+                      <IconComponent className={`w-4 h-4 ${isBilling ? 'text-amber-600 animate-pulse' : activeTab === tabId ? 'text-white' : 'text-rose-700'}`} />
+                      {tabId === 'billing' ? '👑 VIP Club' : def.label === 'Near Playmates' ? t.nearPlaymates : def.label === 'Chat Messenger' ? 'Messages' : def.label === 'Events & Classes' ? 'Play Events' : def.label === 'Specialists' ? 'Specialists' : def.label}
+                    </button>
+                  );
+                })}
 
-            {/* More Menu Trigger Button */}
-            <button
-              id="tab-btn-more-menu"
-              onClick={() => setIsSideMenuOpen(true)}
-              className="px-3.5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-1 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 cursor-pointer"
-              title="Open full feature exploration menu"
-            >
-              <Menu className="w-4 h-4 text-slate-600" /> More Options
-            </button>
-          </nav>
-        )}
+              {/* More Menu Trigger Button */}
+              <button
+                id="tab-btn-more-menu"
+                onClick={() => setIsSideMenuOpen(true)}
+                className="px-3.5 py-2.5 rounded-xl text-xs font-black transition flex items-center gap-1 text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 cursor-pointer"
+                title="Open full feature exploration menu"
+              >
+                <Menu className="w-4 h-4 text-slate-600" /> More Options
+              </button>
+            </nav>
+          )}
 
-        {/* User Identity / Action Block & Global Language Dropdown */}
-        <div id="user-branding-badge" className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* User Identity / Action Block & Global Language Dropdown */}
+          <div id="user-branding-badge" className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           {/* PWA & Android App Installation Actions */}
           <PWAInstallButton />
 
@@ -2833,16 +2868,16 @@ export default function App() {
                 <span className="hidden xl:inline">App Guide</span>
               </button>
 
-              {/* Profile Privacy & Biometrics Button */}
+              {/* Profile Privacy & Visibility Button */}
               <button
                 id="btn-header-profile-privacy"
                 type="button"
                 onClick={() => setShowProfilePrivacyModal(true)}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-900 border border-rose-300/80 rounded-xl text-xs font-black transition cursor-pointer shadow-2xs transform hover:scale-102"
-                title="Profile visibility (Mom/Dad), Biometric login & SEO Shield"
+                title="Profile visibility (Mom/Dad) & SEO Privacy Shield"
               >
-                <Fingerprint className="w-3.5 h-3.5 text-rose-700" />
-                <span className="hidden xl:inline">Privacy &amp; Bio</span>
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-700" />
+                <span className="hidden xl:inline">Privacy &amp; Visibility</span>
                 <span className="text-[9px] bg-rose-600 text-white px-1.5 py-0.2 rounded font-extrabold uppercase">
                   {userProfile?.profileVisibility || 'Mom'}
                 </span>
@@ -2923,7 +2958,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 sm:gap-3 select-none font-sans flex-wrap">
+            <div className="flex items-center gap-2 select-none font-sans flex-wrap justify-end">
               {/* Public Specialists Tab Trigger */}
               <button
                 id="header-btn-specialists-public"
@@ -2933,12 +2968,12 @@ export default function App() {
                   setActiveTab('specialists');
                   setIsGuestViewingKnowledge(false);
                 }}
-                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border flex items-center gap-1.5 transition cursor-pointer ${
+                className={`text-xs font-bold px-3 py-2 rounded-xl border flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
                   appMode === 'dashboard' && activeTab === 'specialists'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                    : 'bg-rose-50/80 text-rose-800 border-rose-200/80 hover:bg-rose-100/80'
                 }`}
-                title="View verified pediatricians & child specialists portfolios across India"
+                title="View verified specialists portfolios across India"
               >
                 <Users className="w-3.5 h-3.5 text-rose-600" />
                 <span>🩺 Specialists ({specialistsList.length}+)</span>
@@ -2953,10 +2988,10 @@ export default function App() {
                   setActiveTab('kid_stories');
                   setIsGuestViewingKnowledge(false);
                 }}
-                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border hidden sm:flex items-center gap-1.5 transition cursor-pointer ${
+                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden sm:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
                   appMode === 'dashboard' && activeTab === 'kid_stories'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-rose-50/60 text-rose-800 border-rose-200 hover:bg-rose-100'
+                    : 'bg-rose-50/60 text-rose-800 border-rose-200/70 hover:bg-rose-100/70'
                 }`}
                 title="Read & publish kid achievements, awards and stories"
               >
@@ -2973,10 +3008,10 @@ export default function App() {
                   setActiveTab('events');
                   setIsGuestViewingKnowledge(false);
                 }}
-                className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border hidden md:flex items-center gap-1.5 transition cursor-pointer ${
+                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden md:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
                   appMode === 'dashboard' && activeTab === 'events'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-indigo-50/60 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
+                    : 'bg-indigo-50/60 text-indigo-900 border-indigo-200/70 hover:bg-indigo-100/70'
                 }`}
                 title="Browse kids events, workshops and weekend activities"
               >
@@ -2999,7 +3034,7 @@ export default function App() {
                     setGuestKnowledgeSlug(undefined);
                   }
                 }}
-                className={`text-xs font-bold px-3 py-1.5 rounded-xl border hidden lg:flex items-center gap-1.5 transition cursor-pointer ${
+                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden lg:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
                   (appMode === 'dashboard' && activeTab === 'knowledge') || isGuestViewingKnowledge
                     ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
@@ -3017,7 +3052,7 @@ export default function App() {
                   setAppMode('dashboard');
                   setActiveTab('store');
                 }}
-                className={`text-xs font-bold hidden md:flex items-center gap-1.5 transition cursor-pointer px-2.5 py-1.5 rounded-xl border ${
+                className={`text-xs font-bold hidden md:flex items-center gap-1.5 transition cursor-pointer px-3 py-2 rounded-xl border shrink-0 ${
                   appMode === 'dashboard' && activeTab === 'store'
                     ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
                     : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
@@ -3035,14 +3070,14 @@ export default function App() {
                   setVoiceInitialLanguage('en-IN');
                   setShowKannadaVoiceModal(true);
                 }}
-                className="text-xs bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white font-black hidden sm:flex items-center gap-1.5 transition hover:scale-102 cursor-pointer px-3 py-1.5 rounded-xl border border-rose-600/80 shadow-xs"
+                className="text-xs bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white font-black hidden sm:flex items-center gap-1.5 transition hover:scale-102 cursor-pointer px-3 py-2 rounded-xl border border-rose-600/80 shadow-xs shrink-0"
                 title="Call for support (English, Kannada, Hindi, Tamil, Telugu & all Indian languages)"
               >
                 <span className="text-sm animate-bounce">🎙️</span>
                 <span>Helpline</span>
               </button>
 
-              <span className="w-px h-3 bg-slate-200 hidden sm:inline" />
+              <span className="w-px h-4 bg-slate-200 hidden sm:inline shrink-0" />
 
               {/* Sign In & Join for Guests */}
               <button
@@ -3051,7 +3086,7 @@ export default function App() {
                   setAppMode('auth');
                   setAuthMode('login');
                 }}
-                className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-xl hover:bg-slate-100 transition cursor-pointer"
+                className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl hover:bg-slate-100 transition cursor-pointer shrink-0"
               >
                 Sign In
               </button>
@@ -3061,77 +3096,80 @@ export default function App() {
                   setAppMode('auth');
                   setAuthMode('register');
                 }}
-                className="text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
+                className="text-xs font-black bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl shadow-xs transition cursor-pointer shrink-0"
               >
                 Join Free
               </button>
             </div>
           )}
+          </div>
         </div>
       </header>
 
       {/* Mobile Sub-Header Bar: Brings Trust Score and Logout clearly below the header for easy one-tap access on mobile */}
       {appMode === 'dashboard' && userProfile && (
-        <div id="mobile-user-status-bar" className="md:hidden bg-gradient-to-r from-rose-50/90 via-amber-50/60 to-rose-50/90 border-b border-rose-200/70 px-3 py-2 flex items-center justify-between gap-2 text-xs w-full max-w-full shadow-2xs">
-          {/* Trust Score Button */}
-          <button
-            id="btn-mob-trustscore"
-            onClick={() => setShowTrustScoreExplanation(true)}
-            className="flex items-center gap-2 bg-white/95 border border-rose-200/90 hover:border-rose-300 rounded-xl px-2.5 py-1.5 shadow-2xs transition active:scale-95 text-left cursor-pointer shrink-0"
-            title="View Safety & Trust Score Breakdown"
-          >
-            <div className="flex flex-col">
-              <span className="text-[8px] font-black text-rose-800 uppercase tracking-widest leading-none">Trust Score</span>
-              <span className="text-xs font-serif font-black text-rose-950 leading-tight">
-                {calculateTrustScore(userProfile)}/100
+        <div id="mobile-user-status-bar" className="md:hidden bg-gradient-to-r from-rose-50/90 via-amber-50/60 to-rose-50/90 border-b border-rose-200/70 py-2 w-full shadow-2xs">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2 text-xs w-full">
+            {/* Trust Score Button */}
+            <button
+              id="btn-mob-trustscore"
+              onClick={() => setShowTrustScoreExplanation(true)}
+              className="flex items-center gap-2 bg-white/95 border border-rose-200/90 hover:border-rose-300 rounded-xl px-2.5 py-1.5 shadow-2xs transition active:scale-95 text-left cursor-pointer shrink-0"
+              title="View Safety & Trust Score Breakdown"
+            >
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-rose-800 uppercase tracking-widest leading-none">Trust Score</span>
+                <span className="text-xs font-serif font-black text-rose-950 leading-tight">
+                  {calculateTrustScore(userProfile)}/100
+                </span>
+              </div>
+              <span className="text-xs font-mono font-black text-rose-700 bg-rose-100/70 px-1 py-0.5 rounded">
+                🛡️
+              </span>
+            </button>
+
+            {/* Mobile Contacts Privacy Button */}
+            <button
+              id="btn-mob-contacts-privacy"
+              type="button"
+              onClick={() => setShowContactsPrivacyModal(true)}
+              className="flex items-center gap-1 bg-white/95 border border-rose-200 rounded-xl px-2 py-1.5 shadow-2xs transition active:scale-95 text-rose-900 font-bold text-[10px] cursor-pointer shrink-0"
+              title="Manage Phone Contacts Privacy & Ghost Mode"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-rose-700" />
+              <span>Contacts</span>
+              {userProfile?.contactsPrivacy?.autoHideFromAllContacts ? (
+                <span className="text-[8px] bg-rose-600 text-white px-1 rounded font-black">Ghost</span>
+              ) : (
+                <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">
+                  Active
+                </span>
+              )}
+            </button>
+
+            {/* User Parent Name & Aadhaar Badge */}
+            <div className="flex items-center gap-1 min-w-0 flex-1 justify-center overflow-hidden">
+              <span className={`text-[9px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider truncate flex items-center gap-1 border ${
+                userProfile?.aadhaarVerified 
+                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                  : 'bg-amber-50 text-amber-800 border-amber-200'
+              }`}>
+                {userProfile?.aadhaarVerified ? '✓ Verified' : '⚠ Unverified'}
               </span>
             </div>
-            <span className="text-xs font-mono font-black text-rose-700 bg-rose-100/70 px-1 py-0.5 rounded">
-              🛡️
-            </span>
-          </button>
 
-          {/* Mobile Contacts Privacy Button */}
-          <button
-            id="btn-mob-contacts-privacy"
-            type="button"
-            onClick={() => setShowContactsPrivacyModal(true)}
-            className="flex items-center gap-1 bg-white/95 border border-rose-200 rounded-xl px-2 py-1.5 shadow-2xs transition active:scale-95 text-rose-900 font-bold text-[10px] cursor-pointer shrink-0"
-            title="Manage Phone Contacts Privacy & Ghost Mode"
-          >
-            <Smartphone className="w-3.5 h-3.5 text-rose-700" />
-            <span>Contacts</span>
-            {userProfile?.contactsPrivacy?.autoHideFromAllContacts ? (
-              <span className="text-[8px] bg-rose-600 text-white px-1 rounded font-black">Ghost</span>
-            ) : (
-              <span className="text-[8px] bg-emerald-100 text-emerald-800 px-1 rounded font-black">
-                Active
-              </span>
-            )}
-          </button>
-
-          {/* User Parent Name & Aadhaar Badge */}
-          <div className="flex items-center gap-1 min-w-0 flex-1 justify-center overflow-hidden">
-            <span className={`text-[9px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider truncate flex items-center gap-1 border ${
-              userProfile?.aadhaarVerified 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                : 'bg-amber-50 text-amber-800 border-amber-200'
-            }`}>
-              {userProfile?.aadhaarVerified ? '✓ Verified' : '⚠ Unverified'}
-            </span>
+            {/* Direct Mobile Log Out Button */}
+            <button
+              id="btn-mob-logout"
+              onClick={handleLogOut}
+              type="button"
+              className="flex items-center gap-1 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 hover:text-rose-900 px-2.5 py-1.5 rounded-xl text-xs font-black shadow-2xs transition active:scale-95 shrink-0 cursor-pointer"
+              title="Log Out of Vernunt"
+            >
+              <LogOut className="w-3.5 h-3.5 text-rose-700" />
+              <span>Log Out</span>
+            </button>
           </div>
-
-          {/* Direct Mobile Log Out Button */}
-          <button
-            id="btn-mob-logout"
-            onClick={handleLogOut}
-            type="button"
-            className="flex items-center gap-1 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 hover:text-rose-900 px-2.5 py-1.5 rounded-xl text-xs font-black shadow-2xs transition active:scale-95 shrink-0 cursor-pointer"
-            title="Log Out of Vernunt"
-          >
-            <LogOut className="w-3.5 h-3.5 text-rose-700" />
-            <span>Log Out</span>
-          </button>
         </div>
       )}
 
@@ -3141,16 +3179,18 @@ export default function App() {
           type="button"
           id="banner-shop-favourite-products"
           onClick={() => setActiveTab('store')}
-          className="w-full bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-800 hover:to-rose-700 text-white py-2.5 px-4 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 text-xs sm:text-sm font-extrabold shadow-sm transition-all duration-200 cursor-pointer border-b border-rose-800/30 group text-center"
+          className="w-full bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 hover:from-rose-800 hover:to-rose-700 text-white py-2.5 px-4 shadow-sm transition-all duration-200 cursor-pointer border-b border-rose-800/30 group text-center"
           title="Shop your child's favourite products on Vernunt Store"
         >
-          <div className="flex items-center gap-2 whitespace-normal sm:whitespace-nowrap">
-            <ShoppingBag className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform shrink-0" />
-            <span className="font-serif tracking-wide">Shop verified child toys, Montessori kits &amp; STEM activities</span>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap sm:flex-nowrap items-center justify-center gap-2 w-full">
+            <div className="flex items-center gap-2 whitespace-normal sm:whitespace-nowrap">
+              <ShoppingBag className="w-4 h-4 text-amber-200 group-hover:scale-110 transition-transform shrink-0" />
+              <span className="font-serif tracking-wide text-xs sm:text-sm">Shop verified child toys, Montessori kits &amp; STEM activities</span>
+            </div>
+            <span className="ml-1 bg-white/20 hover:bg-white/30 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0 border border-white/30 shadow-2xs whitespace-nowrap">
+              Vernunt Store 🛍️
+            </span>
           </div>
-          <span className="ml-1 bg-white/20 hover:bg-white/30 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full flex items-center gap-1 shrink-0 border border-white/30 shadow-2xs whitespace-nowrap">
-            Vernunt Store 🛍️
-          </span>
         </button>
       )}
 
@@ -3158,9 +3198,9 @@ export default function App() {
       {appMode === 'dashboard' && (
         <div 
           id="mobile-sticky-tabs" 
-          className="lg:hidden bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-[60px] sm:top-[68px] z-20 shadow-xs px-2.5 py-2"
+          className="lg:hidden bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-[60px] sm:top-[68px] z-20 shadow-xs py-2"
         >
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
+          <div className="max-w-7xl mx-auto px-3 sm:px-4 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth">
             {Object.entries(tabsConfig)
               .filter(([_, placement]) => placement === 'header')
               .map(([tabId]) => {
@@ -3227,7 +3267,7 @@ export default function App() {
       )}
 
       {/* Main content body panel */}
-      <main id="app-main" className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-8">
+      <main id="app-main" className={`flex-1 w-full ${appMode === 'landing' && !isGuestViewingKnowledge ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8'}`}>
         
         {/* Onboarding View Logic */}
         {appMode === 'landing' && !isGuestViewingKnowledge && (
@@ -3548,10 +3588,10 @@ export default function App() {
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-black font-serif text-slate-900">
-                    Vernunt Pan-India Pediatricians &amp; Specialists Directory
+                    Vernunt Pan-India Specialists Directory
                   </h3>
                   <p className="text-sm text-slate-600 max-w-md mx-auto">
-                    This section requires verified guardian sign-in. However, our <strong>Pan-India Pediatricians &amp; Specialists Directory</strong> is 100% open and accessible to the public without any login!
+                    This section requires verified guardian sign-in. However, our <strong>Pan-India Specialists Directory</strong> is 100% open and accessible to the public without any login!
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -3560,7 +3600,7 @@ export default function App() {
                     onClick={() => setActiveTab('specialists')}
                     className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
                   >
-                    Explore 161+ Verified Doctors &amp; Portfolios ↗
+                    Explore Verified Specialists &amp; Portfolios ↗
                   </button>
                   <button
                     type="button"
@@ -3603,28 +3643,119 @@ export default function App() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      id="btn-generate-event-qr-action"
-                      type="button"
-                      onClick={handleGenerateEventQrAction}
-                      disabled={isGeneratingQrPass}
-                      className="relative overflow-hidden group px-4 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-500 hover:via-orange-600 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-orange-500/30 transform transition-all duration-300 hover:scale-105 active:scale-95 animate-pulse hover:animate-none cursor-pointer shrink-0 font-sans ring-2 ring-amber-400/50 hover:ring-amber-300 disabled:opacity-85 disabled:cursor-wait"
-                    >
-                      {/* Shimmer light-beam overlay for enhanced discoverability */}
-                      <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
-                      
-                      {isGeneratingQrPass ? (
-                        <>
-                          <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
-                          <span>Generating Dynamic QR Pass...</span>
-                        </>
-                      ) : (
-                        <>
-                          <ScanLine className="w-4 h-4 text-slate-950 animate-bounce" />
-                          <span>Generate Dynamic QR Pass</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0 relative" ref={qrBenefitsRef}>
+                      <button
+                        id="btn-generate-event-qr-action"
+                        type="button"
+                        onClick={handleGenerateEventQrAction}
+                        disabled={isGeneratingQrPass}
+                        className="relative overflow-hidden group px-4 py-2.5 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 hover:from-amber-500 hover:via-orange-600 hover:to-amber-600 text-slate-950 text-xs font-black rounded-xl flex items-center justify-center gap-2 shadow-md hover:shadow-xl hover:shadow-orange-500/30 transform transition-all duration-300 hover:scale-105 active:scale-95 animate-pulse hover:animate-none cursor-pointer shrink-0 font-sans ring-2 ring-amber-400/50 hover:ring-amber-300 disabled:opacity-85 disabled:cursor-wait"
+                      >
+                        {/* Shimmer light-beam overlay for enhanced discoverability */}
+                        <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/35 to-transparent pointer-events-none" />
+                        
+                        {isGeneratingQrPass ? (
+                          <>
+                            <Loader2 className="w-4 h-4 text-slate-950 animate-spin" />
+                            <span>Generating Dynamic QR Pass...</span>
+                          </>
+                        ) : (
+                          <>
+                            <ScanLine className="w-4 h-4 text-slate-950 animate-bounce" />
+                            <span>Generate Dynamic QR Pass</span>
+                          </>
+                        )}
+                      </button>
+
+                      {/* Secondary button & tooltip explaining Dynamic QR Pass benefits to first-time users */}
+                      <div className="relative">
+                        <button
+                          id="btn-event-qr-benefits-info"
+                          type="button"
+                          onClick={() => setShowQrBenefitsTooltip((prev) => !prev)}
+                          onMouseEnter={() => setShowQrBenefitsTooltip(true)}
+                          aria-label="Explain Dynamic QR Pass benefits and faster gate entry"
+                          title="Click or hover to learn how Dynamic QR Pass reduces wait times"
+                          className="px-3 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-amber-300 hover:text-amber-200 border border-slate-700 hover:border-amber-400/50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-400/50 shrink-0"
+                        >
+                          <HelpCircle className="w-4 h-4 shrink-0 text-amber-400" />
+                          <span className="hidden sm:inline">Pass Benefits</span>
+                        </button>
+
+                        {/* Interactive Tooltip / Popover for first-time users */}
+                        {showQrBenefitsTooltip && (
+                          <div
+                            id="tooltip-event-qr-benefits"
+                            role="tooltip"
+                            className="absolute right-0 top-full mt-2 w-72 sm:w-80 p-3.5 bg-slate-900/98 backdrop-blur-md text-white rounded-2xl border border-amber-500/40 shadow-2xl z-50 animate-fadeIn text-left space-y-2.5"
+                          >
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                              <div className="flex items-center gap-1.5 font-bold text-amber-400 text-xs">
+                                <Zap className="w-3.5 h-3.5 text-amber-400" />
+                                <span>Why Use Dynamic QR Pass?</span>
+                              </div>
+                              <button
+                                id="btn-close-qr-benefits-tooltip"
+                                type="button"
+                                onClick={() => setShowQrBenefitsTooltip(false)}
+                                className="text-slate-400 hover:text-white p-0.5 rounded cursor-pointer transition-colors"
+                                aria-label="Close tooltip"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+
+                            <ul className="space-y-2 text-[11px] text-slate-300">
+                              <li className="flex items-start gap-2">
+                                <Clock className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="text-white font-semibold">Reduced Entry Wait Times:</strong>
+                                  <p className="text-slate-300 leading-snug">
+                                    Instant 1-second gate check-in via organizer scanner. Skip manual registration queues and walk right into events.
+                                  </p>
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <ShieldCheck className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="text-white font-semibold">Anti-Fraud & Rotating Security:</strong>
+                                  <p className="text-slate-300 leading-snug">
+                                    Dynamic cryptographic tokens refresh automatically, preventing screenshot duplication and unauthorized transfers.
+                                  </p>
+                                </div>
+                              </li>
+                              <li className="flex items-start gap-2">
+                                <Users className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="text-white font-semibold">All-In-One Family Check-In:</strong>
+                                  <p className="text-slate-300 leading-snug">
+                                    Admits all registered family members on a single screen, complete with offline backup check-in codes.
+                                  </p>
+                                </div>
+                              </li>
+                            </ul>
+
+                            <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10.5px]">
+                              <span className="text-emerald-400 font-medium flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                Express Lane Active
+                              </span>
+                              <button
+                                id="btn-qr-benefits-quick-generate"
+                                type="button"
+                                onClick={() => {
+                                  setShowQrBenefitsTooltip(false);
+                                  handleGenerateEventQrAction();
+                                }}
+                                className="text-amber-400 hover:text-amber-300 font-bold hover:underline cursor-pointer"
+                              >
+                                Generate Pass Now →
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Babysitting & Drop-in Daycare Marketplace Feature Banner */}
@@ -4811,7 +4942,7 @@ export default function App() {
             {activeTab === 'portfolio' && userProfile && (
               <PortfoliosTab 
                 currentProfile={userProfile} 
-                onNavigateToPediatricians={() => {
+                onNavigateToSpecialists={() => {
                   setActiveTab('specialists');
                 }}
               />
@@ -4877,22 +5008,43 @@ export default function App() {
       </main>
 
       {/* Persistent global footer */}
-      <footer id="global-page-footer" className="bg-white border-t border-slate-200/80 py-10 text-center text-xs text-slate-500 mt-auto px-4">
-        <div className="max-w-5xl mx-auto space-y-6 mb-6">
+      <footer id="global-page-footer" className="bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-12 pb-10 mt-auto text-slate-600">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           
-          {/* Dedicated Host & Provider Registration Portals */}
-          <div className="bg-slate-50/80 border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-b border-slate-200/70 pb-3">
-              <div className="text-left">
-                <span className="text-[10px] uppercase font-black tracking-wider text-rose-700 block">Host &amp; Provider Registration Portals</span>
-                <p className="text-[11px] text-slate-600 font-medium">Join Vernunt's verified neighborhood childcare, daycare &amp; activities network</p>
+          {/* Dedicated Host & Provider Registration Portals Card */}
+          <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
+              <div className="space-y-1.5 text-left">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] uppercase font-black tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/60">
+                    Partner With Vernunt
+                  </span>
+                  <span className="text-[11px] font-bold bg-amber-50 text-amber-900 px-3 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1.5">
+                    <span>🎁</span> 6 – 12 Months Free Introductory Offer
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 font-serif">
+                  Join India's Verified Childcare, Daycare &amp; Activity Network
+                </h3>
+                <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+                  Register your playhome, daycare center, pediatric clinic, or children's activity workshops for trusted visibility among verified local families.
+                </p>
               </div>
-              <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
-                🎁 6 - 12 Months Free Introductory Offer
-              </span>
+
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 shrink-0">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200/70 font-bold text-[11px]">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Aadhaar Verified</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200/70 font-bold text-[11px]">
+                  <Zap className="w-3.5 h-3.5 text-amber-600" />
+                  <span>0% Commission Trial</span>
+                </div>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5 pt-1">
+            {/* Provider Portal Action Buttons Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-5">
               <button
                 id="footer-btn-host-sitter-playhome"
                 type="button"
@@ -4907,10 +5059,19 @@ export default function App() {
                     handleStartSignUp('Parent', { isParentHostingDaycare: true });
                   }
                 }}
-                className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-rose-50/70 border border-slate-200/80 hover:border-rose-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
               >
-                <span>🏠</span>
-                <span>Host Sitter / Playhome Registration</span>
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                  🏠
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-rose-700 transition-colors">
+                    Host Sitter / Playhome
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                    Turn your home into a trusted neighborhood care hub
+                  </p>
+                </div>
               </button>
 
               <button
@@ -4923,10 +5084,19 @@ export default function App() {
                     handleStartSignUp('Daycare Center');
                   }
                 }}
-                className="px-3.5 py-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-teal-50/70 border border-slate-200/80 hover:border-teal-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
               >
-                <span>🏫</span>
-                <span>Register Daycare / Creche Center</span>
+                <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                  🏫
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition-colors">
+                    Daycare / Creche Center
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                    List facility slots, CCTV access &amp; hourly bookings
+                  </p>
+                </div>
               </button>
 
               <button
@@ -4943,10 +5113,19 @@ export default function App() {
                     handleStartSignUp('Event Organizer');
                   }
                 }}
-                className="px-3.5 py-2 bg-orange-50 hover:bg-orange-100 text-orange-800 border border-orange-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-orange-50/70 border border-slate-200/80 hover:border-orange-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
               >
-                <span>🎉</span>
-                <span>Host Activity or Event</span>
+                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                  🎉
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-orange-700 transition-colors">
+                    Host Activity or Event
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                    Workshops, weekend camps &amp; sports sessions
+                  </p>
+                </div>
               </button>
 
               <button
@@ -4963,179 +5142,336 @@ export default function App() {
                     handleStartSignUp('Portfolio Professional');
                   }
                 }}
-                className="px-3.5 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-200 rounded-xl font-bold text-xs transition shadow-2xs cursor-pointer flex items-center gap-1.5"
+                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-purple-50/70 border border-slate-200/80 hover:border-purple-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
               >
-                <span>💼</span>
-                <span>Pediatric Specialists &amp; Clinics</span>
+                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
+                  💼
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
+                    Pediatric Specialists
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
+                    Doctors, child psychologists, coaches &amp; clinics
+                  </p>
+                </div>
               </button>
             </div>
           </div>
 
-          {/* Quick Nav Links */}
-          <div className="flex flex-wrap items-center justify-center gap-3 text-xs font-semibold text-slate-600">
-            <button
-              type="button"
-              onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('knowledge');
-                } else {
-                  setIsGuestViewingKnowledge(true);
-                  setGuestKnowledgeSlug(undefined);
-                }
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="hover:text-rose-700 font-bold transition cursor-pointer text-rose-800"
-            >
-              📚 1,000+ Child Growth Guides (Open Access)
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('daycare');
-                } else {
-                  handleStartSignUp('Parent');
-                }
-              }}
-              className="hover:text-rose-700 transition cursor-pointer"
-            >
-              🍼 Babysitting &amp; Daycare
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (userProfile && appMode === 'dashboard') {
-                  setActiveTab('radar');
-                } else {
-                  handleStartSignUp('Parent');
-                }
-              }}
-              className="hover:text-rose-700 transition cursor-pointer"
-            >
-              🎯 Playmate Radar
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => {
-                setAppMode('dashboard');
-                setActiveTab('store');
-              }}
-              className="text-rose-700 hover:text-rose-800 transition font-black cursor-pointer"
-            >
-              🛍️ Vernunt Store &amp; Play Gear
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => setShowChildComplianceModal(true)}
-              className="hover:text-rose-700 transition cursor-pointer"
-            >
-              🛡️ COPPA &amp; DPDP Safety Protocols
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => setShowAndroidPlayStoreModal(true)}
-              className="text-rose-700 hover:text-rose-800 transition font-black cursor-pointer inline-flex items-center gap-1"
-            >
-              <Smartphone className="w-3 h-3" />
-              <span>Android App</span>
-            </button>
-            <span>&bull;</span>
-            <button
-              type="button"
-              onClick={() => setShowIosAppModal(true)}
-              className="text-slate-900 hover:text-slate-700 transition font-black cursor-pointer inline-flex items-center gap-1"
-            >
-              <Apple className="w-3 h-3 text-slate-800" />
-              <span>iPhone &amp; iPad App</span>
-            </button>
-          </div>
-
-          {/* Mobile Apps Download Section (Android & iOS) */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-w-5xl mx-auto">
-            {/* Android Card */}
-            <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-              <div className="flex items-center gap-3 text-left">
-                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-                  <Smartphone className="w-5 h-5" />
+          {/* Structured 4-Column Navigation & Info Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 text-left pt-2">
+            
+            {/* Column 1: Brand, Mission & Security */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <VernuntLogo size="sm" />
+              </div>
+              <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                India's verified neighborhood kids playmate radar, safe childcare network, and verified parent community.
+              </p>
+              
+              <div className="space-y-2 pt-1 text-[11px] text-slate-600">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>DigiLocker Govt ID Verified Guardians</span>
                 </div>
-                <div>
-                  <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
-                    <span>Vernunt for Android</span>
-                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">App v1.0.0</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug">
-                    Signed Release Android App for Google Play or direct download. Web synced.
-                  </p>
+                <div className="flex items-center gap-2">
+                  <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>DPDP Act 2023 &amp; COPPA Child Safe</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Zero-Knowledge Contact Ghost Privacy</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <a
-                  href="/api/download/android-apk"
-                  download="vernunt-app.apk"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download Android App</span>
-                </a>
+
+              <div className="pt-1">
                 <button
                   type="button"
-                  onClick={() => setShowAndroidPlayStoreModal(true)}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                  onClick={() => setShowChildComplianceModal(true)}
+                  className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
                 >
-                  Guide
+                  <span>Safety &amp; Compliance Standards</span>
+                  <ArrowRight className="w-3 h-3" />
                 </button>
               </div>
             </div>
 
-            {/* iOS Apple Card */}
-            <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-950 text-white border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
-              <div className="flex items-center gap-3 text-left">
-                <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0 shadow-sm border border-white/10">
-                  <Apple className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
-                    <span>Vernunt for iOS</span>
-                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">iPhone &amp; iPad</span>
+            {/* Column 2: Platform Features */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-200/80 pb-2">
+                Platform Features
+              </h4>
+              <ul className="space-y-2.5 text-xs">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userProfile && appMode === 'dashboard') {
+                        setActiveTab('radar');
+                      } else {
+                        handleStartSignUp('Parent');
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">🎯</span>
+                    <span>Playmate Radar (Nearby Match)</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userProfile && appMode === 'dashboard') {
+                        setActiveTab('daycare');
+                      } else {
+                        handleStartSignUp('Parent');
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-teal-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center text-xs shrink-0">🍼</span>
+                    <span>Babysitting &amp; Drop-in Daycare</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userProfile && appMode === 'dashboard') {
+                        setActiveTab('events');
+                      } else {
+                        handleStartSignUp('Parent');
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-orange-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-orange-50 text-orange-600 flex items-center justify-center text-xs shrink-0">🎉</span>
+                    <span>Events, Workshops &amp; Camps</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userProfile && appMode === 'dashboard') {
+                        setActiveTab('groups');
+                      } else {
+                        handleStartSignUp('Parent');
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-indigo-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">🌸</span>
+                    <span>Vernunt Groups &amp; Neighborhood Pods</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAppMode('dashboard');
+                      setActiveTab('store');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-rose-800 transition flex items-center gap-2 cursor-pointer font-bold text-rose-700"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center text-xs shrink-0">🛍️</span>
+                    <span>Vernunt Store &amp; Play Gear</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (userProfile && appMode === 'dashboard') {
+                        setActiveTab('knowledge');
+                      } else {
+                        setIsGuestViewingKnowledge(true);
+                        setGuestKnowledgeSlug(undefined);
+                      }
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">📚</span>
+                    <span>1,000+ Child Growth Guides</span>
+                  </button>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: Trust, Safety & Support */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-200/80 pb-2">
+                Trust &amp; Governance
+              </h4>
+              <ul className="space-y-2.5 text-xs">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setShowChildComplianceModal(true)}
+                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🛡️</span>
+                    <span>COPPA &amp; DPDP Safety Protocols</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactsPrivacyModal(true)}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center text-xs shrink-0">🔒</span>
+                    <span>Contacts Privacy &amp; Ghost Mode</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    id="btn-footer-tac-toggle"
+                    onClick={() => setShowLegalModal(true)}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-xs shrink-0">📄</span>
+                    <span>Guardian Terms of Service &amp; Privacy</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setShowContactUsModal(true)}
+                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">💬</span>
+                    <span>Help &amp; Support Hub</span>
+                  </button>
+                </li>
+                <li>
+                  <a
+                    href="mailto:support@vernunt.com"
+                    className="hover:text-rose-700 transition flex items-center gap-2 text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">✉️</span>
+                    <span>support@vernunt.com</span>
+                  </a>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Vernunt Mobile Apps */}
+            <div className="space-y-3.5">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-200/80 pb-2">
+                Vernunt on Mobile
+              </h4>
+              <p className="text-[11px] text-slate-500 leading-snug">
+                Instant push alerts, encrypted offline sync &amp; live radar on your smartphone.
+              </p>
+
+              {/* Android Card */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs font-bold text-slate-900">Vernunt Android</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-snug">
-                    1-Tap iOS Profile (.mobileconfig) &amp; Safari Home Screen Web App.
-                  </p>
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">v1.0.0</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <a
+                    href="/api/download/android-apk"
+                    download="vernunt-app.apk"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download APK</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setShowAndroidPlayStoreModal(true)}
+                    className="py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Guide
+                  </button>
                 </div>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+
+              {/* iOS Card */}
+              <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Apple className="w-4 h-4 text-slate-800" />
+                    <span className="text-xs font-bold text-slate-900">Vernunt iOS</span>
+                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">Web App</span>
+                </div>
                 <button
                   type="button"
                   id="btn-footer-ios-install"
                   onClick={() => setShowIosAppModal(true)}
-                  className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                  className="w-full py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition cursor-pointer"
                 >
-                  <Download className="w-3.5 h-3.5 text-slate-950" />
-                  <span>Install on iOS</span>
+                  <Download className="w-3.5 h-3.5 text-white" />
+                  <span>Install on iPhone / iPad</span>
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <p className="text-[11px] text-slate-400">
-          &copy; 2026 <strong>Vernunt</strong> (vernunt.com &bull; app.vernunt.com). All Rights Reserved. India's Verified Kids Playmate Radar &amp; Childcare Network.
-        </p>
-        <button
-          id="btn-footer-tac-toggle"
-          type="button"
-          onClick={() => setShowLegalModal(true)}
-          className="text-orange-600 font-bold hover:underline mt-2 text-xs focus:outline-none cursor-pointer"
-        >
-          View Privacy Regulations &amp; Guardian Terms of Service
-        </button>
+          </div>
+
+          {/* Bottom Sub-Footer Bar */}
+          <div className="border-t border-slate-200/90 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+            <div className="text-center md:text-left space-y-1">
+              <p className="font-medium text-slate-600">
+                &copy; {new Date().getFullYear()} <strong className="text-slate-900">Vernunt Technologies</strong> (vernunt.com &bull; app.vernunt.com). All Rights Reserved.
+              </p>
+              <p className="text-[11px] text-slate-400">
+                India's Verified Kids Playmate Radar &amp; Childcare Network. Protected by Indian copyright &amp; trademark laws.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
+              <button
+                type="button"
+                onClick={() => setShowLegalModal(true)}
+                className="hover:text-slate-900 hover:underline transition cursor-pointer"
+              >
+                Terms of Service
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowLegalModal(true)}
+                className="hover:text-slate-900 hover:underline transition cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowChildComplianceModal(true)}
+                className="hover:text-slate-900 hover:underline transition cursor-pointer"
+              >
+                Child Safety
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowContactUsModal(true)}
+                className="hover:text-slate-900 hover:underline transition cursor-pointer"
+              >
+                Contact Support
+              </button>
+            </div>
+          </div>
+
+        </div>
       </footer>
 
       {/* Global Modals overlay injections */}
@@ -5888,7 +6224,7 @@ export default function App() {
         />
       )}
 
-      {/* Profile Privacy & Biometric Security Settings Modal */}
+      {/* Profile Privacy & Visibility Settings Modal */}
       {showProfilePrivacyModal && (
         <ProfilePrivacyModal
           isOpen={showProfilePrivacyModal}

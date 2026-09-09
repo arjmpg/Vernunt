@@ -1,6 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { execSync } from 'child_process';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+const { ZipArchive } = require('archiver');
 
 const cwd = process.cwd();
 const publicDir = path.join(cwd, 'public');
@@ -69,10 +72,36 @@ const mobileConfigXml = `<?xml version="1.0" encoding="UTF-8"?>
 fs.writeFileSync(mobileConfigPath, mobileConfigXml, 'utf8');
 console.log('✅ Generated public/vernunt.mobileconfig');
 
-// 2. Generate vernunt-ios-project.zip using python3 zipfile module
-try {
-  execSync(`python3 -m zipfile -c "${zipOutPath}" ios/`, { stdio: 'inherit' });
-  console.log('✅ Generated public/vernunt-ios-project.zip');
-} catch (err) {
-  console.error('Failed to create iOS zip archive:', err);
+// 2. Generate vernunt-ios-project.zip using pure Node archiver
+async function generateIosZip() {
+  const iosDir = path.join(cwd, 'ios');
+  if (!fs.existsSync(iosDir)) {
+    console.log('ℹ️ iOS source directory not present, skipping zip generation.');
+    return;
+  }
+  return new Promise((resolve) => {
+    const output = fs.createWriteStream(zipOutPath);
+    const archive = new ZipArchive();
+
+    output.on('close', () => {
+      console.log(`✅ Generated public/vernunt-ios-project.zip (${archive.pointer()} total bytes)`);
+      resolve();
+    });
+
+    output.on('error', (err) => {
+      console.error('Failed to create iOS zip archive:', err);
+      resolve();
+    });
+
+    archive.on('error', (err) => {
+      console.error('Archiver error:', err);
+      resolve();
+    });
+
+    archive.pipe(output);
+    archive.directory(iosDir, false);
+    archive.finalize();
+  });
 }
+
+await generateIosZip();

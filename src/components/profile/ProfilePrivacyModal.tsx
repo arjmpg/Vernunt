@@ -3,18 +3,11 @@ import { ChildProfile } from '../../types.ts';
 import { 
   ShieldCheck, 
   Lock, 
-  Fingerprint, 
-  Eye, 
-  EyeOff, 
   Check, 
   Smartphone, 
   X, 
-  AlertCircle, 
-  KeyRound,
-  Users,
-  Smile
+  EyeOff
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 interface ProfilePrivacyModalProps {
   isOpen: boolean;
@@ -37,14 +30,6 @@ export function ProfilePrivacyModal({
   const [parentGender, setParentGender] = useState<'Mother' | 'Father' | 'Other'>(
     userProfile?.parentGender || 'Mother'
   );
-  const [biometricEnabled, setBiometricEnabled] = useState<boolean>(
-    userProfile?.biometricAuthEnabled ?? true
-  );
-  const [biometricType, setBiometricType] = useState<'fingerprint' | 'face_id' | 'none'>(
-    userProfile?.biometricType || 'fingerprint'
-  );
-  const [biometricStatusMsg, setBiometricStatusMsg] = useState<string>('');
-  const [isVerifyingBiometric, setIsVerifyingBiometric] = useState<boolean>(false);
 
   // SEO & Safety toggles
   const [unindexedFromSeo, setUnindexedFromSeo] = useState<boolean>(
@@ -57,37 +42,11 @@ export function ProfilePrivacyModal({
     userProfile?.requirePinForChat ?? false
   );
 
-  const handleTestBiometric = async () => {
-    setIsVerifyingBiometric(true);
-    setBiometricStatusMsg('Touch fingerprint sensor or look into front camera...');
-
-    try {
-      // Check if WebAuthn / PublicKeyCredential is supported in browser
-      if (window.PublicKeyCredential && (await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.())) {
-        setTimeout(() => {
-          setIsVerifyingBiometric(false);
-          setBiometricStatusMsg('✓ Biometric Verified! Sensor hardware authenticated.');
-          confetti({ particleCount: 30, spread: 50 });
-        }, 1200);
-      } else {
-        setTimeout(() => {
-          setIsVerifyingBiometric(false);
-          setBiometricStatusMsg('✓ Biometric simulation successful (Touch ID / Face ID Active).');
-          confetti({ particleCount: 25, spread: 45 });
-        }, 1000);
-      }
-    } catch (err) {
-      setIsVerifyingBiometric(false);
-      setBiometricStatusMsg('✓ Biometric enabled for fast app login.');
-    }
-  };
-
   const handleSave = () => {
     onUpdateProfile({
       profileVisibility: visibility,
       parentGender,
-      biometricAuthEnabled: biometricEnabled,
-      biometricType,
+      biometricAuthEnabled: false,
       unindexedFromSeo,
       hideExactLocation,
       requirePinForChat
@@ -106,10 +65,10 @@ export function ProfilePrivacyModal({
             </div>
             <div>
               <h3 className="text-base font-black text-slate-900 font-serif">
-                Privacy &amp; Biometric Security
+                Profile Privacy &amp; Visibility
               </h3>
               <p className="text-[11px] text-slate-400">
-                Configure profile viewability, gender filters &amp; device biometric login
+                Configure profile viewability, gender filters &amp; child privacy shield
               </p>
             </div>
           </div>
@@ -184,87 +143,10 @@ export function ProfilePrivacyModal({
             </div>
           </div>
 
-          {/* Section 2: Biometric Login Settings (Fingerprint / Face ID) */}
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/90 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Fingerprint className="w-5 h-5 text-rose-700" />
-                <div>
-                  <h4 className="text-xs font-black text-slate-900">
-                    Biometric Quick Login
-                  </h4>
-                  <p className="text-[10px] text-slate-500">
-                    Unlock Vernunt instantly using fingerprint or Face ID
-                  </p>
-                </div>
-              </div>
-
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={biometricEnabled}
-                  onChange={(e) => setBiometricEnabled(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-700"></div>
-              </label>
-            </div>
-
-            {biometricEnabled && (
-              <div className="pt-2 border-t border-slate-200/70 space-y-2.5">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setBiometricType('fingerprint')}
-                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                      biometricType === 'fingerprint'
-                        ? 'bg-rose-700 text-white border-rose-700'
-                        : 'bg-white text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <Fingerprint className="w-3.5 h-3.5" />
-                    <span>Fingerprint (Touch ID)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setBiometricType('face_id')}
-                    className={`flex-1 py-1.5 px-2 rounded-xl text-xs font-bold border transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                      biometricType === 'face_id'
-                        ? 'bg-rose-700 text-white border-rose-700'
-                        : 'bg-white text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <Smile className="w-3.5 h-3.5" />
-                    <span>Face ID / Recognition</span>
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between pt-1">
-                  <button
-                    type="button"
-                    onClick={handleTestBiometric}
-                    disabled={isVerifyingBiometric}
-                    className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 text-xs font-bold py-1.5 px-3 rounded-xl transition cursor-pointer flex items-center gap-1.5"
-                  >
-                    <Fingerprint className="w-3.5 h-3.5 text-rose-700" />
-                    <span>{isVerifyingBiometric ? "Scanning Sensor..." : "Test Biometric Scanner"}</span>
-                  </button>
-
-                  {biometricStatusMsg && (
-                    <span className="text-[11px] font-bold text-emerald-700 animate-fade-in">
-                      {biometricStatusMsg}
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Section 3: Child Safety & SEO Cloaking */}
+          {/* Section 2: Child Safety & SEO Cloaking */}
           <div className="space-y-2 pt-1">
             <h4 className="text-xs font-black text-slate-900">
-              3. Child Safety &amp; SEO Privacy Shield
+              2. Child Safety &amp; SEO Privacy Shield
             </h4>
 
             <div className="space-y-2">
@@ -298,6 +180,14 @@ export function ProfilePrivacyModal({
                 </div>
               </label>
             </div>
+          </div>
+
+          {/* Account Security Note */}
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 flex items-start gap-2">
+            <Lock className="w-3.5 h-3.5 text-slate-600 shrink-0 mt-0.5" />
+            <span>
+              Sign-in is authenticated using verified Mobile Phone OTP or Email Password verification.
+            </span>
           </div>
         </div>
 

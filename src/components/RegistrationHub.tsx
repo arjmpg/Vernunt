@@ -218,6 +218,7 @@ export default function RegistrationHub({
 
   // --- PARENT / CHILD CHANNELS STATES ---
   const [parentName, setParentName] = useState(initialParentName || '');
+  const [parentGender, setParentGender] = useState<'Mother' | 'Father' | 'Other'>('Mother');
   const [childName, setChildName] = useState('');
   const [gradeLevel, setGradeLevel] = useState('Kindergarten');
   const [childAge, setChildAge] = useState<number>(5);
@@ -1854,6 +1855,7 @@ export default function RegistrationHub({
         generalAvailability: generalAvailability.length > 0 ? generalAvailability : ['Weekdays After School', 'Weekends (Sat & Sun)'],
         childPrivacySetting: childPrivacySetting || 'full',
         parentProfession: parentProfession.trim() || 'Professional',
+        parentGender: parentGender || 'Mother',
         motherTongue: motherTongue.trim() || 'English, Hindi',
         languagesKnown: languagesKnown.length > 0 ? languagesKnown : ['English', 'Hindi'],
         phoneNumber: phoneNumber.trim(),
@@ -2630,6 +2632,72 @@ export default function RegistrationHub({
                     className={`px-4 py-2.5 bg-slate-50 border ${errors.parentName ? 'border-red-400' : 'border-slate-200'} rounded-xl text-xs outline-none focus:ring-2 focus:ring-orange-200`}
                   />
                   {errors.parentName && <p className="text-[10px] text-red-500 font-semibold">{errors.parentName}</p>}
+                </div>
+
+                {/* Parent Gender / Relationship with Community Matching Hint */}
+                <div id="field-parent-gender-container" className="flex flex-col space-y-2.5 bg-gradient-to-r from-rose-50/80 via-amber-50/50 to-sky-50/70 p-4 rounded-2xl border border-rose-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                      <Users className="w-4 h-4 text-rose-600" />
+                      <span>Parent Identity / Gender</span>
+                      <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <span className="text-[9.5px] font-bold text-rose-700 bg-rose-100/90 px-2.5 py-0.5 rounded-full border border-rose-200">
+                      Community Matching
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                    <button
+                      type="button"
+                      id="btn-parent-gender-mother"
+                      onClick={() => setParentGender('Mother')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                        parentGender === 'Mother'
+                          ? 'bg-gradient-to-r from-rose-500 to-pink-600 text-white border-rose-600 shadow-md ring-2 ring-rose-300'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-rose-300 hover:bg-rose-50/50'
+                      }`}
+                    >
+                      <span className="text-base">👩</span>
+                      <span>Mother (Female)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-parent-gender-father"
+                      onClick={() => setParentGender('Father')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                        parentGender === 'Father'
+                          ? 'bg-gradient-to-r from-sky-600 to-blue-700 text-white border-sky-700 shadow-md ring-2 ring-sky-300'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-sky-300 hover:bg-sky-50/50'
+                      }`}
+                    >
+                      <span className="text-base">👨</span>
+                      <span>Father (Male)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      id="btn-parent-gender-other"
+                      onClick={() => setParentGender('Other')}
+                      className={`py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 border transition-all cursor-pointer ${
+                        parentGender === 'Other'
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white border-amber-600 shadow-md ring-2 ring-amber-300'
+                          : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                      }`}
+                    >
+                      <span className="text-base">🧑</span>
+                      <span>Guardian / Other</span>
+                    </button>
+                  </div>
+
+                  {/* Helpful hint near the field as specifically requested */}
+                  <div className="flex items-start gap-2 bg-white/95 p-3 rounded-xl border border-rose-200/90 text-[11px] text-slate-600 leading-relaxed shadow-2xs">
+                    <span className="text-base shrink-0">💡</span>
+                    <div>
+                      <strong className="text-rose-950 font-bold">Why we ask this:</strong> Specifying whether you are a Mother or Father helps you discover and join dedicated parent groups on Vernunt — such as neighborhood <span className="font-semibold text-rose-700">"Moms Circles"</span>, weekend <span className="font-semibold text-sky-700">"Dads Playgroups &amp; Sports Clubs"</span>, and connects you comfortably with other verified parents in your community for safe playdates.
+                    </div>
+                  </div>
                 </div>
 
                 {/* Locality & Bangalore Neighborhood */}

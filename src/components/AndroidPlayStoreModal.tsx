@@ -27,48 +27,41 @@ interface AndroidPlayStoreModalProps {
   onClose: () => void;
 }
 
-export const AndroidPlayStoreModal: React.FC<AndroidPlayStoreModalProps> = ({ isOpen, onClose }) => {
+const AndroidPlayStoreModalContent: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState<boolean>(false);
   const [downloadSuccess, setDownloadSuccess] = useState<boolean>(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'download' | 'playstore_guide' | 'specs'>('download');
   const [showParseTroubleshooting, setShowParseTroubleshooting] = useState<boolean>(false);
+  const [cookieWarning, setCookieWarning] = useState<boolean>(false);
 
-  const { isInstallable, isInstalled, install: installPWA } = usePWAInstall();
+  const { isInstallable, install: installPWA } = usePWAInstall();
 
   const publicApkUrl = typeof window !== 'undefined' ? getPublicApkUrl() : 'https://app.vernunt.com/api/download/android-apk';
   const whatsappUrl = typeof window !== 'undefined' ? getWhatsAppShareApkLink() : '#';
 
   useEffect(() => {
-    if (isOpen) {
-      // Prevent background scrolling while modal is open
-      document.body.style.overflow = 'hidden';
+    // Prevent background scrolling while modal is open
+    document.body.style.overflow = 'hidden';
 
-      // Generate QR Code for direct APK download
-      const targetUrl = typeof window !== 'undefined' ? window.location.origin + '/api/download/android-apk' : 'https://app.vernunt.com/api/download/android-apk';
-      QRCode.toDataURL(targetUrl, {
-        width: 220,
-        margin: 1,
-        color: {
-          dark: '#9f1239', // Rose 800
-          light: '#ffffff'
-        }
-      })
-        .then(url => setQrCodeDataUrl(url))
-        .catch(err => console.error('QR Code generation error:', err));
-    } else {
-      document.body.style.overflow = '';
-    }
+    // Generate QR Code for direct APK download
+    const targetUrl = typeof window !== 'undefined' ? window.location.origin + '/api/download/android-apk' : 'https://app.vernunt.com/api/download/android-apk';
+    QRCode.toDataURL(targetUrl, {
+      width: 220,
+      margin: 1,
+      color: {
+        dark: '#9f1239', // Rose 800
+        light: '#ffffff'
+      }
+    })
+      .then(url => setQrCodeDataUrl(url))
+      .catch(err => console.error('QR Code generation error:', err));
 
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
-
-  if (!isOpen) return null;
-
-  const [cookieWarning, setCookieWarning] = useState(false);
+  }, []);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -490,10 +483,10 @@ export const AndroidPlayStoreModal: React.FC<AndroidPlayStoreModalProps> = ({ is
                   <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between gap-2">
                     <div>
                       <div className="text-[10px] text-slate-400 font-bold uppercase">Short Description (80 chars)</div>
-                      <div className="text-slate-800">India's verified kids doctors, pediatricians, playmates &amp; daycare network.</div>
+                      <div className="text-slate-800">India's verified specialists, playmates &amp; daycare network.</div>
                     </div>
                     <button
-                      onClick={() => copyToClipboard("India's verified kids doctors, pediatricians, playmates & daycare network.", 'short_desc')}
+                      onClick={() => copyToClipboard("India's verified specialists, playmates & daycare network.", 'short_desc')}
                       className="p-1.5 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg text-slate-600"
                     >
                       {copiedKey === 'short_desc' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
@@ -652,4 +645,9 @@ export const AndroidPlayStoreModal: React.FC<AndroidPlayStoreModalProps> = ({ is
       </div>
     </div>
   );
+};
+
+export const AndroidPlayStoreModal: React.FC<AndroidPlayStoreModalProps> = ({ isOpen, onClose }) => {
+  if (!isOpen) return null;
+  return <AndroidPlayStoreModalContent onClose={onClose} />;
 };

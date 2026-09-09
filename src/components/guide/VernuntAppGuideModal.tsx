@@ -90,7 +90,7 @@ const GUIDE_STEPS = [
   },
   {
     stepNumber: 5,
-    title: 'Safety Matrix & Biometric Shield',
+    title: 'Safety Matrix & Privacy Shield',
     subtitle: 'Aadhaar verified parents & zero child data indexing',
     badge: 'Step 5 of 5 • Trust & Security',
     icon: ShieldCheck,
@@ -98,7 +98,7 @@ const GUIDE_STEPS = [
     accentColor: 'from-slate-900 to-slate-800',
     description: 'India’s most secure parenting network, engineered to protect child privacy and parent peace of mind.',
     highlights: [
-      'Biometric Login: Log in securely using device fingerprint or Face ID.',
+      'Multi-Factor Auth: Verified Mobile OTP & secure password authentication.',
       'SEO Shield: All sensitive child data, photos, and location coordinates are completely unindexed from search engines.',
       'Profile Visibility: Toggle your representation as Mom, Dad, or Mom & Dad.',
       '4-Digit Drop-Off Handshake PIN for trusted babysitting and playdates.'
