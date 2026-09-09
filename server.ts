@@ -3,15 +3,9 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { execSync } from "child_process";
-import { GoogleGenAI } from "@google/genai";
 
-// 100% FREE MODE: External Gemini API calls are deactivated to guarantee zero billing and zero token costs.
-// All voice assistance and knowledge queries run locally via the built-in Indian regional knowledge engine
-// and client-side native Web Speech synthesis.
-const genAIClient: any = null;
-function getGenAI(): any {
-  return genAIClient;
-}
+// 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
+// Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
 
 let razorpayInstance: any = null;
 async function getRazorpayInstance() {
@@ -2435,7 +2429,7 @@ Sitemap: https://app.vernunt.com/sitemap-doctors.xml
     }
   });
 
-  // Helper generators for graceful fallbacks when Gemini quota/key is depleted (e.g., 429 RESOURCE_EXHAUSTED)
+  // Built-in intelligent local generators for play ideas and copilot guidance (Zero external API, 100% free)
   function generateFallbackPlayIdeas(kids: any[], category?: string): string {
     const kidList = Array.isArray(kids) && kids.length > 0 ? kids : [{ childName: "Children", childAge: 5, interests: [] }];
     const mainKid = kidList[0] || {};
@@ -2646,7 +2640,6 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     return res.json({ success: true, text: replyText });
   };
   app.post("/api/copilot", handleCopilot);
-  app.post("/api/gemini/copilot", handleCopilot);
 
   const handlePlayIdeas = (req: any, res: any) => {
     const { kids, category } = req.body || {};
@@ -2654,7 +2647,6 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     return res.json({ success: true, text: outputText });
   };
   app.post("/api/generate-play-ideas", handlePlayIdeas);
-  app.post("/api/gemini/generate-play-ideas", handlePlayIdeas);
 
   // CHILD-SAFETY BIOMETRIC FACE COMPARISON GATEWAY
   const handleVerifyFace = (req: any, res: any) => {
@@ -2685,7 +2677,6 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     }
   };
   app.post("/api/verify-face", handleVerifyFace);
-  app.post("/api/gemini/verify-face", handleVerifyFace);
 
   // =========================================================================
   // SECURE PRODUCTION-STYLE RAZORPAY PAYMENT GATEWAY ENDPOINTS
