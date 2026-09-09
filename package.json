@@ -11,6 +11,7 @@
     "start": "node dist/server.cjs"
   },
   "dependencies": {
+    "@google/genai": "^2.7.0",
     "@types/archiver": "^8.0.0",
     "archiver": "^8.0.0",
     "canvas-confetti": "^1.9.2",

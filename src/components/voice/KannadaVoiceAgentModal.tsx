@@ -233,7 +233,7 @@ export const KannadaVoiceAgentModal: React.FC<KannadaVoiceAgentModalProps> = ({
   ) => {
     stopAudio();
 
-    // 100% FREE MODE: Directly play via free client-side Web Speech API (zero API costs, instant response)
+    // 1. If preloaded Neural WAV audio data is provided, play it directly
     if (preloadedAudioUrl) {
       try {
         const audio = new Audio(preloadedAudioUrl);
@@ -241,7 +241,7 @@ export const KannadaVoiceAgentModal: React.FC<KannadaVoiceAgentModalProps> = ({
         audio.playbackRate = speechRate;
         audio.onplay = () => {
           setIsPlayingAudio(true);
-          setIsNeuralAudioActive(false);
+          setIsNeuralAudioActive(true);
         };
         audio.onended = () => {
           setIsPlayingAudio(false);
@@ -258,11 +258,51 @@ export const KannadaVoiceAgentModal: React.FC<KannadaVoiceAgentModalProps> = ({
         await audio.play();
         return;
       } catch (audioErr) {
-        console.warn('Audio playback error, playing via browser speech:', audioErr);
+        console.warn('Neural audio playback error, falling back to browser speech:', audioErr);
       }
     }
 
-    // 100% Free instant client-side Web Speech
+    // 2. Otherwise request high-definition neural human speech synthesis from server
+    try {
+      setIsPlayingAudio(true);
+      const res = await fetch('/api/ai/synthesize-speech', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          voiceGender,
+          languageCode: langCode
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.audioDataUrl) {
+        const audio = new Audio(data.audioDataUrl);
+        currentAudioRef.current = audio;
+        audio.playbackRate = speechRate;
+        audio.onplay = () => {
+          setIsPlayingAudio(true);
+          setIsNeuralAudioActive(true);
+        };
+        audio.onended = () => {
+          setIsPlayingAudio(false);
+          setIsNeuralAudioActive(false);
+          currentAudioRef.current = null;
+          if (onEndCallback) onEndCallback();
+        };
+        audio.onerror = () => {
+          setIsPlayingAudio(false);
+          setIsNeuralAudioActive(false);
+          currentAudioRef.current = null;
+          fallbackBrowserSpeech(text, langCode, onEndCallback);
+        };
+        await audio.play();
+        return;
+      }
+    } catch (synthErr) {
+      console.warn('Neural speech synthesis fetch error, using enhanced browser speech:', synthErr);
+    }
+
+    // 3. Fallback to Enhanced Browser Web Speech with natural human pitch/tone
     fallbackBrowserSpeech(text, langCode, onEndCallback);
   };
 
@@ -593,9 +633,6 @@ export const KannadaVoiceAgentModal: React.FC<KannadaVoiceAgentModalProps> = ({
                   </h2>
                   <span className="bg-amber-400 text-slate-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
                     Live Telephony Helpline
-                  </span>
-                  <span className="bg-emerald-400 text-emerald-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                    ✨ 100% Free Support (Zero Cost)
                   </span>
                 </div>
                 <p className="text-rose-100 text-xs mt-0.5 font-medium flex items-center gap-2 flex-wrap">

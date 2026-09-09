@@ -3,9 +3,20 @@ import path from "path";
 import fs from "fs";
 import os from "os";
 import { execSync } from "child_process";
+import { GoogleGenAI } from "@google/genai";
 
-// 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
-// Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
+let genAIClient: GoogleGenAI | null = null;
+function getGenAI(): GoogleGenAI | null {
+  if (!genAIClient) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("[Gemini API] GEMINI_API_KEY environment variable is not set. Intelligent fallback Kannada knowledge engine activated.");
+      return null;
+    }
+    genAIClient = new GoogleGenAI({ apiKey });
+  }
+  return genAIClient;
+}
 
 let razorpayInstance: any = null;
 async function getRazorpayInstance() {
@@ -340,23 +351,112 @@ async function startServer() {
 
       console.log(`[Vernunt Multilingual Voice Agent] Inbound query: "${userPrompt}" | Caller: ${callerName || 'Parent'} | Lang: ${selectedLanguage || 'auto-detect'}`);
 
-      // 100% FREE INTELLECTUAL ENGINE: Matches intent, category, and language instantly without external API billing
-      const lower = userPrompt.toLowerCase();
-      let matched = INDIAN_VOICE_SAMPLES[1]; // default Kannada
+      const ai = getGenAI();
 
-      if (lower.includes("hindi") || lower.includes("हिंदी") || lower.includes("हिन्दी") || lower.includes("namaste") || lower.includes("kya") || lower.includes("madad") || selectedLanguage?.startsWith("hi")) {
+      if (ai) {
+        try {
+          const systemInstruction = `You are "Priya", an exceptionally cheerful, vibrant, enthusiastic, polite, and deeply caring Customer Care Executive at "Vernunt Kids Connect" (vernunt.com / app.vernunt.com) headquartered in Bangalore, India.
+
+CRITICAL DIRECTIVES:
+1. ENTHUSIASTIC & HAPPY TONE:
+   - YOU MUST ALWAYS SPEAK IN AN ENERGETIC, HAPPY, WARM, AND SMILING VOICE MODE!
+   - Use cheerful verbal affirmations and positive expressions like: "Wonderful! 🌟", "I'd be absolutely delighted to help you with that!", "Certainly!", "Haanji bilkul!", "Khandita!", "Romba santhosham!", "Super excited to assist you today!".
+   - NEVER sound dull, flat, slow, or bureaucratic.
+   - NEVER SAY OR SOUND LIKE AN AI, ROBOT, MACHINE, OR AUTOMATED MODEL. Never say "As an AI..." or mention algorithms.
+   - Keep spoken sentences concise and conversational (2-3 short, vibrant sentences, ~25-40 words total) so it sounds cheerful and crisp over telephone audio.
+
+2. MULTILINGUAL INDIAN LANGUAGE HANDLING:
+   - If the caller says a language name (e.g. "Kannada", "Hindi", "Tamil", "Telugu", "Marathi", "Bengali", "Malayalam", "Gujarati", "Punjabi", "Odia", "English") or speaks in that language, smoothly switch into that native Indian language in the response with genuine warmth!
+   - If the caller asks in English, reply in friendly, energetic Indian English.
+   - If the caller asks in Kannada, reply in fluent, enthusiastic Kannada script (ಕನ್ನಡ).
+   - If in Hindi, reply in cheerful Devanagari Hindi (हिन्दी).
+   - If in Tamil, Telugu, Malayalam, Bengali, Marathi, Gujarati, Punjabi, or Odia, reply in that authentic script with native cultural warmth.
+
+3. VERNUNT PLATFORM KNOWLEDGE:
+   - Playmates Radar: Local verified playmates for kids aged 0-14, safe neighborhood meetups.
+   - Safety & KYC: 100% verified parents & daycare staff via DigiLocker and Govt Aadhaar.
+   - Daycare & Babysitting: Hourly rates ₹150-₹300/hr, background checked, CCTV verified.
+   - Vernunt Store: Certified organic baby millet foods, teething biscuits, Montessori STEM toys, 24-hr delivery in Bangalore & major cities.
+   - Events & Dynamic QR: Sports days, art & clay modeling workshops, instant QR entry tickets on WhatsApp/App.
+   - Support Contact: Official email is support@vernunt.com.
+
+4. OUTPUT FORMAT:
+   Return STRICT JSON only without markdown code blocks:
+   {
+     "responseText": "The exact native script response to be read aloud with enthusiasm",
+     "detectedLanguage": "kn-IN" | "hi-IN" | "ta-IN" | "te-IN" | "ml-IN" | "mr-IN" | "bn-IN" | "gu-IN" | "pa-IN" | "or-IN" | "en-IN",
+     "detectedLanguageName": "Language name in native & English",
+     "phonetics": "Latin transliteration of the spoken text",
+     "englishTranslation": "Accurate English meaning",
+     "intent": "language_switch" | "playmates" | "kyc" | "daycare" | "store" | "events" | "general_help",
+     "suggestedAction": "Short 2-3 word button label"
+   }`;
+
+          const response = await ai.models.generateContent({
+            model: "gemini-3.7-flash",
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text: `Caller Name: ${callerName || 'Parent'}\nCaller Selected Language Preference: ${selectedLanguage || 'auto-detect'}\nCaller Spoken Enquiry: "${userPrompt}"\n\nGenerate realistic human phone support response in JSON format matching { "responseText": string, "detectedLanguage": string, "detectedLanguageName": string, "phonetics": string, "englishTranslation": string, "intent": string, "suggestedAction": string }. Return ONLY valid raw JSON.`
+                  }
+                ]
+              }
+            ],
+            config: {
+              systemInstruction: systemInstruction,
+              responseMimeType: "application/json",
+              temperature: 0.3
+            }
+          });
+
+          const rawText = response.text ? response.text.trim() : "";
+          let parsed: any = null;
+          try {
+            const cleanJson = rawText.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+            parsed = JSON.parse(cleanJson);
+          } catch (e) {
+            console.warn("[Multilingual Voice Agent] JSON parse fallback:", e);
+          }
+
+          if (parsed && (parsed.responseText || parsed.kannadaText)) {
+            const textToSpeak = parsed.responseText || parsed.kannadaText;
+            return res.json({
+              success: true,
+              kannadaText: textToSpeak,
+              responseText: textToSpeak,
+              detectedLanguage: parsed.detectedLanguage || selectedLanguage || "kn-IN",
+              detectedLanguageName: parsed.detectedLanguageName || "Indian Regional Voice",
+              kannadaPhonetics: parsed.phonetics || parsed.kannadaPhonetics || "",
+              englishTranslation: parsed.englishTranslation || "",
+              intent: parsed.intent || "general_help",
+              suggestedAction: parsed.suggestedAction || "Continue Support",
+              source: "gemini-3.7-flash"
+            });
+          }
+        } catch (geminiError: any) {
+          console.error("[Multilingual Voice Agent Gemini API Error]:", geminiError);
+        }
+      }
+
+      // High-accuracy fallback knowledge matching across Indian languages
+      const lower = userPrompt.toLowerCase();
+      let matched = INDIAN_VOICE_SAMPLES[1]; // default Kannada / English
+
+      if (lower.includes("hindi") || lower.includes("हिंदी") || lower.includes("हिन्दी") || lower.includes("namaste") || lower.includes("kya") || lower.includes("madad")) {
         matched = INDIAN_VOICE_SAMPLES[2];
-      } else if (lower.includes("tamil") || lower.includes("தமிழ்") || lower.includes("vanakkam") || lower.includes("enna") || selectedLanguage?.startsWith("ta")) {
+      } else if (lower.includes("tamil") || lower.includes("தமிழ்") || lower.includes("vanakkam") || lower.includes("enna")) {
         matched = INDIAN_VOICE_SAMPLES[3];
-      } else if (lower.includes("telugu") || lower.includes("తెలుగు") || lower.includes("namaskaram") || lower.includes("ela") || selectedLanguage?.startsWith("te")) {
+      } else if (lower.includes("telugu") || lower.includes("తెలుగు") || lower.includes("namaskaram") || lower.includes("ela")) {
         matched = INDIAN_VOICE_SAMPLES[4];
-      } else if (lower.includes("malayalam") || lower.includes("മലയാളം") || lower.includes("kerala") || selectedLanguage?.startsWith("ml")) {
+      } else if (lower.includes("malayalam") || lower.includes("മലയാളം") || lower.includes("kerala")) {
         matched = INDIAN_VOICE_SAMPLES[5];
-      } else if (lower.includes("bengali") || lower.includes("বাংলা") || lower.includes("bangla") || lower.includes("nomoshkar") || selectedLanguage?.startsWith("bn")) {
+      } else if (lower.includes("bengali") || lower.includes("বাংলা") || lower.includes("bangla") || lower.includes("nomoshkar")) {
         matched = INDIAN_VOICE_SAMPLES[6];
-      } else if (lower.includes("marathi") || lower.includes("मराठी") || lower.includes("kashi") || selectedLanguage?.startsWith("mr")) {
+      } else if (lower.includes("marathi") || lower.includes("मराठी") || lower.includes("kashi")) {
         matched = INDIAN_VOICE_SAMPLES[7];
-      } else if (lower.includes("english") || lower.includes("hello") || lower.includes("hi") || lower.includes("who are you") || selectedLanguage?.startsWith("en")) {
+      } else if (lower.includes("english") || lower.includes("hello") || lower.includes("hi") || lower.includes("who are you")) {
         matched = INDIAN_VOICE_SAMPLES[0];
       } else if (lower.includes("aadhaar") || lower.includes("kyc") || lower.includes("digilocker") || lower.includes("ಆಧಾರ್") || lower.includes("आधार")) {
         matched = INDIAN_VOICE_SAMPLES[1];
@@ -372,7 +472,7 @@ async function startServer() {
         englishTranslation: matched.englishMeaning,
         intent: matched.category,
         suggestedAction: matched.suggestedAction,
-        source: "free-indian-knowledge-engine"
+        source: "indian-knowledge-engine"
       });
     } catch (err: any) {
       console.error("[Multilingual Voice Agent Error]:", err);
@@ -2429,7 +2529,7 @@ Sitemap: https://app.vernunt.com/sitemap-doctors.xml
     }
   });
 
-  // Built-in intelligent local generators for play ideas and copilot guidance (Zero external API, 100% free)
+  // Helper generators for graceful fallbacks when Gemini quota/key is depleted (e.g., 429 RESOURCE_EXHAUSTED)
   function generateFallbackPlayIdeas(kids: any[], category?: string): string {
     const kidList = Array.isArray(kids) && kids.length > 0 ? kids : [{ childName: "Children", childAge: 5, interests: [] }];
     const mainKid = kidList[0] || {};
@@ -2521,17 +2621,54 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     return Buffer.concat([header, pcmBuffer]);
   }
 
-  // 100% FREE SPEECH SYNTHESIS ENDPOINT (Zero External API Cost)
+  // NEURAL SPEECH SYNTHESIS ENDPOINT (GEMINI HIGH-FIDELITY HUMAN VOICE)
   const handleSynthesizeSpeech = async (req: any, res: any) => {
     try {
-      const { text } = req.body || {};
+      const { text, voiceGender = 'female', languageCode = 'en-IN' } = req.body || {};
       const promptText = (text || "").trim();
-      // Returns 100% free signal so client uses instant, zero-cost native browser Web Speech API
+      if (!promptText) {
+        return res.status(400).json({ success: false, error: "Text is required" });
+      }
+
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const { GoogleGenAI, Modality } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          
+          const voiceName = voiceGender === 'male' ? 'Fenrir' : 'Kore'; // 'Kore', 'Zephyr', 'Puck', 'Fenrir'
+          const ttsResponse = await ai.models.generateContent({
+            model: "gemini-3.1-flash-tts-preview",
+            contents: [{ parts: [{ text: `Speak in a warm, cheerful, completely natural, lifelike, and polite human voice with gentle cadence: ${promptText}` }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName },
+                },
+              },
+            },
+          });
+
+          const base64Pcm = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Pcm) {
+            const pcmBuffer = Buffer.from(base64Pcm, 'base64');
+            const wavBuffer = pcmToWav(pcmBuffer, 24000, 1);
+            const audioDataUrl = `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+            return res.json({
+              success: true,
+              audioDataUrl,
+              isNeuralVoice: true
+            });
+          }
+        } catch (ttsErr) {
+          console.warn("[TTS Synthesis Warning, falling back to enhanced browser speech]:", ttsErr);
+        }
+      }
+
       return res.json({
         success: true,
         audioDataUrl: null,
         isNeuralVoice: false,
-        isFreeBrowserTts: true,
         fallbackText: promptText
       });
     } catch (err: any) {
@@ -2541,10 +2678,10 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   };
   app.post("/api/ai/synthesize-speech", handleSynthesizeSpeech);
 
-  // 100% FREE MULTILINGUAL CUSTOMER CARE HELPLINE (Zero API Costs, Instant Response)
+  // MULTILINGUAL CUSTOMER CARE HELPLINE VOICE ASSISTANT ENDPOINT
   const handleVoiceAgentReply = async (req: any, res: any) => {
     try {
-      const { userQuery, languageCode, languageName } = req.body || {};
+      const { userQuery, languageCode, languageName, voiceGender = 'female' } = req.body || {};
       const query = (userQuery || "").trim();
       const lang = languageName || "English";
       const code = languageCode || "en-IN";
@@ -2553,78 +2690,92 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
         return res.json({
           success: true,
           reply: "Hello! I'm Priya from Vernunt Support. How may I assist you with playdates, verified daycares, or community events today?",
-          languageCode: code,
-          audioDataUrl: null,
-          isAiGenerated: false
+          languageCode: code
         });
       }
 
-      const q = query.toLowerCase();
       let replyText = "";
+      let audioDataUrl: string | null = null;
 
-      // Topic-aware multilingual responses for child playdates, safety, daycare, store, and events
+      // Check if Gemini API is available
+      if (process.env.GEMINI_API_KEY) {
+        try {
+          const { GoogleGenAI, Modality } = await import("@google/genai");
+          const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+          const response = await ai.models.generateContent({
+            model: "gemini-3.7-flash",
+            contents: `You are Priya, a lively, enthusiastic, cheerful, empathetic, and professional customer care executive speaking live on the phone for Vernunt (India's leading verified child playdate, activity & daycare platform, support email: support@vernunt.com).
+The caller is speaking to you.
+Customer query: "${query}"
+Language required: "${lang}" (Language code: ${code}).
+
+CRITICAL INSTRUCTIONS:
+1. Speak in a vibrant, joyful, warm, and highly enthusiastic human tone, as a real telephonic customer care executive.
+2. Reply strictly in the requested Indian language (${lang} / ${code}). If Kannada, use authentic natural spoken Kannada. If Hindi, natural spoken Hindi. If Tamil, natural Tamil. If English, warm Indian English.
+3. Keep the response concise, punchy, and conversational (1 to 3 spoken sentences) as it will be spoken over the phone.
+4. Do NOT mention you are an AI or bot. You are Priya, a customer care executive at Vernunt Bangalore helpdesk.`
+          });
+
+          replyText = response.text?.trim() || "";
+
+          // Attempt neural speech synthesis
+          if (replyText) {
+            try {
+              const voiceName = voiceGender === 'male' ? 'Fenrir' : 'Kore';
+              const ttsResponse = await ai.models.generateContent({
+                model: "gemini-3.1-flash-tts-preview",
+                contents: [{ parts: [{ text: `Say with a natural, friendly, smiling, warm human tone: ${replyText}` }] }],
+                config: {
+                  responseModalities: [Modality.AUDIO],
+                  speechConfig: {
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName },
+                    },
+                  },
+                },
+              });
+
+              const base64Pcm = ttsResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+              if (base64Pcm) {
+                const pcmBuffer = Buffer.from(base64Pcm, 'base64');
+                const wavBuffer = pcmToWav(pcmBuffer, 24000, 1);
+                audioDataUrl = `data:audio/wav;base64,${wavBuffer.toString('base64')}`;
+              }
+            } catch (ttsErr) {
+              console.warn("[TTS Speech Generation skipped]:", ttsErr);
+            }
+
+            return res.json({
+              success: true,
+              reply: replyText,
+              audioDataUrl,
+              languageCode: code,
+              isAiGenerated: true
+            });
+          }
+        } catch (genAiErr) {
+          console.warn("[Voice Agent AI Warning, using natural fallback]:", genAiErr);
+        }
+      }
+
+      // Natural enthusiastic fallback replies by language
+      let fallbackReply = "Thank you so much for contacting Vernunt Customer Care! We are delighted to assist you with verified playdates, trusted daycare, and child safety anytime at support@vernunt.com!";
       if (code.startsWith("kn") || lang.toLowerCase().includes("kannada")) {
-        if (q.includes("play") || q.includes("ಆಟ") || q.includes("ಗೆಳೆಯ") || q.includes("ಮಗು") || q.includes("radar")) {
-          replyText = "ಖಂಡಿತ! ವರ್ನಂಟ್ ಪ್ಲಾಟ್‌ಫಾರ್ಮ್‌ನಲ್ಲಿ ನಿಮ್ಮ ಸುತ್ತಮುತ್ತಲಿನ 0-14 ವರ್ಷದ ಪರಿಶೀಲಿತ ಮಕ್ಕಳೊಂದಿಗೆ ಸುರಕ್ಷಿತ ಪ್ಲೇಡೇಟ್‌ಗಳನ್ನು ಸುಲಭವಾಗಿ ಆಯೋಜಿಸಬಹುದು. ಎಲ್ಲಾ ಪೋಷಕರು ಆಧಾರ್ ಮೂಲಕ ಪರಿಶೀಲಿಸಲ್ಪಟ್ಟಿರುತ್ತಾರೆ!";
-        } else if (q.includes("daycare") || q.includes("ಡೇ ಕೇರ್") || q.includes("ಕೇರ್") || q.includes("ಆಯಾ")) {
-          replyText = "ಖಂಡಿತವಾಗಿ! ನಮ್ಮಲ್ಲಿ ಸಿಸಿಟಿವಿ ಪರಿಶೀಲಿತ ಮತ್ತು ಹಿನ್ನೆಲೆ ಪರಿಶೀಲನೆ ಪೂರ್ಣಗೊಂಡ ವಿಶ್ವಾಸಾರ್ಹ ಡೇ-ಕೇರ್‌ಗಳು ಗಂಟೆಗೆ ₹150 ರಿಂದ ₹300 ದರದಲ್ಲಿ ಲಭ್ಯವಿವೆ. ಡೇ-ಕೇರ್ ವಿಭಾಗದಲ್ಲಿ ನಿಮ್ಮ ಹತ್ತಿರದ ಕೇಂದ್ರವನ್ನು ಆಯ್ಕೆ ಮಾಡಿ!";
-        } else if (q.includes("kyc") || q.includes("aadhaar") || q.includes("ಆಧಾರ್") || q.includes("verify") || q.includes("ಸುರಕ್ಷತೆ")) {
-          replyText = "ವರ್ನಂಟ್‌ನಲ್ಲಿ ಮಕ್ಕಳ 100% ಸುರಕ್ಷತೆಗಾಗಿ ಪ್ರತಿಯೊಬ್ಬ ಪೋಷಕರು ಮತ್ತು ಡೇ-ಕೇರ್ ಸಿಬ್ಬಂದಿಯನ್ನು ಡಿಜಿಲಾಕರ್ ಹಾಗೂ ಆಧಾರ್ ಮೂಲಕ ಸರ್ಕಾರಿ ಮಟ್ಟದಲ್ಲಿ ಪರಿಶೀಲಿಸಲಾಗುತ್ತದೆ.";
-        } else if (q.includes("store") || q.includes("ಆಹಾರ") || q.includes("ಗೊಂಬೆ") || q.includes("food") || q.includes("order")) {
-          replyText = "ವರ್ನಂಟ್ ಸ್ಟೋರ್‌ನಲ್ಲಿ ಪ್ರಮಾಣೀಕೃತ ಸಾವಯವ ಸಿರಿಧಾನ್ಯ ಆಹಾರ ಮತ್ತು ಮಾಂಟೆಸ್ಸರಿ ಆಟಿಕೆಗಳು ಲಭ್ಯವಿವೆ. ಬೆಂಗಳೂರಿನಲ್ಲಿ 24 ಗಂಟೆಗಳಲ್ಲಿ ನಿಮ್ಮ ಮನೆ ಬಾಗಿಲಿಗೆ ಉಚಿತ ಡೆಲಿವರಿ ನೀಡಲಾಗುತ್ತದೆ!";
-        } else {
-          replyText = "ನಮಸ್ಕಾರ! ವರ್ನಂಟ್ ಕಸ್ಟಮರ್ ಸಪೋರ್ಟ್‌ಗೆ ಕರೆ ಮಾಡಿದ್ದಕ್ಕೆ ಧನ್ಯವಾದಗಳು, ನಾನು ಪ್ರಿಯಾ. ನಿಮ್ಮ ಮಗುವಿನ ಆಟದ ಸ್ನೇಹಿತರು, ಡೇ-ಕೇರ್ ಅಥವಾ ಯಾವುದೇ ಪ್ರಶ್ನೆಗಳಿಗೆ ನಾನು ಸದಾ ನೆರವಾಗುತ್ತೇನೆ. ನಮಗೆ support@vernunt.com ನಲ್ಲೂ ಬರೆಯಬಹುದು!";
-        }
+        fallbackReply = "ಖಂಡಿತವಾಗಿ! ವರ್ನಂಟ್ ಕಸ್ಟಮರ್ ಕೇರ್‌ಗೆ ಕರೆ ಮಾಡಿದ್ದಕ್ಕೆ ತುಂಬಾ ಧನ್ಯವಾದಗಳು! ನಿಮ್ಮ ಮಗುವಿನ ಸುರಕ್ಷಿತ ಪ್ಲೇಡೇಟ್ ಹಾಗೂ ಡೇ-ಕೇರ್ ವಿಚಾರದಲ್ಲಿ ನಾವು ನಿಮಗೆ ಸದಾ ಸಂತೋಷದಿಂದ ಸಹಾಯ ಮಾಡುತ್ತೇವೆ. ನಮ್ಮ ಇಮೇಲ್ support@vernunt.com ಆಗಿದೆ!";
       } else if (code.startsWith("hi") || lang.toLowerCase().includes("hindi")) {
-        if (q.includes("play") || q.includes("दोस्त") || q.includes("बच्च") || q.includes("खेल") || q.includes("radar")) {
-          replyText = "बिल्कुल! वर्नंट पर आप अपने पड़ोस के 100% आधार-सत्यापित बच्चों के साथ सुरक्षित प्लेडेट बुक कर सकते हैं। आप रडार पर आस-पास के बच्चों को तुरंत देख सकते हैं!";
-        } else if (q.includes("daycare") || q.includes("डेकेयर") || q.includes("आया") || q.includes("संभाल")) {
-          replyText = "ज़रूर! हमारे पास सीसीटीवी व बैकग्राउंड वेरीफाइड डे-केयर व बेबीसिटर्स ₹150 से ₹300 प्रति घंटे में उपलब्ध हैं। आप सीधे ऐप से बुक कर सकते हैं!";
-        } else if (q.includes("kyc") || q.includes("aadhaar") || q.includes("आधार") || q.includes("सुरक्षा")) {
-          replyText = "बच्चों की पूर्ण सुरक्षा के लिए वर्नंट पर सभी माता-पिता और स्टाफ का डिजिलॉकर व आधार से सरकारी सत्यापन अनिवार्य है। यह प्रक्रिया केवल 2 मिनट में पूरी होती है!";
-        } else if (q.includes("store") || q.includes("खिलौना") || q.includes("खाना") || q.includes("ऑर्डर")) {
-          replyText = "वर्नंट स्टोर पर ऑर्गेनिक मिलेट बेबी फूड और मोंटेसरी खिलौने उपलब्ध हैं, जो 24 से 48 घंटे में आपके घर डिलीवर हो जाते हैं!";
-        } else {
-          replyText = "नमस्ते! वर्नंट कस्टमर सपोर्ट में कॉल करने के लिए बहुत-बहुत धन्यवाद! मैं प्रिया हूँ, और आपके बच्चों की सुरक्षा व प्लेडेट के लिए मैं हमेशा तैयार हूँ। आप हमें support@vernunt.com पर भी ईमेल कर सकते हैं!";
-        }
+        fallbackReply = "नमस्ते! वर्नंट कस्टमर सपोर्ट में कॉल करने के लिए बहुत-बहुत धन्यवाद! मैं प्रिया हूँ, और हमें आपकी मदद करके बेहद खुशी होगी। आप हमें support@vernunt.com पर भी लिख सकते हैं!";
       } else if (code.startsWith("ta") || lang.toLowerCase().includes("tamil")) {
-        if (q.includes("daycare") || q.includes("டே-கேர்") || q.includes("பாதுகாப்பு")) {
-          replyText = "வணக்கம்! சரிபார்க்கப்பட்ட நம்பகமான டே-கேர் மையங்கள் மணிக்கு ₹150 முதல் ₹300 வரை முன்பதிவு செய்யலாம். அனைத்து மையங்களும் சிசிடிவி கண்காணிப்பில் உள்ளன!";
-        } else {
-          replyText = "வணக்கம்! வெர்னன்ட் வாடிக்கையாளர் சேவைக்கு அழைத்ததற்கு மிக்க நன்றி, நான் பிரியா! சரிபார்க்கப்பட்ட பிளேடேட்டுகள் மற்றும் குழந்தைகளின் பராமரிப்புக்கு நாங்கள் எப்போதும் மகிழ்ச்சியுடன் தயாராக உள்ளோம்!";
-        }
+        fallbackReply = "வணக்கம்! வெர்னன்ட் வாடிக்கையாளர் சேவைக்கு அழைத்ததற்கு மிக்க நன்றி! உங்கள் குழந்தைகளின் பாதுகாப்பு மற்றும் பிளேடேட் குறித்து உதవ நாங்கள் எப்போதும் மகிழ்ச்சியுடன் தயாராக உள்ளோம்!";
       } else if (code.startsWith("te") || lang.toLowerCase().includes("telugu")) {
-        replyText = "నమస్కారం! వెర్నంట్ కస్టమర్ కేర్‌కి కాల్ చేసినందుకు చాలా ధన్యవాదాలు! మీ పిల్లల ప్లేడేట్ మరియు డేకేర్ విషయాల్లో మీకు సహాయం చేయడానికి మేము ఎంతో ఉత్సాహంగా ఉన్నాము. మా ఇమెయిల్ support@vernunt.com!";
-      } else if (code.startsWith("ml") || lang.toLowerCase().includes("malayalam")) {
-        replyText = "നമസ്കാരം! വെർനന്റ് സപ്പോർട്ടിലേക്ക് സ്വാഗതം! കുട്ടികളുടെ സുരക്ഷിതമായ പ്ലേഡേറ്റുകൾ, ഡേ-കെയർ എന്നിവയ്ക്ക് ഞങ്ങൾ എപ്പോഴും നിങ്ങളുടെ കൂടെയുണ്ട്. അന്വേഷണങ്ങൾക്ക് support@vernunt.com സന്ദർശിക്കുക!";
-      } else if (code.startsWith("mr") || lang.toLowerCase().includes("marathi")) {
-        replyText = "नमस्कार! व्हर्नंट ग्राहक सेवेत आपले स्वागत आहे! मुलांच्या सुरक्षेसाठी सर्व पालकांची व डे-केअर कर्मचाऱ्यांची आधारद्वारे १००% पडताळणी केली जाते. आम्ही आपल्या सेवेसाठी तत्पर आहोत!";
-      } else if (code.startsWith("bn") || lang.toLowerCase().includes("bengali")) {
-        replyText = "নমস্কার! ভার্নান্ট সাপোর্ট সেন্টারে আপনাকে স্বাগত! আপনার এলাকার ভেরিফায়েড বাচ্চাদের খেলার সঙ্গী এবং নির্ভরযোগ্য কেয়ারের জন্য আমরা সদা প্রস্তুত!";
-      } else {
-        // English
-        if (q.includes("play") || q.includes("mate") || q.includes("radar") || q.includes("kid") || q.includes("child")) {
-          replyText = "Wonderful! On Vernunt, you can easily discover verified playmates aged 0 to 14 in your immediate apartment society or neighborhood. All parents are 100% Aadhaar-verified for maximum safety!";
-        } else if (q.includes("daycare") || q.includes("babysitt") || q.includes("care") || q.includes("cost") || q.includes("price") || q.includes("rate")) {
-          replyText = "Certainly! Vernunt partners with background-verified, CCTV-monitored daycares starting from ₹150 to ₹300 per hour. You can view real-time availability and book directly from the Daycare tab!";
-        } else if (q.includes("kyc") || q.includes("aadhaar") || q.includes("safety") || q.includes("verify") || q.includes("secure")) {
-          replyText = "Child safety is our top priority! Every parent and caretaker undergoes instant DigiLocker government Aadhaar verification with admin review before joining playdates.";
-        } else if (q.includes("store") || q.includes("food") || q.includes("toy") || q.includes("order") || q.includes("deliver")) {
-          replyText = "The Vernunt Store offers certified organic millet meals and STEM Montessori toys with fast 24-hour doorstep delivery in major cities!";
-        } else if (q.includes("event") || q.includes("ticket") || q.includes("qr") || q.includes("workshop")) {
-          replyText = "You can book tickets for robotics, clay modeling, and sports workshops instantly, receiving dynamic QR entry passes right inside your app!";
-        } else {
-          replyText = "Hello! Thank you for calling Vernunt Support. I'm Priya, and I'd be delighted to assist you with playdates, verified daycares, child safety, or platform features anytime at support@vernunt.com!";
-        }
+        fallbackReply = "నమస్కారం! వెర్నంట్ కస్టమర్ సపోర్ట్‌కి కాల్ చేసినందుకు చాలా ధన్యవాదాలు! మీ పిల్లల ప్లేడేట్ మరియు డేకేర్ విషయాల్లో మీకు సహాయం చేయడానికి మేము ఎంతో ఉత్సాహంగా ఉన్నాము!";
       }
 
       return res.json({
         success: true,
-        reply: replyText,
+        reply: fallbackReply,
         audioDataUrl: null,
         languageCode: code,
-        isAiGenerated: false,
-        isFreeMode: true
+        isAiGenerated: false
       });
     } catch (err: any) {
       console.error("[Voice Agent Reply Route Error]:", err);
@@ -2640,6 +2791,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     return res.json({ success: true, text: replyText });
   };
   app.post("/api/copilot", handleCopilot);
+  app.post("/api/gemini/copilot", handleCopilot);
 
   const handlePlayIdeas = (req: any, res: any) => {
     const { kids, category } = req.body || {};
@@ -2647,6 +2799,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     return res.json({ success: true, text: outputText });
   };
   app.post("/api/generate-play-ideas", handlePlayIdeas);
+  app.post("/api/gemini/generate-play-ideas", handlePlayIdeas);
 
   // CHILD-SAFETY BIOMETRIC FACE COMPARISON GATEWAY
   const handleVerifyFace = (req: any, res: any) => {
@@ -2677,6 +2830,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     }
   };
   app.post("/api/verify-face", handleVerifyFace);
+  app.post("/api/gemini/verify-face", handleVerifyFace);
 
   // =========================================================================
   // SECURE PRODUCTION-STYLE RAZORPAY PAYMENT GATEWAY ENDPOINTS
