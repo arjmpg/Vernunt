@@ -763,6 +763,9 @@ export interface KidStory {
   instagramFollowers?: number | string; // Extracted follower count e.g. "14.8K" or 14800
   kidRadarId?: string; // Reference to connect in Search Radar
   chapterNumber?: number; // Story chapter for the same child
+  googleWebStoryUrl?: string; // Canonical Google AMP Web Story URL (e.g. "https://app.vernunt.com/web-stories/aarav-sharma-speedcubing-champion-bangalore")
+  googleIndexedAt?: string; // Timestamp when story was dispatched to Googlebot & IndexNow
+  googleIndexingStatus?: 'indexed' | 'queued' | 'verified';
 }
 
 // Vernunt Groups (Peanut style mom & parent communities)

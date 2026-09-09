@@ -107,23 +107,22 @@ export async function getFcmMessaging(): Promise<Messaging | null> {
 }
 
 /**
- * Proactively register the FCM Service Worker on app startup
+ * Proactively obtain or register the unified Service Worker on app startup
  */
 export async function registerServiceWorkerForFCM(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return null;
   try {
-    const reg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
+    // Check if unified SW is already registered
+    const existing = await navigator.serviceWorker.getRegistration();
+    if (existing) {
+      return existing;
+    }
+    const reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
     await navigator.serviceWorker.ready;
     return reg;
   } catch (err) {
-    try {
-      const fallbackReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-      await navigator.serviceWorker.ready;
-      return fallbackReg;
-    } catch (fallbackErr) {
-      console.debug('[FCM] SW registration note:', fallbackErr);
-      return null;
-    }
+    console.debug('[FCM] SW registration note:', err);
+    return null;
   }
 }
 
@@ -162,13 +161,13 @@ export async function requestPushPermissionAndGetToken(
     let swReg: ServiceWorkerRegistration | null = null;
     if ('serviceWorker' in navigator) {
       try {
-        // Try registering firebase-messaging-sw.js or fallback to sw.js
-        swReg = await navigator.serviceWorker.register('/firebase-messaging-sw.js', { scope: '/' });
-        await navigator.serviceWorker.ready;
+        swReg = await navigator.serviceWorker.getRegistration();
+        if (!swReg) {
+          swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+          await navigator.serviceWorker.ready;
+        }
       } catch (swErr) {
-        console.warn('[FCM] firebase-messaging-sw.js fallback to sw.js:', swErr);
-        swReg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-        await navigator.serviceWorker.ready;
+        console.warn('[FCM] SW retrieval note:', swErr);
       }
     }
 

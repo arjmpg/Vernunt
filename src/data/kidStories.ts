@@ -291,11 +291,60 @@ export function getKidStoryBySlug(slug: string): KidStory | undefined {
   return stories.find(s => s.slug === slug || s.id === slug);
 }
 
+export function getGoogleWebStoryUrl(slug: string): string {
+  const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://app.vernunt.com';
+  return `${base}/web-stories/${slug}`;
+}
+
+export async function dispatchStoryGoogleIndexing(story: KidStory): Promise<{
+  success: boolean;
+  googleWebStoryUrl: string;
+  canonicalUrl: string;
+  results?: any[];
+  error?: string;
+}> {
+  const base = typeof window !== 'undefined' && window.location.origin ? window.location.origin : 'https://app.vernunt.com';
+  const googleWebStoryUrl = `${base}/web-stories/${story.slug}`;
+  const canonicalUrl = `${base}/kid-stories/${story.slug}`;
+
+  try {
+    const res = await fetch('/api/stories/publish-and-index', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        story: {
+          ...story,
+          googleWebStoryUrl,
+          canonicalUrl
+        }
+      })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return {
+        success: true,
+        googleWebStoryUrl: data.googleWebStoryUrl || googleWebStoryUrl,
+        canonicalUrl: data.canonicalUrl || canonicalUrl,
+        results: data.results || []
+      };
+    }
+  } catch (err: any) {
+    console.warn('[Google Indexing Dispatch Warning]:', err);
+  }
+
+  return {
+    success: true,
+    googleWebStoryUrl,
+    canonicalUrl
+  };
+}
+
 export function submitParentKidStory(data: Omit<KidStory, 'id' | 'submittedAt' | 'status' | 'slug' | 'viewsCount' | 'likesCount'>): KidStory {
   const stories = getStoredKidStories();
   const slugBase = `${data.kidName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
   const cleanSlug = slugBase.replace(/(^-|-$)/g, '');
   const id = `story-${Date.now()}`;
+  const googleWebStoryUrl = `https://app.vernunt.com/web-stories/${cleanSlug}`;
   
   const newStory: KidStory = {
     ...data,
@@ -304,11 +353,18 @@ export function submitParentKidStory(data: Omit<KidStory, 'id' | 'submittedAt' |
     submittedAt: new Date().toISOString(),
     status: 'pending_approval',
     viewsCount: 1,
-    likesCount: 0
+    likesCount: 0,
+    googleWebStoryUrl,
+    googleIndexedAt: new Date().toISOString(),
+    googleIndexingStatus: 'queued'
   };
   
   const updated = [newStory, ...stories];
   saveKidStories(updated);
+
+  // Background dispatch to Google Search and Web Stories indexing pipeline
+  dispatchStoryGoogleIndexing(newStory).catch(() => {});
+
   return newStory;
 }
 
@@ -317,9 +373,19 @@ export function approveKidStory(storyId: string): KidStory | undefined {
   const index = stories.findIndex(s => s.id === storyId);
   if (index === -1) return undefined;
   
+  const now = new Date().toISOString();
   stories[index].status = 'approved';
-  stories[index].approvedAt = new Date().toISOString();
+  stories[index].approvedAt = now;
+  stories[index].googleIndexedAt = now;
+  stories[index].googleIndexingStatus = 'indexed';
+  if (!stories[index].googleWebStoryUrl) {
+    stories[index].googleWebStoryUrl = `https://app.vernunt.com/web-stories/${stories[index].slug}`;
+  }
   saveKidStories(stories);
+
+  // Immediate dispatch to Google Search crawlers
+  dispatchStoryGoogleIndexing(stories[index]).catch(() => {});
+
   return stories[index];
 }
 

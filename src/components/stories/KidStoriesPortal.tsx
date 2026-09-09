@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Sparkles, Search, Award, Instagram, ArrowRight, Share2, Heart, Eye, 
   CheckCircle2, ChevronLeft, BookOpen, Plus, ShieldCheck, MapPin, Calendar,
-  Book, Trash2, Lock, Gift, Users, ExternalLink, AlertTriangle, Layers
+  Book, Trash2, Lock, Gift, Users, ExternalLink, AlertTriangle, Layers, Globe
 } from 'lucide-react';
 import { KidStory, ChildProfile } from '../../types.ts';
 import { 
@@ -20,6 +20,7 @@ import KidStoryBookReader from './KidStoryBookReader.tsx';
 import KidBookCard from './KidBookCard.tsx';
 import InstagramShareModal from './InstagramShareModal.tsx';
 import StoryReferralModal from './StoryReferralModal.tsx';
+import GoogleWebStoryModal from './GoogleWebStoryModal.tsx';
 
 interface KidStoriesPortalProps {
   currentUser: ChildProfile | null;
@@ -63,6 +64,9 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
 
   const [showInstagramModal, setShowInstagramModal] = useState(false);
   const [instagramTargetStory, setInstagramTargetStory] = useState<KidStory | null>(null);
+
+  const [showGoogleStoryModal, setShowGoogleStoryModal] = useState(false);
+  const [googleStoryTarget, setGoogleStoryTarget] = useState<KidStory | null>(null);
 
   const [showReferralModal, setShowReferralModal] = useState(false);
   const [isLifetimeUnlocked, setIsLifetimeUnlocked] = useState(isKidStoryLifetimeUnlocked());
@@ -230,6 +234,12 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
   const handleOpenInstagramShare = (story: KidStory) => {
     setInstagramTargetStory(story);
     setShowInstagramModal(true);
+  };
+
+  // Helper to open Google Web Story Modal & Fast Indexing View
+  const handleOpenGoogleWebStory = (story: KidStory) => {
+    setGoogleStoryTarget(story);
+    setShowGoogleStoryModal(true);
   };
 
   // Check if current user is the author/parent of active story
@@ -534,6 +544,14 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
               </div>
 
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleOpenGoogleWebStory(activeStory)}
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-bold transition flex items-center gap-1.5 cursor-pointer"
+                  title="View Google Web Story with Vernunt white-label branding"
+                >
+                  <Globe className="w-3.5 h-3.5" /> Google Story
+                </button>
                 <button
                   type="button"
                   onClick={() => handleOpenInstagramShare(activeStory)}
@@ -843,6 +861,7 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
                   onOpenBook={handleOpenKidBook}
                   onAddStoryToKid={(kidName, nextChapter) => onOpenWriteModal(kidName, nextChapter)}
                   onOpenInstagram={(b) => handleOpenInstagramShare(b.latestStory)}
+                  onOpenGoogleWebStory={(s) => handleOpenGoogleWebStory(s)}
                   currentUser={currentUser}
                   isAdmin={currentUser?.userRole === 'Admin' || currentUser?.email === 'ardha@vernunt.com' || currentUser?.email === 'arjunmpgupta@gmail.com'}
                   onEditStory={(b) => {
@@ -1044,6 +1063,10 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
             setShowBookReader(false);
             handleOpenInstagramShare(s);
           }}
+          onOpenGoogleWebStory={(s) => {
+            setShowBookReader(false);
+            handleOpenGoogleWebStory(s);
+          }}
           onAddStoryToKid={(kidName, nextChapter) => {
             setShowBookReader(false);
             onOpenWriteModal(kidName, nextChapter);
@@ -1059,6 +1082,22 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
         onClose={() => setShowInstagramModal(false)}
         story={instagramTargetStory}
       />
+
+      {/* Dedicated Google Web Story Experience Modal */}
+      {showGoogleStoryModal && googleStoryTarget && (
+        <GoogleWebStoryModal
+          isOpen={showGoogleStoryModal}
+          onClose={() => setShowGoogleStoryModal(false)}
+          story={googleStoryTarget}
+          onOpenBook={(kidName) => {
+            setShowGoogleStoryModal(false);
+            const foundBook = kidBooks.find(b => b.kidName.toLowerCase() === kidName.toLowerCase());
+            if (foundBook) {
+              handleOpenKidBook(foundBook);
+            }
+          }}
+        />
+      )}
 
       {/* Parent Referral & Lifetime Free Writing Modal */}
       <StoryReferralModal

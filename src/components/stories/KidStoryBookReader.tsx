@@ -4,10 +4,11 @@ import {
   BookOpen, ChevronLeft, ChevronRight, Sparkles, Award, Instagram, 
   Share2, Compass, ShieldCheck, X, Volume2, VolumeX, Eye, Plus, 
   Layers, Bookmark, CornerDownRight, CheckCircle2, UserCheck, Heart,
-  BookmarkCheck, Check
+  BookmarkCheck, Check, Globe
 } from 'lucide-react';
 import { KidStory } from '../../types.ts';
 import { extractInstagramHandle, incrementStoryViews, getBookThemeForCategory } from '../../data/kidStories.ts';
+import GoogleWebStoryModal from './GoogleWebStoryModal.tsx';
 
 interface KidStoryBookReaderProps {
   isOpen?: boolean;
@@ -21,6 +22,7 @@ interface KidStoryBookReaderProps {
   isLoggedInParent?: boolean;
   onOpenInstagramShare?: (story: KidStory) => void;
   onOpenShareModal?: (story: KidStory) => void;
+  onOpenGoogleWebStory?: (story: KidStory) => void;
   onContactAdmin?: (story: KidStory) => void;
   onDeleteStory?: (storyId: string) => void;
   onAddStoryToKid?: (kidName: string, nextChapter: number) => void;
@@ -47,12 +49,15 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
   isLoggedInParent = false,
   onOpenInstagramShare,
   onOpenShareModal,
+  onOpenGoogleWebStory,
   onContactAdmin,
   onDeleteStory,
   onAddStoryToKid,
   currentParentIdentifier
 }) => {
   if (!isOpen) return null;
+
+  const [showGoogleWebStory, setShowGoogleWebStory] = useState(false);
 
   // Group stories by kidName
   const kidsMap = useMemo(() => {
@@ -665,9 +670,17 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-full bg-emerald-100/90 text-emerald-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
-                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> Google Indexed
-                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowGoogleWebStory(true);
+                          onOpenGoogleWebStory?.(currentStory);
+                        }}
+                        className="px-2.5 py-1 rounded-full bg-emerald-100/90 hover:bg-emerald-200 text-emerald-800 text-[10px] font-black uppercase tracking-wider flex items-center gap-1 border border-emerald-200 cursor-pointer transition shadow-2xs active:scale-95"
+                        title="View Google Web Story & SEO Indexing"
+                      >
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" /> Google Story Indexed
+                      </button>
                       <span className="text-xs font-serif font-bold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-md">
                         Page {currentPageIndex + 1}
                       </span>
@@ -699,18 +712,34 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
                           </div>
                         </div>
 
-                        {/* 1-Click Instagram Share Button under Photo */}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const shareFn = onOpenInstagramShare || onOpenShareModal;
-                            if (shareFn) shareFn(currentStory);
-                          }}
-                          className="w-full mt-2.5 py-2 px-3 bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-98"
-                        >
-                          <Instagram className="w-3.5 h-3.5" />
-                          <span>Share Chapter to Instagram</span>
-                        </button>
+                        {/* Action buttons: Google Web Story & Instagram */}
+                        <div className="mt-2.5 grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowGoogleWebStory(true);
+                              onOpenGoogleWebStory?.(currentStory);
+                            }}
+                            className="py-2 px-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-98"
+                            title="View Google Web Story with Vernunt white-label branding"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span>Google Story</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const shareFn = onOpenInstagramShare || onOpenShareModal;
+                              if (shareFn) shareFn(currentStory);
+                            }}
+                            className="py-2 px-2 bg-gradient-to-r from-pink-600 via-rose-600 to-purple-600 hover:opacity-95 text-white font-bold text-xs rounded-xl shadow-xs flex items-center justify-center gap-1.5 transition cursor-pointer active:scale-98"
+                            title="Share Chapter to Instagram"
+                          >
+                            <Instagram className="w-3.5 h-3.5" />
+                            <span>Instagram</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Pull Quote */}
@@ -932,6 +961,18 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
           </button>
         )}
       </div>
+
+      {/* Google Web Story Experience Modal */}
+      {showGoogleWebStory && currentStory && (
+        <GoogleWebStoryModal
+          isOpen={showGoogleWebStory}
+          onClose={() => setShowGoogleWebStory(false)}
+          story={currentStory}
+          onOpenBook={() => {
+            setShowGoogleWebStory(false);
+          }}
+        />
+      )}
 
     </div>
   );

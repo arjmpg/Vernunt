@@ -13,6 +13,15 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 
+// If registered separately, unregister this redundant worker so /sw.js handles everything cleanly
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    self.registration.unregister().then(() => {
+      console.log('[firebase-messaging-sw] Gracefully unregistered in favor of unified /sw.js');
+    })
+  );
+});
+
 let messaging = null;
 try {
   messaging = firebase.messaging();

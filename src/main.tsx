@@ -34,7 +34,34 @@ if (pathname === '/sitemap.xml') {
     document.documentElement.innerText = robotsText;
   }
 } else {
-  // Service Worker Management: In development/preview sandboxes, purge stale workers and caches to prevent white screen issues
+  // Loop-breaker safety guard: detect and prevent rapid reload loops
+  try {
+    const RELOAD_KEY = 'vernunt_reload_guard';
+    const now = Date.now();
+    const raw = sessionStorage.getItem(RELOAD_KEY);
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (now - data.timestamp < 10000 && data.count >= 4) {
+        console.warn('⚠️ Reload loop prevented by Vernunt Safety Guard. Purging stale workers...');
+        sessionStorage.removeItem(RELOAD_KEY);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((regs) => {
+            for (const r of regs) r.unregister();
+          });
+        }
+      } else if (now - data.timestamp < 10000) {
+        sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ count: data.count + 1, timestamp: now }));
+      } else {
+        sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ count: 1, timestamp: now }));
+      }
+    } else {
+      sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ count: 1, timestamp: now }));
+    }
+  } catch {
+    // Non-blocking
+  }
+
+  // Service Worker Management: In development/preview sandboxes, purge stale workers and caches
   const isDevOrPreview = 
     import.meta.env.DEV || 
     window.location.hostname.includes('localhost') || 
@@ -58,34 +85,23 @@ if (pathname === '/sitemap.xml') {
         });
       }
     } else {
-      let refreshing = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (!refreshing) {
-          refreshing = true;
-          window.location.reload();
-        }
-      });
-
+      // Production service worker registration
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then((registration) => {
-            // Check for updates on every page load
-            registration.update().catch(() => {});
+        // Clean up any conflicting legacy workers like firebase-messaging-sw.js
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+          for (const reg of registrations) {
+            const scriptUrl = reg.active?.scriptURL || reg.installing?.scriptURL || reg.waiting?.scriptURL || '';
+            if (scriptUrl.includes('firebase-messaging-sw.js')) {
+              console.log('🧹 Purging redundant firebase-messaging-sw.js in favor of unified /sw.js');
+              reg.unregister();
+            }
+          }
+        }).catch(() => {});
 
-            registration.onupdatefound = () => {
-              const installingWorker = registration.installing;
-              if (installingWorker) {
-                installingWorker.onstatechange = () => {
-                  if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                    console.log('⚡ New Vernunt version installed! Reloading to apply updates...');
-                    if (installingWorker.postMessage) {
-                      installingWorker.postMessage({ type: 'SKIP_WAITING' });
-                    }
-                  }
-                };
-              }
-            };
-            console.log('🤖 PWA Active: ServiceWorker registered:', registration.scope);
+        // Register the unified PWA service worker without reload loops
+        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          .then((registration) => {
+            console.log('🤖 PWA Active: Unified ServiceWorker registered with scope:', registration.scope);
           })
           .catch((error) => {
             console.error('❌ ServiceWorker registration error:', error);

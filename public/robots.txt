@@ -14,15 +14,21 @@ Disallow: /*?user=*
 Disallow: /*?child=*
 Disallow: /*?group=*
 
-# Allow only public educational guides, pediatric directories & verified clinic services
+# Allow only public educational guides, pediatric directories, verified clinic services & kid stories
 Allow: /
 Allow: /knowledge
 Allow: /specialists
 Allow: /doctors/
 Allow: /events
 Allow: /safety
+Allow: /kid-stories/
+Allow: /web-stories/
+Allow: /stories/
 
 Sitemap: https://app.vernunt.com/sitemap.xml
 Sitemap: https://app.vernunt.com/sitemap-doctors.xml
 Sitemap: https://app.vernunt.com/sitemap-guides.xml
+Sitemap: https://app.vernunt.com/sitemap-stories.xml
+Sitemap: https://app.vernunt.com/sitemap-webstories.xml
+Sitemap: https://app.vernunt.com/sitemap-kid-stories.xml
 

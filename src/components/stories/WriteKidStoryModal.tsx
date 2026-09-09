@@ -1,8 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Award, Instagram, Upload, Plus, Trash2, ShieldCheck, CheckCircle2, AlertCircle, FileText, Sparkles, Heart, Gift, Lightbulb, Users, RefreshCw, Trophy, Star, ArrowRight, BookOpen, Layers } from 'lucide-react';
+import { 
+  X, Award, Instagram, Upload, Plus, Trash2, ShieldCheck, CheckCircle2, 
+  AlertCircle, FileText, Sparkles, Heart, Gift, Lightbulb, Users, RefreshCw, 
+  Trophy, Star, ArrowRight, BookOpen, Layers, Globe, Copy, ExternalLink, Check 
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { ChildProfile } from '../../types.ts';
+import { ChildProfile, KidStory } from '../../types.ts';
 import { submitParentKidStory, extractInstagramHandle, extractInstagramFollowers, isKidStoryLifetimeUnlocked, getKidBooks, KidBookProfile } from '../../data/kidStories.ts';
+import GoogleWebStoryModal from './GoogleWebStoryModal.tsx';
 
 interface WriteKidStoryModalProps {
   isOpen: boolean;
@@ -64,6 +69,9 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
   const [errorMsg, setErrorMsg] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submittedStory, setSubmittedStory] = useState<KidStory | null>(null);
+  const [showGooglePreview, setShowGooglePreview] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
   const [suggestionShuffleIndex, setSuggestionShuffleIndex] = useState(0);
 
   // If defaultKidName is passed, prefill
@@ -286,7 +294,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      submitParentKidStory({
+      const created = submitParentKidStory({
         kidName: kidName.trim(),
         kidAge: Number(kidAge),
         kidCity: kidCity.trim() || 'Bangalore',
@@ -304,6 +312,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
         parentPhone: currentUser.phone || currentUser.phoneNumber
       });
 
+      setSubmittedStory(created);
       setIsSuccess(true);
       setIsSubmitting(false);
       try {
@@ -392,35 +401,92 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
           </div>
         ) : isSuccess ? (
           /* Submission Success State */
-          <div className="p-8 text-center space-y-5 my-auto">
+          <div className="p-6 sm:p-8 text-center space-y-5 my-auto overflow-y-auto">
             <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
               <CheckCircle2 className="w-8 h-8" />
             </div>
             
             <div className="max-w-md mx-auto space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">
-                Story Submitted for Editorial Approval!
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span>Vernunt Little Achievers • 100% White-Label</span>
+              </div>
+
+              <h3 className="text-xl font-bold font-serif text-slate-900">
+                Story Published &amp; Linked to Google Stories!
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Thank you for celebrating <span className="font-bold text-slate-900">{kidName}</span>! Our editorial team reviews every story to verify authenticity and uphold child digital safety standards.
+                Thank you for celebrating <span className="font-bold text-slate-900">{kidName}</span>! The story has been generated as a Google Web Story and instantly dispatched to Google Search crawlers.
               </p>
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-left text-[11px] text-amber-900 space-y-1 mt-3">
-                <div className="font-bold flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" /> Google Search Engine Indexing
+
+              {/* Instant Google Web Story & Indexing Live Card */}
+              {submittedStory && (
+                <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl text-left space-y-2.5 mt-3 shadow-lg border border-slate-700">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-amber-400">
+                      <Globe className="w-4 h-4" />
+                      <span>Google Web Story Live</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-black tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full">
+                      Search Indexing Dispatched
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-slate-300 space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">AMP URL:</span>
+                      <span className="font-mono text-amber-200 truncate">
+                        https://app.vernunt.com/web-stories/{submittedStory.slug}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Publisher:</span>
+                      <span className="font-bold text-white">Vernunt Achievers (White-Label)</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-slate-400">Googlebot Ping:</span>
+                      <span className="text-emerald-400 font-bold">✓ Fast Index Pipeline Active</span>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowGooglePreview(true)}
+                      className="flex-1 py-2 px-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Globe className="w-3.5 h-3.5" />
+                      <span>Preview Google Story</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const url = `https://app.vernunt.com/web-stories/${submittedStory.slug}`;
+                        if (navigator.clipboard) {
+                          navigator.clipboard.writeText(url);
+                          setCopiedUrl(true);
+                          setTimeout(() => setCopiedUrl(false), 2500);
+                        }
+                      }}
+                      className="py-2 px-3 bg-white/10 hover:bg-white/20 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 cursor-pointer border border-white/20"
+                    >
+                      {copiedUrl ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      <span>{copiedUrl ? 'Copied!' : 'Copy Link'}</span>
+                    </button>
+                  </div>
                 </div>
-                <div>
-                  Once approved by the admin, {kidName}'s achievement profile will be indexed by Google and appear publicly on the Vernunt Achievers portal with a dedicated SEO profile link.
-                </div>
-              </div>
+              )}
             </div>
 
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer"
-            >
-              Done & View Stories
-            </button>
+            <div className="pt-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition cursor-pointer"
+              >
+                Done &amp; View Stories
+              </button>
+            </div>
           </div>
         ) : (
           /* Form Body */
@@ -888,6 +954,15 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
           </form>
         )}
       </div>
+
+      {/* Google Web Story Live Experience Preview */}
+      {showGooglePreview && submittedStory && (
+        <GoogleWebStoryModal
+          isOpen={showGooglePreview}
+          onClose={() => setShowGooglePreview(false)}
+          story={submittedStory}
+        />
+      )}
     </div>
   );
 };

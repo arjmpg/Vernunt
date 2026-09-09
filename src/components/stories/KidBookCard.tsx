@@ -14,15 +14,18 @@ import {
   MessageSquare, 
   Check, 
   X,
-  ShieldCheck
+  ShieldCheck,
+  Globe
 } from 'lucide-react';
 import { KidBookProfile, getBookThemeForCategory } from '../../data/kidStories.ts';
+import { KidStory } from '../../types.ts';
 
 interface KidBookCardProps {
   book: KidBookProfile;
   onOpenBook: (book: KidBookProfile) => void;
   onAddStoryToKid?: (kidName: string, nextChapter: number) => void;
   onOpenInstagram?: (book: KidBookProfile) => void;
+  onOpenGoogleWebStory?: (story: KidStory) => void;
   isAdmin?: boolean;
   currentUser?: any;
   onEditStory?: (book: KidBookProfile) => void;
@@ -33,6 +36,7 @@ export const KidBookCard: React.FC<KidBookCardProps> = ({
   onOpenBook,
   onAddStoryToKid,
   onOpenInstagram,
+  onOpenGoogleWebStory,
   isAdmin = false,
   currentUser = null,
   onEditStory
@@ -196,6 +200,19 @@ export const KidBookCard: React.FC<KidBookCardProps> = ({
                 )}
               </div>
             )}
+
+            {/* Google Web Story Icon */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenGoogleWebStory?.(book.latestStory);
+              }}
+              title="View Google Web Story & Fast Indexing"
+              className="p-1.5 bg-blue-600/80 hover:bg-blue-600 text-white rounded-full transition shadow-xs cursor-pointer active:scale-95"
+            >
+              <Globe className="w-3.5 h-3.5" />
+            </button>
 
             {/* Instagram Share Icon */}
             {book.instagramUrl && (
