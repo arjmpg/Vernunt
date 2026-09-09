@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   BookOpen, ChevronLeft, ChevronRight, Sparkles, Award, Instagram, 
   Share2, Compass, ShieldCheck, X, Volume2, VolumeX, Eye, Plus, 
-  Layers, Bookmark, CornerDownRight, CheckCircle2, UserCheck, Heart
+  Layers, Bookmark, CornerDownRight, CheckCircle2, UserCheck, Heart,
+  BookmarkCheck, Check
 } from 'lucide-react';
 import { KidStory } from '../../types.ts';
 import { extractInstagramHandle, incrementStoryViews, getBookThemeForCategory } from '../../data/kidStories.ts';
@@ -24,6 +25,14 @@ interface KidStoryBookReaderProps {
   onDeleteStory?: (storyId: string) => void;
   onAddStoryToKid?: (kidName: string, nextChapter: number) => void;
   currentParentIdentifier?: string;
+}
+
+interface SavedBookmark {
+  kidName: string;
+  pageIndex: number;
+  storyId: string;
+  chapterNumber: number;
+  timestamp: number;
 }
 
 export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
@@ -79,7 +88,25 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
   const [flipDirection, setFlipDirection] = useState<'next' | 'prev'>('next');
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const [showToc, setShowToc] = useState<boolean>(false);
-  const pageContainerRef = useRef<HTMLDivElement>(null);
+  const [bookmarkToast, setBookmarkToast] = useState<string | null>(null);
+
+  // Bookmark tracking for each kid
+  const [savedBookmark, setSavedBookmark] = useState<SavedBookmark | null>(null);
+
+  // Load bookmark for current child from localStorage
+  useEffect(() => {
+    if (!activeKidName || typeof window === 'undefined') return;
+    try {
+      const raw = localStorage.getItem(`vernunt_story_bookmark_${activeKidName}`);
+      if (raw) {
+        setSavedBookmark(JSON.parse(raw));
+      } else {
+        setSavedBookmark(null);
+      }
+    } catch {
+      setSavedBookmark(null);
+    }
+  }, [activeKidName]);
 
   // Sync when initialStoryId or initialKidName changes
   useEffect(() => {
@@ -111,40 +138,72 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
     }
   }, [currentStory?.id]);
 
-  // Realistic paper rustle acoustic synthesis using Web Audio API
+  // Multi-layered subtle paper-texture sound effect synthesized with Web Audio API
   const playPageTurnSound = () => {
     if (!soundEnabled || typeof window === 'undefined') return;
     try {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
+      const now = ctx.currentTime;
       
-      // Page rustle synthesis using white noise buffer + bandpass filter
-      const bufferSize = ctx.sampleRate * 0.22; // 220ms
+      // Layer 1: Textured paper grain friction (high-pass filtered white noise)
+      const bufferSize = Math.floor(ctx.sampleRate * 0.28); // 280ms
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.35));
+        // Natural pink/brownish curve for dry paper leaf rustle
+        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.32));
       }
 
-      const whiteNoise = ctx.createBufferSource();
-      whiteNoise.buffer = buffer;
+      const noiseSource = ctx.createBufferSource();
+      noiseSource.buffer = buffer;
 
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(900, ctx.currentTime);
-      filter.frequency.exponentialRampToValueAtTime(350, ctx.currentTime + 0.18);
-      filter.Q.setValueAtTime(2.5, ctx.currentTime);
+      const frictionFilter = ctx.createBiquadFilter();
+      frictionFilter.type = 'bandpass';
+      frictionFilter.frequency.setValueAtTime(1400, now);
+      frictionFilter.frequency.exponentialRampToValueAtTime(320, now + 0.24);
+      frictionFilter.Q.setValueAtTime(2.2, now);
 
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.12, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.2);
+      const frictionGain = ctx.createGain();
+      frictionGain.gain.setValueAtTime(0.14, now);
+      frictionGain.gain.exponentialRampToValueAtTime(0.001, now + 0.26);
 
-      whiteNoise.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
+      noiseSource.connect(frictionFilter);
+      frictionFilter.connect(frictionGain);
+      frictionGain.connect(ctx.destination);
+      noiseSource.start(now);
 
-      whiteNoise.start();
+      // Layer 2: Subtle paper body air swoop (low-mid displacement)
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.22);
+
+      const oscGain = ctx.createGain();
+      oscGain.gain.setValueAtTime(0.05, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+      osc.connect(oscGain);
+      oscGain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.23);
+
+      // Layer 3: Paper settle click at the end (~220ms)
+      const settleOsc = ctx.createOscillator();
+      settleOsc.type = 'triangle';
+      settleOsc.frequency.setValueAtTime(220, now + 0.18);
+      settleOsc.frequency.exponentialRampToValueAtTime(80, now + 0.24);
+
+      const settleGain = ctx.createGain();
+      settleGain.gain.setValueAtTime(0.0001, now);
+      settleGain.gain.setValueAtTime(0.04, now + 0.18);
+      settleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+      settleOsc.connect(settleGain);
+      settleGain.connect(ctx.destination);
+      settleOsc.start(now + 0.18);
+      settleOsc.stop(now + 0.25);
     } catch {
       // Audio autoplay policy fallback
     }
@@ -158,7 +217,7 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
       setTimeout(() => {
         setCurrentPageIndex(prev => prev + 1);
         setIsFlipping(false);
-      }, 500);
+      }, 520);
     }
   };
 
@@ -170,7 +229,61 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
       setTimeout(() => {
         setCurrentPageIndex(prev => prev - 1);
         setIsFlipping(false);
-      }, 500);
+      }, 520);
+    }
+  };
+
+  // Toggle Bookmark Handler
+  const handleToggleBookmark = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!currentStory) return;
+
+    const isCurrentBookmarked = savedBookmark?.pageIndex === currentPageIndex;
+
+    if (isCurrentBookmarked) {
+      // Remove bookmark
+      try {
+        localStorage.removeItem(`vernunt_story_bookmark_${activeKidName}`);
+        setSavedBookmark(null);
+        setBookmarkToast(`Bookmark removed from Page ${currentPageIndex + 1}`);
+        setTimeout(() => setBookmarkToast(null), 2500);
+      } catch (err) {
+        console.warn(err);
+      }
+    } else {
+      // Save bookmark
+      const newBm: SavedBookmark = {
+        kidName: activeKidName,
+        pageIndex: currentPageIndex,
+        storyId: currentStory.id,
+        chapterNumber: currentStory.chapterNumber || currentPageIndex + 1,
+        timestamp: Date.now()
+      };
+      try {
+        localStorage.setItem(`vernunt_story_bookmark_${activeKidName}`, JSON.stringify(newBm));
+        setSavedBookmark(newBm);
+        playPageTurnSound();
+        setBookmarkToast(`🔖 Bookmark saved for ${activeKidName} on Page ${currentPageIndex + 1}!`);
+        setTimeout(() => setBookmarkToast(null), 3000);
+      } catch (err) {
+        console.warn(err);
+      }
+    }
+  };
+
+  // Jump to saved bookmark
+  const handleJumpToBookmark = () => {
+    if (savedBookmark && savedBookmark.pageIndex < currentKidStories.length) {
+      const targetIdx = savedBookmark.pageIndex;
+      if (targetIdx !== currentPageIndex && !isFlipping) {
+        setFlipDirection(targetIdx > currentPageIndex ? 'next' : 'prev');
+        setIsFlipping(true);
+        playPageTurnSound();
+        setTimeout(() => {
+          setCurrentPageIndex(targetIdx);
+          setIsFlipping(false);
+        }, 520);
+      }
     }
   };
 
@@ -227,9 +340,26 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
     (currentStory.parentPhone && currentStory.parentPhone.includes(currentParentIdentifier))
   );
 
+  const isCurrentPageBookmarked = savedBookmark?.pageIndex === currentPageIndex;
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-stone-950/95 backdrop-blur-md overflow-y-auto p-2 sm:p-4 select-none font-sans">
       
+      {/* Floating Bookmark Toast Feedback */}
+      <AnimatePresence>
+        {bookmarkToast && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.9 }}
+            className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 text-white font-serif font-bold text-xs rounded-full shadow-2xl border border-amber-300 flex items-center gap-2"
+          >
+            <BookmarkCheck className="w-4 h-4 text-amber-200" />
+            <span>{bookmarkToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top Leather Trim Navigation Bar */}
       <div className="w-full max-w-5xl mx-auto flex items-center justify-between gap-3 py-2.5 px-4 bg-stone-900/90 text-stone-200 rounded-2xl border border-stone-800 shadow-2xl mb-2 shrink-0">
         
@@ -293,75 +423,70 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
                             setCurrentPageIndex(sIdx);
                             setIsFlipping(false);
                             setShowToc(false);
-                          }, 450);
+                          }, 520);
                         } else {
                           setShowToc(false);
                         }
                       }}
-                      className={`w-full text-left px-2.5 py-2 rounded-xl flex items-center justify-between transition cursor-pointer ${
+                      className={`w-full text-left p-2 rounded-xl flex items-center justify-between transition cursor-pointer ${
                         sIdx === currentPageIndex
                           ? 'bg-amber-500/20 text-amber-300 font-bold'
                           : 'text-stone-300 hover:bg-stone-800'
                       }`}
                     >
                       <span className="truncate">Ch {story.chapterNumber || sIdx + 1}: {story.title}</span>
-                      {sIdx === currentPageIndex && <span className="text-amber-400 text-[10px]">Active</span>}
+                      {savedBookmark?.pageIndex === sIdx && (
+                        <span className="text-[10px] text-amber-400 shrink-0">🔖 Saved</span>
+                      )}
                     </button>
                   ))}
                 </div>
               )}
             </div>
           )}
-        </div>
 
-        {/* Right Controls: Sound, Write Next Chapter, Close */}
-        <div className="flex items-center gap-2 shrink-0">
-          {onAddStoryToKid && (
+          {/* Quick Jump to Saved Bookmark */}
+          {savedBookmark && savedBookmark.pageIndex !== currentPageIndex && (
             <button
               type="button"
-              onClick={() => {
-                onAddStoryToKid(activeKidName, currentKidStories.length + 1);
-                onClose();
-              }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white text-xs font-bold rounded-xl shadow-xs transition cursor-pointer"
-              title="Add a new milestone chapter to this child's book"
+              onClick={handleJumpToBookmark}
+              className="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-[11px] font-bold transition flex items-center gap-1 cursor-pointer shrink-0 animate-pulse"
+              title={`Jump to your saved place on Chapter ${savedBookmark.chapterNumber}`}
             >
-              <Plus className="w-3.5 h-3.5" />
-              <span>+ Add Chapter</span>
+              <BookmarkCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span>Resume Ch {savedBookmark.chapterNumber}</span>
             </button>
           )}
 
+        </div>
+
+        {/* Right Controls: Sound Toggle & Close */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-1.5 rounded-xl text-xs transition cursor-pointer ${soundEnabled ? 'text-amber-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-800'}`}
-            title={soundEnabled ? 'Page flip sound on' : 'Page flip sound muted'}
+            className={`p-1.5 rounded-xl transition cursor-pointer ${
+              soundEnabled ? 'text-amber-400 hover:bg-stone-800' : 'text-stone-500 hover:bg-stone-800'
+            }`}
+            title={soundEnabled ? "Paper Sound Effects: Enabled" : "Paper Sound Effects: Muted"}
           >
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </button>
 
-          <span className="text-xs font-mono text-stone-400 px-1 hidden md:inline">
-            Story {currentPageIndex + 1} of {currentKidStories.length}
-          </span>
-
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white rounded-xl transition cursor-pointer"
-            title="Close Book (Esc)"
+            className="p-1.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded-xl transition cursor-pointer"
+            title="Close Storybook Reader (Esc)"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
       </div>
 
-      {/* 3D Physical Storybook Stage */}
-      <div 
-        ref={pageContainerRef}
-        className="flex-1 max-w-5xl w-full mx-auto flex items-center justify-center relative select-none"
-        style={{ perspective: '2200px' }}
-      >
+      {/* Main 3D Book Experience Stage */}
+      <div className="flex-1 flex items-center justify-center relative w-full my-auto px-1 sm:px-4 py-2">
         
         {/* Previous Page Turn Button (Floating on Left) */}
         <button
@@ -412,58 +537,130 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
             <div className="absolute bottom-0 inset-x-0 h-2 bg-black/20" />
           </div>
 
-          {/* Realistic 3D Page Body with Framer-Motion Page-Flip Animation */}
-          <div className="relative w-full overflow-hidden rounded-2xl" style={{ perspective: '1800px' }}>
+          {/* Realistic 3D Page Body with Dynamic Page-Curl & Shadow Transition */}
+          <div className="relative w-full overflow-hidden rounded-2xl" style={{ perspective: '2400px' }}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={`${activeKidName}-${currentStory.id}-${currentPageIndex}`}
                 initial={{
-                  rotateY: flipDirection === 'next' ? 45 : -45,
-                  opacity: 0.7,
-                  scale: 0.98,
+                  rotateY: flipDirection === 'next' ? 70 : -70,
+                  rotateZ: flipDirection === 'next' ? -2.5 : 2.5,
+                  skewY: flipDirection === 'next' ? -2 : 2,
+                  scale: 0.95,
+                  opacity: 0.6,
                   filter: 'brightness(0.9)'
                 }}
                 animate={{
                   rotateY: 0,
-                  opacity: 1,
+                  rotateZ: 0,
+                  skewY: 0,
                   scale: 1,
+                  opacity: 1,
                   filter: 'brightness(1)'
                 }}
                 exit={{
-                  rotateY: flipDirection === 'next' ? -45 : 45,
-                  opacity: 0.6,
-                  scale: 0.98,
+                  rotateY: flipDirection === 'next' ? -70 : 70,
+                  rotateZ: flipDirection === 'next' ? 2.5 : -2.5,
+                  skewY: flipDirection === 'next' ? 2 : -2,
+                  scale: 0.95,
+                  opacity: 0.5,
                   filter: 'brightness(0.85)'
                 }}
                 transition={{
-                  duration: 0.45,
-                  ease: [0.25, 1, 0.5, 1]
+                  duration: 0.52,
+                  ease: [0.25, 1, 0.35, 1]
                 }}
                 className="w-full bg-[#fdfbf7] text-stone-900 rounded-2xl shadow-inner border border-[#e6dfd1] relative overflow-hidden"
                 style={{
                   transformStyle: 'preserve-3d',
+                  transformOrigin: flipDirection === 'next' ? '0% 50%' : '100% 50%',
                   backgroundImage: 'radial-gradient(#e5ded0 0.8px, transparent 0.8px)',
                   backgroundSize: '22px 22px',
-                  boxShadow: 'inset 0 0 50px rgba(180, 160, 130, 0.2), 0 10px 30px rgba(0,0,0,0.35)'
+                  boxShadow: 'inset 0 0 50px rgba(180, 160, 130, 0.2), 0 12px 36px rgba(0,0,0,0.38)'
                 }}
               >
                 
-                {/* Dynamic Page Spine Shadow overlay for authentic lighting */}
+                {/* DYNAMIC SHADOW TRANSITION OVERLAY: Sweeps across the page curl hinge */}
+                <motion.div 
+                  initial={{ opacity: 0.5, scaleX: 1.4 }}
+                  animate={{ opacity: 0, scaleX: 1 }}
+                  transition={{ duration: 0.5, ease: 'easeOut' }}
+                  className="absolute inset-0 pointer-events-none z-25 bg-gradient-to-r from-black/25 via-stone-700/15 to-transparent"
+                />
+
+                {/* VISUAL BOOKMARK ELEMENT ANCHORED TO TOP-RIGHT EDGE OF BOOK PAGE */}
+                <div 
+                  id="page-visual-bookmark"
+                  onClick={handleToggleBookmark}
+                  className="absolute top-0 right-4 sm:right-7 z-30 cursor-pointer select-none group"
+                  title={isCurrentPageBookmarked ? "Click to remove bookmark" : "Click to save bookmark on this page"}
+                >
+                  <div className={`transition-all duration-300 transform ${
+                    isCurrentPageBookmarked 
+                      ? 'translate-y-0 opacity-100 shadow-xl' 
+                      : '-translate-y-2.5 opacity-80 group-hover:translate-y-0 group-hover:opacity-100'
+                  }`}>
+                    {/* Ribbon Body with Swallowtail Notch */}
+                    <div 
+                      className={`w-7 sm:w-9 h-14 sm:h-16 flex flex-col items-center justify-start pt-2 px-1 text-white shadow-md transition-colors ${
+                        isCurrentPageBookmarked
+                          ? 'bg-gradient-to-b from-red-700 via-rose-700 to-amber-600 border-x border-amber-300/40'
+                          : 'bg-gradient-to-b from-stone-500/80 via-stone-600/80 to-amber-700/80 border-x border-white/20'
+                      }`}
+                      style={{
+                        clipPath: 'polygon(0 0, 100% 0, 100% 86%, 50% 100%, 0 86%)'
+                      }}
+                    >
+                      {isCurrentPageBookmarked ? (
+                        <BookmarkCheck className="w-4 h-4 text-amber-200 fill-amber-300 drop-shadow-xs" />
+                      ) : (
+                        <Bookmark className="w-3.5 h-3.5 text-stone-200 group-hover:text-amber-200 transition-colors" />
+                      )}
+                      <span className="text-[8px] font-black uppercase tracking-tighter mt-1 font-mono text-amber-100 hidden sm:inline">
+                        {isCurrentPageBookmarked ? `P.${currentPageIndex + 1}` : 'SAVE'}
+                      </span>
+                    </div>
+
+                    {/* Bookmark Hover Tooltip */}
+                    <div className="absolute right-0 top-full mt-1 hidden group-hover:block bg-stone-900 text-white text-[10px] font-sans font-bold px-2 py-1 rounded-lg shadow-xl whitespace-nowrap border border-amber-400/40 z-40">
+                      {isCurrentPageBookmarked 
+                        ? `🔖 Saved Bookmark (Page ${currentPageIndex + 1}) • Tap to remove` 
+                        : `🔖 Save Bookmark on Page ${currentPageIndex + 1}`}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tactile Page Spine Shadow overlay for authentic lighting */}
                 <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-stone-400/25 via-stone-400/10 to-transparent pointer-events-none z-10" />
                 <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-stone-400/25 via-stone-400/10 to-transparent pointer-events-none z-10" />
+
+                {/* Tactile Bottom Corner Dog-Ear / Page Peel Graphic */}
+                <div 
+                  onClick={handleTurnNext}
+                  className="absolute bottom-0 right-0 w-10 h-10 cursor-pointer z-20 group hidden sm:block"
+                  title="Turn to next page"
+                >
+                  <div 
+                    className="w-full h-full transition-transform duration-300 group-hover:scale-110"
+                    style={{
+                      background: 'linear-gradient(135deg, transparent 50%, #e2d7c3 50%)',
+                      filter: 'drop-shadow(-2px -2px 3px rgba(0,0,0,0.15))'
+                    }}
+                  />
+                </div>
 
                 {/* Page Content Container: Dual-Page Grid on Desktop */}
                 <div className="p-4 sm:p-7 md:p-9 max-h-[75vh] overflow-y-auto space-y-6">
                   
                   {/* Top Chapter Header Banner */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-stone-300/80">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pb-3.5 border-b border-stone-300/80 pr-10 sm:pr-14">
                     <div className="space-y-0.5">
                       <div className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-widest text-amber-900 font-serif">
                         <Sparkles className="w-3.5 h-3.5 text-amber-600" />
                         <span>Chapter {currentStory.chapterNumber || currentPageIndex + 1} of {currentKidStories.length} • {currentStory.category}</span>
                       </div>
                       <div className="text-[11px] text-stone-500 font-serif italic">
-                        {activeKidName}'s Chronicles • Published & Verified in Vernunt Gazette
+                        {activeKidName}'s Chronicles • Published &amp; Verified in Vernunt Gazette
                       </div>
                     </div>
 
@@ -521,72 +718,81 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
                         "{currentStory.summary}"
                       </div>
 
-                      {/* Verified Accolades Plaque */}
-                      <div className="space-y-2 bg-stone-100/90 p-3.5 rounded-2xl border border-stone-200 shadow-2xs">
-                        <div className="text-[10px] font-black uppercase tracking-wider text-amber-900 flex items-center gap-1.5 font-serif">
-                          <Award className="w-3.5 h-3.5 text-amber-600" />
-                          <span>Key Accolades in this Chapter</span>
-                        </div>
-
-                        <div className="space-y-1.5">
-                          {currentStory.achievements.map((ach, idx) => (
-                            <div key={idx} className="text-xs text-stone-700 flex items-start gap-2 leading-tight">
-                              <span className="text-amber-600 font-bold shrink-0 mt-0.5">✦</span>
-                              <span>{ach}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                    </div>
-
-                    {/* RIGHT PAGE WING: Story Title & Complete Editorial Narrative */}
-                    <div className="md:col-span-7 space-y-4">
-                      
-                      {/* Chapter Title */}
-                      <div className="space-y-1">
-                        <h2 className="text-xl sm:text-2xl font-serif font-bold text-stone-900 leading-snug">
-                          {currentStory.title}
-                        </h2>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500 font-medium">
-                          <span>Parent: <strong className="text-stone-700">{currentStory.parentName}</strong></span>
-                          <span>•</span>
-                          <span>{new Date(currentStory.submittedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short' })}</span>
-                        </div>
-                      </div>
-
-                      {/* Editorial Narrative Text with Illuminated Drop Cap */}
-                      <div className="font-serif text-sm sm:text-base text-stone-800 leading-relaxed space-y-3 pt-2">
-                        <p className="whitespace-pre-line text-justify first-letter:text-5xl first-letter:font-bold first-letter:text-amber-800 first-letter:mr-2.5 first-letter:float-left first-letter:font-serif first-letter:leading-none">
-                          {currentStory.content}
-                        </p>
-                      </div>
-
-                      {/* Connect on Search Radar Box */}
-                      <div className="mt-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                        <div className="space-y-0.5">
-                          <div className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
-                            <Compass className="w-3.5 h-3.5 text-orange-600" />
-                            <span>Connect with {currentStory.kidName} on Search Radar</span>
+                      {/* Achievements and Medals Box */}
+                      {currentStory.achievements && currentStory.achievements.length > 0 && (
+                        <div className="bg-stone-100/90 border border-stone-200 rounded-2xl p-3.5 space-y-2">
+                          <div className="text-[10px] font-black uppercase tracking-wider text-stone-600 flex items-center gap-1">
+                            <Award className="w-3.5 h-3.5 text-amber-600" />
+                            <span>Hall of Achievements</span>
                           </div>
-                          <p className="text-[11px] text-stone-600">
-                            Coordinate playdates & swap coaching tips in {currentStory.kidCity}.
-                          </p>
+                          <div className="space-y-1">
+                            {currentStory.achievements.map((ach, aIdx) => (
+                              <div key={aIdx} className="flex items-center gap-1.5 text-xs text-stone-800">
+                                <span className="text-amber-600 text-[10px]">🏆</span>
+                                <span className="font-semibold">{ach}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
+                      )}
 
+                      {/* Playmate Radar Call to Action */}
+                      {onConnectRadar && (
                         <button
                           type="button"
                           onClick={() => {
                             if (isLoggedInParent) {
-                              onConnectRadar?.(currentStory.kidName, currentStory.kidCity);
-                            } else {
-                              onRadarAuthRequired?.(currentStory.kidName);
+                              onConnectRadar(currentStory.kidName, currentStory.kidCity);
+                              onClose();
+                            } else if (onRadarAuthRequired) {
+                              onRadarAuthRequired(currentStory.kidName);
                             }
                           }}
-                          className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer shrink-0"
+                          className="w-full py-2 px-3 bg-stone-900 hover:bg-stone-800 text-amber-300 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                         >
-                          Find on Radar
+                          <Compass className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Find {currentStory.kidName} on Playmate Radar</span>
                         </button>
+                      )}
+
+                    </div>
+
+                    {/* RIGHT PAGE WING: Story Title, Narrative, Family Reflections */}
+                    <div className="md:col-span-7 space-y-5">
+                      
+                      {/* Chapter Title in Classic Serif Typography */}
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 text-xs font-serif font-bold text-amber-800">
+                          <span>Chapter {currentStory.chapterNumber || currentPageIndex + 1}</span>
+                          <span>•</span>
+                          <span>{currentStory.datePublished}</span>
+                        </div>
+                        <h2 className="text-2xl sm:text-3xl font-serif font-bold text-stone-900 leading-tight">
+                          {currentStory.title}
+                        </h2>
+                      </div>
+
+                      {/* Full Story Content Body with Classic Initial Letter Dropcap */}
+                      <div className="prose prose-stone max-w-none text-stone-800 font-serif text-sm sm:text-base leading-relaxed space-y-3">
+                        <p className="first-letter:text-4xl first-letter:font-bold first-letter:float-left first-letter:mr-2 first-letter:font-serif first-letter:text-amber-900 whitespace-pre-line">
+                          {currentStory.content}
+                        </p>
+                      </div>
+
+                      {/* Parent Reflection Callout */}
+                      <div className="bg-[#f2ede4] border border-[#e0d6c4] rounded-2xl p-4 text-xs font-serif space-y-2">
+                        <div className="font-bold text-stone-900 flex items-center gap-1.5">
+                          <Heart className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                          <span>From {currentStory.parentName} ({currentStory.kidName}'s Parent):</span>
+                        </div>
+                        <p className="text-stone-700 italic leading-relaxed">
+                          "Watching {currentStory.kidName} dedicate time to {currentStory.category.toLowerCase()} has brought immense joy. We hope sharing this story in the Vernunt Gazette inspires other neighborhood kids!"
+                        </p>
+                        {kidHandle && (
+                          <div className="text-[11px] text-stone-600 font-sans pt-1">
+                            Follow their journey on Instagram: <strong className="text-pink-700">@{kidHandle}</strong>
+                          </div>
+                        )}
                       </div>
 
                     </div>
@@ -694,10 +900,10 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
                 setTimeout(() => {
                   setCurrentPageIndex(idx);
                   setIsFlipping(false);
-                }, 450);
+                }, 520);
               }
             }}
-            className={`transition-all rounded-full cursor-pointer flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold ${
+            className={`transition-all rounded-full cursor-pointer flex items-center gap-1 px-2.5 py-1 text-[11px] font-bold relative ${
               idx === currentPageIndex
                 ? 'bg-amber-400 text-stone-950 shadow-md scale-105'
                 : 'bg-stone-800 text-stone-400 hover:bg-stone-700 hover:text-white'
@@ -705,6 +911,9 @@ export const KidStoryBookReader: React.FC<KidStoryBookReaderProps> = ({
             title={`Go to Chapter ${idx + 1}: ${story.title}`}
           >
             <span>Ch {story.chapterNumber || idx + 1}</span>
+            {savedBookmark?.pageIndex === idx && (
+              <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" title="Bookmark Saved" />
+            )}
           </button>
         ))}
 

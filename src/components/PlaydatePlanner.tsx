@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { ChildProfile, Playdate } from '../types.ts';
-import { CalendarRange, CalendarCheck2, MapPin, Clock, Trash2, HeartHandshake, Sparkles } from 'lucide-react';
+import { CalendarRange, CalendarCheck2, MapPin, Clock, Trash2, HeartHandshake, Sparkles, BellRing } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { auth, db, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { onSnapshot, collection, query, where, or, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PlaydateActivitySuggestions } from './PlaydateActivitySuggestions.tsx';
+import { sendPlaydateRequestPush, sendPlaydateConfirmedPush } from '../utils/fcmMessaging.ts';
 
 interface PlaydatePlannerProps {
   playmates: ChildProfile[];
   userProfile: ChildProfile | null;
   activeCompanion: ChildProfile | null;
+  onOpenPushModal?: () => void;
 }
 
-export default function PlaydatePlanner({ playmates, userProfile, activeCompanion }: PlaydatePlannerProps) {
+export default function PlaydatePlanner({ playmates, userProfile, activeCompanion, onOpenPushModal }: PlaydatePlannerProps) {
   // Local list of playdates
   const [playdates, setPlaydates] = useState<Playdate[]>([]);
 
@@ -111,7 +113,19 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
       setPlaydates([newRequest, ...playdates]);
     }
 
-    setNotification(`Successfully sent playdate request to ${guestChildName}'s parent!`);
+    // Trigger Real-Time FCM Push Notification to Invitee Guardian's Device (Android / iOS / Web)
+    sendPlaydateRequestPush({
+      targetUserId: guestId,
+      requesterParentName: userProfile?.parentName || 'Vernunt Guardian',
+      requesterChildName: userProfile?.childName || 'Playmate',
+      inviteeChildName: guestChildName,
+      date,
+      time,
+      location: locationName.trim(),
+      playdateId: newRequest.id
+    }).catch(err => console.warn('[FCM] Playdate push trigger note:', err));
+
+    setNotification(`Successfully sent playdate request to ${guestChildName}'s parent with real-time push alert!`);
     setTimeout(() => setNotification(null), 4000);
 
     // Celebrate with elegant confetti
@@ -154,6 +168,18 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
         }
         return d;
       }));
+    }
+
+    if (targetPlaydate) {
+      // Trigger Real-Time FCM Push Notification to Host Guardian's Device (Android / iOS / Web)
+      sendPlaydateConfirmedPush({
+        targetUserId: targetPlaydate.hostId,
+        inviteeParentName: userProfile?.parentName || 'Vernunt Guardian',
+        childName: userProfile?.childName || 'Playmate',
+        date: targetPlaydate.date,
+        time: targetPlaydate.time || '10:00 AM',
+        playdateId: targetPlaydate.id
+      }).catch(err => console.warn('[FCM] Playdate confirmed push trigger note:', err));
     }
 
     // Google Chat Workspace bot playdate confirmation notification
@@ -206,9 +232,22 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
 
         {/* Propose/Book New Playdate Invitation */}
         <div id="propose-invitation-card" className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
-          <div id="req-header" className="flex items-center gap-2 text-slate-800 mb-2">
-            <CalendarRange className="w-5.5 h-5.5 text-orange-500" />
-            <h3 className="font-bold text-lg font-serif">Propose Playground Playdate</h3>
+          <div id="req-header" className="flex items-center justify-between text-slate-800 mb-2">
+            <div className="flex items-center gap-2">
+              <CalendarRange className="w-5.5 h-5.5 text-orange-500" />
+              <h3 className="font-bold text-lg font-serif">Propose Playground Playdate</h3>
+            </div>
+            {onOpenPushModal && (
+              <button
+                type="button"
+                onClick={onOpenPushModal}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-semibold border border-orange-200 transition-colors"
+                title="Configure Firebase Cloud Messaging Push Alerts"
+              >
+                <BellRing className="w-3.5 h-3.5 text-orange-600" />
+                <span>FCM Push Alerts</span>
+              </button>
+            )}
           </div>
 
           <form id="invite-form" onSubmit={handleSubmitRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">

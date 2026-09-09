@@ -4,7 +4,7 @@ import {
   Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, 
   SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
   CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
-  Globe, PlusCircle, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert
+  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy
 } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
@@ -92,18 +92,6 @@ export default function SpecialistsTab({
   const [claimingSpecialist, setClaimingSpecialist] = useState<SpecialistProfile | null>(null);
   const [showAdminClaimsModal, setShowAdminClaimsModal] = useState<boolean>(false);
   const isSuperAdmin = isAuthorizedSystemAdmin(currentProfile?.email, currentProfile?.userRole);
-
-  // Doctor extraction states (from Google My Business, Clinic Website, or Health Directory)
-  const [showExtractModal, setShowExtractModal] = useState<boolean>(false);
-  const [extractSourceUrl, setExtractSourceUrl] = useState<string>('');
-  const [extractDoctorName, setExtractDoctorName] = useState<string>('');
-  const [extractCity, setExtractCity] = useState<string>('Delhi NCR');
-  const [extractLocality, setExtractLocality] = useState<string>('South Extension');
-  const [extractHospital, setExtractHospital] = useState<string>('');
-  const [extractFee, setExtractFee] = useState<number>(800);
-  const [isExtracting, setIsExtracting] = useState<boolean>(false);
-  const [extractError, setExtractError] = useState<string | null>(null);
-  const [extractSuccessMsg, setExtractSuccessMsg] = useState<string | null>(null);
 
   // Automatically attempt to locate user GPS on initial load for nearest distance sorting
   useEffect(() => {
@@ -366,6 +354,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     { key: 'All', label: 'All Specialists', icon: Compass, color: 'text-orange-500' },
     { key: 'Pediatrician', label: 'Pediatricians & Child Doctors', icon: Stethoscope, color: 'text-rose-500' },
     { key: 'Gynecologist', label: 'Gynecologists & OB/GYN', icon: Heart, color: 'text-fuchsia-500' },
+    { key: 'Nutritionist', label: 'Children Nutritionists & Dietitians', icon: Utensils, color: 'text-emerald-500' },
+    { key: 'Coach', label: 'Kids Coaches & Sports Mentors', icon: Trophy, color: 'text-amber-500' },
     ...customSpecCats.map(cs => ({ key: cs.value, label: cs.name, icon: Briefcase, color: 'text-indigo-500' }))
   ];
 
@@ -798,49 +788,6 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     setRazorpayStep('success');
   };
 
-  // Extraction handler for adding new doctors via URL / Google My Business / Clinic Directory
-  const handleExtractDoctorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!extractSourceUrl.trim() && !extractDoctorName.trim()) {
-      setExtractError('Please enter a doctor profile URL or Doctor Name');
-      return;
-    }
-    setIsExtracting(true);
-    setExtractError(null);
-    setExtractSuccessMsg(null);
-    try {
-      const res = await fetch('/api/extract-doctor-profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sourceUrl: extractSourceUrl.trim(),
-          doctorName: extractDoctorName.trim(),
-          city: extractCity,
-          locality: extractLocality,
-          hospitalAffiliation: extractHospital.trim(),
-          sessionFee: extractFee
-        })
-      });
-      const data = await res.json();
-      if (data.success && data.specialist) {
-        onAddNewSpecialist(data.specialist);
-        setExtractSuccessMsg(`✓ Successfully extracted and verified ${data.specialist.name}!`);
-        setTimeout(() => {
-          setShowExtractModal(false);
-          setExtractSourceUrl('');
-          setExtractDoctorName('');
-          setExtractSuccessMsg(null);
-        }, 1400);
-      } else {
-        setExtractError(data.error || 'Failed to extract doctor profile');
-      }
-    } catch (err: any) {
-      setExtractError(err.message || 'Server extraction error occurred');
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
   const activeCityInfo = INDIAN_CITIES.find(c => c.id === selectedCity);
   const currentLocalityList = activeCityInfo ? activeCityInfo.popularAreas : BANGALORE_AREAS;
 
@@ -885,6 +832,14 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
       if (query === 'kids doctor' || query === 'kids doctors' || query === 'child doctor' || query === 'baby doctor') {
         return spec.category === 'Pediatrician' || spec.category === 'Pediatric Specialist';
+      }
+
+      if (query === 'nutritionist' || query === 'nutritionists' || query === 'dietitian' || query === 'dietitians' || query === 'nutrition' || query === 'diet') {
+        return spec.category === 'Nutritionist' || spec.title.toLowerCase().includes('nutrition') || spec.specialties.some(s => s.toLowerCase().includes('nutrition') || s.toLowerCase().includes('diet'));
+      }
+
+      if (query === 'coach' || query === 'coaches' || query === 'swimming' || query === 'gymnastics' || query === 'football' || query === 'fitness') {
+        return spec.category === 'Coach' || spec.title.toLowerCase().includes(query) || spec.specialties.some(s => s.toLowerCase().includes(query));
       }
 
       return (
@@ -1013,19 +968,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           </p>
         </div>
 
-        {/* Action buttons: Extract Doctor & Apply */}
+        {/* Action button: Apply / Register Practice */}
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            id="btn-trigger-extract-doctor"
-            onClick={() => setShowExtractModal(true)}
-            type="button"
-            className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs py-2.5 px-3.5 rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-            title="Extract and auto-white label doctor from Google My Business or clinic website into Vernunt"
-          >
-            <PlusCircle className="w-4 h-4 text-rose-600" />
-            <span>Extract Doctor Profile</span>
-          </button>
-
           <button
             id="btn-trigger-register-specialist"
             onClick={() => setShowRegModal(true)}
@@ -1060,7 +1004,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               type="button"
               id="filter-only-pediatricians-btn"
@@ -1090,6 +1034,36 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               }`}
             >
               Gynecologists & OB/GYN ({specialistsList.filter(s => s.category === 'Gynecologist').length})
+            </button>
+            <button
+              type="button"
+              id="filter-only-nutritionists-btn"
+              onClick={() => {
+                setCategoryFilter('Nutritionist');
+                setSelectedLocality('All Areas');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                categoryFilter === 'Nutritionist'
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-emerald-50 border-emerald-200'
+              }`}
+            >
+              Child Nutritionists ({specialistsList.filter(s => s.category === 'Nutritionist').length})
+            </button>
+            <button
+              type="button"
+              id="filter-only-coaches-btn"
+              onClick={() => {
+                setCategoryFilter('Coach');
+                setSelectedLocality('All Areas');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                categoryFilter === 'Coach'
+                  ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-amber-50 border-amber-200'
+              }`}
+            >
+              Kids Coaches ({specialistsList.filter(s => s.category === 'Coach').length})
             </button>
           </div>
         </div>
@@ -1787,8 +1761,9 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                   >
                     <option value="Pediatrician">Pediatrician / Child Specialist</option>
                     <option value="Gynecologist">Gynecologist &amp; Obstetrician</option>
+                    <option value="Nutritionist">Child Nutritionist &amp; Dietitian</option>
+                    <option value="Coach">Kids Coach &amp; Sports Mentor</option>
                     <option value="Therapist">Child Development &amp; Speech Therapist</option>
-                    <option value="Nutritionist">Pediatric Nutritionist</option>
                     <option value="Other">Other Healthcare Specialist</option>
                     {customSpecCats.map(cs => (
                       <option key={cs.id} value={cs.value}>✨ {cs.name}</option>
@@ -2010,166 +1985,6 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 Close Promotion Sheet
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Extract Doctor Profile Modal */}
-      {showExtractModal && (
-        <div id="modal-extract-doctor" className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs flex items-center justify-center p-4 z-[99999] animate-fade-in">
-          <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden transform scale-100 transition-all flex flex-col max-h-[90vh]">
-            <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-slate-900 p-5 text-white flex items-center justify-between">
-              <div>
-                <span className="px-2 py-0.5 bg-white/20 text-[9px] font-black uppercase tracking-wider rounded-md">Vernunt Pan-India Ingestion</span>
-                <h4 className="text-base font-bold font-serif mt-1 flex items-center gap-1.5">
-                  <PlusCircle className="w-4 h-4 text-rose-300" />
-                  Extract &amp; White-Label Doctor Profile
-                </h4>
-                <p className="text-[11px] text-rose-100 mt-0.5">
-                  Ingest doctor details from Google My Business, clinic portals, or health directories into Vernunt.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowExtractModal(false)}
-                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center cursor-pointer transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleExtractDoctorSubmit} className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-              {extractError && (
-                <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-semibold">
-                  ⚠️ {extractError}
-                </div>
-              )}
-              {extractSuccessMsg && (
-                <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-semibold flex items-center gap-2">
-                  <span>🎉</span>
-                  <span>{extractSuccessMsg}</span>
-                </div>
-              )}
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  Google My Business, Clinic Website, or Directory URL:
-                </label>
-                <input
-                  type="url"
-                  value={extractSourceUrl}
-                  onChange={(e) => setExtractSourceUrl(e.target.value)}
-                  placeholder="https://maps.google.com/... or https://www.cloudninecare.com/doctors/..."
-                  className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none font-sans"
-                />
-                <span className="text-[10px] text-slate-400 mt-1 block">
-                  Vernunt server will fetch the portrait photo, qualifications, and white-label it.
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Doctor Full Name *</label>
-                  <input
-                    type="text"
-                    value={extractDoctorName}
-                    onChange={(e) => setExtractDoctorName(e.target.value)}
-                    placeholder="e.g. Dr. Rajesh Kumar"
-                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">City *</label>
-                  <select
-                    value={extractCity}
-                    onChange={(e) => {
-                      setExtractCity(e.target.value);
-                      const c = INDIAN_CITIES.find(ci => ci.name === e.target.value);
-                      if (c && c.popularAreas.length > 1) {
-                        setExtractLocality(c.popularAreas[1]);
-                      }
-                    }}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none bg-white"
-                  >
-                    {INDIAN_CITIES.map(c => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Locality / Area</label>
-                  <input
-                    type="text"
-                    value={extractLocality}
-                    onChange={(e) => setExtractLocality(e.target.value)}
-                    placeholder="e.g. South Extension, Saket"
-                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-slate-700 mb-1">Session / Consult Fee (₹)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="50"
-                    value={extractFee}
-                    onChange={(e) => setExtractFee(Number(e.target.value))}
-                    className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 mb-1">Hospital / Clinic Affiliation</label>
-                <input
-                  type="text"
-                  value={extractHospital}
-                  onChange={(e) => setExtractHospital(e.target.value)}
-                  placeholder="e.g. Fortis La Femme, Max Super Speciality, Apollo Cradle"
-                  className="w-full p-2.5 rounded-xl border border-slate-200 focus:border-rose-500 focus:ring-1 focus:ring-rose-500 outline-none"
-                />
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
-                <span className="font-bold text-slate-800 text-[11px] block">Vernunt White-Label Guarantee</span>
-                <p className="text-[10.5px] text-slate-500 leading-relaxed">
-                  The profile will be automatically converted to Vernunt Verified format with clean Google reviews, synced portrait photos, direct booking link, and WhatsApp share card.
-                </p>
-              </div>
-
-              <div className="pt-2 flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowExtractModal(false)}
-                  className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isExtracting}
-                  className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-xl shadow-xs transition flex items-center gap-2 cursor-pointer"
-                >
-                  {isExtracting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Extracting Profile...</span>
-                    </>
-                  ) : (
-                    <>
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      <span>Extract &amp; Add Specialist</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}

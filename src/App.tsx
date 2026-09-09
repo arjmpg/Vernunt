@@ -59,6 +59,7 @@ import { ContactUsModal } from './components/ContactUsModal.tsx';
 import InstagramFlyerModal from './components/influencer/InstagramFlyerModal.tsx';
 import { PAN_INDIA_PEDIATRICIANS } from './data/panIndiaPediatricians.ts';
 import { PAN_INDIA_GYNECOLOGISTS } from './data/panIndiaGynecologists.ts';
+import { BANGALORE_NUTRITIONISTS_AND_COACHES } from './data/bangaloreNutritionistsAndCoaches.ts';
 import { getClaimedSpecialistsMap } from './utils/specialistClaims.ts';
 import { 
   queueConnectionRequest, 
@@ -75,6 +76,13 @@ import { VernuntPagesFeed } from './components/blog/VernuntPagesFeed.tsx';
 import { CommunityHostingHub } from './components/community/CommunityHostingHub.tsx';
 import { ProfilePrivacyModal } from './components/profile/ProfilePrivacyModal.tsx';
 import { VernuntAppGuideModal } from './components/guide/VernuntAppGuideModal.tsx';
+import { PWAInstallButton } from './components/PWAInstallButton.tsx';
+import { AndroidPlayStoreModal } from './components/AndroidPlayStoreModal.tsx';
+import { IosAppInstallModal } from './components/IosAppInstallModal.tsx';
+import { AndroidDownloadBanner } from './components/AndroidDownloadBanner.tsx';
+import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
+import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
+import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
 
 // Icons
 import { 
@@ -82,9 +90,9 @@ import {
   Award, Shield, ShieldAlert, Sparkles, LogOut, Info,
   SlidersHorizontal, Search, RotateCcw, HelpCircle, Check, MapPin,
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
-  Bell, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
+  Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint
+  Fingerprint, Download, Apple
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -292,6 +300,8 @@ export default function App() {
   const [mapOrRadarView, setMapOrRadarView] = useState<'swipe' | 'list' | 'radar' | 'map'>('swipe');
   const [showProfilePrivacyModal, setShowProfilePrivacyModal] = useState<boolean>(false);
   const [showAppGuideModal, setShowAppGuideModal] = useState<boolean>(false);
+  const [showAndroidPlayStoreModal, setShowAndroidPlayStoreModal] = useState<boolean>(false);
+  const [showIosAppModal, setShowIosAppModal] = useState<boolean>(false);
 
   // Open-access Knowledge Base state for unregistered/guest users
   const [isGuestViewingKnowledge, setIsGuestViewingKnowledge] = useState<boolean>(() => {
@@ -1023,7 +1033,8 @@ export default function App() {
 
   const INITIAL_SPECIALISTS: SpecialistProfile[] = [
     ...PAN_INDIA_PEDIATRICIANS,
-    ...PAN_INDIA_GYNECOLOGISTS
+    ...PAN_INDIA_GYNECOLOGISTS,
+    ...BANGALORE_NUTRITIONISTS_AND_COACHES
   ];
 
   // Robust deduplication & sanitation ensuring 100% unique React keys, authentic extracted clinical profiles, and no demo entries
@@ -1050,11 +1061,11 @@ export default function App() {
       // Skip duplicated ID
       if (seenIds.has(s.id)) continue;
 
-      // Skip duplicated doctor records with matching clean name and locality/city
-      const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
-      if (['Pediatrician', 'Gynecologist'].includes(s.category) && cleanName) {
+      // Skip duplicated doctor / specialist records with matching clean name and locality/city
+      const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+      if (['Pediatrician', 'Gynecologist', 'Nutritionist', 'Coach'].includes(s.category) && cleanName) {
         const cityKey = (s.location || '').toLowerCase().split(',')[0].trim();
-        const uniqueNameCityKey = `${cleanName}__${cityKey}`;
+        const uniqueNameCityKey = `${cleanName}__${cityKey}__${s.category}`;
         if (cleanNamesSeen.has(uniqueNameCityKey)) continue;
         cleanNamesSeen.add(uniqueNameCityKey);
       }
@@ -1066,11 +1077,15 @@ export default function App() {
   };
 
   const [specialistsList, setSpecialistsList] = useState<SpecialistProfile[]>(() => {
-    const allAuthoritative = [...PAN_INDIA_PEDIATRICIANS, ...PAN_INDIA_GYNECOLOGISTS];
+    const allAuthoritative = [
+      ...PAN_INDIA_PEDIATRICIANS,
+      ...PAN_INDIA_GYNECOLOGISTS,
+      ...BANGALORE_NUTRITIONISTS_AND_COACHES
+    ];
     const bMap = new Map(allAuthoritative.map(p => [p.id, p]));
     const bNameMap = new Map(
       allAuthoritative.map(p => [
-        p.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, ''),
+        p.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, ''),
         p
       ])
     );
@@ -1082,21 +1097,22 @@ export default function App() {
       localStorage.removeItem('vernunt_specialists_list_v2');
       localStorage.removeItem('vernunt_specialists_list_v3');
       localStorage.removeItem('vernunt_specialists_list_v4');
-      const saved = localStorage.getItem('vernunt_specialists_list_v5');
+      localStorage.removeItem('vernunt_specialists_list_v5');
+      const saved = localStorage.getItem('vernunt_specialists_list_v6');
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            // Strictly filter out synthetic/unverified profiles: only keep authoritative or claimed/custom doctors
+            // Strictly filter out synthetic/unverified profiles: only keep authoritative or claimed/custom specialists
             const validParsed = parsed.filter((s: SpecialistProfile) => {
               if (s.id?.startsWith('spec-custom-') || claimedMap[s.id]) return true;
-              const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+              const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
               return bMap.has(s.id) || bNameMap.has(cleanName);
             });
             // Update verified specialists with authoritative data, real photos & claims
             const updated = validParsed.map((s: SpecialistProfile) => {
-              const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '');
-              const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
+              const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, '');
+              const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist', 'Nutritionist', 'Coach'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
               let item = s;
               if (match) {
                 item = { ...s, ...match, photoUrl: match.photoUrl, googleRatingText: match.googleRatingText };
@@ -1126,13 +1142,17 @@ export default function App() {
     return sanitizeAndDeduplicateSpecialists(merged);
   });
 
-  // Ensure any cached specialists always receive latest photos, reviews and gynecologist expansion on mount
+  // Ensure any cached specialists always receive latest photos, reviews, and nutritionists/coaches on mount
   useEffect(() => {
-    const allAuthoritative = [...PAN_INDIA_PEDIATRICIANS, ...PAN_INDIA_GYNECOLOGISTS];
+    const allAuthoritative = [
+      ...PAN_INDIA_PEDIATRICIANS,
+      ...PAN_INDIA_GYNECOLOGISTS,
+      ...BANGALORE_NUTRITIONISTS_AND_COACHES
+    ];
     const bMap = new Map(allAuthoritative.map(p => [p.id, p]));
     const bNameMap = new Map(
       allAuthoritative.map(p => [
-        p.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, ''),
+        p.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, ''),
         p
       ])
     );
@@ -1142,7 +1162,7 @@ export default function App() {
       // Purge any non-authoritative dummy profiles that may have leaked
       const strictlyVerifiedPrev = prev.filter((s: SpecialistProfile) => {
         if (s.id?.startsWith('spec-custom-') || claimedMap[s.id]) return true;
-        const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
+        const cleanName = s.name ? s.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, '') : '';
         return bMap.has(s.id) || bNameMap.has(cleanName);
       });
 
@@ -1154,8 +1174,8 @@ export default function App() {
       }
 
       const refreshed = strictlyVerifiedPrev.map(s => {
-        const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor)\s+/i, '').replace(/[^a-z0-9]/g, '');
-        const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
+        const cleanName = s.name.toLowerCase().replace(/^(dr\.?|doctor|coach|dt\.?|ms\.?|mr\.?)\s+/i, '').replace(/[^a-z0-9]/g, '');
+        const match = bMap.get(s.id) || (['Pediatrician', 'Gynecologist', 'Nutritionist', 'Coach'].includes(s.category) ? bNameMap.get(cleanName) : undefined);
         let item = s;
         if (match) {
           if (s.photoUrl !== match.photoUrl || s.googleRatingText !== match.googleRatingText) {
@@ -1210,7 +1230,7 @@ export default function App() {
     setSpecialistsList(prev => {
       const next = sanitizeAndDeduplicateSpecialists(prev.map(s => s.id === updatedSpec.id ? updatedSpec : s));
       try {
-        localStorage.setItem('vernunt_specialists_list_v5', JSON.stringify(next));
+        localStorage.setItem('vernunt_specialists_list_v6', JSON.stringify(next));
       } catch (err) {
         console.debug('Failed to cache updated specialist:', err);
       }
@@ -1234,7 +1254,7 @@ export default function App() {
   useEffect(() => {
     if (specialistsList && specialistsList.length > 0) {
       try {
-        localStorage.setItem('vernunt_specialists_list_v5', JSON.stringify(sanitizeAndDeduplicateSpecialists(specialistsList)));
+        localStorage.setItem('vernunt_specialists_list_v6', JSON.stringify(sanitizeAndDeduplicateSpecialists(specialistsList)));
       } catch (e) {
         console.debug('Specialists save note:', e);
       }
@@ -1399,6 +1419,14 @@ export default function App() {
   const [showPushToast, setShowPushToast] = useState<boolean>(false);
   const [notificationsHistory, setNotificationsHistory] = useState<any[]>([]);
   const [showNotificationDrawer, setShowNotificationDrawer] = useState<boolean>(false);
+  const [showPushNotificationModal, setShowPushNotificationModal] = useState<boolean>(false);
+
+  // Register FCM service worker on boot
+  useEffect(() => {
+    registerServiceWorkerForFCM().catch((err) => {
+      console.debug('[FCM] SW boot registration note:', err);
+    });
+  }, []);
 
   const triggerToast = (message: string, title: string = 'Vernunt Update') => {
     setLatestNotification({
@@ -2565,6 +2593,12 @@ export default function App() {
         )
       )}
 
+      {/* Persistent Mobile Apps (Android & iOS) Download Banner */}
+      <AndroidDownloadBanner 
+        onOpenModal={() => setShowAndroidPlayStoreModal(true)} 
+        onOpenIosModal={() => setShowIosAppModal(true)}
+      />
+
       {/* Main Header navigation */}
       <header id="main-navigation-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-100 shadow-xs px-3 sm:px-4 md:px-8 py-2.5 md:py-3 flex items-center justify-between gap-2 w-full max-w-full">
         <div 
@@ -2653,7 +2687,10 @@ export default function App() {
         )}
 
         {/* User Identity / Action Block & Global Language Dropdown */}
-        <div id="user-branding-badge" className="flex items-center gap-2 sm:gap-4 shrink-0">
+        <div id="user-branding-badge" className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {/* PWA & Android App Installation Actions */}
+          <PWAInstallButton />
+
           {/* Global Language Selector Dropdown */}
           <div id="global-language-selector" className="relative flex items-center gap-1 bg-slate-50 border border-slate-200 py-1 px-1.5 sm:py-1.5 sm:px-2 rounded-xl hover:bg-slate-100 transition max-w-[120px] sm:max-w-none">
             <span className="text-xs shrink-0" role="img" aria-label="language-globe">🌐</span>
@@ -2692,6 +2729,17 @@ export default function App() {
                   )}
                 </button>
               </div>
+
+              {/* FCM Push Notification Settings Button */}
+              <button
+                id="btn-fcm-push-settings"
+                onClick={() => setShowPushNotificationModal(true)}
+                className="p-1.5 sm:px-2.5 sm:py-1.5 border border-orange-200 hover:border-orange-300 bg-orange-50/70 hover:bg-orange-100/70 rounded-xl text-orange-800 transition active:scale-95 flex items-center gap-1.5 cursor-pointer text-xs font-bold"
+                title="Real-Time FCM Push Notifications for Playdates & Events (Android & iOS)"
+              >
+                <BellRing className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
+                <span className="hidden sm:inline">Push Alerts</span>
+              </button>
 
               {/* Desktop Unique Circular Interactive Community Trust Score Badge */}
               <button
@@ -4654,6 +4702,7 @@ export default function App() {
                 playmates={playmates} 
                 userProfile={userProfile} 
                 activeCompanion={selectedPlaymate}
+                onOpenPushModal={() => setShowPushNotificationModal(true)}
               />
             )}
 
@@ -4664,6 +4713,7 @@ export default function App() {
                 eventsList={eventsList}
                 setEventsList={setEventsList}
                 initialOpenCreateWizard={openEventWizardOnMount}
+                onOpenPushModal={() => setShowPushNotificationModal(true)}
                 onAddBooking={(newBooking) => {
                   setBookingsList(prev => [newBooking, ...prev]);
                   confetti({ particleCount: 150, spread: 80 });
@@ -4985,6 +5035,93 @@ export default function App() {
             >
               🛡️ COPPA &amp; DPDP Safety Protocols
             </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => setShowAndroidPlayStoreModal(true)}
+              className="text-rose-700 hover:text-rose-800 transition font-black cursor-pointer inline-flex items-center gap-1"
+            >
+              <Smartphone className="w-3 h-3" />
+              <span>Android App</span>
+            </button>
+            <span>&bull;</span>
+            <button
+              type="button"
+              onClick={() => setShowIosAppModal(true)}
+              className="text-slate-900 hover:text-slate-700 transition font-black cursor-pointer inline-flex items-center gap-1"
+            >
+              <Apple className="w-3 h-3 text-slate-800" />
+              <span>iPhone &amp; iPad App</span>
+            </button>
+          </div>
+
+          {/* Mobile Apps Download Section (Android & iOS) */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 max-w-5xl mx-auto">
+            {/* Android Card */}
+            <div className="bg-gradient-to-r from-rose-50 via-amber-50 to-rose-50 border border-rose-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-2">
+                    <span>Vernunt for Android</span>
+                    <span className="bg-emerald-100 text-emerald-800 text-[10px] px-2 py-0.5 rounded-full font-bold">App v1.0.0</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    Signed Release Android App for Google Play or direct download. Web synced.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href="/api/download/android-apk"
+                  download="vernunt-app.apk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Download Android App</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => setShowAndroidPlayStoreModal(true)}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 text-xs font-bold rounded-xl transition shadow-2xs cursor-pointer"
+                >
+                  Guide
+                </button>
+              </div>
+            </div>
+
+            {/* iOS Apple Card */}
+            <div className="bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-950 text-white border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-md">
+              <div className="flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-xl bg-white/10 text-white flex items-center justify-center shrink-0 shadow-sm border border-white/10">
+                  <Apple className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                    <span>Vernunt for iOS</span>
+                    <span className="bg-emerald-500/20 text-emerald-300 text-[10px] px-2 py-0.5 rounded-full font-bold border border-emerald-500/30">iPhone &amp; iPad</span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-snug">
+                    1-Tap iOS Profile (.mobileconfig) &amp; Safari Home Screen Web App.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  id="btn-footer-ios-install"
+                  onClick={() => setShowIosAppModal(true)}
+                  className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-950 text-xs font-bold rounded-xl flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-slate-950" />
+                  <span>Install on iOS</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -5002,6 +5139,14 @@ export default function App() {
       </footer>
 
       {/* Global Modals overlay injections */}
+      <AndroidPlayStoreModal 
+        isOpen={showAndroidPlayStoreModal}
+        onClose={() => setShowAndroidPlayStoreModal(false)}
+      />
+      <IosAppInstallModal 
+        isOpen={showIosAppModal}
+        onClose={() => setShowIosAppModal(false)}
+      />
       {detailModalProfile && (
         <PlaymateDetailModal 
           profile={detailModalProfile}
@@ -5050,6 +5195,8 @@ export default function App() {
 
       {showLegalModal && (
         <LegalPolicyModal 
+          isOpen={showLegalModal}
+          onClose={() => setShowLegalModal(false)}
           onKeepClose={() => setShowLegalModal(false)}
         />
       )}
@@ -5383,6 +5530,33 @@ export default function App() {
                 className="p-1.5 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-900 transition"
               >
                 <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Real-time FCM Device Push Configuration Banner */}
+            <div className="p-3 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl space-y-1.5 mt-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase text-orange-900 tracking-wider flex items-center gap-1.5">
+                  <BellRing className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
+                  Firebase Cloud Messaging (FCM)
+                </span>
+                <span className="text-[9px] font-bold text-orange-800 bg-orange-100 px-1.5 py-0.5 rounded">
+                  Android &amp; iOS
+                </span>
+              </div>
+              <p className="text-[10.5px] text-orange-950 leading-snug">
+                Receive instant playdate invitations, acceptance alerts, and event reminder alarms right on your device's lock screen.
+              </p>
+              <button
+                id="btn-drawer-fcm-config"
+                onClick={() => {
+                  setShowNotificationDrawer(false);
+                  setShowPushNotificationModal(true);
+                }}
+                className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+              >
+                <span>Configure Device Push Notifications</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
 
@@ -5745,6 +5919,26 @@ export default function App() {
           title={loadingTitle} 
         />
       )}
+
+      {/* Real-time Firebase Cloud Messaging (FCM) Push Notifications Modal */}
+      {showPushNotificationModal && (
+        <PushNotificationModal
+          isOpen={showPushNotificationModal}
+          onClose={() => setShowPushNotificationModal(false)}
+          userProfile={userProfile}
+          onShowToast={(title, msg) => {
+            triggerToast(msg, title);
+          }}
+        />
+      )}
+
+      {/* Foreground Real-Time Push Toast Banner */}
+      <ForegroundPushToast
+        onNavigateTab={(tab) => {
+          setAppMode('dashboard');
+          setActiveTab(tab as any);
+        }}
+      />
 
     </div>
   );

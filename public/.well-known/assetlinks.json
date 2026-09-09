@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.vernunt.app",
+      "sha256_cert_fingerprints": [
+        "0E:3F:FB:A7:93:FA:50:8E:4B:12:8C:1E:B0:1B:21:65:A5:B6:C7:CA:93:11:64:CE:35:B9:E7:33:E7:95:D0:E9"
+      ]
+    }
+  }
+]

@@ -13,12 +13,21 @@ export enum LocationSharing {
 
 export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Admin' | 'eventbuyers' | 'EventBuyer';
 
+export type DevelopmentStage = 
+  | 'Newborn (0-3 months)'
+  | 'Infant (4-11 months)'
+  | 'Toddler (1-2 years)'
+  | 'Early Preschooler (3-4 years)'
+  | 'School-Age (5-8 years)';
+
 export interface ChildProfile {
   id: string;
   parentName: string;
   childName: string;
   childAge: number;
   childGender: 'Boy' | 'Girl' | 'Other';
+  birthDate?: string; // YYYY-MM-DD format
+  developmentStage?: DevelopmentStage;
   gradeLevel: string; // e.g. "Toddler", "Preschool", "Kindergarten", "1st Grade", "2nd Grade", "3rd Grade"
   playStyle: string;
   bio: string;
@@ -945,14 +954,22 @@ export interface BabyVaccine {
 }
 
 // Baby Growth & Milestone
+export type MilestoneCategory = 'Motor' | 'Cognitive' | 'Speech' | 'Social' | 'Self-Care' | 'Teething';
+
+export type MilestoneStatus = 'achieved' | 'emerging' | 'upcoming';
+
 export interface BabyMilestone {
   id: string;
-  category: 'Motor' | 'Cognitive' | 'Speech' | 'Social' | 'Teething';
+  category: MilestoneCategory;
   title: string;
+  description?: string;
   expectedAgeMonths: number;
   achieved: boolean;
+  status?: MilestoneStatus;
   achievedDate?: string;
   notes?: string;
+  redFlags?: string;
+  parentTips?: string;
 }
 
 

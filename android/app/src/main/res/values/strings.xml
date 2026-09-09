@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Vernunt</string>
+    <string name="app_url">https://app.vernunt.com/</string>
+    <string name="offline_msg">No internet connection. Please connect and try again.</string>
+</resources>

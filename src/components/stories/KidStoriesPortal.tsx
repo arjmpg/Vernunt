@@ -843,6 +843,11 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
                   onOpenBook={handleOpenKidBook}
                   onAddStoryToKid={(kidName, nextChapter) => onOpenWriteModal(kidName, nextChapter)}
                   onOpenInstagram={(b) => handleOpenInstagramShare(b.latestStory)}
+                  currentUser={currentUser}
+                  isAdmin={currentUser?.userRole === 'Admin' || currentUser?.email === 'ardha@vernunt.com' || currentUser?.email === 'arjunmpgupta@gmail.com'}
+                  onEditStory={(b) => {
+                    handleSelectStory(b.latestStory);
+                  }}
                 />
               ))}
             </div>

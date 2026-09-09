@@ -1,6 +1,6 @@
 {
   "name": "Vernunt",
-  "description": "Vernunt (vernunt.com / app.vernunt.com) - 1,000+ Pan-India verified kids doctors & pediatricians directory, verified kids playmate discovery radar, neighborhood babysitting & daycare marketplace, and 1,000+ child growth guides.",
+  "description": "Vernunt (vernunt.com / app.vernunt.com) - 1,000+ Pan-India verified kids doctors & pediatricians directory, verified kids playmate discovery radar, neighborhood babysitting & daycare marketplace, and official Android app with real-time web synchronization.",
   "requestFramePermissions": [
     "camera",
     "geolocation",

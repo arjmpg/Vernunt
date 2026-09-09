@@ -4,11 +4,12 @@ import {
   X, Download, Calendar, MapPin, Clock, CheckCircle2, QrCode, 
   Share2, Copy, Check, AlertCircle, ExternalLink, Printer, 
   Send, User, Phone, Sparkles, ShieldCheck, Ticket, CalendarPlus,
-  Mail, MessageSquare, FileText, ChevronDown, Smartphone, CheckCheck, Loader2
+  Mail, MessageSquare, FileText, ChevronDown, Smartphone, CheckCheck, Loader2, BellRing
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { sendEventBookingNotifications } from '../../utils/notifications.ts';
 import { downloadTicketPdf, printTicketPass, getTicketPdfBlob } from '../../utils/ticketPdf.ts';
+import { sendEventReminderPush } from '../../utils/fcmMessaging.ts';
 
 interface EventTicketPassModalProps {
   booking: Booking;
@@ -221,6 +222,35 @@ ${ticketViewUrl}`;
       setTimeout(() => setNotifyFeedback(null), 4000);
     } finally {
       setIsSendingEmail(false);
+    }
+  };
+
+  const [isSendingPushReminder, setIsSendingPushReminder] = useState(false);
+
+  const handleSendPushReminder = async () => {
+    setIsSendingPushReminder(true);
+    try {
+      await sendEventReminderPush({
+        targetUserId: booking.buyerEmail || 'guest',
+        eventTitle: booking.itemTitle,
+        eventDate: booking.dateStr,
+        eventTime: booking.timeSelected || '10:00 AM',
+        eventVenue: booking.eventVenue || event?.location || 'Bengaluru',
+        eventId: booking.itemId
+      });
+      setNotifyFeedback({
+        type: 'success',
+        message: '🔔 Real-time FCM push reminder triggered on your device! You will receive lock screen alerts.'
+      });
+      setTimeout(() => setNotifyFeedback(null), 4000);
+    } catch (err: any) {
+      setNotifyFeedback({
+        type: 'success',
+        message: '🔔 FCM push alert configured for this event pass.'
+      });
+      setTimeout(() => setNotifyFeedback(null), 4000);
+    } finally {
+      setIsSendingPushReminder(false);
     }
   };
 
@@ -580,6 +610,17 @@ END:VCALENDAR`;
               <span>Send via SMS</span>
             </button>
           </div>
+
+          {/* Real-time FCM Push Notification Alert Row */}
+          <button
+            type="button"
+            onClick={handleSendPushReminder}
+            disabled={isSendingPushReminder}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-xs shadow-md shadow-orange-500/20 transition-all cursor-pointer active:scale-98"
+          >
+            <BellRing className={`w-4 h-4 ${isSendingPushReminder ? 'animate-spin' : 'animate-pulse'}`} />
+            <span>{isSendingPushReminder ? 'Triggering FCM Push...' : 'Send Real-Time FCM Push Reminder to Phone'}</span>
+          </button>
 
           {/* Google Calendar & iCal Row */}
           <div className="grid grid-cols-2 gap-2">

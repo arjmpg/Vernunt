@@ -39,9 +39,19 @@ export default function PediatricianPortfolioModal({
   const [photoSyncMessage, setPhotoSyncMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
-  // Clean doctor name formatting (avoids double "Dr. Dr.")
+  // Clean specialist name formatting (preserves titles like Coach, Dt., Ms., Mr., and avoids double "Dr. Dr.")
   const cleanDocName = specialist 
-    ? (specialist.name.startsWith('Dr.') ? specialist.name : `Dr. ${specialist.name}`)
+    ? (
+        specialist.name.startsWith('Dr.') || 
+        specialist.name.startsWith('Coach') || 
+        specialist.name.startsWith('Dt.') || 
+        specialist.name.startsWith('Ms.') || 
+        specialist.name.startsWith('Mr.') ||
+        specialist.category === 'Coach' ||
+        specialist.category === 'Nutritionist'
+          ? specialist.name 
+          : `Dr. ${specialist.name}`
+      )
     : '';
 
   const directUrl = specialist ? getSpecialistDirectUrl(specialist.id) : '';
@@ -302,7 +312,13 @@ export default function PediatricianPortfolioModal({
             <div className="space-y-1 flex-1 pr-16 sm:pr-0">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="px-2.5 py-0.5 rounded-full bg-rose-500/40 text-rose-100 text-[10px] font-black uppercase tracking-wider border border-rose-300/30">
-                  Vernunt Verified Pediatrician
+                  {specialist.category === 'Nutritionist'
+                    ? 'Verified Child Nutritionist'
+                    : specialist.category === 'Coach'
+                    ? 'Verified Kids Coach'
+                    : specialist.category === 'Gynecologist'
+                    ? 'Verified Gynecologist'
+                    : 'Vernunt Verified Pediatrician'}
                 </span>
                 <span className="px-2.5 py-0.5 rounded-full bg-amber-400/20 text-amber-200 text-[10px] font-black uppercase tracking-wider border border-amber-300/30">
                   Bangalore Specialist

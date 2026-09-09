@@ -27,7 +27,76 @@ export interface OutboxItem {
 const STORAGE_KEY = 'vernunt_sync_outbox_v1';
 let outboxCache: OutboxItem[] = [];
 let listeners: Array<(items: OutboxItem[]) => void> = [];
+let syncStatusListeners: Array<(status: SyncServiceWorkerStatus) => void> = [];
 let isSyncInProgress = false;
+let lastSyncTimestamp = 0;
+let lastSwSyncTriggerTime = 0;
+
+export interface SyncServiceWorkerStatus {
+  swRegistered: boolean;
+  backgroundSyncSupported: boolean;
+  lastSwTriggerTime: number;
+  lastSuccessfulSyncTime: number;
+  isSyncing: boolean;
+}
+
+/**
+ * Register Background Sync with Service Worker
+ * Triggered automatically when offline items are queued or when operations fail
+ */
+export async function registerServiceWorkerBackgroundSync(tag = 'vernunt-outbox-sync'): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return false;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg && 'sync' in reg) {
+      await (reg as any).sync.register(tag);
+      console.log(`📡 [Sync Outbox] Service Worker Background Sync registered tag: "${tag}"`);
+      return true;
+    }
+  } catch (err) {
+    console.debug('[Sync Outbox] Background Sync registration note:', err);
+  }
+  return false;
+}
+
+/**
+ * Get current Service Worker Background Sync integration status
+ */
+export function getServiceWorkerSyncStatus(): SyncServiceWorkerStatus {
+  const hasSw = typeof window !== 'undefined' && 'serviceWorker' in navigator;
+  const hasSyncManager = typeof window !== 'undefined' && 'SyncManager' in window;
+  return {
+    swRegistered: hasSw,
+    backgroundSyncSupported: hasSyncManager,
+    lastSwTriggerTime: lastSwSyncTriggerTime,
+    lastSuccessfulSyncTime: lastSyncTimestamp,
+    isSyncing: isSyncInProgress
+  };
+}
+
+/**
+ * Subscribe to Service Worker sync status changes
+ */
+export function subscribeToSyncStatus(callback: (status: SyncServiceWorkerStatus) => void): () => void {
+  syncStatusListeners.push(callback);
+  callback(getServiceWorkerSyncStatus());
+  return () => {
+    syncStatusListeners = syncStatusListeners.filter(l => l !== callback);
+  };
+}
+
+function notifySyncStatusListeners() {
+  const status = getServiceWorkerSyncStatus();
+  syncStatusListeners.forEach(cb => {
+    try {
+      cb(status);
+    } catch (e) {
+      console.debug('[Sync Outbox] Status listener error:', e);
+    }
+  });
+}
 
 // Load persisted outbox from localStorage
 function loadOutbox(): OutboxItem[] {
@@ -127,6 +196,9 @@ export function enqueueOutboxAction(
   saveOutbox(updated);
 
   console.log(`📦 [Sync Outbox] Enqueued action: [${actionType}] - ${description}`);
+
+  // Register Service Worker Background Sync
+  registerServiceWorkerBackgroundSync('vernunt-outbox-sync');
 
   // If online, immediately attempt background sync
   if (typeof navigator !== 'undefined' && navigator.onLine) {
@@ -341,15 +413,30 @@ async function processOutboxItem(item: OutboxItem): Promise<boolean> {
 
 /**
  * Triggers background sync of all queued items
+ * @param autoRetryFailed If true, automatically resets failed operations to 'queued' so they are retried
  */
-export async function triggerBackgroundSync(): Promise<{ successCount: number; failedCount: number }> {
+export async function triggerBackgroundSync(autoRetryFailed: boolean = false): Promise<{ successCount: number; failedCount: number }> {
   if (isSyncInProgress) {
     return { successCount: 0, failedCount: 0 };
   }
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    console.log('📡 [Sync Outbox] Device is offline. Skipping sync attempt.');
+    console.log('📡 [Sync Outbox] Device is offline. Registering Service Worker background sync for reconnect...');
+    registerServiceWorkerBackgroundSync('vernunt-outbox-sync');
     return { successCount: 0, failedCount: 0 };
+  }
+
+  // If autoRetryFailed is enabled or on reconnect, promote failed items to queued
+  if (autoRetryFailed) {
+    const hasFailed = outboxCache.some(item => item.status === 'failed');
+    if (hasFailed) {
+      outboxCache.forEach(item => {
+        if (item.status === 'failed' && (item.retryCount || 0) < 5) {
+          item.status = 'queued';
+        }
+      });
+      saveOutbox([...outboxCache]);
+    }
   }
 
   const pendingItems = outboxCache.filter(item => item.status === 'queued' || item.status === 'failed');
@@ -358,6 +445,7 @@ export async function triggerBackgroundSync(): Promise<{ successCount: number; f
   }
 
   isSyncInProgress = true;
+  notifySyncStatusListeners();
   let successCount = 0;
   let failedCount = 0;
 
@@ -372,6 +460,7 @@ export async function triggerBackgroundSync(): Promise<{ successCount: number; f
       // Mark as syncing
       item.status = 'syncing';
       saveOutbox([...currentItems]);
+      notifySyncStatusListeners();
 
       try {
         const ok = await processOutboxItem(item);
@@ -399,8 +488,56 @@ export async function triggerBackgroundSync(): Promise<{ successCount: number; f
   }
 
   isSyncInProgress = false;
+  lastSyncTimestamp = Date.now();
+  notifySyncStatusListeners();
+
+  if (failedCount > 0) {
+    console.warn(`⚠️ [Sync Outbox] ${failedCount} item(s) failed to sync. Registering Service Worker Background Sync retry...`);
+    registerServiceWorkerBackgroundSync('firebase-outbox-sync');
+  }
+
   console.log(`✨ [Sync Outbox] Batch sync finished. Success: ${successCount}, Failed: ${failedCount}`);
   return { successCount, failedCount };
+}
+
+/**
+ * Retry all failed items in the outbox
+ */
+export async function retryAllFailedOutboxItems(): Promise<{ successCount: number; failedCount: number }> {
+  const items = [...outboxCache];
+  let markedCount = 0;
+  items.forEach(i => {
+    if (i.status === 'failed') {
+      i.status = 'queued';
+      markedCount++;
+    }
+  });
+
+  if (markedCount > 0) {
+    saveOutbox(items);
+    console.log(`🔄 [Sync Outbox] Reset ${markedCount} failed item(s) to queued for retry.`);
+  }
+
+  return triggerBackgroundSync(false);
+}
+
+/**
+ * Trigger an explicit sync via the active Service Worker
+ */
+export async function triggerServiceWorkerSync(): Promise<boolean> {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
+    return false;
+  }
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    if (reg.active) {
+      reg.active.postMessage({ type: 'REQUEST_SW_OUTBOX_FLUSH' });
+      return true;
+    }
+  } catch (err) {
+    console.warn('[Sync Outbox] Could not postMessage to active Service Worker:', err);
+  }
+  return false;
 }
 
 /**
@@ -413,7 +550,7 @@ export async function retryOutboxItem(itemId: string): Promise<boolean> {
 
   target.status = 'queued';
   saveOutbox(items);
-  await triggerBackgroundSync();
+  await triggerBackgroundSync(false);
   return true;
 }
 
@@ -432,19 +569,41 @@ export function clearEntireOutbox() {
   saveOutbox([]);
 }
 
-// Attach automatic browser connection listener
+// Attach automatic browser connection and Service Worker listeners
 if (typeof window !== 'undefined') {
+  // 1. Online event listener: Automatically retry failed Firebase write operations when network returns
   window.addEventListener('online', () => {
-    console.log('🌐 [Sync Outbox] Internet connection detected! Automatically flushing queued outbox actions...');
+    console.log('🌐 [Sync Outbox] Internet connection restored! Automatically retrying failed Firebase writes...');
     setTimeout(() => {
-      triggerBackgroundSync();
-    }, 500);
+      retryAllFailedOutboxItems();
+    }, 300);
   });
 
-  // Periodic heartbeat every 45 seconds to check and push if online
+  // 2. Service Worker Message Listener
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'TRIGGER_OUTBOX_SYNC') {
+        console.log(`⚡ [Sync Outbox] Received Service Worker Background Sync event [${event.data.tag || 'sync'}]! Auto-retrying failed writes...`);
+        lastSwSyncTriggerTime = Date.now();
+        notifySyncStatusListeners();
+        // Auto-retry failed items upon Service Worker sync signal
+        triggerBackgroundSync(true);
+      }
+    });
+
+    // Ping Service Worker to confirm active background sync capability
+    navigator.serviceWorker.ready.then((reg) => {
+      if (reg.active) {
+        reg.active.postMessage({ type: 'PING_SYNC' });
+      }
+      registerServiceWorkerBackgroundSync('vernunt-outbox-sync');
+    }).catch(() => {});
+  }
+
+  // 3. Periodic heartbeat check every 45 seconds
   setInterval(() => {
     if (navigator.onLine && getPendingOutboxCount() > 0) {
-      triggerBackgroundSync();
+      triggerBackgroundSync(false);
     }
   }, 45000);
 }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ChildProfile, BabyVaccine, BabyMilestone } from '../../types.ts';
+import { MilestonesVisualizer } from './MilestonesVisualizer.tsx';
 import { 
   Baby, 
   Heart, 
@@ -251,7 +252,7 @@ const PREGNANCY_WEEKS_DATA: Record<number, { fruit: string; size: string; weight
 };
 
 export function GrowthTrackerHub({ userProfile }: GrowthTrackerHubProps) {
-  const [activeTab, setActiveTab] = useState<'vaccines' | 'pregnancy' | 'growth'>('vaccines');
+  const [activeTab, setActiveTab] = useState<'milestones' | 'vaccines' | 'pregnancy' | 'growth'>('milestones');
 
   // Vaccination state
   const [vaccines, setVaccines] = useState<BabyVaccine[]>(() => {
@@ -379,7 +380,19 @@ export function GrowthTrackerHub({ userProfile }: GrowthTrackerHubProps) {
 
       {/* Main Tab Switcher */}
       <div className="flex items-center justify-center">
-        <div className="inline-flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1">
+        <div className="inline-flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1 flex-wrap justify-center">
+          <button
+            type="button"
+            id="tab-milestones"
+            onClick={() => setActiveTab('milestones')}
+            className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'milestones' ? 'bg-rose-700 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>Age-Appropriate Milestones</span>
+          </button>
+
           <button
             type="button"
             id="tab-vaccines"
@@ -413,10 +426,15 @@ export function GrowthTrackerHub({ userProfile }: GrowthTrackerHubProps) {
             }`}
           >
             <Activity className="w-4 h-4" />
-            <span>Weight &amp; Height Milestones</span>
+            <span>Weight &amp; Height Logs</span>
           </button>
         </div>
       </div>
+
+      {/* TAB: Age-Appropriate Milestones Visualizer */}
+      {activeTab === 'milestones' && (
+        <MilestonesVisualizer userProfile={userProfile} />
+      )}
 
       {/* TAB 1: Vaccine Schedule */}
       {activeTab === 'vaccines' && (

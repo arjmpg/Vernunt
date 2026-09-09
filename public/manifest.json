@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json.schemastore.org/web-manifest-combined.json",
+  "id": "https://app.vernunt.com/",
+  "name": "Vernunt - Kids Doctors, Playmates & Daycare",
+  "short_name": "Vernunt",
+  "description": "Consult 1,000+ top pediatricians across India with zero booking fees. Discover verified neighborhood playmates and daycare.",
+  "start_url": "/?utm_source=android_app",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "background_color": "#ffffff",
+  "theme_color": "#be123c",
+  "orientation": "portrait-primary",
+  "lang": "en-IN",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["medical", "health", "parenting", "lifestyle", "education"],
+  "shortcuts": [
+    {
+      "name": "Kids Doctors & Specialists",
+      "short_name": "Doctors",
+      "description": "Consult 1,000+ top pediatricians across India",
+      "url": "/specialists",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Kids Playmate Radar",
+      "short_name": "Playmates",
+      "description": "Discover verified neighborhood playmates",
+      "url": "/radar",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Interactive Kid Stories",
+      "short_name": "Stories",
+      "description": "Read moral stories and earn badges",
+      "url": "/stories",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daycare & Babysitting",
+      "short_name": "Daycare",
+      "description": "Verified neighborhood creches and sitters",
+      "url": "/daycare",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192" }]
+    }
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "id": "com.vernunt.app",
+      "url": "https://play.google.com/store/apps/details?id=com.vernunt.app"
+    }
+  ]
+}

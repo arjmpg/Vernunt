@@ -85,13 +85,18 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Always bypass Service Worker for sitemap.xml, robots.txt, sw.js and backend API routes
+  // Always bypass Service Worker for sitemap.xml, robots.txt, sw.js, backend API routes, and binary downloads (.apk, .zip, .mobileconfig)
   if (
     url.pathname === '/sw.js' ||
     url.pathname === '/sitemap.xml' ||
     url.pathname === '/robots.txt' ||
     url.pathname.endsWith('.xml') ||
     url.pathname.endsWith('.txt') ||
+    url.pathname.endsWith('.apk') ||
+    url.pathname.endsWith('.zip') ||
+    url.pathname.endsWith('.mobileconfig') ||
+    url.pathname.includes('/download/') ||
+    url.pathname.includes('vernunt-app') ||
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/uploads/')
   ) {
@@ -171,6 +176,153 @@ self.addEventListener('fetch', (event) => {
       });
 
       return cachedResponse || networkFetch;
+    })
+  );
+});
+
+// ==========================================
+// SERVICE WORKER BACKED BACKGROUND SYNC FOR OUTBOX & FIREBASE RETRY
+// ==========================================
+async function broadcastOutboxSyncTrigger(tag) {
+  console.log(`[Service Worker] Executing Background Sync for tag: ${tag}`);
+  try {
+    const windowClients = await self.clients.matchAll({
+      type: 'window',
+      includeUncontrolled: true
+    });
+
+    if (windowClients && windowClients.length > 0) {
+      for (const client of windowClients) {
+        client.postMessage({
+          type: 'TRIGGER_OUTBOX_SYNC',
+          tag: tag,
+          source: 'service-worker-background-sync',
+          timestamp: Date.now()
+        });
+      }
+      console.log(`[Service Worker] Broadcasted TRIGGER_OUTBOX_SYNC to ${windowClients.length} window client(s).`);
+    } else {
+      console.log('[Service Worker] No open window clients found during background sync. Storing pending sync event.');
+    }
+  } catch (err) {
+    console.warn('[Service Worker] Error broadcasting outbox sync trigger:', err);
+  }
+}
+
+// Background Sync API listener: triggered automatically by the browser when connectivity is restored
+self.addEventListener('sync', (event) => {
+  console.log('[Service Worker] Received sync event:', event.tag);
+  if (
+    event.tag === 'vernunt-outbox-sync' ||
+    event.tag === 'firebase-outbox-sync' ||
+    event.tag === 'sync-outbox'
+  ) {
+    event.waitUntil(broadcastOutboxSyncTrigger(event.tag));
+  }
+});
+
+// Periodic Background Sync API listener (Chrome/Android PWAs)
+self.addEventListener('periodicsync', (event) => {
+  console.log('[Service Worker] Received periodicsync event:', event.tag);
+  if (
+    event.tag === 'vernunt-periodic-sync' ||
+    event.tag === 'vernunt-outbox-sync'
+  ) {
+    event.waitUntil(broadcastOutboxSyncTrigger(event.tag));
+  }
+});
+
+// Listen for message events from application window
+self.addEventListener('message', (event) => {
+  if (!event.data) return;
+
+  if (event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+
+  if (event.data.type === 'PING_SYNC') {
+    console.log('[Service Worker] Ping sync received from window.');
+    if (event.source && typeof event.source.postMessage === 'function') {
+      event.source.postMessage({
+        type: 'PONG_SYNC',
+        syncSupported: 'sync' in self.registration,
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  if (event.data.type === 'REQUEST_SW_OUTBOX_FLUSH') {
+    console.log('[Service Worker] Explicit outbox flush requested by client.');
+    event.waitUntil(broadcastOutboxSyncTrigger('manual-client-request'));
+  }
+});
+
+// ==========================================
+// FIREBASE CLOUD MESSAGING & PUSH NOTIFICATIONS
+// ==========================================
+self.addEventListener('push', (event) => {
+  console.log('[Service Worker] Push event received:', event);
+  let payload = {
+    title: 'Vernunt Notification',
+    body: 'You have a new update in Vernunt.',
+    icon: '/pwa-192x192.png',
+    badge: '/favicon.png',
+    data: { url: '/' }
+  };
+
+  if (event.data) {
+    try {
+      const data = event.data.json();
+      payload.title = data.notification?.title || data.title || payload.title;
+      payload.body = data.notification?.body || data.body || payload.body;
+      payload.icon = data.notification?.icon || data.icon || payload.icon;
+      payload.badge = data.notification?.badge || data.badge || payload.badge;
+      payload.data = { ...payload.data, ...(data.data || data) };
+    } catch (e) {
+      payload.body = event.data.text() || payload.body;
+    }
+  }
+
+  const options = {
+    body: payload.body,
+    icon: payload.icon || '/pwa-192x192.png',
+    badge: payload.badge || '/favicon.png',
+    vibrate: [200, 100, 200],
+    tag: payload.data?.tag || `vernunt-push-${Date.now()}`,
+    renotify: true,
+    data: payload.data || { url: '/' },
+    actions: [
+      { action: 'open', title: 'Open Vernunt' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(payload.title, options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  if (event.action === 'dismiss') return;
+
+  const targetUrl = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // If a window tab is already open, focus and navigate it
+      for (const client of clientList) {
+        if ('focus' in client) {
+          if (client.url.includes(self.registration.scope)) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
+        }
+      }
+      // Otherwise open a new window
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
     })
   );
 });

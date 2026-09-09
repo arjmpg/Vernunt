@@ -5,7 +5,7 @@ import {
   Map as MapIcon, List, Compass, Star, Calendar, Plus, Award, 
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
   Ticket, QrCode, UserCheck, CalendarDays, Wallet, Clock, ArrowRight, ShieldCheck,
-  Navigation, Flame, CheckCircle2, ArrowUpDown, Globe
+  Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
@@ -23,6 +23,7 @@ import UserPurchasesModal from './events/UserPurchasesModal.tsx';
 import EventSeoSitemapModal from './events/EventSeoSitemapModal.tsx';
 import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
+import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 import { MOCK_EVENTS } from '../data/mockData.ts';
 
@@ -36,6 +37,7 @@ interface EventsTabProps {
   onUpdateUserProfile?: (profile: any) => void;
   onOpenLogin?: () => void;
   initialOpenCreateWizard?: boolean;
+  onOpenPushModal?: () => void;
 }
 
 export default function EventsTab({
@@ -47,7 +49,8 @@ export default function EventsTab({
   globalCommissionRate,
   onUpdateUserProfile,
   onOpenLogin,
-  initialOpenCreateWizard = false
+  initialOpenCreateWizard = false,
+  onOpenPushModal
 }: EventsTabProps) {
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -195,6 +198,16 @@ export default function EventsTab({
     if (evt) {
       setActiveTicketEvent(evt);
       setActiveTicketModalBooking(booking);
+
+      // Trigger Real-Time FCM Push Notification for Event Pass & Reminders (Android / iOS / Web)
+      sendEventReminderPush({
+        targetUserId: booking.buyerEmail || userProfile?.id || 'guest',
+        eventTitle: booking.itemTitle,
+        eventDate: booking.dateStr,
+        eventTime: booking.timeSelected || '10:00 AM',
+        eventVenue: booking.eventVenue || evt?.location || 'Bengaluru',
+        eventId: booking.itemId
+      }).catch(err => console.warn('[FCM] Event booking push trigger note:', err));
     }
   };
 
@@ -1044,6 +1057,20 @@ ${deepLink}`;
               </span>
             )}
           </button>
+
+          {/* FCM Push Notification Alerts Button */}
+          {onOpenPushModal && (
+            <button
+              id="btn-events-push-alerts"
+              type="button"
+              onClick={onOpenPushModal}
+              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border border-orange-200"
+              title="Configure real-time Firebase Cloud Messaging push event reminders"
+            >
+              <BellRing className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
+              <span>Push Alerts</span>
+            </button>
+          )}
 
           {/* Google SEO & Sitemap Portal Button */}
           <button
@@ -2322,6 +2349,16 @@ ${deepLink}`;
                         event: checkoutEvent,
                         type: 'booking_confirmed'
                       }).catch((err) => console.warn('Notification dispatch error:', err));
+
+                      // Dispatch Real-Time FCM Push Notification to Android / iOS / Web device
+                      sendEventReminderPush({
+                        targetUserId: buyerEmail || userProfile?.id || 'guest',
+                        eventTitle: checkoutEvent.title,
+                        eventDate: checkoutEvent.date,
+                        eventTime: checkoutEvent.time,
+                        eventVenue: checkoutEvent.location,
+                        eventId: checkoutEvent.id
+                      }).catch((err) => console.warn('[FCM] Checkout event push notification note:', err));
 
                       // Join event state update
                       setEventsList(prev => prev.map(e => {

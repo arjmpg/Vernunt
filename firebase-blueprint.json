@@ -126,6 +126,21 @@
       },
       "required": ["id", "title", "body", "createdAt"]
     },
+    "FcmDeviceToken": {
+      "title": "FcmDeviceToken",
+      "description": "Registered FCM token and device notification preferences for parents",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "parentName": { "type": "string" },
+        "token": { "type": "string" },
+        "platform": { "type": "string", "enum": ["android", "ios", "web"] },
+        "preferences": { "type": "object" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "token", "platform"]
+    },
     "CustomEventCategory": {
       "title": "CustomEventCategory",
       "description": "Dynamic custom activity or gathering categories managed by administrators",
