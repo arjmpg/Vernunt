@@ -4,12 +4,40 @@ import {
   Clock, ShieldCheck, Ticket, User, Sparkles, RefreshCw, CheckCircle2,
   ScanLine, ExternalLink, Smartphone, AlertCircle, History, Users,
   Search, ArrowRight, CheckCircle, Clock3, Filter, Trash2, FileSpreadsheet,
-  Flashlight, FlashlightOff, Camera, Zap, Sun, Lightbulb, Video
+  Flashlight, FlashlightOff, Camera, Zap, Sun, Lightbulb, Video,
+  Bookmark, Eye, Tag, Archive, CheckCheck, Plus, ArrowUpRight
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import jsQR from 'jsqr';
 import { CommunityEvent, Booking, ChildProfile } from '../../types.ts';
+import { getSafeChildAreaName } from '../../utils/childSafetyFilter.ts';
+
+export type EventPassStatus = 'Upcoming' | 'Used' | 'Expired';
+
+export interface EventPassRecord {
+  id: string;
+  ticketNumber: string;
+  eventId: string;
+  eventTitle: string;
+  eventCategory?: string;
+  eventEmoji?: string;
+  eventDate: string;
+  eventTime: string;
+  venue: string;
+  safeArea?: string;
+  attendeeName: string;
+  parentName: string;
+  phone: string;
+  tierName: string;
+  ticketPrice?: number;
+  status: EventPassStatus;
+  generatedAt: string;
+  usedAt?: string;
+  usedGate?: string;
+  usedMethod?: string;
+  qrPayload?: string;
+}
 
 export interface ScannedAttendeeRecord {
   id: string;
@@ -53,8 +81,8 @@ export default function EventDynamicQrPassModal({
 
   const selectedEvent = eventsList.find(e => e.id === selectedEventId) || eventsList[0];
 
-  // Active View Tab: 'pass' | 'scanner' | 'roster' | 'history'
-  const [activeTab, setActiveTab] = useState<'pass' | 'scanner' | 'roster' | 'history'>('pass');
+  // Active View Tab: 'pass' | 'pass-history' | 'scanner' | 'roster' | 'history'
+  const [activeTab, setActiveTab] = useState<'pass' | 'pass-history' | 'scanner' | 'roster' | 'history'>('pass');
 
   // Camera Flash / Torch & Low-Light Scanner State
   const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
@@ -217,6 +245,446 @@ export default function EventDynamicQrPassModal({
   const currentMainAttendee = attendeesRoster.find(a => a.id === 'att-1') || attendeesRoster[0];
   const isCheckedIn = currentMainAttendee?.status === 'checked-in';
   const checkInTimestamp = currentMainAttendee?.checkInTimestamp || null;
+
+  // Pass History State: Previously generated, used, and expired passes
+  const [passCategoryFilter, setPassCategoryFilter] = useState<'all' | 'Upcoming' | 'Used' | 'Expired'>('all');
+  const [passSearchQuery, setPassSearchQuery] = useState<string>('');
+  const [passCopiedId, setPassCopiedId] = useState<string | null>(null);
+  const [savedPassFeedback, setSavedPassFeedback] = useState<boolean>(false);
+  const [previewPass, setPreviewPass] = useState<EventPassRecord | null>(null);
+  const [previewQrDataUrl, setPreviewQrDataUrl] = useState<string>('');
+  const [showQuickGenerateModal, setShowQuickGenerateModal] = useState<boolean>(false);
+  const [quickGenEventId, setQuickGenEventId] = useState<string>(eventsList[0]?.id || '');
+  const [quickGenTier, setQuickGenTier] = useState<string>('Standard Child Entry');
+  const [quickGenAttendee, setQuickGenAttendee] = useState<string>(userProfile?.childName || 'Aarav Sharma');
+
+  const [passHistory, setPassHistory] = useState<EventPassRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_event_pass_history_v2');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {
+      console.warn('Failed to load saved pass history', e);
+    }
+
+    const baseChild = userProfile?.childName || 'Aarav Sharma';
+    const baseParent = userProfile?.parentName || 'Priya Sharma';
+    const basePhone = userProfile?.phone || '+91 98201 44821';
+
+    const seeds: EventPassRecord[] = [
+      {
+        id: 'pass-seed-1',
+        ticketNumber: 'VERN-EVT-WHIT-9421',
+        eventId: 'blr-event-3',
+        eventTitle: 'Whitefield Junior Lego Robotics & STEM Challenge',
+        eventCategory: 'Class & Workshop',
+        eventEmoji: '🤖',
+        eventDate: '2026-09-19',
+        eventTime: '10:30 AM',
+        venue: 'Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore',
+        safeArea: 'Whitefield, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'VIP Family Pass + Workshop Kit',
+        ticketPrice: 299,
+        status: 'Upcoming',
+        generatedAt: 'Sep 08, 2026 • 11:20 AM'
+      },
+      {
+        id: 'pass-seed-2',
+        ticketNumber: 'VERN-EVT-CUBB-3820',
+        eventId: 'blr-event-1',
+        eventTitle: 'Cubbon Park Weekend Family Art & Nature Sketching',
+        eventCategory: 'Community Event',
+        eventEmoji: '🎨',
+        eventDate: '2026-09-26',
+        eventTime: '09:00 AM',
+        venue: 'Cubbon Park Bamboo Grove Lawn, Bangalore',
+        safeArea: 'Cubbon Park, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'Standard Child Entry',
+        ticketPrice: 0,
+        status: 'Upcoming',
+        generatedAt: 'Sep 09, 2026 • 04:15 PM'
+      },
+      {
+        id: 'pass-seed-3',
+        ticketNumber: 'VERN-EVT-HSRL-4819',
+        eventId: 'blr-event-2',
+        eventTitle: 'HSR Layout Junior Football & Agility Drills',
+        eventCategory: 'Outdoor Sports',
+        eventEmoji: '⚽',
+        eventDate: '2026-09-06',
+        eventTime: '07:30 AM',
+        venue: 'Sector 2 Play Arena Park, HSR Layout, Bangalore',
+        safeArea: 'HSR Layout, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'Standard Child Entry',
+        ticketPrice: 0,
+        status: 'Used',
+        generatedAt: 'Sep 05, 2026 • 06:10 PM',
+        usedAt: 'Sep 06, 2026 • 07:35 AM',
+        usedGate: 'Gate-B (Lawn Express)',
+        usedMethod: 'Dynamic QR Scan'
+      },
+      {
+        id: 'pass-seed-4',
+        ticketNumber: 'VERN-EVT-INDI-6032',
+        eventId: 'blr-event-past-1',
+        eventTitle: 'Indiranagar Toddler Sensory Messy Play & Clay Fest',
+        eventCategory: 'Sensory Play',
+        eventEmoji: '🏺',
+        eventDate: '2026-08-23',
+        eventTime: '10:00 AM',
+        venue: 'Defense Colony Children Garden, Indiranagar, Bangalore',
+        safeArea: 'Indiranagar, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'VIP Sibling Pass',
+        ticketPrice: 199,
+        status: 'Used',
+        generatedAt: 'Aug 20, 2026 • 02:45 PM',
+        usedAt: 'Aug 23, 2026 • 09:58 AM',
+        usedGate: 'Gate-A (North Entrance)',
+        usedMethod: 'Fast Touchless Gate Scan'
+      },
+      {
+        id: 'pass-seed-5',
+        ticketNumber: 'VERN-EVT-KORA-1159',
+        eventId: 'blr-event-past-2',
+        eventTitle: 'Koramangala Junior Chess Masters League',
+        eventCategory: 'Competition',
+        eventEmoji: '♟️',
+        eventDate: '2026-07-12',
+        eventTime: '02:00 PM',
+        venue: 'Koramangala 4th Block Club Hall, Bangalore',
+        safeArea: 'Koramangala, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'Standard Child Entry',
+        ticketPrice: 150,
+        status: 'Expired',
+        generatedAt: 'Jul 09, 2026 • 08:30 PM'
+      },
+      {
+        id: 'pass-seed-6',
+        ticketNumber: 'VERN-EVT-SARJ-7741',
+        eventId: 'blr-event-past-3',
+        eventTitle: 'Sarjapur Kids Science Carnival & Stargazing Night',
+        eventCategory: 'Science & Astronomy',
+        eventEmoji: '🔭',
+        eventDate: '2026-06-30',
+        eventTime: '06:30 PM',
+        venue: 'Decathlon Ground Amphitheater, Sarjapur, Bangalore',
+        safeArea: 'Sarjapur Road, Bangalore',
+        attendeeName: baseChild,
+        parentName: baseParent,
+        phone: basePhone,
+        tierName: 'Family Stargazing Pass',
+        ticketPrice: 350,
+        status: 'Expired',
+        generatedAt: 'Jun 25, 2026 • 10:00 AM'
+      }
+    ];
+
+    // Merge bookingsList if any
+    if (bookingsList && bookingsList.length > 0) {
+      bookingsList.forEach(b => {
+        if (b.type === 'EventTicket' || !b.type) {
+          const tNum = b.ticketNumber || `VERN-EVT-${b.id.slice(-4)}`;
+          if (!seeds.some(s => s.ticketNumber === tNum || s.id === b.id)) {
+            seeds.unshift({
+              id: b.id,
+              ticketNumber: tNum,
+              eventId: b.itemId || 'custom-evt',
+              eventTitle: b.itemTitle || 'Community Event Admission',
+              eventCategory: 'Registered Ticket',
+              eventEmoji: '🎟️',
+              eventDate: b.dateStr || '2026-09-20',
+              eventTime: b.timeSelected || '10:00 AM',
+              venue: b.eventVenue || 'Local Community Venue, Bangalore',
+              safeArea: getSafeChildAreaName(b.eventVenue || 'Bangalore'),
+              attendeeName: b.childName || b.buyerName || baseChild,
+              parentName: b.buyerName || baseParent,
+              phone: b.buyerPhone || basePhone,
+              tierName: b.tierName || b.ticketTierName || 'Confirmed Admission Ticket',
+              ticketPrice: b.amountPaid || 0,
+              status: b.checkedIn ? 'Used' : 'Upcoming',
+              generatedAt: b.createdAt || 'Recent',
+              usedAt: b.checkedInAt,
+              usedGate: 'Gate-A (North Entrance)',
+              usedMethod: 'QR Scan'
+            });
+          }
+        }
+      });
+    }
+
+    return seeds;
+  });
+
+  // Persist pass history to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('vernunt_event_pass_history_v2', JSON.stringify(passHistory));
+    } catch (e) {
+      console.warn('Failed to persist pass history', e);
+    }
+  }, [passHistory]);
+
+  // Generate QR for preview pass
+  useEffect(() => {
+    if (!previewPass) {
+      setPreviewQrDataUrl('');
+      return;
+    }
+    const payload = JSON.stringify({
+      protocol: 'VERNUNT_DYNAMIC_GATE_CHECKIN_V2',
+      ticketNumber: previewPass.ticketNumber,
+      eventId: previewPass.eventId,
+      eventTitle: previewPass.eventTitle,
+      eventDate: previewPass.eventDate,
+      eventTime: previewPass.eventTime,
+      venue: previewPass.venue,
+      attendee: previewPass.attendeeName,
+      parent: previewPass.parentName,
+      tier: previewPass.tierName,
+      status: previewPass.status,
+      seal: 'VERNUNT_VERIFIED_SIGNATURE_2026'
+    });
+    QRCode.toDataURL(payload, {
+      width: 420,
+      margin: 1.5,
+      color: { dark: '#090d16', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    })
+      .then(url => setPreviewQrDataUrl(url))
+      .catch(err => console.error('Preview QR generation error', err));
+  }, [previewPass]);
+
+  // Pass Category Counts
+  const passCounts = useMemo(() => {
+    let upcoming = 0;
+    let used = 0;
+    let expired = 0;
+    for (const p of passHistory) {
+      if (p.status === 'Upcoming') upcoming++;
+      else if (p.status === 'Used') used++;
+      else if (p.status === 'Expired') expired++;
+    }
+    return {
+      all: passHistory.length,
+      upcoming,
+      used,
+      expired
+    };
+  }, [passHistory]);
+
+  // Filtered Pass History based on category and search query
+  const filteredPassHistory = useMemo(() => {
+    return passHistory.filter(pass => {
+      // Category filter
+      if (passCategoryFilter !== 'all' && pass.status !== passCategoryFilter) {
+        return false;
+      }
+      // Search filter
+      if (passSearchQuery.trim()) {
+        const q = passSearchQuery.trim().toLowerCase();
+        const matchTitle = (pass.eventTitle || '').toLowerCase().includes(q);
+        const matchTicket = (pass.ticketNumber || '').toLowerCase().includes(q);
+        const matchAttendee = (pass.attendeeName || '').toLowerCase().includes(q);
+        const matchVenue = (pass.venue || '').toLowerCase().includes(q);
+        const matchTier = (pass.tierName || '').toLowerCase().includes(q);
+        if (!matchTitle && !matchTicket && !matchAttendee && !matchVenue && !matchTier) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [passHistory, passCategoryFilter, passSearchQuery]);
+
+  // Action: Load a pass into the active Live Dynamic QR Pass view
+  const handleLoadPassToQr = (pass: EventPassRecord) => {
+    // Find matching event
+    const matched = eventsList.find(e => e.id === pass.eventId || e.title === pass.eventTitle);
+    if (matched) {
+      setSelectedEventId(matched.id);
+    }
+    setTicketNumber(pass.ticketNumber);
+    setAttendeeName(pass.attendeeName);
+    setParentName(pass.parentName);
+    setPhone(pass.phone);
+    setTicketTier(pass.tierName);
+    setActiveTab('pass');
+    setPreviewPass(null);
+    confetti({ particleCount: 30, spread: 60, origin: { y: 0.6 } });
+  };
+
+  // Action: Mark pass as Used (Simulate Gate Scan)
+  const handleMarkPassAsUsed = (passId: string) => {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const formattedDate = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} • ${timeStr}`;
+
+    setPassHistory(prev => prev.map(p => {
+      if (p.id === passId) {
+        return {
+          ...p,
+          status: 'Used',
+          usedAt: formattedDate,
+          usedGate: 'Gate-A (North Entrance)',
+          usedMethod: 'Dynamic QR Scan'
+        };
+      }
+      return p;
+    }));
+
+    // If matches current ticket, update attendee roster as well
+    const targetPass = passHistory.find(p => p.id === passId);
+    if (targetPass && (targetPass.ticketNumber === ticketNumber || targetPass.eventId === selectedEventId)) {
+      setAttendeesRoster(prev => prev.map(a => {
+        if (a.id === 'att-1' || a.ticketNumber === targetPass.ticketNumber) {
+          return {
+            ...a,
+            status: 'checked-in',
+            checkInTimestamp: timeStr,
+            scannedAtRaw: Date.now(),
+            method: 'QR Scan'
+          };
+        }
+        return a;
+      }));
+    }
+
+    confetti({ particleCount: 35, spread: 65, origin: { y: 0.6 } });
+  };
+
+  // Action: Mark pass back to Upcoming
+  const handleMarkPassAsUpcoming = (passId: string) => {
+    setPassHistory(prev => prev.map(p => {
+      if (p.id === passId) {
+        return {
+          ...p,
+          status: 'Upcoming',
+          usedAt: undefined,
+          usedGate: undefined,
+          usedMethod: undefined
+        };
+      }
+      return p;
+    }));
+
+    // If matches current ticket, update attendee roster as well
+    const targetPass = passHistory.find(p => p.id === passId);
+    if (targetPass && (targetPass.ticketNumber === ticketNumber || targetPass.eventId === selectedEventId)) {
+      setAttendeesRoster(prev => prev.map(a => {
+        if (a.id === 'att-1' || a.ticketNumber === targetPass.ticketNumber) {
+          return {
+            ...a,
+            status: 'pending',
+            checkInTimestamp: undefined,
+            scannedAtRaw: undefined,
+            method: undefined
+          };
+        }
+        return a;
+      }));
+    }
+  };
+
+  // Action: Save Current Active Pass to Pass History
+  const handleSaveCurrentPassToHistory = () => {
+    if (!selectedEvent) return;
+    const currentTicket = currentMainAttendee?.ticketNumber || ticketNumber;
+    const existingIndex = passHistory.findIndex(p => p.ticketNumber === currentTicket || (p.eventId === selectedEvent.id && p.attendeeName === attendeeName));
+
+    const now = new Date();
+    const formattedGen = `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+    const newPassRecord: EventPassRecord = {
+      id: `pass-${Date.now()}`,
+      ticketNumber: currentTicket,
+      eventId: selectedEvent.id,
+      eventTitle: selectedEvent.title,
+      eventCategory: selectedEvent.category || 'Event',
+      eventEmoji: selectedEvent.iconEmoji || '🎟️',
+      eventDate: selectedEvent.date,
+      eventTime: selectedEvent.time,
+      venue: selectedEvent.location || 'Local Community Venue, Bangalore',
+      safeArea: getSafeChildAreaName(selectedEvent.location || 'Bangalore'),
+      attendeeName: attendeeName,
+      parentName: parentName,
+      phone: phone,
+      tierName: ticketTier,
+      ticketPrice: selectedEvent.ticketPrice || 0,
+      status: isCheckedIn ? 'Used' : 'Upcoming',
+      generatedAt: formattedGen,
+      usedAt: isCheckedIn ? (checkInTimestamp || formattedGen) : undefined,
+      usedGate: 'Gate-A (North Entrance)',
+      usedMethod: 'Dynamic QR Scan'
+    };
+
+    if (existingIndex >= 0) {
+      setPassHistory(prev => {
+        const next = [...prev];
+        next[existingIndex] = { ...next[existingIndex], ...newPassRecord };
+        return next;
+      });
+    } else {
+      setPassHistory(prev => [newPassRecord, ...prev]);
+    }
+
+    setSavedPassFeedback(true);
+    setTimeout(() => setSavedPassFeedback(false), 2200);
+    confetti({ particleCount: 25, spread: 50, origin: { y: 0.7 } });
+  };
+
+  // Action: Quick Generate Pass for any event
+  const handleQuickGeneratePass = () => {
+    const targetEvt = eventsList.find(e => e.id === quickGenEventId) || eventsList[0];
+    if (!targetEvt) return;
+    const newTicketNum = `VERN-EVT-${targetEvt.id.slice(0, 4).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const now = new Date();
+    const newPass: EventPassRecord = {
+      id: `pass-gen-${Date.now()}`,
+      ticketNumber: newTicketNum,
+      eventId: targetEvt.id,
+      eventTitle: targetEvt.title,
+      eventCategory: targetEvt.category || 'Event',
+      eventEmoji: targetEvt.iconEmoji || '🎟️',
+      eventDate: targetEvt.date,
+      eventTime: targetEvt.time,
+      venue: targetEvt.location || 'Local Community Venue, Bangalore',
+      safeArea: getSafeChildAreaName(targetEvt.location || 'Bangalore'),
+      attendeeName: quickGenAttendee || userProfile?.childName || 'Aarav Sharma',
+      parentName: userProfile?.parentName || 'Priya Sharma',
+      phone: userProfile?.phone || '+91 98201 44821',
+      tierName: quickGenTier,
+      ticketPrice: targetEvt.ticketPrice || 0,
+      status: 'Upcoming',
+      generatedAt: `${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} • ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    };
+
+    setPassHistory(prev => [newPass, ...prev]);
+    setShowQuickGenerateModal(false);
+    confetti({ particleCount: 40, spread: 70, origin: { y: 0.6 } });
+  };
+
+  // Action: Copy ticket code
+  const handleCopyPassTicket = (ticketNum: string, passId: string) => {
+    navigator.clipboard.writeText(ticketNum);
+    setPassCopiedId(passId);
+    setTimeout(() => setPassCopiedId(null), 2000);
+  };
 
   // Regenerate ticket number when event changes
   useEffect(() => {
@@ -937,6 +1405,25 @@ export default function EventDynamicQrPassModal({
             </button>
 
             <button
+              id="tab-btn-pass-history"
+              type="button"
+              onClick={() => setActiveTab('pass-history')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer relative shrink-0 ${
+                activeTab === 'pass-history'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Ticket className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Pass History</span>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'pass-history' ? 'bg-indigo-400 text-slate-950' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {passHistory.length}
+              </span>
+            </button>
+
+            <button
               id="tab-btn-camera-scanner"
               type="button"
               onClick={() => setActiveTab('scanner')}
@@ -1201,6 +1688,54 @@ export default function EventDynamicQrPassModal({
                         <span>Simulate Organizer Gate Scan</span>
                       </>
                     )}
+                  </button>
+
+                  {/* Save to History Button */}
+                  <button
+                    id="btn-save-current-pass-to-history"
+                    type="button"
+                    onClick={handleSaveCurrentPassToHistory}
+                    className={`w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer border ${
+                      savedPassFeedback 
+                        ? 'bg-emerald-50 border-emerald-300 text-emerald-800 ring-1 ring-emerald-300' 
+                        : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900 shadow-2xs'
+                    }`}
+                  >
+                    {savedPassFeedback ? (
+                      <>
+                        <CheckCheck className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Saved to Pass History!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bookmark className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Save Pass to Digital Wallet & History</span>
+                      </>
+                    )}
+                  </button>
+
+                  {/* Pass History Quick Shortcut */}
+                  <button
+                    id="btn-view-pass-history-shortcut"
+                    type="button"
+                    onClick={() => setActiveTab('pass-history')}
+                    className="w-full py-2.5 px-3.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-indigo-50 hover:from-indigo-100 hover:to-purple-100 border border-indigo-200 text-indigo-950 rounded-2xl text-xs font-bold flex items-center justify-between transition cursor-pointer shadow-2xs"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                        <Ticket className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="text-left">
+                        <span className="font-black text-slate-900 block text-xs">Pass History & Digital Wallet</span>
+                        <span className="text-[10px] text-indigo-700 font-medium">
+                          {passCounts.upcoming} Upcoming • {passCounts.used} Used • {passCounts.expired} Expired
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-600">
+                      <span>Browse Passes</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </div>
                   </button>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -1810,6 +2345,465 @@ export default function EventDynamicQrPassModal({
             </div>
           )}
 
+          {/* TAB: PASS HISTORY VIEW (Categorized by 'Upcoming', 'Used', and 'Expired') */}
+          {activeTab === 'pass-history' && (
+            <div id="pass-history-section" className="pt-4 space-y-4">
+              {/* Pass History Header Banner */}
+              <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-3.5 sm:p-5 rounded-2xl border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-md">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center shrink-0">
+                    <Ticket className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm sm:text-base font-black text-white">Event Pass History & Digital Passes</h4>
+                      <span className="bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[9px] font-mono px-2 py-0.5 rounded-full font-bold">
+                        Encrypted Passes
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300">
+                      Previously generated and redeemed passes categorized by Upcoming, Used, and Expired
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <button
+                    id="btn-quick-generate-pass-modal"
+                    type="button"
+                    onClick={() => setShowQuickGenerateModal(true)}
+                    className="px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-sm cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Generate New Pass</span>
+                  </button>
+
+                  <button
+                    id="btn-switch-to-dynamic-pass-view"
+                    type="button"
+                    onClick={() => setActiveTab('pass')}
+                    className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-indigo-300" />
+                    <span>Present Active QR</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Category Breakdown Metric Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Upcoming */}
+                <button
+                  type="button"
+                  onClick={() => setPassCategoryFilter('Upcoming')}
+                  className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                    passCategoryFilter === 'Upcoming'
+                      ? 'bg-blue-50/90 border-blue-300 ring-2 ring-blue-400/40 shadow-xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-blue-800 flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping"></span>
+                      Upcoming
+                    </span>
+                    <span className="w-7 h-7 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-mono font-black">
+                      {passCounts.upcoming}
+                    </span>
+                  </div>
+                  <div className="text-xl font-black text-slate-900 mt-1">{passCounts.upcoming} Active Passes</div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Valid for gate entry & scanner presentation</p>
+                </button>
+
+                {/* Used */}
+                <button
+                  type="button"
+                  onClick={() => setPassCategoryFilter('Used')}
+                  className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                    passCategoryFilter === 'Used'
+                      ? 'bg-emerald-50/90 border-emerald-300 ring-2 ring-emerald-400/40 shadow-xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      Used / Admitted
+                    </span>
+                    <span className="w-7 h-7 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-mono font-black">
+                      {passCounts.used}
+                    </span>
+                  </div>
+                  <div className="text-xl font-black text-slate-900 mt-1">{passCounts.used} Verified Passes</div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Scanned & checked in at gate entrance</p>
+                </button>
+
+                {/* Expired */}
+                <button
+                  type="button"
+                  onClick={() => setPassCategoryFilter('Expired')}
+                  className={`p-3.5 rounded-2xl border text-left transition cursor-pointer ${
+                    passCategoryFilter === 'Expired'
+                      ? 'bg-slate-100 border-slate-400 ring-2 ring-slate-400/40 shadow-xs'
+                      : 'bg-white hover:bg-slate-50 border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Clock3 className="w-3 h-3 text-slate-500" />
+                      Expired
+                    </span>
+                    <span className="w-7 h-7 rounded-xl bg-slate-150 text-slate-700 flex items-center justify-center text-xs font-mono font-black">
+                      {passCounts.expired}
+                    </span>
+                  </div>
+                  <div className="text-xl font-black text-slate-900 mt-1">{passCounts.expired} Past Passes</div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Event dates elapsed and archived</p>
+                </button>
+              </div>
+
+              {/* Category Filter Tabs & Search Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 pt-1">
+                {/* Categorized Filter Pills */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setPassCategoryFilter('all')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition cursor-pointer shrink-0 ${
+                      passCategoryFilter === 'all'
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    All Passes ({passCounts.all})
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPassCategoryFilter('Upcoming')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+                      passCategoryFilter === 'Upcoming'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-300"></span>
+                    <span>Upcoming ({passCounts.upcoming})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPassCategoryFilter('Used')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+                      passCategoryFilter === 'Used'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-3 h-3" />
+                    <span>Used ({passCounts.used})</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPassCategoryFilter('Expired')}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
+                      passCategoryFilter === 'Expired'
+                        ? 'bg-slate-700 text-white shadow-xs'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                    }`}
+                  >
+                    <Clock3 className="w-3 h-3" />
+                    <span>Expired ({passCounts.expired})</span>
+                  </button>
+                </div>
+
+                {/* Search query input */}
+                <div className="relative min-w-[200px] sm:w-64">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by event, ticket, child..."
+                    value={passSearchQuery}
+                    onChange={(e) => setPassSearchQuery(e.target.value)}
+                    className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                  {passSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setPassSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Pass Cards List */}
+              <div className="space-y-3">
+                {filteredPassHistory.length === 0 ? (
+                  <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 mx-auto shadow-2xs">
+                      <Ticket className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <div>
+                      <h5 className="text-sm font-black text-slate-800">No {passCategoryFilter === 'all' ? '' : passCategoryFilter} Passes Found</h5>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                        {passSearchQuery
+                          ? `No event passes match "${passSearchQuery}". Try clearing your search.`
+                          : `There are currently no passes in the ${passCategoryFilter} category.`}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-center gap-2 pt-1">
+                      {passSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setPassSearchQuery('')}
+                          className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-xs font-bold rounded-xl hover:bg-slate-100 transition cursor-pointer"
+                        >
+                          Clear Search
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowQuickGenerateModal(true)}
+                        className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-black rounded-xl transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Generate a Pass</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  filteredPassHistory.map(pass => {
+                    const isUpcoming = pass.status === 'Upcoming';
+                    const isUsed = pass.status === 'Used';
+                    const isExpired = pass.status === 'Expired';
+                    const isCurrentLivePass = pass.ticketNumber === (currentMainAttendee?.ticketNumber || ticketNumber);
+
+                    return (
+                      <div
+                        key={pass.id}
+                        id={`pass-card-${pass.id}`}
+                        className={`rounded-2xl border transition shadow-2xs overflow-hidden ${
+                          isUpcoming
+                            ? 'bg-gradient-to-r from-white via-blue-50/30 to-white border-blue-200 hover:border-blue-300'
+                            : isUsed
+                            ? 'bg-gradient-to-r from-white via-emerald-50/30 to-white border-emerald-200 hover:border-emerald-300'
+                            : 'bg-gradient-to-r from-white via-slate-50/50 to-white border-slate-200 hover:border-slate-300 opacity-90'
+                        }`}
+                      >
+                        <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5">
+                          {/* Left Details */}
+                          <div className="space-y-2 flex-1">
+                            {/* Top Meta Line: Status Badge + Category + Current active marker */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              {/* Status Badge */}
+                              {isUpcoming && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 border border-blue-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping"></span>
+                                  Upcoming • Valid Pass
+                                </span>
+                              )}
+                              {isUsed && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-900 border border-emerald-200">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                                  Used • Admitted at Gate
+                                </span>
+                              )}
+                              {isExpired && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-slate-200 text-slate-700 border border-slate-300">
+                                  <Clock3 className="w-3 h-3 text-slate-500" />
+                                  Expired Pass
+                                </span>
+                              )}
+
+                              {/* Event Category Tag */}
+                              {pass.eventCategory && (
+                                <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80">
+                                  {pass.eventCategory}
+                                </span>
+                              )}
+
+                              {/* Ticket Tier Pill */}
+                              <span className="text-[10px] font-bold text-indigo-800 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-lg flex items-center gap-1">
+                                <Tag className="w-2.5 h-2.5 text-indigo-600" />
+                                {pass.tierName}
+                              </span>
+
+                              {/* Current Live Active Indicator */}
+                              {isCurrentLivePass && (
+                                <span className="text-[9.5px] font-black text-amber-900 bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1 font-mono">
+                                  <Sparkles className="w-2.5 h-2.5 text-amber-600" />
+                                  Currently Loaded
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Event Title */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">{pass.eventEmoji || '🎟️'}</span>
+                              <h5 className="text-sm sm:text-base font-black text-slate-900 leading-snug">
+                                {pass.eventTitle}
+                              </h5>
+                            </div>
+
+                            {/* Key Info Grid: Date, Venue (Child-Safe), Attendee, Ticket ID */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-xs text-slate-600 pt-0.5">
+                              {/* Date & Time */}
+                              <div className="flex items-center gap-1.5">
+                                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span className="font-semibold text-slate-800">{pass.eventDate}</span>
+                                <span>•</span>
+                                <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0 ml-0.5" />
+                                <span>{pass.eventTime}</span>
+                              </div>
+
+                              {/* Child-Safe Venue Name */}
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span className="font-semibold text-slate-800 truncate" title={pass.venue}>
+                                  {pass.safeArea || getSafeChildAreaName(pass.venue)}
+                                </span>
+                                <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.1 rounded font-bold shrink-0">
+                                  Safe Area
+                                </span>
+                              </div>
+
+                              {/* Child / Attendee Name */}
+                              <div className="flex items-center gap-1.5">
+                                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                <span>Child: <strong className="text-slate-900">{pass.attendeeName}</strong></span>
+                                {pass.parentName && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-slate-500">Parent: {pass.parentName}</span>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Ticket ID with quick copy */}
+                              <div className="flex items-center gap-2 font-mono">
+                                <span className="text-slate-500 text-[11px]">Pass ID:</span>
+                                <span className="bg-slate-100 text-slate-900 px-2 py-0.5 rounded font-black text-[11px] border border-slate-200">
+                                  {pass.ticketNumber}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyPassTicket(pass.ticketNumber, pass.id)}
+                                  className="text-[10px] text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer font-sans font-bold"
+                                  title="Copy ticket number"
+                                >
+                                  {passCopiedId === pass.id ? (
+                                    <>
+                                      <Check className="w-3 h-3 text-emerald-600" />
+                                      <span className="text-emerald-700">Copied!</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Copy className="w-3 h-3" />
+                                      <span>Copy</span>
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Status Footnote description */}
+                            <div className="pt-1 text-[11px]">
+                              {isUpcoming && (
+                                <p className="text-blue-700 flex items-center gap-1.5 font-medium">
+                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                                  <span>Dynamic cryptographic gate token generated on {pass.generatedAt}. Present at check-in desk.</span>
+                                </p>
+                              )}
+                              {isUsed && (
+                                <p className="text-emerald-800 flex items-center gap-1.5 font-medium">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>
+                                    Admitted on {pass.usedAt || 'Recent'} via {pass.usedMethod || 'Dynamic QR Scan'} ({pass.usedGate || 'Gate-A'}).
+                                  </span>
+                                </p>
+                              )}
+                              {isExpired && (
+                                <p className="text-slate-500 flex items-center gap-1.5 font-medium">
+                                  <Clock3 className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>Event date elapsed ({pass.eventDate}). Pass was archived.</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Right Action Buttons */}
+                          <div className="flex flex-row md:flex-col items-center md:items-end justify-end gap-2 shrink-0 border-t md:border-t-0 border-slate-150 pt-2 md:pt-0">
+                            {/* Present / Load to Live Dynamic QR */}
+                            <button
+                              type="button"
+                              onClick={() => handleLoadPassToQr(pass)}
+                              className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                              title="Load pass into rotating Dynamic QR Code display"
+                            >
+                              <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Present Live QR</span>
+                            </button>
+
+                            {/* View High-Res QR Code Modal */}
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPass(pass)}
+                              className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                            >
+                              <Eye className="w-3.5 h-3.5 text-indigo-600" />
+                              <span>View QR</span>
+                            </button>
+
+                            {/* Contextual Status Action */}
+                            {isUpcoming && (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkPassAsUsed(pass.id)}
+                                className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer"
+                                title="Simulate gate check-in admission scan"
+                              >
+                                <ScanLine className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Simulate Gate Scan</span>
+                              </button>
+                            )}
+
+                            {isUsed && (
+                              <button
+                                type="button"
+                                onClick={() => handleMarkPassAsUpcoming(pass.id)}
+                                className="px-2.5 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition cursor-pointer"
+                                title="Revert pass status back to Upcoming"
+                              >
+                                <span>Mark Upcoming (Undo)</span>
+                              </button>
+                            )}
+
+                            {isExpired && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setQuickGenEventId(pass.eventId);
+                                  setShowQuickGenerateModal(true);
+                                }}
+                                className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition cursor-pointer"
+                              >
+                                <span>Re-generate Pass</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 3: CHECK-IN HISTORY LOG VIEW */}
           {activeTab === 'history' && (
             <div id="checkin-history-view" className="pt-4 space-y-4">
@@ -1971,6 +2965,213 @@ export default function EventDynamicQrPassModal({
             </div>
           </div>
         </div>
+
+        {/* SUB-MODAL: HIGH-RES QR PASS QUICK VIEWER */}
+        {previewPass && (
+          <div 
+            id="modal-pass-qr-preview"
+            className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[220] flex items-center justify-center p-4 animate-fade-in text-left"
+          >
+            <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden my-auto p-5 sm:p-6 relative space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-150">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center">
+                    <QrCode className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">Digital Pass QR Code</h4>
+                    <span className="text-[10px] font-mono text-slate-500 font-bold">{previewPass.ticketNumber}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPreviewPass(null)}
+                  className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* QR Image Box with Perforation Style */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-center relative overflow-hidden shadow-inner">
+                {previewQrDataUrl ? (
+                  <div className="bg-white p-3 rounded-2xl border border-slate-200 inline-block shadow-sm">
+                    <img 
+                      src={previewQrDataUrl} 
+                      alt="Event Pass QR Code" 
+                      className="w-52 h-52 mx-auto rounded-lg"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-52 h-52 mx-auto flex items-center justify-center text-xs text-slate-400">
+                    Generating high-res QR code...
+                  </div>
+                )}
+
+                {/* Status Indicator */}
+                <div className="mt-3 flex items-center justify-center gap-2">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider ${
+                    previewPass.status === 'Upcoming'
+                      ? 'bg-blue-100 text-blue-900 border border-blue-200'
+                      : previewPass.status === 'Used'
+                      ? 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+                      : 'bg-slate-200 text-slate-700 border border-slate-300'
+                  }`}>
+                    {previewPass.status === 'Upcoming' && 'Upcoming • Valid for Gate Admission'}
+                    {previewPass.status === 'Used' && 'Used • Admitted at Gate'}
+                    {previewPass.status === 'Expired' && 'Expired Pass'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Event & Pass Metadata */}
+              <div className="space-y-1.5 text-xs text-slate-700 bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80">
+                <div className="font-black text-slate-900 text-sm flex items-center gap-1.5">
+                  <span>{previewPass.eventEmoji || '🎟️'}</span>
+                  <span>{previewPass.eventTitle}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 text-[11.5px]">
+                  <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{previewPass.eventDate} at {previewPass.eventTime}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 text-[11.5px]">
+                  <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="truncate">{previewPass.safeArea || getSafeChildAreaName(previewPass.venue)}</span>
+                </div>
+                <div className="flex items-center gap-2 text-slate-600 text-[11.5px]">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Attendee: <strong>{previewPass.attendeeName}</strong></span>
+                  <span>•</span>
+                  <span>{previewPass.tierName}</span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-between gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleCopyPassTicket(previewPass.ticketNumber, previewPass.id)}
+                  className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span>{passCopiedId === previewPass.id ? 'Copied!' : 'Copy Ticket'}</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleLoadPassToQr(previewPass)}
+                    className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs cursor-pointer"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Present in Live QR</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPreviewPass(null)}
+                    className="px-3.5 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SUB-MODAL: QUICK GENERATE PASS MODAL */}
+        {showQuickGenerateModal && (
+          <div 
+            id="modal-quick-generate-pass"
+            className="fixed inset-0 bg-slate-950/85 backdrop-blur-sm z-[220] flex items-center justify-center p-4 animate-fade-in text-left"
+          >
+            <div className="bg-white rounded-3xl max-w-md w-full border border-slate-200 shadow-2xl overflow-hidden my-auto p-5 sm:p-6 relative space-y-4">
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-slate-150">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center">
+                    <Ticket className="w-4.5 h-4.5 text-amber-700" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900">Generate Event Entry Pass</h4>
+                    <p className="text-[10.5px] text-slate-500">Creates a new upcoming pass with encrypted QR signature</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickGenerateModal(false)}
+                  className="w-7 h-7 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Form Fields */}
+              <div className="space-y-3">
+                <div>
+                  <label className="text-[10.5px] font-bold text-slate-600 uppercase block mb-1">Select Event</label>
+                  <select
+                    value={quickGenEventId}
+                    onChange={(e) => setQuickGenEventId(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                  >
+                    {eventsList.map(e => (
+                      <option key={e.id} value={e.id}>
+                        {e.iconEmoji || '🎟️'} {e.title} ({e.date})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-slate-600 uppercase block mb-1">Attendee Child Name</label>
+                  <input
+                    type="text"
+                    value={quickGenAttendee}
+                    onChange={(e) => setQuickGenAttendee(e.target.value)}
+                    placeholder="Enter attendee child name..."
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10.5px] font-bold text-slate-600 uppercase block mb-1">Pass Tier</label>
+                  <select
+                    value={quickGenTier}
+                    onChange={(e) => setQuickGenTier(e.target.value)}
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800"
+                  >
+                    <option value="Standard Child Entry">Standard Child Entry</option>
+                    <option value="VIP Family Pass + Workshop Kit">VIP Family Pass + Workshop Kit</option>
+                    <option value="Sibling Group Pass">Sibling Group Pass</option>
+                    <option value="Free Community Gate Pass">Free Community Gate Pass</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-150">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickGenerateModal(false)}
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickGeneratePass}
+                  className="px-4 py-2 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 rounded-xl text-xs font-black transition shadow-xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Generate Pass</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -17,7 +17,9 @@ import { VendorProfile } from '../../types/vendor.ts';
 import {
   INITIAL_STORE_PRODUCTS, STORE_CATEGORIES, STORE_COUPONS,
   INITIAL_MOCK_ORDERS, getStoredProducts, saveStoredProducts,
-  getStoredOrders, saveStoredOrders, getStoredCategories
+  getStoredOrders, saveStoredOrders, getStoredCategories,
+  getStoredRecentlyViewedIds, saveStoredRecentlyViewedIds,
+  STORAGE_KEY_RECENTLY_VIEWED, MAX_RECENTLY_VIEWED
 } from '../../data/storeProducts.ts';
 import {
   getStoredVendors, saveStoredVendors,
@@ -28,6 +30,9 @@ import { VendorStorePage } from '../vendor/VendorStorePage.tsx';
 import { VendorDashboard } from '../vendor/VendorDashboard.tsx';
 import { VendorInquiryModal } from '../vendor/VendorInquiryModal.tsx';
 import { ChildProfile } from '../../types.ts';
+import { logProductSearch } from '../../data/productSearchAnalytics.ts';
+import { AdminProductSearchesDesk } from '../admin/AdminProductSearchesDesk.tsx';
+import { CommerceApiClient } from '../../services/commerceApiClient.ts';
 
 // Helper to load Razorpay script
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -97,6 +102,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     }
   });
 
+  // Recently Viewed state (persisted in localStorage and synchronized across refreshes)
+  const [recentlyViewedIds, setRecentlyViewedIds] = useState<string[]>(getStoredRecentlyViewedIds);
+
+  // Persist Recently Viewed IDs to localStorage whenever state changes
+  useEffect(() => {
+    saveStoredRecentlyViewedIds(recentlyViewedIds);
+  }, [recentlyViewedIds]);
+
   // Listen to cross-module updates (from Admin Desk or Vendor Dashboard)
   useEffect(() => {
     const handleProductsUpdated = (e: any) => {
@@ -119,12 +132,26 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       if (e.detail) setCategories(e.detail);
       else setCategories(getStoredCategories());
     };
+    const handleRecentlyViewedUpdated = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setRecentlyViewedIds(prev => (JSON.stringify(prev) === JSON.stringify(e.detail) ? prev : e.detail));
+      } else {
+        setRecentlyViewedIds(getStoredRecentlyViewedIds());
+      }
+    };
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === STORAGE_KEY_RECENTLY_VIEWED) {
+        setRecentlyViewedIds(getStoredRecentlyViewedIds());
+      }
+    };
 
     window.addEventListener('vernunt_products_updated', handleProductsUpdated);
     window.addEventListener('vernunt_orders_updated', handleOrdersUpdated);
     window.addEventListener('vernunt_store_settings_updated', handleSettingsUpdated);
     window.addEventListener('vernunt_vendors_updated', handleVendorsUpdated);
     window.addEventListener('vernunt_categories_updated', handleCategoriesUpdated);
+    window.addEventListener('vernunt_recently_viewed_updated', handleRecentlyViewedUpdated);
+    window.addEventListener('storage', handleStorageChange);
 
     return () => {
       window.removeEventListener('vernunt_products_updated', handleProductsUpdated);
@@ -132,6 +159,8 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       window.removeEventListener('vernunt_store_settings_updated', handleSettingsUpdated);
       window.removeEventListener('vernunt_vendors_updated', handleVendorsUpdated);
       window.removeEventListener('vernunt_categories_updated', handleCategoriesUpdated);
+      window.removeEventListener('vernunt_recently_viewed_updated', handleRecentlyViewedUpdated);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, []);
 
@@ -153,6 +182,21 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
   // Filters and search
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [showAdminSearchLogsModal, setShowAdminSearchLogsModal] = useState<boolean>(false);
+
+  // Auto-log product search queries into 45-day retention telemetry
+  useEffect(() => {
+    if (!searchQuery.trim() || searchQuery.trim().length < 2) return;
+    const timer = setTimeout(() => {
+      try {
+        logProductSearch(searchQuery.trim(), 'store_catalog', userProfile);
+      } catch (err) {
+        console.warn('Failed to log store product search:', err);
+      }
+    }, 650);
+    return () => clearTimeout(timer);
+  }, [searchQuery, userProfile]);
+
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>('all');
@@ -206,6 +250,58 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [completedOrder, setCompletedOrder] = useState<StoreOrder | null>(null);
 
+  // Distributed Inventory Locking (Preventing Overselling)
+  const [inventoryLockToken, setInventoryLockToken] = useState<string | null>(null);
+  const [lockSecondsRemaining, setLockSecondsRemaining] = useState<number>(600);
+  const [inventoryLockError, setInventoryLockError] = useState<string | null>(null);
+  const [isAcquiringLock, setIsAcquiringLock] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (isCheckoutOpen && cart.length > 0) {
+      setIsAcquiringLock(true);
+      setInventoryLockError(null);
+      CommerceApiClient.acquireLock({
+        items: cart.map(item => ({
+          productId: item.product.id,
+          variationId: item.selectedVariation?.id,
+          quantity: item.quantity,
+          productName: item.product.name
+        })),
+        userId: userProfile?.id,
+        userEmail: shippingAddress.email || userProfile?.email,
+        ttlSeconds: 600
+      }).then(res => {
+        setIsAcquiringLock(false);
+        if (res.success && res.lockToken) {
+          setInventoryLockToken(res.lockToken);
+          setLockSecondsRemaining(res.ttlSeconds || 600);
+        } else {
+          setInventoryLockError(res.error || 'One or more items in your cart just sold out or were reserved by another shopper.');
+        }
+      }).catch(err => {
+        setIsAcquiringLock(false);
+        console.warn('Inventory lock fallback:', err);
+      });
+    } else if (!isCheckoutOpen && inventoryLockToken) {
+      CommerceApiClient.releaseLock(inventoryLockToken, 'User closed checkout modal').catch(console.error);
+      setInventoryLockToken(null);
+    }
+  }, [isCheckoutOpen]);
+
+  useEffect(() => {
+    if (!isCheckoutOpen || !inventoryLockToken || lockSecondsRemaining <= 0) return;
+    const timer = setInterval(() => {
+      setLockSecondsRemaining(prev => {
+        if (prev <= 1) {
+          setInventoryLockError('Your 10-minute inventory reservation lease has expired. Please re-open checkout to reserve stock.');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [isCheckoutOpen, inventoryLockToken, lockSecondsRemaining]);
+
   // Invoice Modal
   const [viewInvoiceOrder, setViewInvoiceOrder] = useState<StoreOrder | null>(null);
 
@@ -216,8 +312,36 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Synchronize product detail initial values
+  // Track product visit in Recently Viewed (caps at 5 items, brings latest visit to front, persists to localStorage)
+  const trackProductVisit = (productId: string) => {
+    if (!productId) return;
+    setRecentlyViewedIds(prev => {
+      const filtered = prev.filter(id => id !== productId);
+      const updated = [productId, ...filtered].slice(0, MAX_RECENTLY_VIEWED);
+      saveStoredRecentlyViewedIds(updated);
+      return updated;
+    });
+  };
+
+  const handleRemoveRecentlyViewed = (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setRecentlyViewedIds(prev => {
+      const updated = prev.filter(id => id !== productId);
+      saveStoredRecentlyViewedIds(updated);
+      return updated;
+    });
+    showToast('Removed from Recently Viewed');
+  };
+
+  const handleClearRecentlyViewed = () => {
+    setRecentlyViewedIds([]);
+    saveStoredRecentlyViewedIds([]);
+    showToast('Recently Viewed history cleared');
+  };
+
+  // Synchronize product detail initial values & record product visit
   const handleOpenProduct = (product: StoreProduct) => {
+    trackProductVisit(product.id);
     setSelectedProduct(product);
     setDetailActiveImage(product.featuredImage);
     const initialAttrs: Record<string, string> = {};
@@ -230,6 +354,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     setDetailQuantity(1);
     setShowReviewForm(false);
   };
+
+  // Resolved StoreProduct objects for recently viewed list (max 5)
+  const recentlyViewedProducts = useMemo(() => {
+    return recentlyViewedIds
+      .map(id => products.find(p => p.id === id))
+      .filter((p): p is StoreProduct => Boolean(p))
+      .slice(0, MAX_RECENTLY_VIEWED);
+  }, [recentlyViewedIds, products]);
 
   // Cart Calculations
   const cartItemCount = useMemo(() => {
@@ -514,6 +646,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       console.error('Vendor balance distribution error:', e);
     }
 
+    // Commit distributed inventory lock atomically
+    if (inventoryLockToken) {
+      CommerceApiClient.commitLock(inventoryLockToken, newOrder.id).catch(console.error);
+      setInventoryLockToken(null);
+    }
+
     setCompletedOrder(newOrder);
     setCart([]);
     setIsProcessingPayment(false);
@@ -524,6 +662,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   // Execute Order Placement via Razorpay or COD
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
+
+    if (inventoryLockError) {
+      showToast(`⚠️ Oversell Prevention: ${inventoryLockError}`);
+      return;
+    }
 
     // Handle Cash on Delivery
     if (paymentMethod === 'COD') {
@@ -762,6 +905,22 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               <Heart className="w-3.5 h-3.5" />
               <span>Wishlist ({wishlist.length})</span>
             </button>
+            <span>|</span>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveView('shop');
+                setTimeout(() => {
+                  const el = document.getElementById('recently-viewed-section');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 50);
+              }}
+              className="hover:underline flex items-center gap-1 cursor-pointer text-white hover:text-amber-200 transition"
+              title="Jump to Recently Viewed Products"
+            >
+              <Clock className="w-3.5 h-3.5 text-amber-300" />
+              <span>Recently Viewed ({recentlyViewedProducts.length})</span>
+            </button>
           </div>
         </div>
       </div>
@@ -845,6 +1004,19 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                 <Building className="w-3.5 h-3.5" />
                 <span className="hidden md:inline">Seller Portal</span>
               </button>
+
+              {/* Admin 45-Day Search Logs Shortcut */}
+              {userProfile?.userRole === 'Admin' && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminSearchLogsModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-950 text-xs font-black transition cursor-pointer shadow-2xs"
+                  title="View Products Searched by All Users (45-Day Retention Window)"
+                >
+                  <Search className="w-3.5 h-3.5 text-rose-700" />
+                  <span className="hidden sm:inline">Search Logs (45d)</span>
+                </button>
+              )}
 
               {/* Wishlist Button */}
               <button
@@ -1574,6 +1746,171 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
             </div>
           </div>
         )}
+
+        {/* ========================================================================= */}
+        {/* RECENTLY VIEWED SECTION (Tracks & Displays Last 5 Visited Products)       */}
+        {/* ========================================================================= */}
+        <div id="recently-viewed-section" className="pt-8 border-t border-slate-200 mt-10 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-700 flex items-center justify-center border border-rose-100 shadow-2xs">
+                  <Clock className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                    <span>Recently Viewed Products</span>
+                    <span className="text-[11px] font-bold text-rose-800 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full font-mono">
+                      {recentlyViewedProducts.length} / 5 slots
+                    </span>
+                  </h3>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 font-medium pl-10">
+                Your last 5 visited toys, organic snacks, and STEM tools. Instantly compare or pick up where you left off.
+              </p>
+            </div>
+
+            {recentlyViewedProducts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearRecentlyViewed}
+                className="text-xs font-bold text-slate-500 hover:text-rose-700 flex items-center gap-1.5 transition px-3 py-1.5 rounded-xl border border-slate-200 hover:border-rose-300 hover:bg-rose-50 cursor-pointer"
+                title="Clear browsing history"
+              >
+                <Trash2 className="w-3.5 h-3.5 text-slate-400 hover:text-rose-600" />
+                <span>Clear History</span>
+              </button>
+            )}
+          </div>
+
+          {recentlyViewedProducts.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center space-y-2.5">
+              <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mx-auto border border-slate-200">
+                <Clock className="w-6 h-6" />
+              </div>
+              <h4 className="text-sm font-bold text-slate-800">No recently viewed products</h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto">
+                Explore our collections above or click any product to read verified parent reviews and track your recent visits here.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setSelectedSubcategory('all');
+                  setSearchQuery('');
+                  window.scrollTo({ top: 200, behavior: 'smooth' });
+                }}
+                className="px-4 py-2 bg-slate-900 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Browse Catalog
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5">
+              {recentlyViewedProducts.map((product, index) => {
+                const isWishlisted = wishlist.includes(product.id);
+                return (
+                  <div
+                    key={product.id}
+                    onClick={() => handleOpenProduct(product)}
+                    className="bg-white rounded-2xl border border-slate-200 hover:border-rose-400 hover:shadow-md transition-all duration-200 p-3 flex flex-col justify-between group cursor-pointer relative"
+                  >
+                    {/* Top Visited Badge & Dismiss Button */}
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <span className="text-[9px] font-black text-rose-800 bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {index === 0 ? 'Latest Visit' : `#${index + 1} Recent`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleRemoveRecentlyViewed(product.id, e)}
+                        className="opacity-0 group-hover:opacity-100 transition p-1 text-slate-400 hover:text-rose-600 rounded-md hover:bg-rose-50"
+                        title="Remove from recently viewed"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Image */}
+                    <div className="aspect-square rounded-xl overflow-hidden bg-slate-100 relative mb-2.5">
+                      <img
+                        src={product.featuredImage}
+                        alt={product.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      {product.onSale && (
+                        <span className="absolute top-1.5 left-1.5 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-xs">
+                          {product.discountPercentage}% OFF
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Meta */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1 text-[10px]">
+                        <span className="text-rose-700 font-bold truncate">{product.category}</span>
+                        <span className="text-slate-400 shrink-0 font-medium">{product.ageLabel}</span>
+                      </div>
+                      <h4 className="font-bold text-xs text-slate-900 line-clamp-2 leading-snug group-hover:text-rose-700 transition">
+                        {product.name}
+                      </h4>
+                      <div className="flex items-center gap-1 text-amber-500 text-[10px]">
+                        <Star className="w-3 h-3 fill-amber-500" />
+                        <span className="font-bold text-slate-800">{product.rating}</span>
+                        <span className="text-slate-400 font-normal">({product.reviewCount})</span>
+                      </div>
+                    </div>
+
+                    {/* Price & Action */}
+                    <div className="pt-2.5 mt-2.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                      <div>
+                        <div className="font-black text-xs sm:text-sm text-slate-900 font-mono">
+                          ₹{product.price.toLocaleString('en-IN')}
+                        </div>
+                        {product.regularPrice > product.price && (
+                          <div className="text-[10px] text-slate-400 line-through font-mono">
+                            ₹{product.regularPrice.toLocaleString('en-IN')}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleWishlist(product.id);
+                          }}
+                          className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                            isWishlisted
+                              ? 'bg-rose-50 border-rose-200 text-rose-600'
+                              : 'border-slate-200 hover:bg-slate-50 text-slate-400'
+                          }`}
+                          title={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                        >
+                          <Heart className={`w-3.5 h-3.5 ${isWishlisted ? 'fill-rose-600' : ''}`} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddToCart(product, 1, {}, true);
+                          }}
+                          className="p-1.5 sm:px-2.5 sm:py-1.5 bg-slate-900 hover:bg-rose-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95"
+                          title="Add to Cart"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Add</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
     )}
 
@@ -2412,6 +2749,62 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   ))}
                 </div>
               </div>
+
+              {/* Recently Viewed Products in Detail Modal */}
+              {recentlyViewedProducts.filter(p => p.id !== selectedProduct.id).length > 0 && (
+                <div className="border-t border-slate-200 pt-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-rose-600" />
+                      <h4 className="font-black text-xs sm:text-sm text-slate-900 uppercase tracking-wide">
+                        Recently Viewed While Browsing
+                      </h4>
+                    </div>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Click to compare with other items
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {recentlyViewedProducts
+                      .filter(p => p.id !== selectedProduct.id)
+                      .slice(0, 4)
+                      .map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => handleOpenProduct(p)}
+                          className="group p-2.5 rounded-xl border border-slate-200 hover:border-rose-400 hover:shadow-xs bg-slate-50/50 hover:bg-white transition cursor-pointer flex flex-col justify-between"
+                        >
+                          <div className="aspect-square rounded-lg overflow-hidden bg-white border border-slate-100 mb-2">
+                            <img
+                              src={p.featuredImage}
+                              alt={p.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[9px] font-bold text-rose-700 uppercase block truncate">
+                              {p.ageLabel}
+                            </span>
+                            <h5 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-rose-700 transition">
+                              {p.name}
+                            </h5>
+                            <div className="flex items-baseline gap-1.5 mt-1 font-mono">
+                              <span className="text-xs font-black text-slate-900">
+                                ₹{p.price.toLocaleString('en-IN')}
+                              </span>
+                              {p.regularPrice > p.price && (
+                                <span className="text-[10px] text-slate-400 line-through">
+                                  ₹{p.regularPrice.toLocaleString('en-IN')}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2653,6 +3046,35 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   <span>Payment</span>
                 </div>
               </div>
+            )}
+
+            {/* Distributed Inventory Locking Status Banner */}
+            {checkoutStep < 4 && (
+              <>
+                {inventoryLockError ? (
+                  <div className="bg-rose-50 border-b border-rose-200 px-6 py-2.5 flex items-center justify-between text-xs text-rose-900 font-bold animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                      <span>{inventoryLockError}</span>
+                    </div>
+                  </div>
+                ) : isAcquiringLock ? (
+                  <div className="bg-slate-50 border-b border-slate-200 px-6 py-2 flex items-center gap-2 text-xs text-slate-600 font-bold">
+                    <Clock className="w-3.5 h-3.5 animate-spin text-slate-500 shrink-0" />
+                    <span>Verifying and securing inventory lease...</span>
+                  </div>
+                ) : inventoryLockToken ? (
+                  <div className="bg-emerald-50/80 border-b border-emerald-200 px-6 py-2 flex items-center justify-between text-xs text-emerald-900 animate-fadeIn">
+                    <div className="flex items-center gap-2 font-bold">
+                      <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                      <span>Inventory Reserved: {Math.floor(lockSecondsRemaining / 60)}:{(lockSecondsRemaining % 60).toString().padStart(2, '0')} mins</span>
+                    </div>
+                    <span className="text-[11px] text-emerald-700/90 font-medium hidden sm:inline">
+                      Locked exclusively to prevent overselling
+                    </span>
+                  </div>
+                ) : null}
+              </>
             )}
 
             {/* Checkout Body Steps */}
@@ -3096,6 +3518,51 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           order={viewInvoiceOrder}
           onClose={() => setViewInvoiceOrder(null)}
         />
+      )}
+
+      {/* ========================================================================= */}
+      {/* ADMIN 45-DAY PRODUCT SEARCH TELEMETRY MODAL                               */}
+      {/* ========================================================================= */}
+      {showAdminSearchLogsModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-6 animate-fadeIn">
+          <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 p-5 sm:p-6 space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-black">
+                  <Search className="w-4 h-4" />
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-slate-900 flex items-center gap-2">
+                    <span>45-Day Product Search Telemetry</span>
+                    <span className="bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-mono font-bold px-2 py-0.5 rounded-full uppercase">
+                      Admin Access
+                    </span>
+                  </h2>
+                  <p className="text-xs text-slate-500 font-medium">
+                    View all products searched by users across the ecosystem with a rolling 45-day retention window
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAdminSearchLogsModal(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <AdminProductSearchesDesk
+              onOpenProductDetail={(prodId) => {
+                const p = products.find(prod => prod.id === prodId);
+                if (p) {
+                  setShowAdminSearchLogsModal(false);
+                  handleOpenProduct(p);
+                }
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

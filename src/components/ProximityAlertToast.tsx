@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { MapPin, Sparkles, X, ArrowRight, UserPlus, Calendar, Radio } from 'lucide-react';
+import { MapPin, Sparkles, X, ArrowRight, UserPlus, Calendar, Radio, ShieldCheck } from 'lucide-react';
+import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 
 export interface ProximityAlert {
   id: string;
@@ -204,10 +205,19 @@ function ProximityAlertItem({
             {alert.subtitle}
           </p>
           {alert.address && (
-            <p className="text-[10px] text-slate-400 truncate flex items-center gap-1 mt-0.5">
-              <MapPin className="w-2.5 h-2.5 text-slate-500 shrink-0" />
-              <span className="truncate">{alert.address}</span>
-            </p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] text-slate-300 truncate flex items-center gap-1">
+                <MapPin className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                <span className="truncate">
+                  {alert.type === 'playmate' ? `Area: ${getSafeChildAreaName(alert.address)}` : alert.address}
+                </span>
+              </p>
+              {alert.type === 'playmate' && (
+                <span className="text-[8px] text-emerald-300 bg-emerald-950/80 border border-emerald-500/30 px-1 py-0.2 rounded font-mono font-bold shrink-0">
+                  Protected
+                </span>
+              )}
+            </div>
           )}
         </div>
       </div>

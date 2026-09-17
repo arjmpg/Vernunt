@@ -24,6 +24,8 @@ import {
 import { StoreInvoiceModal } from '../store/StoreInvoiceModal.tsx';
 import { AdminCategoriesDesk } from './AdminCategoriesDesk.tsx';
 import { AdminAttributesDesk } from './AdminAttributesDesk.tsx';
+import { AdminProductSearchesDesk } from './AdminProductSearchesDesk.tsx';
+import { AdminCommerceEngineDesk } from './AdminCommerceEngineDesk.tsx';
 
 interface AdminVernuntCommerceDeskProps {
   onRefresh?: () => void;
@@ -31,7 +33,7 @@ interface AdminVernuntCommerceDeskProps {
 
 export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> = () => {
   // Active Sub-Tab
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'categories' | 'attributes' | 'vendors' | 'withdrawals' | 'moderation' | 'settings' | 'coupons' | 'taxes'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'engine_locks' | 'search_analytics' | 'categories' | 'attributes' | 'vendors' | 'withdrawals' | 'moderation' | 'settings' | 'coupons' | 'taxes'>('orders');
 
   // Master State
   const [orders, setOrders] = useState<StoreOrder[]>(getStoredOrders);
@@ -650,6 +652,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
         {[
           { id: 'orders', label: `📦 Orders (${orders.length})` },
           { id: 'products', label: `🧸 Products (${products.length})` },
+          { id: 'engine_locks', label: '⚡ Engine & Inventory Locks' },
+          { id: 'search_analytics', label: '🔍 Product Searches (45 Days)' },
           { id: 'categories', label: `📁 Categories & Kids Food (${categories.length})` },
           { id: 'attributes', label: `🏷️ Attributes & Terms (${attributes.length})` },
           { id: 'vendors', label: `🏪 Dokan Vendors (${vendors.length})` },
@@ -1474,6 +1478,20 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB: COMMERCE ENGINE & DISTRIBUTED INVENTORY LOCKS                     */}
+      {/* ========================================================================= */}
+      {activeTab === 'engine_locks' && (
+        <AdminCommerceEngineDesk />
+      )}
+
+      {/* ========================================================================= */}
+      {/* SUBTAB 9: 45-DAY PRODUCT SEARCH TELEMETRY DESK                           */}
+      {/* ========================================================================= */}
+      {activeTab === 'search_analytics' && (
+        <AdminProductSearchesDesk />
       )}
 
       {/* ========================================================================= */}

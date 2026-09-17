@@ -49,7 +49,7 @@ interface LandingLoginGatewayProps {
     role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer', 
     details?: { phone?: string; email?: string; phoneVerified?: boolean }
   ) => void;
-  onQuickStart: () => void;
+  onQuickStart?: () => void;
   onGoogleSignIn?: () => void;
   onSelectGoogleAccount?: (account: { email: string; displayName: string; photoURL?: string; role?: string }) => void;
   onOpenKnowledgeBase?: (slug?: string) => void;
@@ -1780,15 +1780,6 @@ export default function LandingLoginGateway({
                     <span>{isAuthenticating ? 'Connecting Google Account...' : 'Continue with Google Account'}</span>
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  id="btn-guest-tour-preview"
-                  onClick={() => onQuickStart ? onQuickStart() : undefined}
-                  className="w-full py-2.5 bg-gradient-to-r from-slate-50 to-amber-50/50 hover:from-slate-100 hover:to-amber-100/60 border border-slate-200/80 rounded-2xl text-slate-700 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer transition shadow-2xs hover:shadow-xs active:scale-98"
-                >
-                  <span>👀 Explore Vernunt as Guest (Instant Preview)</span>
-                </button>
 
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500 pt-1">
                   <button

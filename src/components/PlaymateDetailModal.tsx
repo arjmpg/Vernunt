@@ -23,6 +23,8 @@ interface PlaymateDetailModalProps {
   onUnlockPhone?: (targetId: string) => void;
   onNavigateToReferrals?: () => void;
   onBlockProfile?: (partnerId: string) => void;
+  onOpenReviews?: (profile: ChildProfile) => void;
+  onLeaveReview?: (profile: ChildProfile) => void;
 }
 
 export function PlaymateDetailModal({
@@ -44,7 +46,9 @@ export function PlaymateDetailModal({
   currentUserProfile,
   onUnlockPhone,
   onNavigateToReferrals,
-  onBlockProfile
+  onBlockProfile,
+  onOpenReviews,
+  onLeaveReview
 }: PlaymateDetailModalProps) {
   return (
     <div 
@@ -117,6 +121,12 @@ export function PlaymateDetailModal({
             onBlockProfile={(id) => {
               onBlockProfile?.(id);
               onClose();
+            }}
+            onOpenReviews={(p) => {
+              onOpenReviews?.(p);
+            }}
+            onLeaveReview={(p) => {
+              onLeaveReview?.(p);
             }}
           />
         </div>

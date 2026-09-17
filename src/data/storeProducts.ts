@@ -1283,3 +1283,41 @@ export const saveStoredOrders = (orders: StoreOrder[]) => {
   }
 };
 
+export const STORAGE_KEY_RECENTLY_VIEWED = 'vernunt_store_recently_viewed_v1';
+export const MAX_RECENTLY_VIEWED = 5;
+
+// Helper to get Recently Viewed product IDs from storage
+export const getStoredRecentlyViewedIds = (): string[] => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_RECENTLY_VIEWED);
+    if (saved !== null) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((id): id is string => typeof id === 'string').slice(0, MAX_RECENTLY_VIEWED);
+      }
+    }
+    // Default initial demonstration items if user has never visited before
+    const defaultIds = ['prod-stem-01', 'prod-food-01', 'prod-mont-02'];
+    try {
+      localStorage.setItem(STORAGE_KEY_RECENTLY_VIEWED, JSON.stringify(defaultIds));
+    } catch {
+      // ignore
+    }
+    return defaultIds;
+  } catch (err) {
+    console.warn('Failed to load recently viewed from localStorage', err);
+    return ['prod-stem-01', 'prod-food-01', 'prod-mont-02'];
+  }
+};
+
+// Helper to save Recently Viewed product IDs to storage
+export const saveStoredRecentlyViewedIds = (ids: string[]) => {
+  try {
+    const sanitized = ids.filter(id => typeof id === 'string').slice(0, MAX_RECENTLY_VIEWED);
+    localStorage.setItem(STORAGE_KEY_RECENTLY_VIEWED, JSON.stringify(sanitized));
+    window.dispatchEvent(new CustomEvent('vernunt_recently_viewed_updated', { detail: sanitized }));
+  } catch (err) {
+    console.error('Error saving recently viewed:', err);
+  }
+};
+

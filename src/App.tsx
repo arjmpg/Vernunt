@@ -36,6 +36,8 @@ import { VernuntStore } from './components/store/VernuntStore.tsx';
 
 // Modal helpers
 import ReportModal from './components/ReportModal.tsx';
+import { PlaydateReviewModal } from './components/PlaydateReviewModal.tsx';
+import { ProfileReviewsListModal } from './components/ProfileReviewsListModal.tsx';
 import VerificationModal from './components/VerificationModal.tsx';
 import AadhaarVerificationModal from './components/AadhaarVerificationModal.tsx';
 import EmergencySOSModal from './components/EmergencySOSModal.tsx';
@@ -46,12 +48,14 @@ import RoleSelectionModal from './components/RoleSelectionModal.tsx';
 import ChildSafetyComplianceModal from './components/ChildSafetyComplianceModal.tsx';
 import GoogleAccountSelectModal from './components/GoogleAccountSelectModal.tsx';
 import ProximityAlertToast, { ProximityAlert, playSubtleProximityChime } from './components/ProximityAlertToast.tsx';
+import { getSafeChildAreaName } from './utils/childSafetyFilter.ts';
 import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
 import EventOrganizerCheckInStation from './components/events/EventOrganizerCheckInStation.tsx';
 import EventBuyerRegistrationModal from './components/events/EventBuyerRegistrationModal.tsx';
 import { KidStoriesPortal } from './components/stories/KidStoriesPortal.tsx';
 import { WriteKidStoryModal } from './components/stories/WriteKidStoryModal.tsx';
 import { unlockKidStoryLifetimeReferral } from './data/kidStories.ts';
+import { logProductSearch } from './data/productSearchAnalytics.ts';
 import ActivityFeedWidget from './components/ActivityFeedWidget.tsx';
 import SyncOutboxDrawer, { SyncStatusBadge } from './components/SyncOutboxDrawer.tsx';
 import { KannadaVoiceAgentModal } from './components/voice/KannadaVoiceAgentModal.tsx';
@@ -83,6 +87,8 @@ import { AndroidDownloadBanner } from './components/AndroidDownloadBanner.tsx';
 import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
 import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
 import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
+import { RankMathSuiteModal } from './components/seo/RankMathSuiteModal.tsx';
+import { RankMathFloatingBadge } from './components/seo/RankMathFloatingBadge.tsx';
 
 // Icons
 import { 
@@ -234,6 +240,8 @@ export default function App() {
           params.get('story') ||
           params.get('tab') === 'events' ||
           params.get('event') ||
+          window.location.pathname.startsWith('/events') ||
+          window.location.pathname.startsWith('/explore') ||
           window.location.pathname.startsWith('/stories') ||
           window.location.pathname.startsWith('/story')
         ) {
@@ -245,6 +253,7 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
+          window.location.pathname.startsWith('/specialists') ||
           window.location.pathname.startsWith('/portfolio') ||
           window.location.pathname.startsWith('/specialist') ||
           window.location.pathname.startsWith('/doctor')
@@ -273,7 +282,7 @@ export default function App() {
         ) {
           return 'kid_stories';
         }
-        if (params.get('tab') === 'events' || params.get('event')) {
+        if (params.get('tab') === 'events' || params.get('event') || window.location.pathname.startsWith('/events')) {
           return 'events';
         }
         if (
@@ -282,6 +291,7 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
+          window.location.pathname.startsWith('/specialists') ||
           window.location.pathname.startsWith('/portfolio') ||
           window.location.pathname.startsWith('/specialist') ||
           window.location.pathname.startsWith('/doctor')
@@ -354,6 +364,7 @@ export default function App() {
 
   const [isOffline, setIsOffline] = useState<boolean>(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [isOutboxDrawerOpen, setIsOutboxDrawerOpen] = useState<boolean>(false);
+  const [showRankMathModal, setShowRankMathModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -434,13 +445,15 @@ export default function App() {
       const guideSlug = params.get('guide') || params.get('article') || params.get('slug');
       const path = window.location.pathname;
 
-      if (targetTab === 'events' || targetEventId) {
+      if (targetTab === 'events' || targetEventId || path.startsWith('/events')) {
+        setAppMode('dashboard');
         setActiveTab('events');
       } else if (targetTab === 'affiliate') {
         setActiveTab('affiliate');
-      } else if (targetTab === 'specialists') {
+      } else if (targetTab === 'specialists' || path.startsWith('/specialist') || path.startsWith('/doctor')) {
+        setAppMode('dashboard');
         setActiveTab('specialists');
-      } else if (targetTab === 'knowledge' || guideSlug || path.startsWith('/knowledge') || path.startsWith('/guide')) {
+      } else if (targetTab === 'knowledge' || guideSlug || path.startsWith('/knowledge') || path.startsWith('/guide') || path.startsWith('/explore')) {
         let extractedSlug = guideSlug;
         if (!extractedSlug && (path.startsWith('/knowledge/') || path.startsWith('/guide/'))) {
           extractedSlug = path.split('/')[2] || null;
@@ -1374,6 +1387,62 @@ export default function App() {
   const [filterLanguage, setFilterLanguage] = useState<string>('All');
   const [filterSearchQuery, setFilterSearchQuery] = useState<string>('');
   const deferredSearchQuery = React.useDeferredValue(filterSearchQuery);
+
+  // User's recent radar search queries (last 3) with local persistence
+  const [radarRecentSearches, setRadarRecentSearches] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_radar_recent_searches_v1');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, 3);
+      }
+    } catch (_err) {
+      // Ignore localStorage read error
+    }
+    return ['Lego', 'Montessori', 'Soccer'];
+  });
+  const [isRadarSearchFocused, setIsRadarSearchFocused] = useState<boolean>(false);
+
+  const commitRadarSearchQuery = (query: string) => {
+    const q = query.trim();
+    if (!q) return;
+    setRadarRecentSearches(prev => {
+      const next = [q, ...prev.filter(item => item.toLowerCase() !== q.toLowerCase())].slice(0, 3);
+      try {
+        localStorage.setItem('vernunt_radar_recent_searches_v1', JSON.stringify(next));
+      } catch (_err) {
+        // Ignore localStorage write error
+      }
+      return next;
+    });
+    try {
+      logProductSearch(q, 'radar_search', userProfile);
+    } catch (err) {
+      console.warn('Error recording radar search telemetry:', err);
+    }
+  };
+
+  const removeRecentRadarSearch = (queryToRemove: string) => {
+    setRadarRecentSearches(prev => {
+      const next = prev.filter(q => q !== queryToRemove);
+      try {
+        localStorage.setItem('vernunt_radar_recent_searches_v1', JSON.stringify(next));
+      } catch (_err) {
+        // Ignore localStorage write error
+      }
+      return next;
+    });
+  };
+
+  const clearRecentRadarSearches = () => {
+    setRadarRecentSearches([]);
+    try {
+      localStorage.removeItem('vernunt_radar_recent_searches_v1');
+    } catch (_err) {
+      // Ignore localStorage remove error
+    }
+  };
+
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
   
   // Custom precise filters requested by user:
@@ -1728,7 +1797,7 @@ export default function App() {
               avatarEmoji: '🧸',
               timestamp: Date.now(),
               targetId: p.id,
-              address: p.location?.address || 'Immediate neighborhood (< 1 km)'
+              address: getSafeChildAreaName(p.location?.address) || 'Immediate neighborhood (< 1 km)'
             });
           }
         }
@@ -2066,6 +2135,8 @@ export default function App() {
 
   // Modal display toggles
   const [detailModalProfile, setDetailModalProfile] = useState<ChildProfile | null>(null);
+  const [reviewTargetProfile, setReviewTargetProfile] = useState<ChildProfile | null>(null);
+  const [viewReviewsProfile, setViewReviewsProfile] = useState<ChildProfile | null>(null);
   const [activeReportProfile, setActiveReportProfile] = useState<ChildProfile | null>(null);
   const [activeVerifyProfile, setActiveVerifyProfile] = useState<ChildProfile | null>(null);
   const [showSOSModal, setShowSOSModal] = useState(false);
@@ -2819,6 +2890,27 @@ export default function App() {
                 <div className="flex flex-col text-left">
                   <span className="text-[7.5px] font-black text-emerald-700 uppercase tracking-wider leading-none">Safe Kids</span>
                   <span className="text-[11px] font-bold text-emerald-950 leading-tight">COPPA A+</span>
+                </div>
+              </button>
+
+              {/* Rank Math SEO Suite Enterprise Trigger */}
+              <button
+                id="btn-rank-math-seo-suite-top"
+                onClick={() => setShowRankMathModal(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-rose-50 via-indigo-50 to-pink-50 hover:from-rose-100 hover:to-indigo-100 text-slate-800 border border-rose-200/80 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs group"
+                title="Rank Math SEO Suite: Content Analyzer, Schema Generator, SERP Preview & 301 Redirects"
+              >
+                <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-rose-600 to-indigo-600 flex items-center justify-center text-white text-[9px] font-black shadow-xs">
+                  RM
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[7.5px] font-black text-rose-700 uppercase tracking-wider leading-none">Rank Math</span>
+                  <span className="text-[11px] font-bold text-slate-900 leading-tight flex items-center gap-1">
+                    <span>SEO</span>
+                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                      94/100
+                    </span>
+                  </span>
                 </div>
               </button>
 
@@ -3857,9 +3949,83 @@ export default function App() {
                             type="text"
                             value={filterSearchQuery}
                             onChange={(e) => setFilterSearchQuery(e.target.value)}
+                            onFocus={() => setIsRadarSearchFocused(true)}
+                            onBlur={() => {
+                              if (filterSearchQuery.trim()) {
+                                commitRadarSearchQuery(filterSearchQuery);
+                              }
+                              setTimeout(() => setIsRadarSearchFocused(false), 220);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && filterSearchQuery.trim()) {
+                                commitRadarSearchQuery(filterSearchQuery);
+                                setIsRadarSearchFocused(false);
+                              }
+                            }}
                             placeholder="e.g. Ayaan, Lego, Hindi, Soccer, Doctor..."
                             className="w-full pl-9 pr-4 py-2 bg-rose-50/30 border border-rose-200 hover:border-rose-300 rounded-xl text-xs outline-none focus:ring-4 focus:ring-rose-100 focus:border-rose-500 focus:bg-white focus:scale-[1.01] focus:shadow-md transition-all duration-300 ease-out origin-left"
                           />
+
+                          {/* Dropdown showing user's last 3 recent search queries when input is focused */}
+                          {isRadarSearchFocused && radarRecentSearches.length > 0 && (
+                            <div
+                              id="dropdown-radar-recent-searches"
+                              className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl border border-rose-200 shadow-xl py-2 z-50 animate-fadeIn"
+                              onMouseDown={(e) => e.preventDefault()}
+                            >
+                              <div className="flex items-center justify-between px-3.5 py-1 text-[10px] font-black uppercase text-rose-900/80 border-b border-rose-100 pb-1.5 mb-1 tracking-wider">
+                                <span className="flex items-center gap-1.5">
+                                  <Clock className="w-3.5 h-3.5 text-rose-600" /> Recent Searches (Last 3)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={clearRecentRadarSearches}
+                                  className="text-[10px] font-bold text-slate-400 hover:text-rose-700 transition cursor-pointer"
+                                >
+                                  Clear All
+                                </button>
+                              </div>
+
+                              <div className="divide-y divide-rose-50/80">
+                                {radarRecentSearches.slice(0, 3).map((query, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="px-3.5 py-2 hover:bg-rose-50 transition flex items-center justify-between group/item cursor-pointer"
+                                    onClick={() => {
+                                      setFilterSearchQuery(query);
+                                      commitRadarSearchQuery(query);
+                                      setIsRadarSearchFocused(false);
+                                    }}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-5 h-5 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                                        <Clock className="w-3 h-3 text-rose-600" />
+                                      </div>
+                                      <span className="text-xs font-bold text-slate-800 group-hover/item:text-rose-950 truncate">
+                                        {query}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md opacity-0 group-hover/item:opacity-100 transition">
+                                        Search
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          removeRecentRadarSearch(query);
+                                        }}
+                                        className="p-1 rounded-md text-slate-300 hover:text-rose-600 hover:bg-rose-100 transition cursor-pointer"
+                                        title="Remove query from recent"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -4731,6 +4897,8 @@ export default function App() {
                       onUnlockPhone={handleUnlockPhoneByCredit}
                       onNavigateToReferrals={() => setActiveTab('referrals')}
                       onBlockProfile={handleBlockParent}
+                      onOpenReviews={(p) => setViewReviewsProfile(p)}
+                      onLeaveReview={(p) => setReviewTargetProfile(p)}
                     />
                   ) : (
                     <div className="bg-white rounded-3xl p-8 border border-dashed border-slate-200 text-center text-slate-400 h-full flex flex-col items-center justify-center space-y-3">
@@ -5504,6 +5672,32 @@ export default function App() {
           onUnlockPhone={handleUnlockPhoneByCredit}
           onNavigateToReferrals={() => setActiveTab('referrals')}
           onBlockProfile={handleBlockParent}
+          onOpenReviews={(p) => setViewReviewsProfile(p)}
+          onLeaveReview={(p) => setReviewTargetProfile(p)}
+        />
+      )}
+
+      {viewReviewsProfile && (
+        <ProfileReviewsListModal
+          targetProfile={viewReviewsProfile}
+          currentUserProfile={userProfile}
+          onClose={() => setViewReviewsProfile(null)}
+          onOpenLeaveReview={() => {
+            const p = viewReviewsProfile;
+            setViewReviewsProfile(null);
+            setReviewTargetProfile(p);
+          }}
+        />
+      )}
+
+      {reviewTargetProfile && (
+        <PlaydateReviewModal
+          targetProfile={reviewTargetProfile}
+          currentUserProfile={userProfile}
+          onClose={() => setReviewTargetProfile(null)}
+          onReviewSubmitted={() => {
+            setReviewTargetProfile(null);
+          }}
         />
       )}
 
@@ -6275,6 +6469,14 @@ export default function App() {
           setActiveTab(tab as any);
         }}
       />
+
+      {/* Rank Math SEO Suite Modal */}
+      {showRankMathModal && (
+        <RankMathSuiteModal
+          isOpen={showRankMathModal}
+          onClose={() => setShowRankMathModal(false)}
+        />
+      )}
 
     </div>
   );

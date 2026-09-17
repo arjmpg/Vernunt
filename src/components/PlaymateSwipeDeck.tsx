@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { ChildProfile } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
+import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 import { 
   Heart, 
   X, 
@@ -423,12 +424,17 @@ export function PlaymateSwipeDeck({
                     <span>Kid: {currentProfile.childAge} yrs ({currentProfile.gradeLevel})</span>
                   </p>
 
-                  {/* Location Address / Area */}
+                  {/* Location Address / Area (Child Safe) */}
                   {currentProfile.location?.address && (
-                    <p className="text-xs text-white/70 flex items-center gap-1 mt-0.5">
-                      <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
-                      <span className="truncate">{currentProfile.location.address}</span>
-                    </p>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <p className="text-xs text-white/80 flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-rose-400 shrink-0" />
+                        <span className="truncate">Area: {getSafeChildAreaName(currentProfile.location.address)}</span>
+                      </p>
+                      <span className="text-[9px] text-emerald-300 font-bold bg-emerald-950/70 border border-emerald-500/40 px-1.5 py-0.2 rounded-md uppercase tracking-wider">
+                        Protected
+                      </span>
+                    </div>
                   )}
                 </div>
 

@@ -140,6 +140,8 @@ export interface ChildProfile {
 
   criminalRecordChecked?: boolean;
   positiveReviewsCount?: number;
+  averageRating?: number;
+  reviewsCount?: number;
   attendedEventsCount?: number;
   checkedInEvents?: string[];
   availableDays?: string[];
@@ -974,5 +976,37 @@ export interface BabyMilestone {
   redFlags?: string;
   parentTips?: string;
 }
+
+export interface PlaydateReview {
+  id: string;
+  targetProfileId: string; // The family or child profile receiving the review
+  targetChildName: string;
+  targetParentName: string;
+  reviewerProfileId: string; // The parent authoring the feedback
+  reviewerParentName: string;
+  reviewerChildName?: string;
+  reviewerPhotoUrl?: string;
+  reviewerAadhaarVerified?: boolean;
+  playdateId?: string; // ID of the referenced playdate schedule
+  playdateTitle?: string;
+  rating: number; // 1 to 5 stars
+  reviewText: string;
+  experienceTags?: string[]; // e.g. ["Kind & Sharing", "Punctual", "Super Clean Space", "Great Communicator"]
+  childInteractionRating?: number; // 1 to 5 stars
+  parentHospitalityRating?: number; // 1 to 5 stars
+  safetyRating?: number; // 1 to 5 stars
+  status: 'approved' | 'pending' | 'flagged' | 'rejected';
+  flagReason?: string; // e.g., 'Retaliatory 1-Star Detection', 'Language Scan Alert', 'Parent Reported'
+  moderationNotes?: string;
+  moderatedAt?: string;
+  moderatedBy?: string;
+  createdAt: string;
+  verifiedPlaydate: boolean;
+  helpfulCount?: number;
+  helpfulVoters?: string[];
+  reportedBy?: string[];
+  reportReason?: string;
+}
+
 
 

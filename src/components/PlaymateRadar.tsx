@@ -10,9 +10,11 @@ import {
   Crosshair, 
   Radio,
   Eye,
-  Info
+  Info,
+  ShieldCheck
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
+import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 
 interface PlaymateRadarProps {
   playmates: ChildProfile[];
@@ -361,8 +363,9 @@ export default function PlaymateRadar({
                 </div>
 
                 {/* Dynamic tag hint */}
-                <div className="absolute bottom-11 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-slate-700/80 text-white text-[10px] py-1 px-2.5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-xl flex flex-col items-center gap-0.5 whitespace-nowrap z-30">
-                  <span className="font-bold text-orange-400">{p.childName} ({p.gradeLevel})</span>
+                <div className="absolute bottom-11 left-1/2 -translate-x-1/2 bg-slate-900/95 border border-slate-700/80 text-white text-[10px] py-1.5 px-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none shadow-xl flex flex-col items-center gap-1 whitespace-nowrap z-30">
+                  <span className="font-bold text-orange-400">{p.childName} ({p.gradeLevel || `${p.childAge}y`})</span>
+                  <span className="text-[9px] text-emerald-300 font-mono">Area: {getSafeChildAreaName(p.location?.address)}</span>
                   <span className={`text-[8.5px] font-mono px-1.5 py-0.5 rounded font-black uppercase ${proxBadge.badgeOverlayClass}`}>{distLabel}</span>
                 </div>
               </button>
@@ -420,6 +423,19 @@ export default function PlaymateRadar({
           <span className="block text-orange-600 font-bold font-serif text-sm">{zoomLevel.toFixed(1)}x</span>
           <span className="text-[11px]">Proximity Scale</span>
         </div>
+      </div>
+
+      {/* Child Safety Protected Location Tag */}
+      <div id="radar-child-safety-banner" className="w-full mt-3 p-2.5 bg-emerald-50 border border-emerald-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-emerald-950">
+        <div className="flex items-center gap-2">
+          <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+          <span className="font-semibold text-[11px]">
+            Child Safety Protected: Displays relative proximity &amp; neighborhood area names only.
+          </span>
+        </div>
+        <span className="text-[9px] uppercase font-black tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-0.5 rounded-full shrink-0">
+          Area Only • GPS Hidden
+        </span>
       </div>
 
     </div>

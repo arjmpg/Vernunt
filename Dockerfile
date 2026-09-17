@@ -20,7 +20,7 @@ FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
 # Copy package files and install production dependencies only
 COPY package.json ./

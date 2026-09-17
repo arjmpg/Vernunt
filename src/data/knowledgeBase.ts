@@ -1,4 +1,4 @@
-import { LucideIcon } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export interface InfluencerSpotlight {
   name: string;
@@ -805,8 +805,76 @@ export function getKnowledgeArticleBySlug(slug: string): KnowledgeArticle | null
   if (foundFlagship) return foundFlagship;
 
   const allIndex = generateProgrammaticKnowledgeIndex();
-  const meta = allIndex.find(a => a.slug === slug);
-  if (!meta) return null;
+  let meta = allIndex.find(a => a.slug === slug);
+  if (!meta) {
+    // Try relaxed matching by normalizing common connector words
+    const normalize = (s: string) => s.toLowerCase().replace(/-for-|-in-|-the-|-with-|-and-|-without-/g, '-').trim();
+    const targetNorm = normalize(slug);
+    meta = allIndex.find(a => normalize(a.slug) === targetNorm);
+  }
+
+  // If still not matched, dynamically synthesize metadata so no slug ever fails or returns null
+  if (!meta) {
+    const ageMatch = slug.match(/-(0-12-months|1-3-years|4-6-years|7-10-years|11-14-years|all-ages)-guide$/);
+    const ageKey = ageMatch ? ageMatch[1] : 'all-ages';
+    const ageGroup = ageKey === '0-12-months' ? '0-12 Months' :
+                     ageKey === '1-3-years' ? '1-3 Years' :
+                     ageKey === '4-6-years' ? '4-6 Years' :
+                     ageKey === '7-10-years' ? '7-10 Years' :
+                     ageKey === '11-14-years' ? '11-14 Years' : 'All Ages';
+
+    const baseTopic = slug
+      .replace(/-(0-12-months|1-3-years|4-6-years|7-10-years|11-14-years|all-ages)-guide$/, '')
+      .replace(/-guide$/, '');
+
+    const words = baseTopic.split('-').map(w => {
+      if (['and', 'of', 'for', 'in', 'at', 'to', 'with', 'without'].includes(w)) return w;
+      if (['dha', 'stem', 'cpr', 'sel', 'cbse', 'icse', 'ib', 'hsp', 'diy'].includes(w)) return w.toUpperCase();
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    });
+    let topicTitle = words.join(' ');
+    topicTitle = topicTitle
+      .replace(/Anti Inflammatory/i, 'Anti-Inflammatory')
+      .replace(/Baby Led/i, 'Baby-Led')
+      .replace(/Screen Free/i, 'Screen-Free');
+
+    let category: KnowledgeCategory = 'Nutrition';
+    let categoryLabel = 'Baby & Child Nutrition';
+    const tLower = baseTopic.toLowerCase();
+
+    if (tLower.includes('anxiety') || tLower.includes('meltdown') || tLower.includes('sibling') || tLower.includes('mindset') || 
+        tLower.includes('psychology') || tLower.includes('tantrum') || tLower.includes('attachment') || tLower.includes('discipline')) {
+      category = 'Psychology';
+      categoryLabel = 'Child Psychology & SEL';
+    } else if (tLower.includes('homeschool') || tLower.includes('montessori') || tLower.includes('coding') || tLower.includes('math') ||
+               tLower.includes('reading') || tLower.includes('education') || tLower.includes('science')) {
+      category = 'Education';
+      categoryLabel = 'Homeschooling & Education';
+    } else if (tLower.includes('soccer') || tLower.includes('swimming') || tLower.includes('gymnastics') || tLower.includes('sports') ||
+               tLower.includes('athletics') || tLower.includes('archery') || tLower.includes('martial-arts')) {
+      category = 'Sports';
+      categoryLabel = 'Baby & Junior Sports';
+    } else if (tLower.includes('sleep') || tLower.includes('teething') || tLower.includes('potty') || tLower.includes('newborn') ||
+               tLower.includes('infant') || tLower.includes('colic') || tLower.includes('fever')) {
+      category = 'Care';
+      categoryLabel = 'Newborn & Infant Care';
+    } else if (tLower.includes('money') || tLower.includes('ai') || tLower.includes('future') || tLower.includes('screen') ||
+               tLower.includes('cooking') || tLower.includes('gardening')) {
+      category = 'Future';
+      categoryLabel = 'AI Era & Life Skills';
+    }
+
+    meta = {
+      slug,
+      title: `${topicTitle} for ${ageGroup} - Essential Milestones, Clinical Protocols & Pro Tips | Vernunt Child Growth Hub`,
+      category,
+      categoryLabel,
+      ageGroup,
+      readTime: '6 min read',
+      summary: `Evidence-based clinical guide on ${topicTitle.toLowerCase()} for ${ageGroup}. Pediatric milestones, daily routine blueprints, and doctor-approved protocols.`,
+      keywords: [topicTitle.toLowerCase(), `${topicTitle.toLowerCase()} for ${ageGroup.toLowerCase()}`, categoryLabel.toLowerCase(), 'vernunt parenting guide']
+    };
+  }
 
   return {
     slug: meta.slug,

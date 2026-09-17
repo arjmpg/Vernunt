@@ -45,9 +45,12 @@ import VernuntLogo from './VernuntLogo.tsx';
 import VernuntSeoSuite from './VernuntSeoSuite.tsx';
 import AdminTicketingCommissionDesk from './admin/AdminTicketingCommissionDesk.tsx';
 import { AdminVernuntCommerceDesk } from './admin/AdminVernuntCommerceDesk.tsx';
+import { AdminProductSearchesDesk } from './admin/AdminProductSearchesDesk.tsx';
+import { AdminCommerceEngineDesk } from './admin/AdminCommerceEngineDesk.tsx';
 import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.tsx';
 import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
+import { AdminReviewModerationDesk } from './admin/AdminReviewModerationDesk.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -79,8 +82,8 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'reviews-moderation' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -1519,6 +1522,28 @@ export default function AdminDashboard({
               )}
             </button>
 
+            {/* MENU ITEM: Playdate Review & Abuse Moderation */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('reviews-moderation'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'reviews-moderation'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Playdate Reviews & Abuse Shield Moderation"
+            >
+              <div className="flex items-center gap-2.5">
+                <Star className="w-4 h-4 shrink-0 text-amber-400 fill-amber-400" />
+                {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Review Moderation</span>}
+              </div>
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-xs">
+                  Abuse Shield
+                </span>
+              )}
+            </button>
+
             {/* MENU ITEM: Events & Classes */}
             <button
               type="button"
@@ -1554,6 +1579,36 @@ export default function AdminDashboard({
             >
               <ShoppingCart className="w-4 h-4 shrink-0 text-[#96588a]" />
               {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Commerce & Passes</span>}
+            </button>
+
+            {/* MENU ITEM: Core Engine & Inventory Locks */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('commerce-engine'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'commerce-engine'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Core Engine, Search Index & Distributed Locks"
+            >
+              <Zap className="w-4 h-4 shrink-0 text-amber-400" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Core Engine & Locks</span>}
+            </button>
+
+            {/* MENU ITEM: 45-Day Product Searches Telemetry */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('product-searches'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'product-searches'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="45-Day User Product Searches"
+            >
+              <Search className="w-4 h-4 shrink-0 text-amber-300" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Product Searches (45d)</span>}
             </button>
 
             {/* MENU ITEM: Affiliates & Partners */}
@@ -3126,10 +3181,37 @@ export default function AdminDashboard({
           )}
 
           {/* ========================================================================= */}
+          {/* VIEW: REVIEWS & COMMUNITY ABUSE MODERATION CONSOLE                        */}
+          {/* ========================================================================= */}
+          {activeMenu === 'reviews-moderation' && (
+            <div className="space-y-5 animate-fadeIn">
+              <AdminReviewModerationDesk />
+            </div>
+          )}
+
+          {/* ========================================================================= */}
           {/* VIEW D: VERNUNT COMMERCE & STORE INVENTORY DESK                           */}
           {/* ========================================================================= */}
           {activeMenu === 'woocommerce' && (
             <AdminVernuntCommerceDesk />
+          )}
+
+          {/* ========================================================================= */}
+          {/* VIEW D1.5: CORE COMMERCE ENGINE, SEARCH INDEX & INVENTORY LOCKS          */}
+          {/* ========================================================================= */}
+          {activeMenu === 'commerce-engine' && (
+            <div className="space-y-4 animate-fadeIn">
+              <AdminCommerceEngineDesk />
+            </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* VIEW D2: 45-DAY USER PRODUCT SEARCHES TELEMETRY DESK                     */}
+          {/* ========================================================================= */}
+          {activeMenu === 'product-searches' && (
+            <div className="space-y-4 animate-fadeIn">
+              <AdminProductSearchesDesk />
+            </div>
           )}
 
           {/* ========================================================================= */}

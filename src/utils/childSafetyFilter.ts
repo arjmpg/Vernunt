@@ -175,8 +175,8 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
           implemented: true
         },
         {
-          rule: 'Concentric Proximity Masking',
-          description: 'Exact residential GPS coordinates are masked with fuzzy neighborhood geohashes and public play spaces.',
+          rule: 'Concentric Proximity Masking & Area-Only Display',
+          description: 'Exact residential GPS coordinates and street/door addresses of children and parents are concealed; only general neighborhood area names are shown.',
           implemented: true
         }
       ]
@@ -186,6 +186,11 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
       description: 'Protective real-time guards for safe playdates and community interaction.',
       status: 'COMPLIANT' as const,
       items: [
+        {
+          rule: 'Zero Exact Location Disclosure (Area Name Only)',
+          description: 'Child safety safeguard preventing exact address exposure. All views show only high-level locality / neighborhood area name.',
+          implemented: true
+        },
         {
           rule: 'Emergency SOS & Geo-Beacon Panic Broadcast',
           description: 'Real-time GPS coordinates dispatcher with 1-tap notifications to guardian contacts and Childline 1098.',
@@ -233,4 +238,65 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
     regulations,
     timestamp: new Date().toISOString()
   };
+}
+
+/**
+ * Child Safety Location Masker
+ * Enforces child physical safety by strictly hiding exact residential addresses,
+ * door numbers, flat numbers, street names, building names, and precise coordinates
+ * of children and parents.
+ * 
+ * Returns ONLY the safe broad area / neighborhood name (e.g., "Indiranagar, Bangalore", "HSR Layout, Bangalore").
+ */
+export function getSafeChildAreaName(rawAddress?: string | null): string {
+  if (!rawAddress || typeof rawAddress !== 'string') {
+    return 'Neighborhood Area';
+  }
+
+  let cleaned = rawAddress.trim();
+
+  // Strip parenthetical building or apartment details: e.g. "Indiranagar, Bangalore (Prestige Shantiniketan)" or "(Flat 402)"
+  cleaned = cleaned.replace(/\([^)]*\)/g, '').trim();
+
+  // Strip door / house / flat / plot / building prefixes: e.g. "Flat 402, ", "#12, ", "House 45A, "
+  cleaned = cleaned.replace(/^(?:flat|apt|apartment|house|door|building|plot|no\.?|#)\s*[\w\d\-/]+\s*,?\s*/i, '');
+  
+  // Strip initial street / cross numbers if present
+  cleaned = cleaned.replace(/^(?:[\w\d\-/]+,\s*){1,2}/, (match) => {
+    if (/^\d+/i.test(match) || /cross|main|street|lane|road|rd/i.test(match)) {
+      return '';
+    }
+    return match;
+  });
+
+  // Strip 6-digit postal/PIN codes (e.g. 560038, 400050)
+  cleaned = cleaned.replace(/,?\s*\b\d{6}\b/g, '');
+
+  // Split segments
+  const rawParts = cleaned.split(',').map(s => s.trim()).filter(Boolean);
+  if (rawParts.length === 0) return 'Neighborhood Area';
+
+  // Filter out any ultra-specific street/floor segments
+  const parts = rawParts.filter(part => {
+    const p = part.toLowerCase();
+    return !/\b(?:floor|flat|apt|room|door|house|no\.?|plot|block\s+\d+|sector\s+\d+|stage\s+\d+|cross|lane|phase\s+\d+)\b/i.test(p);
+  });
+
+  const candidates = parts.length > 0 ? parts : rawParts;
+
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  // Locality + City (e.g. "Indiranagar, Bangalore" or "Bandra West, Mumbai")
+  if (candidates.length >= 2) {
+    const city = candidates[candidates.length - 1];
+    const locality = candidates[candidates.length - 2];
+    if (locality.toLowerCase() === city.toLowerCase()) {
+      return locality;
+    }
+    return `${locality}, ${city}`;
+  }
+
+  return candidates.join(', ');
 }

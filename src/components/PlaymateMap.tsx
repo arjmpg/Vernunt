@@ -5,9 +5,10 @@ import {
   Users, X, Check, ExternalLink, BookOpen, Trophy, 
   Palette, Layers, Share2, Zap, RotateCcw, 
   Maximize2, Minimize2, Eye, EyeOff, Filter, Activity, Flame,
-  ZoomIn, ZoomOut
+  ZoomIn, ZoomOut, ShieldCheck
 } from 'lucide-react';
 import { getHaversineDistance } from '../utils/distance.ts';
+import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 
 interface PlaymateMapProps {
   playmates: ChildProfile[];
@@ -63,7 +64,7 @@ export default function PlaymateMap({
   onToggleJoinEvent,
   onNavigateToEventsTab
 }: PlaymateMapProps) {
-  const ourNeighborhood = userProfile?.location?.address || 'Bangalore, Karnataka, India';
+  const ourNeighborhood = getSafeChildAreaName(userProfile?.location?.address) || 'Bangalore, Karnataka';
   const centerLat = userProfile?.location?.lat || 12.9716;
   const centerLng = userProfile?.location?.lng || 77.5946;
 
@@ -371,8 +372,12 @@ export default function PlaymateMap({
               </span>
             )}
           </div>
-          <p id="map-subtitle" className="text-xs text-slate-500 mt-0.5">
-            Real-time clustering & high-density event overlay around <strong className="text-slate-700">{ourNeighborhood}</strong> ({maxDistanceKm} km radius)
+          <p id="map-subtitle" className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+            <span>Broad area overlay around <strong className="text-slate-700">{ourNeighborhood}</strong> ({maxDistanceKm} km radius)</span>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold rounded-md">
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              Child Safety: Area Only • Exact Locations Hidden
+            </span>
           </p>
         </div>
 
@@ -572,12 +577,15 @@ export default function PlaymateMap({
 
           {/* User Location Center Marker */}
           <div id="user-location-marker" className="absolute z-20 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
-            <div id="user-location-pin" className="p-2 bg-slate-900 border-2 border-white rounded-full shadow-lg scale-105 animate-bounce">
-              <MapPin id="user-pin" className="w-5 h-5 text-orange-500" />
+            <div id="user-location-pin" className="p-2 bg-slate-900 border-2 border-emerald-400 rounded-full shadow-lg scale-105 animate-bounce">
+              <MapPin id="user-pin" className="w-5 h-5 text-emerald-400" />
             </div>
-            <span id="user-location-lbl" className="bg-slate-900 text-white text-[9px] px-2 py-0.5 rounded-lg mt-1 font-bold shadow-lg whitespace-nowrap">
-              YOU (Family Base)
-            </span>
+            <div id="user-location-lbl" className="bg-slate-950/95 text-white text-[9px] px-2.5 py-1 rounded-xl mt-1 font-bold shadow-lg whitespace-nowrap border border-slate-700 flex flex-col items-center gap-0.5">
+              <span>YOU: {ourNeighborhood}</span>
+              <span className="text-[7.5px] text-emerald-400 uppercase font-mono font-bold flex items-center gap-0.5">
+                <ShieldCheck className="w-2.5 h-2.5 text-emerald-400" /> Area Only (Protected)
+              </span>
+            </div>
           </div>
 
         {/* SVG Connector Lines for Spiderfied Clusters */}
@@ -902,8 +910,7 @@ export default function PlaymateMap({
               p.location?.lng || centerLng
             );
             const distLabel = rawDistKm > 1000 ? "Nearby" : `${rawDistKm.toFixed(1)} km away`;
-            const destinationStr = encodeURIComponent(p.location?.address || `${p.location?.lat},${p.location?.lng}`);
-            const mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${centerLat},${centerLng}&destination=${destinationStr}`;
+            const safeAreaName = getSafeChildAreaName(p.location?.address);
 
             return (
               <div
@@ -921,28 +928,22 @@ export default function PlaymateMap({
                     <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                     <span className="font-extrabold">{p.childName} ({p.childAge}y) • {distLabel}</span>
                   </div>
-                  {p.location?.address && (
-                    <p className="text-[8.5px] text-slate-300 max-w-[150px] truncate leading-normal italic text-left">
-                      {p.location.address}
-                    </p>
-                  )}
-                  <div className="flex items-center gap-1 pt-0.5">
+                  <div className="flex items-center gap-1 bg-slate-900/90 border border-slate-800 px-2 py-1 rounded-lg">
+                    <span className="text-[8.5px] text-emerald-300 font-semibold truncate max-w-[170px]">
+                      Area: {safeAreaName}
+                    </span>
+                    <span className="text-[7.5px] text-emerald-400 bg-emerald-950 px-1 py-0.2 rounded font-mono font-bold shrink-0">
+                      Protected
+                    </span>
+                  </div>
+                  <div className="pt-0.5">
                     <button
                       type="button"
                       onClick={() => onSelectPlaymate(p)}
-                      className="bg-rose-600 hover:bg-rose-700 text-white px-2 py-0.5 rounded-md font-bold text-[9px] uppercase cursor-pointer"
+                      className="w-full bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded-lg font-bold text-[9px] uppercase tracking-wider cursor-pointer text-center flex items-center justify-center gap-1"
                     >
-                      View Profile
+                      <span>View Verified Profile</span>
                     </button>
-                    <a
-                      id={`directions-btn-${p.id}`}
-                      href={mapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-2 py-0.5 rounded-md font-bold text-[9px] uppercase tracking-wider text-center flex items-center justify-center gap-0.5 transition cursor-pointer"
-                    >
-                      Directions ↗
-                    </a>
                   </div>
                 </div>
 
