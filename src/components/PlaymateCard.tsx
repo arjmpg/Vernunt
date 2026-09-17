@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
 import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
-import { getAverageRatingForProfile, subscribeToReviews } from '../services/reviewService.ts';
 
 export function formatLastActive(timestamp?: string): string {
   if (!timestamp) return 'Recently active';
@@ -184,8 +183,6 @@ interface PlaymateCardProps {
   onUnlockPhone?: (targetProfileId: string) => void;
   onNavigateToReferrals?: () => void;
   onBlockProfile?: (id: string) => void;
-  onOpenReviews?: (profile: ChildProfile) => void;
-  onLeaveReview?: (profile: ChildProfile) => void;
 }
 
 export default function PlaymateCard({ 
@@ -206,21 +203,10 @@ export default function PlaymateCard({
   currentUserProfile = null,
   onUnlockPhone,
   onNavigateToReferrals,
-  onBlockProfile,
-  onOpenReviews,
-  onLeaveReview
+  onBlockProfile
 }: PlaymateCardProps) {
   const [liked, setLiked] = useState(isInterestSent || isConnected);
   const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
-  const [ratingStats, setRatingStats] = useState(() => getAverageRatingForProfile(profile.id));
-
-  useEffect(() => {
-    setRatingStats(getAverageRatingForProfile(profile.id));
-    const unsub = subscribeToReviews(() => {
-      setRatingStats(getAverageRatingForProfile(profile.id));
-    });
-    return () => unsub();
-  }, [profile.id]);
 
   const isViewerKycVerified = currentUserProfile?.userRole === 'Admin' || (currentUserProfile?.verificationStatus === VerificationStatus.VERIFIED && !!currentUserProfile?.aadhaarVerified);
   const isParentPhotoUnlocked = isConnected || isViewerKycVerified;
@@ -517,58 +503,6 @@ export default function PlaymateCard({
             <p id="child-id-grade" className="text-xs font-semibold text-slate-600 mt-0.5">
               {profile.gradeLevel ? `${profile.gradeLevel} • ` : ''}{profile.childAge} {profile.ageUnit === 'months' ? 'months' : 'yrs'} old
             </p>
-
-            {/* Playdate Rating & Reviews Badge */}
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              {ratingStats.totalReviews > 0 ? (
-                <button
-                  id={`btn-open-reviews-score-${profile.id}`}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenReviews && onOpenReviews(profile);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-amber-50/90 hover:bg-amber-100 text-amber-900 border border-amber-200/80 transition-all cursor-pointer text-xs font-bold shadow-2xs group"
-                  title="Click to view verified playdate ratings and reviews"
-                >
-                  <div className="flex items-center text-amber-500">
-                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 group-hover:scale-110 transition-transform" />
-                  </div>
-                  <span className="font-extrabold text-slate-900 font-mono text-xs">
-                    {ratingStats.averageRating.toFixed(1)}
-                  </span>
-                  <span className="text-[10px] text-slate-500 font-medium">
-                    ({ratingStats.totalReviews} {ratingStats.totalReviews === 1 ? 'review' : 'reviews'})
-                  </span>
-                </button>
-              ) : (
-                <button
-                  id={`btn-first-review-${profile.id}`}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onLeaveReview ? onLeaveReview(profile) : onOpenReviews ? onOpenReviews(profile) : null;
-                  }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-amber-50 text-slate-500 hover:text-amber-800 border border-slate-200/60 hover:border-amber-200 text-[10px] font-semibold transition cursor-pointer"
-                  title="Be the first to rate a playdate with this family"
-                >
-                  <Star className="w-3 h-3 text-slate-300" />
-                  <span>No reviews yet • Be first</span>
-                </button>
-              )}
-
-              <button
-                id={`btn-quick-rate-playmate-${profile.id}`}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLeaveReview ? onLeaveReview(profile) : onOpenReviews ? onOpenReviews(profile) : null;
-                }}
-                className="text-[10px] font-bold text-orange-600 hover:text-orange-700 hover:underline cursor-pointer"
-              >
-                + Rate Playdate
-              </button>
-            </div>
           </div>
 
           {/* Color-Coded Proximity Badge */}
@@ -1039,31 +973,6 @@ export default function PlaymateCard({
               <span>🔒 Child security lock active • Connection required to message</span>
             </div>
           )}
-        </div>
-
-        {/* Reviews & Feedback Quick Bar */}
-        <div className="flex items-center justify-between p-2.5 bg-amber-50/70 rounded-2xl border border-amber-200/60 text-xs shadow-3xs">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-amber-100 rounded-xl text-amber-700">
-              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-            </div>
-            <div>
-              <span className="font-extrabold text-slate-900 text-xs font-serif">
-                {ratingStats.averageRating > 0 ? `${ratingStats.averageRating.toFixed(1)} / 5.0 Rating` : 'Parent Feedback'}
-              </span>
-              <span className="text-[10px] text-slate-500 block font-medium">
-                {ratingStats.totalReviews > 0 ? `${ratingStats.totalReviews} verified parent review${ratingStats.totalReviews === 1 ? '' : 's'}` : 'Be first to rate after playdate'}
-              </span>
-            </div>
-          </div>
-          <button
-            id={`btn-view-all-reviews-${profile.id}`}
-            type="button"
-            onClick={() => onOpenReviews ? onOpenReviews(profile) : onLeaveReview ? onLeaveReview(profile) : null}
-            className="px-3 py-1.5 bg-white hover:bg-amber-100/70 text-amber-900 border border-amber-300/80 rounded-xl text-[11px] font-bold shadow-2xs transition cursor-pointer"
-          >
-            {ratingStats.totalReviews > 0 ? 'Read Reviews 💬' : 'Rate Experience ⭐'}
-          </button>
         </div>
 
         {/* Primary Interaction Buttons Grid */}

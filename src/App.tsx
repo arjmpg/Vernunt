@@ -36,8 +36,6 @@ import { VernuntStore } from './components/store/VernuntStore.tsx';
 
 // Modal helpers
 import ReportModal from './components/ReportModal.tsx';
-import { PlaydateReviewModal } from './components/PlaydateReviewModal.tsx';
-import { ProfileReviewsListModal } from './components/ProfileReviewsListModal.tsx';
 import VerificationModal from './components/VerificationModal.tsx';
 import AadhaarVerificationModal from './components/AadhaarVerificationModal.tsx';
 import EmergencySOSModal from './components/EmergencySOSModal.tsx';
@@ -87,8 +85,7 @@ import { AndroidDownloadBanner } from './components/AndroidDownloadBanner.tsx';
 import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
 import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
 import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
-import { RankMathSuiteModal } from './components/seo/RankMathSuiteModal.tsx';
-import { RankMathFloatingBadge } from './components/seo/RankMathFloatingBadge.tsx';
+import KidsInvestmentsTab from './components/investments/KidsInvestmentsTab.tsx';
 
 // Icons
 import { 
@@ -98,7 +95,7 @@ import {
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint, Download, Apple
+  Fingerprint, Download, Apple, Coins
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -106,6 +103,7 @@ import { captureAffiliateFromUrl } from './utils/affiliate.ts';
 
 const TAB_DEFINITIONS = [
   { id: 'radar', label: 'Playmates Radar (Swipe)', icon: Navigation },
+  { id: 'kids_investments', label: '💰 Kids Investment & Plots', icon: Coins },
   { id: 'groups', label: '🌸 Vernunt Groups', icon: Users },
   { id: 'community', label: '☕ Community Hosting', icon: CalendarRange },
   { id: 'pages', label: '📖 Vernunt Pages & Pods', icon: Radio },
@@ -128,6 +126,7 @@ const TAB_DEFINITIONS = [
 
 export const DEFAULT_TABS_CONFIG: { [key: string]: 'header' | 'side' } = {
   radar: 'header',
+  kids_investments: 'header',
   groups: 'header',
   community: 'header',
   pages: 'header',
@@ -227,10 +226,38 @@ export default function App() {
   // Navigation & User session states with instant cache hydration
   const [userProfile, setUserProfile] = useState<ChildProfile | null>(() => initialSession?.userProfile || null);
   const [userRole, setUserRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin'>(() => initialSession?.userRole || 'Parent');
+
+  // Fallback guest profile to allow non-logged-in users full exploration across features
+  const guestProfile: ChildProfile = React.useMemo(() => ({
+    id: 'guest-explorer',
+    parentName: 'Guest Parent',
+    childName: 'Child Explorer',
+    childAge: 5,
+    gender: 'Other',
+    location: 'Bangalore, India',
+    interests: ['Outdoor Play', 'Learning', 'Kids Future Wealth'],
+    bio: 'Exploring Vernunt Parent Community & Child Future Hub',
+    isVerified: false,
+    verificationStatus: 'Unverified',
+    userRole: 'Parent',
+    createdAt: new Date().toISOString(),
+    subscriptionPlan: 'Free',
+    phoneNumber: '9876543210'
+  }), []);
+
+  const effectiveProfile = userProfile || guestProfile;
   const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
+        if (
+          params.get('tab') === 'kids_investments' ||
+          params.get('tab') === 'investments' ||
+          params.get('tab') === 'investment' ||
+          window.location.pathname.startsWith('/investments')
+        ) {
+          return 'dashboard';
+        }
         if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
           return 'dashboard';
         }
@@ -240,8 +267,6 @@ export default function App() {
           params.get('story') ||
           params.get('tab') === 'events' ||
           params.get('event') ||
-          window.location.pathname.startsWith('/events') ||
-          window.location.pathname.startsWith('/explore') ||
           window.location.pathname.startsWith('/stories') ||
           window.location.pathname.startsWith('/story')
         ) {
@@ -253,7 +278,6 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
-          window.location.pathname.startsWith('/specialists') ||
           window.location.pathname.startsWith('/portfolio') ||
           window.location.pathname.startsWith('/specialist') ||
           window.location.pathname.startsWith('/doctor')
@@ -266,10 +290,23 @@ export default function App() {
     }
     return initialSession ? 'dashboard' : 'landing';
   });
-  const [activeTab, setActiveTab] = useState<'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories'>(() => {
+  const [activeTab, setActiveTab] = useState<
+    'radar' | 'kids_investments' | 'daycare' | 'chat' | 'planner' | 'events' | 
+    'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 
+    'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories' | 
+    'groups' | 'community' | 'pages' | 'tracker'
+  >(() => {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
+        if (
+          params.get('tab') === 'kids_investments' ||
+          params.get('tab') === 'investments' ||
+          params.get('tab') === 'investment' ||
+          window.location.pathname.startsWith('/investments')
+        ) {
+          return 'kids_investments';
+        }
         if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
           return 'store';
         }
@@ -282,7 +319,7 @@ export default function App() {
         ) {
           return 'kid_stories';
         }
-        if (params.get('tab') === 'events' || params.get('event') || window.location.pathname.startsWith('/events')) {
+        if (params.get('tab') === 'events' || params.get('event')) {
           return 'events';
         }
         if (
@@ -291,7 +328,6 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
-          window.location.pathname.startsWith('/specialists') ||
           window.location.pathname.startsWith('/portfolio') ||
           window.location.pathname.startsWith('/specialist') ||
           window.location.pathname.startsWith('/doctor')
@@ -364,7 +400,6 @@ export default function App() {
 
   const [isOffline, setIsOffline] = useState<boolean>(() => typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [isOutboxDrawerOpen, setIsOutboxDrawerOpen] = useState<boolean>(false);
-  const [showRankMathModal, setShowRankMathModal] = useState<boolean>(false);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -445,15 +480,13 @@ export default function App() {
       const guideSlug = params.get('guide') || params.get('article') || params.get('slug');
       const path = window.location.pathname;
 
-      if (targetTab === 'events' || targetEventId || path.startsWith('/events')) {
-        setAppMode('dashboard');
+      if (targetTab === 'events' || targetEventId) {
         setActiveTab('events');
       } else if (targetTab === 'affiliate') {
         setActiveTab('affiliate');
-      } else if (targetTab === 'specialists' || path.startsWith('/specialist') || path.startsWith('/doctor')) {
-        setAppMode('dashboard');
+      } else if (targetTab === 'specialists') {
         setActiveTab('specialists');
-      } else if (targetTab === 'knowledge' || guideSlug || path.startsWith('/knowledge') || path.startsWith('/guide') || path.startsWith('/explore')) {
+      } else if (targetTab === 'knowledge' || guideSlug || path.startsWith('/knowledge') || path.startsWith('/guide')) {
         let extractedSlug = guideSlug;
         if (!extractedSlug && (path.startsWith('/knowledge/') || path.startsWith('/guide/'))) {
           extractedSlug = path.split('/')[2] || null;
@@ -2135,8 +2168,6 @@ export default function App() {
 
   // Modal display toggles
   const [detailModalProfile, setDetailModalProfile] = useState<ChildProfile | null>(null);
-  const [reviewTargetProfile, setReviewTargetProfile] = useState<ChildProfile | null>(null);
-  const [viewReviewsProfile, setViewReviewsProfile] = useState<ChildProfile | null>(null);
   const [activeReportProfile, setActiveReportProfile] = useState<ChildProfile | null>(null);
   const [activeVerifyProfile, setActiveVerifyProfile] = useState<ChildProfile | null>(null);
   const [showSOSModal, setShowSOSModal] = useState(false);
@@ -2893,27 +2924,6 @@ export default function App() {
                 </div>
               </button>
 
-              {/* Rank Math SEO Suite Enterprise Trigger */}
-              <button
-                id="btn-rank-math-seo-suite-top"
-                onClick={() => setShowRankMathModal(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 bg-gradient-to-r from-rose-50 via-indigo-50 to-pink-50 hover:from-rose-100 hover:to-indigo-100 text-slate-800 border border-rose-200/80 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs group"
-                title="Rank Math SEO Suite: Content Analyzer, Schema Generator, SERP Preview & 301 Redirects"
-              >
-                <div className="w-5 h-5 rounded-md bg-gradient-to-tr from-rose-600 to-indigo-600 flex items-center justify-center text-white text-[9px] font-black shadow-xs">
-                  RM
-                </div>
-                <div className="flex flex-col text-left">
-                  <span className="text-[7.5px] font-black text-rose-700 uppercase tracking-wider leading-none">Rank Math</span>
-                  <span className="text-[11px] font-bold text-slate-900 leading-tight flex items-center gap-1">
-                    <span>SEO</span>
-                    <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                      94/100
-                    </span>
-                  </span>
-                </div>
-              </button>
-
               <div className="text-right hidden lg:block">
                 <div className="flex items-center gap-1.5 justify-end">
                   {userProfile?.aadhaarVerified && (
@@ -3391,6 +3401,12 @@ export default function App() {
               setIsGuestViewingKnowledge(false);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
+            onOpenKidsInvestments={() => {
+              setAppMode('dashboard');
+              setActiveTab('kids_investments');
+              setIsGuestViewingKnowledge(false);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onOpenEventBuyerRegistration={() => setShowEventBuyerRegModal(true)}
             onOpenKannadaVoice={(lang) => {
               setVoiceInitialLanguage(lang || 'en-IN');
@@ -3672,37 +3688,47 @@ export default function App() {
               </div>
             ))}
 
-            {/* Guest Private Tab Protection */}
-            {!userProfile && !['specialists', 'knowledge', 'store'].includes(activeTab) && (
-              <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl border border-slate-200 shadow-sm text-center space-y-5 animate-fade-in">
-                <div className="w-16 h-16 bg-rose-50 text-rose-600 rounded-2xl flex items-center justify-center text-3xl mx-auto border border-rose-150">
-                  🩺
+            {/* Radar Guardian Sign-In Protection (Child Safety & Privacy) */}
+            {!userProfile && activeTab === 'radar' && (
+              <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl border border-amber-200 shadow-md text-center space-y-5 animate-fade-in">
+                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto border border-amber-200">
+                  🛡️
                 </div>
                 <div className="space-y-2">
                   <h3 className="text-xl font-black font-serif text-slate-900">
-                    Vernunt Pan-India Specialists Directory
+                    Guardian Sign-In Required for Kids Radar
                   </h3>
-                  <p className="text-sm text-slate-600 max-w-md mx-auto">
-                    This section requires verified guardian sign-in. However, our <strong>Pan-India Specialists Directory</strong> is 100% open and accessible to the public without any login!
+                  <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
+                    To safeguard neighborhood children and maintain 100% Aadhaar safety, real-time playmates proximity radar and connect requests require guardian sign-in.
+                  </p>
+                  <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 max-w-md mx-auto">
+                    ✨ All other features — Kids Wealth Investments &amp; Plots, Verified Specialists, Playfest Events, 1000+ Guides, Stories Flipbooks, and Daycares — are 100% open for guests!
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('specialists')}
-                    className="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
-                  >
-                    Explore Verified Specialists &amp; Portfolios ↗
-                  </button>
                   <button
                     type="button"
                     onClick={() => {
                       setAppMode('landing');
                       setIsGuestViewingKnowledge(false);
                     }}
+                    className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
+                  >
+                    Sign In / Register Guardian ↗
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('kids_investments')}
+                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
+                  >
+                    💰 Explore Kids Investments &amp; Plots
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('specialists')}
                     className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
                   >
-                    Back to Home
+                    Specialists Directory ↗
                   </button>
                 </div>
               </div>
@@ -4897,8 +4923,6 @@ export default function App() {
                       onUnlockPhone={handleUnlockPhoneByCredit}
                       onNavigateToReferrals={() => setActiveTab('referrals')}
                       onBlockProfile={handleBlockParent}
-                      onOpenReviews={(p) => setViewReviewsProfile(p)}
-                      onLeaveReview={(p) => setReviewTargetProfile(p)}
                     />
                   ) : (
                     <div className="bg-white rounded-3xl p-8 border border-dashed border-slate-200 text-center text-slate-400 h-full flex flex-col items-center justify-center space-y-3">
@@ -4926,41 +4950,49 @@ export default function App() {
               </div>
             )}
 
+            {/* Tab: Kids Investment & Wealth Planning (Plots, Mutual Funds, Gold/Silver) */}
+            {activeTab === 'kids_investments' && (
+              <KidsInvestmentsTab 
+                currentProfile={userProfile} 
+                onNavigateToTab={(targetTab) => setActiveTab(targetTab as any)}
+              />
+            )}
+
             {/* Tab: Peanut-Style Vernunt Groups & Circles */}
-            {activeTab === 'groups' && userProfile && (
+            {activeTab === 'groups' && (
               <VernuntGroupsHub 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
                 onOpenCommunityMeetups={() => setActiveTab('community')} 
               />
             )}
 
             {/* Tab: Community Hosting (renamed from host events) */}
-            {activeTab === 'community' && userProfile && (
+            {activeTab === 'community' && (
               <CommunityHostingHub 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
               />
             )}
 
             {/* Tab: Vernunt Pages Micro-Blogging & Audio Pods */}
-            {activeTab === 'pages' && userProfile && (
+            {activeTab === 'pages' && (
               <VernuntPagesFeed 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
               />
             )}
 
             {/* Tab: Pregnancy & Baby Growth/Milestones/Vaccine Tracker */}
-            {activeTab === 'tracker' && userProfile && (
+            {activeTab === 'tracker' && (
               <GrowthTrackerHub 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
               />
             )}
 
             {/* Tab: Babysitting & Drop-in Daycare Marketplace */}
-            {activeTab === 'daycare' && userProfile && (
+            {activeTab === 'daycare' && (
               <DaycareSittingTab
                 daycarePlayhomes={daycarePlayhomes}
                 careBookings={careBookings}
-                currentUserProfile={userProfile}
+                currentUserProfile={effectiveProfile}
                 onSaveDaycareProfile={handleSaveDaycareProfile}
                 onAddCareBooking={handleAddCareBooking}
                 onUpdateBookingStatus={handleUpdateBookingStatus}
@@ -4980,10 +5012,10 @@ export default function App() {
             )}
 
             {/* Tab: Instant chats log */}
-            {activeTab === 'chat' && userProfile && (
+            {activeTab === 'chat' && (
               <ChatPanel 
                 playmates={playmates} 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
                 activePlaymate={selectedPlaymate} 
                 onBackToRadar={() => setActiveTab('radar')}
                 connectedIds={connectedIds}
@@ -4996,10 +5028,10 @@ export default function App() {
             )}
 
             {/* Tab: Structured schedules */}
-            {activeTab === 'planner' && userProfile && (
+            {activeTab === 'planner' && (
               <PlaydatePlanner 
                 playmates={playmates} 
-                userProfile={userProfile} 
+                userProfile={effectiveProfile} 
                 activeCompanion={selectedPlaymate}
                 onOpenPushModal={() => setShowPushNotificationModal(true)}
               />
@@ -5107,9 +5139,9 @@ export default function App() {
             )}
 
             {/* Tab: Health vaccine records */}
-            {activeTab === 'portfolio' && userProfile && (
+            {activeTab === 'portfolio' && (
               <PortfoliosTab 
-                currentProfile={userProfile} 
+                currentProfile={effectiveProfile} 
                 onNavigateToSpecialists={() => {
                   setActiveTab('specialists');
                 }}
@@ -5127,9 +5159,9 @@ export default function App() {
             )}
 
             {/* Tab: Affiliate Partner Center (WooCommerce Affiliate Model) */}
-            {activeTab === 'affiliate' && userProfile && (
+            {activeTab === 'affiliate' && (
               <AffiliateDashboard 
-                userProfile={userProfile}
+                userProfile={effectiveProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
                 eventsList={eventsList}
                 specialistsList={specialistsList}
@@ -5137,18 +5169,18 @@ export default function App() {
             )}
 
             {/* Tab: Parental Referral Rewards Center */}
-            {activeTab === 'referrals' && userProfile && (
+            {activeTab === 'referrals' && (
               <ReferralPortal 
-                userProfile={userProfile}
+                userProfile={effectiveProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
                 allPlaymates={playmates}
               />
             )}
 
             {/* Tab: Subscription & Billing Portal */}
-            {activeTab === 'billing' && userProfile && (
+            {activeTab === 'billing' && (
               <BillingPortal 
-                userProfile={userProfile}
+                userProfile={effectiveProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
                 onNavigateToReferrals={() => setActiveTab('referrals')}
               />
@@ -5672,32 +5704,6 @@ export default function App() {
           onUnlockPhone={handleUnlockPhoneByCredit}
           onNavigateToReferrals={() => setActiveTab('referrals')}
           onBlockProfile={handleBlockParent}
-          onOpenReviews={(p) => setViewReviewsProfile(p)}
-          onLeaveReview={(p) => setReviewTargetProfile(p)}
-        />
-      )}
-
-      {viewReviewsProfile && (
-        <ProfileReviewsListModal
-          targetProfile={viewReviewsProfile}
-          currentUserProfile={userProfile}
-          onClose={() => setViewReviewsProfile(null)}
-          onOpenLeaveReview={() => {
-            const p = viewReviewsProfile;
-            setViewReviewsProfile(null);
-            setReviewTargetProfile(p);
-          }}
-        />
-      )}
-
-      {reviewTargetProfile && (
-        <PlaydateReviewModal
-          targetProfile={reviewTargetProfile}
-          currentUserProfile={userProfile}
-          onClose={() => setReviewTargetProfile(null)}
-          onReviewSubmitted={() => {
-            setReviewTargetProfile(null);
-          }}
         />
       )}
 
@@ -6469,14 +6475,6 @@ export default function App() {
           setActiveTab(tab as any);
         }}
       />
-
-      {/* Rank Math SEO Suite Modal */}
-      {showRankMathModal && (
-        <RankMathSuiteModal
-          isOpen={showRankMathModal}
-          onClose={() => setShowRankMathModal(false)}
-        />
-      )}
 
     </div>
   );

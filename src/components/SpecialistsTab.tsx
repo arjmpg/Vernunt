@@ -4,8 +4,11 @@ import {
   Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, 
   SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
   CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
-  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy
+  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp
 } from 'lucide-react';
+import { MutualFundAdvisor } from '../types/investment.ts';
+import { INITIAL_MUTUAL_FUND_ADVISORS } from '../data/kidsInvestmentData.ts';
+import MutualFundAdvisorDashboard from './investments/MutualFundAdvisorDashboard.tsx';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import PediatricianPortfolioModal from './PediatricianPortfolioModal.tsx';
@@ -92,6 +95,70 @@ export default function SpecialistsTab({
   const [claimingSpecialist, setClaimingSpecialist] = useState<SpecialistProfile | null>(null);
   const [showAdminClaimsModal, setShowAdminClaimsModal] = useState<boolean>(false);
   const isSuperAdmin = isAuthorizedSystemAdmin(currentProfile?.email, currentProfile?.userRole);
+
+  // Mutual Fund & Kids Wealth Advisors state
+  const [showAdvisorDashboard, setShowAdvisorDashboard] = useState<boolean>(false);
+  const [advisors, setAdvisors] = useState<MutualFundAdvisor[]>(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_custom_advisors');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.debug('Error loading advisors in SpecialistsTab', e);
+    }
+    return INITIAL_MUTUAL_FUND_ADVISORS;
+  });
+
+  const handleAddAdvisor = (adv: MutualFundAdvisor) => {
+    setAdvisors(prev => {
+      const updated = [adv, ...prev];
+      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleUpdateAdvisor = (adv: MutualFundAdvisor) => {
+    setAdvisors(prev => {
+      const updated = prev.map(a => a.id === adv.id ? adv : a);
+      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDeleteAdvisor = (advId: string) => {
+    setAdvisors(prev => {
+      const updated = prev.filter(a => a.id !== advId);
+      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Combine clinical specialists with Certified AMFI Kids Wealth & Mutual Fund Advisors
+  const combinedSpecialistsList = useMemo(() => {
+    const advisorSpecs: SpecialistProfile[] = advisors.map(adv => ({
+      id: adv.id,
+      name: adv.name,
+      title: `${adv.agencyName || 'Certified'} • AMFI Registered Mutual Fund Advisor`,
+      category: 'Kids Wealth & Investment Planners',
+      rating: adv.rating || 4.9,
+      reviewsCount: adv.reviewsCount || 128,
+      experienceYears: adv.experienceYears || 10,
+      bio: adv.bio || 'AMFI Certified Mutual Fund Distributor specializing in Child Future Planning and Minor Demat structuring.',
+      location: `${adv.city}, ${adv.state}`,
+      photoUrl: adv.photoUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
+      sessionFee: adv.feeType === 'Free Initial Consultation' ? 0 : 499,
+      availableSlots: ['10:00 AM', '02:00 PM', '05:00 PM', '07:00 PM'],
+      specialties: adv.specialization?.length ? adv.specialization : ['Child Education Corpus', 'Equity SIP', 'AMFI Certified Portfolio'],
+      languages: adv.languages?.length ? adv.languages : ['English', 'Hindi'],
+      qualifications: `ARN: ${adv.arnNumber}${adv.sebiRegNumber ? ` • SEBI: ${adv.sebiRegNumber}` : ''}`,
+      hospitalAffiliation: adv.agencyName || 'Mutual Fund Advisory Practice',
+      clinicAddress: `${adv.city}, ${adv.state}`,
+      phone: adv.phone,
+      email: adv.email,
+      isVerified: adv.verificationStatus === 'AMFI_VERIFIED'
+    }));
+
+    return [...specialistsList, ...advisorSpecs];
+  }, [specialistsList, advisors]);
 
   // Automatically attempt to locate user GPS on initial load for nearest distance sorting
   useEffect(() => {
@@ -356,6 +423,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     { key: 'Gynecologist', label: 'Gynecologists & OB/GYN', icon: Heart, color: 'text-fuchsia-500' },
     { key: 'Nutritionist', label: 'Nutritionists & Dietitians', icon: Utensils, color: 'text-emerald-500' },
     { key: 'Coach', label: 'Sports Coaches & Mentors', icon: Trophy, color: 'text-amber-500' },
+    { key: 'Kids Wealth & Investment Planners', label: 'Kids Wealth & MF Planners', icon: TrendingUp, color: 'text-indigo-600' },
     ...customSpecCats.map(cs => ({ key: cs.value, label: cs.name, icon: Briefcase, color: 'text-indigo-500' }))
   ];
 
@@ -801,7 +869,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
   // Filter criteria logic with Pan-India Cities & Localities with guaranteed unique IDs
   const filteredSpecs = useMemo(() => {
     const seenIds = new Set<string>();
-    return specialistsList.filter(spec => {
+    return combinedSpecialistsList.filter(spec => {
       if (!spec || !spec.id || seenIds.has(spec.id)) return false;
       seenIds.add(spec.id);
 
@@ -968,8 +1036,19 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           </p>
         </div>
 
-        {/* Action button: Apply / Register Practice */}
+        {/* Action buttons: Register Practice & MF Advisor Dashboard */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            id="btn-trigger-mf-advisor-dashboard"
+            onClick={() => setShowAdvisorDashboard(true)}
+            type="button"
+            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+            title="Mutual Fund Advisors: Manage Profile & Showcase AMFI Credentials"
+          >
+            <TrendingUp className="w-4 h-4" />
+            <span>MF Advisor Dashboard</span>
+          </button>
+
           <button
             id="btn-trigger-register-specialist"
             onClick={() => setShowRegModal(true)}
@@ -1064,6 +1143,21 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               }`}
             >
               Kids Coaches ({specialistsList.filter(s => s.category === 'Coach').length})
+            </button>
+            <button
+              type="button"
+              id="filter-only-wealth-advisors-btn"
+              onClick={() => {
+                setCategoryFilter('Kids Wealth & Investment Planners');
+                setSelectedLocality('All Areas');
+              }}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                categoryFilter === 'Kids Wealth & Investment Planners'
+                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
+                  : 'bg-white text-slate-700 hover:bg-indigo-50 border-indigo-200'
+              }`}
+            >
+              Kids Wealth &amp; MF Planners ({combinedSpecialistsList.filter(s => s.category === 'Kids Wealth & Investment Planners').length})
             </button>
           </div>
         </div>
@@ -2024,6 +2118,16 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           onClaimApproved={handleClaimApproved}
         />
       )}
+
+      {/* Mutual Fund Advisor Dashboard & Credentials Manager */}
+      <MutualFundAdvisorDashboard
+        isOpen={showAdvisorDashboard}
+        onClose={() => setShowAdvisorDashboard(false)}
+        advisors={advisors}
+        onAddAdvisor={handleAddAdvisor}
+        onUpdateAdvisor={handleUpdateAdvisor}
+        onDeleteAdvisor={handleDeleteAdvisor}
+      />
 
     </div>
   );

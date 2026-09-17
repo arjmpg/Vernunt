@@ -34,8 +34,6 @@ import {
   ShieldCheck,
   Zap
 } from 'lucide-react';
-import { RankMathSuiteModal } from './seo/RankMathSuiteModal.tsx';
-import { RankMathFloatingBadge } from './seo/RankMathFloatingBadge.tsx';
 
 interface KnowledgeHubProps {
   initialSlug?: string;
@@ -56,7 +54,6 @@ export function KnowledgeHub({
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedAgeGroup, setSelectedAgeGroup] = useState<string>('All');
   const [selectedArticleSlug, setSelectedArticleSlug] = useState<string | null>(initialSlug || null);
-  const [showRankMathModal, setShowRankMathModal] = useState<boolean>(false);
 
   // Sync initialSlug when prop changes
   useEffect(() => {
@@ -318,15 +315,9 @@ export function KnowledgeHub({
             <span className="bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[11px] px-3 py-1 rounded-full">
               👶 Age: {currentArticle.ageGroup}
             </span>
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
-                <Clock className="w-3.5 h-3.5" /> {currentArticle.readTime}
-              </span>
-              <RankMathFloatingBadge
-                score={94}
-                onClick={() => setShowRankMathModal(true)}
-              />
-            </div>
+            <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1 ml-auto">
+              <Clock className="w-3.5 h-3.5" /> {currentArticle.readTime}
+            </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 font-serif leading-tight">
@@ -903,19 +894,6 @@ export function KnowledgeHub({
           </div>
         )}
       </div>
-
-      {/* Rank Math SEO Suite Modal */}
-      {showRankMathModal && currentArticle && (
-        <RankMathSuiteModal
-          isOpen={showRankMathModal}
-          onClose={() => setShowRankMathModal(false)}
-          initialUrl={`https://app.vernunt.com/knowledge/${currentArticle.slug}`}
-          initialTitle={`${currentArticle.title} | Vernunt`}
-          initialDescription={currentArticle.summary}
-          initialContent={currentArticle.content?.sections?.map(s => `${s.heading}\n${s.body?.join(' ')}`).join('\n\n') || currentArticle.summary}
-          initialSlug={currentArticle.slug}
-        />
-      )}
 
     </div>
   );

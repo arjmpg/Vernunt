@@ -5,13 +5,26 @@ import {
   ScanLine, ExternalLink, Smartphone, AlertCircle, History, Users,
   Search, ArrowRight, CheckCircle, Clock3, Filter, Trash2, FileSpreadsheet,
   Flashlight, FlashlightOff, Camera, Zap, Sun, Lightbulb, Video,
-  Bookmark, Eye, Tag, Archive, CheckCheck, Plus, ArrowUpRight
+  Bookmark, Eye, Tag, Archive, CheckCheck, Plus, ArrowUpRight,
+  Wifi, WifiOff, HardDrive, Database, ShieldAlert, KeyRound, CheckSquare, Layers
 } from 'lucide-react';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
 import jsQR from 'jsqr';
 import { CommunityEvent, Booking, ChildProfile } from '../../types.ts';
 import { getSafeChildAreaName } from '../../utils/childSafetyFilter.ts';
+import { 
+  CachedQrPass, 
+  getOfflineCachedPasses, 
+  getOfflineCachedPass, 
+  savePassToOfflineCache, 
+  isPassCachedOffline, 
+  removePassFromOfflineCache,
+  setActiveOfflinePassId,
+  getActiveOfflinePassId,
+  generateOfflinePasscode,
+  clearAllOfflinePasses
+} from '../../utils/offlineQrPassStorage.ts';
 
 export type EventPassStatus = 'Upcoming' | 'Used' | 'Expired';
 
@@ -81,8 +94,28 @@ export default function EventDynamicQrPassModal({
 
   const selectedEvent = eventsList.find(e => e.id === selectedEventId) || eventsList[0];
 
-  // Active View Tab: 'pass' | 'pass-history' | 'scanner' | 'roster' | 'history'
-  const [activeTab, setActiveTab] = useState<'pass' | 'pass-history' | 'scanner' | 'roster' | 'history'>('pass');
+  // Active View Tab: 'pass' | 'offline-wallet' | 'pass-history' | 'scanner' | 'roster' | 'history'
+  const [activeTab, setActiveTab] = useState<'pass' | 'offline-wallet' | 'pass-history' | 'scanner' | 'roster' | 'history'>('pass');
+
+  // Offline Caching & Connectivity State
+  const [isOnline, setIsOnline] = useState<boolean>(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const [isSimulatedOffline, setIsSimulatedOffline] = useState<boolean>(false);
+  const [offlineCachedPasses, setOfflineCachedPasses] = useState<CachedQrPass[]>(() => getOfflineCachedPasses());
+  const [offlineSaveNotice, setOfflineSaveNotice] = useState<string | null>(null);
+  const [offlineFilterQuery, setOfflineFilterQuery] = useState<string>('');
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const isOfflineActive = !isOnline || isSimulatedOffline;
 
   // Camera Flash / Torch & Low-Light Scanner State
   const [isFlashOn, setIsFlashOn] = useState<boolean>(false);
@@ -713,7 +746,7 @@ export default function EventDynamicQrPassModal({
     });
   }, [currentMainAttendee?.ticketNumber, ticketNumber, selectedEvent, attendeeName, parentName, phone, ticketTier, qrTimestamp]);
 
-  // Generate crisp QR code whenever payload updates
+  // Generate crisp QR code whenever payload updates and auto-cache to localStorage
   useEffect(() => {
     QRCode.toDataURL(qrPayload, {
       width: 400,
@@ -724,9 +757,125 @@ export default function EventDynamicQrPassModal({
       },
       errorCorrectionLevel: 'H'
     })
-      .then(url => setQrDataUrl(url))
-      .catch(err => console.error('QR generation failure', err));
-  }, [qrPayload]);
+      .then(url => {
+        setQrDataUrl(url);
+        // Automatically cache this dynamic QR pass into localStorage for offline venue check-in!
+        if (selectedEvent) {
+          const currentTicket = currentMainAttendee?.ticketNumber || ticketNumber;
+          savePassToOfflineCache({
+            id: `offline-${currentTicket}`,
+            ticketNumber: currentTicket,
+            eventId: selectedEvent.id,
+            eventTitle: selectedEvent.title,
+            eventCategory: selectedEvent.category,
+            eventEmoji: selectedEvent.iconEmoji,
+            eventDate: selectedEvent.date,
+            eventTime: selectedEvent.time,
+            venue: selectedEvent.location || 'Local Community Venue, Bangalore',
+            safeArea: getSafeChildAreaName(selectedEvent.location || 'Bangalore'),
+            attendeeName: attendeeName,
+            parentName: parentName,
+            phone: phone,
+            tierName: ticketTier,
+            ticketPrice: selectedEvent.ticketPrice,
+            qrDataUrl: url,
+            qrPayload: qrPayload,
+            status: isCheckedIn ? 'Used' : 'Upcoming',
+            gateLocation: 'Gate-A (North Entrance)'
+          });
+          setOfflineCachedPasses(getOfflineCachedPasses());
+        }
+      })
+      .catch(err => {
+        console.error('QR generation failure', err);
+        // Offline recovery: retrieve cached data URL from localStorage if available
+        const currentTicket = currentMainAttendee?.ticketNumber || ticketNumber;
+        const cached = getOfflineCachedPass(currentTicket);
+        if (cached && cached.qrDataUrl) {
+          setQrDataUrl(cached.qrDataUrl);
+        }
+      });
+  }, [qrPayload, selectedEvent, currentMainAttendee?.ticketNumber, ticketNumber, attendeeName, parentName, phone, ticketTier, isCheckedIn]);
+
+  // Initial load: restore active cached pass if opening without internet
+  useEffect(() => {
+    const cachedList = getOfflineCachedPasses();
+    setOfflineCachedPasses(cachedList);
+    const activeId = getActiveOfflinePassId();
+    if (activeId) {
+      const match = cachedList.find(p => p.ticketNumber === activeId || p.id === activeId);
+      if (match && !qrDataUrl && match.qrDataUrl) {
+        setQrDataUrl(match.qrDataUrl);
+      }
+    }
+  }, []);
+
+  // Action: Manually refresh or force update offline cache
+  const handleManualSaveToOfflineCache = () => {
+    if (!selectedEvent || !qrDataUrl) return;
+    const currentTicket = currentMainAttendee?.ticketNumber || ticketNumber;
+    savePassToOfflineCache({
+      id: `offline-${currentTicket}`,
+      ticketNumber: currentTicket,
+      eventId: selectedEvent.id,
+      eventTitle: selectedEvent.title,
+      eventCategory: selectedEvent.category,
+      eventEmoji: selectedEvent.iconEmoji,
+      eventDate: selectedEvent.date,
+      eventTime: selectedEvent.time,
+      venue: selectedEvent.location || 'Local Community Venue, Bangalore',
+      safeArea: getSafeChildAreaName(selectedEvent.location || 'Bangalore'),
+      attendeeName: attendeeName,
+      parentName: parentName,
+      phone: phone,
+      tierName: ticketTier,
+      ticketPrice: selectedEvent.ticketPrice,
+      qrDataUrl: qrDataUrl,
+      qrPayload: qrPayload,
+      status: isCheckedIn ? 'Used' : 'Upcoming',
+      gateLocation: 'Gate-A (North Entrance)'
+    });
+    setOfflineCachedPasses(getOfflineCachedPasses());
+    setOfflineSaveNotice(`Pass #${currentTicket} securely cached in device storage. Ready for venue check-in without internet!`);
+    setTimeout(() => setOfflineSaveNotice(null), 3500);
+    try {
+      confetti({ particleCount: 30, spread: 60, origin: { y: 0.6 } });
+    } catch {
+      // ignore
+    }
+  };
+
+  // Action: Load an offline pass from local storage into active view
+  const handleLoadOfflinePass = (pass: CachedQrPass) => {
+    const matched = eventsList.find(e => e.id === pass.eventId || e.title === pass.eventTitle);
+    if (matched) {
+      setSelectedEventId(matched.id);
+    }
+    setTicketNumber(pass.ticketNumber);
+    setAttendeeName(pass.attendeeName);
+    setParentName(pass.parentName);
+    setPhone(pass.phone);
+    setTicketTier(pass.tierName);
+    setQrDataUrl(pass.qrDataUrl);
+    setActiveOfflinePassId(pass.ticketNumber);
+    setActiveTab('pass');
+    setOfflineSaveNotice(`Loaded offline pass for ${pass.attendeeName} (${pass.ticketNumber}). No network connection required.`);
+    setTimeout(() => setOfflineSaveNotice(null), 3500);
+  };
+
+  // Action: Delete an offline pass from local storage
+  const handleDeleteOfflinePass = (ticketNum: string) => {
+    removePassFromOfflineCache(ticketNum);
+    setOfflineCachedPasses(getOfflineCachedPasses());
+  };
+
+  // Action: Clear all offline passes
+  const handleClearAllOfflinePasses = () => {
+    if (window.confirm('Clear all cached offline event passes from this device?')) {
+      clearAllOfflinePasses();
+      setOfflineCachedPasses([]);
+    }
+  };
 
   // Auto-rotating dynamic security refresh every 30s to prevent screenshot fraud
   useEffect(() => {
@@ -1405,6 +1554,26 @@ export default function EventDynamicQrPassModal({
             </button>
 
             <button
+              id="tab-btn-offline-wallet"
+              type="button"
+              onClick={() => setActiveTab('offline-wallet')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer relative shrink-0 ${
+                activeTab === 'offline-wallet'
+                  ? 'bg-emerald-800 text-white shadow-xs'
+                  : 'text-emerald-850 bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 font-bold'
+              }`}
+              title="Access all cached event tickets stored on this device without internet"
+            >
+              <HardDrive className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Offline Passes</span>
+              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                activeTab === 'offline-wallet' ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-200 text-emerald-950'
+              }`}>
+                {offlineCachedPasses.length}
+              </span>
+            </button>
+
+            <button
               id="tab-btn-pass-history"
               type="button"
               onClick={() => setActiveTab('pass-history')}
@@ -1476,22 +1645,88 @@ export default function EventDynamicQrPassModal({
             </button>
           </div>
 
-          {/* Quick Low-Light Flash Status on right */}
-          <button
-            id="btn-quick-flash-toggle-bar"
-            type="button"
-            onClick={toggleCameraFlash}
-            className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
-              isFlashOn
-                ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
-            }`}
-            title="Toggle camera flash / torch"
-          >
-            {isFlashOn ? <Flashlight className="w-3.5 h-3.5 text-amber-600 fill-amber-400" /> : <FlashlightOff className="w-3.5 h-3.5 text-slate-400" />}
-            <span>Torch: {isFlashOn ? 'ON' : 'OFF'}</span>
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Offline Venue Test / Connection Status Pill */}
+            <button
+              id="btn-connection-offline-toggle"
+              type="button"
+              onClick={() => setIsSimulatedOffline(prev => !prev)}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition cursor-pointer border ${
+                isOfflineActive
+                  ? 'bg-amber-100 text-amber-900 border-amber-300 shadow-xs ring-1 ring-amber-300'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-250 hover:bg-emerald-100'
+              }`}
+              title="Click to test venue offline access without network"
+            >
+              {isOfflineActive ? <WifiOff className="w-3.5 h-3.5 text-amber-700 animate-pulse" /> : <Wifi className="w-3.5 h-3.5 text-emerald-600" />}
+              <span>{isOfflineActive ? (isSimulatedOffline ? 'Simulated Offline' : 'Venue Offline') : 'Online (Synced)'}</span>
+            </button>
+
+            {/* Quick Low-Light Flash Status on right */}
+            <button
+              id="btn-quick-flash-toggle-bar"
+              type="button"
+              onClick={toggleCameraFlash}
+              className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition cursor-pointer ${
+                isFlashOn
+                  ? 'bg-amber-100 text-amber-900 border border-amber-300 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 hover:bg-slate-100'
+              }`}
+              title="Toggle camera flash / torch"
+            >
+              {isFlashOn ? <Flashlight className="w-3.5 h-3.5 text-amber-600 fill-amber-400" /> : <FlashlightOff className="w-3.5 h-3.5 text-slate-400" />}
+              <span>Torch: {isFlashOn ? 'ON' : 'OFF'}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Offline Venue Alert Banner */}
+        {isOfflineActive && (
+          <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 text-white px-4 sm:px-6 py-2.5 text-xs font-bold flex flex-wrap items-center justify-between gap-2 shadow-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <WifiOff className="w-4 h-4 shrink-0 text-amber-200 animate-pulse" />
+              <span>
+                <strong>Venue Offline Mode:</strong> {isSimulatedOffline ? 'Simulating Zero-Internet Venue' : 'No Active Internet Connection'}. Showing cached QR tickets directly from device storage.
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('offline-wallet')}
+                className="bg-white/20 hover:bg-white/30 text-white px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wide flex items-center gap-1 cursor-pointer transition"
+              >
+                <HardDrive className="w-3 h-3" />
+                <span>Open Offline Wallet ({offlineCachedPasses.length})</span>
+              </button>
+              {isSimulatedOffline && (
+                <button
+                  type="button"
+                  onClick={() => setIsSimulatedOffline(false)}
+                  className="bg-white text-slate-900 hover:bg-amber-50 px-2 py-0.5 rounded text-[10px] font-bold cursor-pointer transition"
+                >
+                  Exit Offline Test
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Offline Save Toast Notice */}
+        {offlineSaveNotice && (
+          <div className="bg-emerald-600 text-white px-4 sm:px-6 py-2 text-xs font-bold flex items-center justify-between shadow-md shrink-0">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-200" />
+              <span>{offlineSaveNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setOfflineSaveNotice(null)}
+              className="text-white hover:text-emerald-100 text-xs font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Modal Scrollable Body */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-5 divide-y divide-slate-100">
@@ -1601,6 +1836,55 @@ export default function EventDynamicQrPassModal({
                     {isFlashOn ? <Flashlight className="w-3 h-3 text-amber-600 fill-amber-300" /> : <FlashlightOff className="w-3 h-3 text-slate-400" />}
                     <span>Torch: {isFlashOn ? 'ON' : 'OFF'}</span>
                   </button>
+                </div>
+
+                {/* Offline LocalStorage Cache Status & Emergency Gate Code */}
+                <div className="mt-3.5 w-full bg-emerald-50/90 border border-emerald-250 rounded-2xl p-2.5 text-left space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-emerald-900 uppercase tracking-wider flex items-center gap-1.5">
+                      <HardDrive className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Device Offline Storage</span>
+                    </span>
+                    <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-200 text-emerald-900 flex items-center gap-1">
+                      <Check className="w-2.5 h-2.5 stroke-[3]" />
+                      Cached for Venue
+                    </span>
+                  </div>
+
+                  <p className="text-[9.5px] text-emerald-800 leading-snug font-medium">
+                    This dynamic QR pass is stored in your device's browser localStorage. If mobile network drops inside the venue, the pass remains 100% accessible.
+                  </p>
+
+                  <div className="bg-white/80 rounded-xl p-2 border border-emerald-200/70 flex items-center justify-between">
+                    <div>
+                      <span className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Backup Manual Gate PIN
+                      </span>
+                      <span className="text-xs font-mono font-black text-slate-900 tracking-wider">
+                        {generateOfflinePasscode(currentMainAttendee?.ticketNumber || ticketNumber)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={handleManualSaveToOfflineCache}
+                        className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-[9.5px] font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                        title="Update offline cache with latest QR security timestamp"
+                      >
+                        <RefreshCw className="w-2.5 h-2.5" />
+                        <span>Update Cache</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('offline-wallet')}
+                        className="px-2 py-1 bg-white hover:bg-slate-50 border border-emerald-300 text-emerald-900 rounded-lg text-[9.5px] font-bold transition flex items-center gap-1 cursor-pointer"
+                        title="View all cached tickets on this device"
+                      >
+                        <Layers className="w-2.5 h-2.5 text-emerald-700" />
+                        <span>Wallet ({offlineCachedPasses.length})</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -1714,6 +1998,17 @@ export default function EventDynamicQrPassModal({
                     )}
                   </button>
 
+                  {/* Save to Device Offline Storage Button */}
+                  <button
+                    id="btn-save-current-pass-to-offline"
+                    type="button"
+                    onClick={handleManualSaveToOfflineCache}
+                    className="w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition cursor-pointer border bg-emerald-50 hover:bg-emerald-100 border-emerald-250 text-emerald-900 shadow-2xs"
+                  >
+                    <HardDrive className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Save to Device Storage for Offline Check-in</span>
+                  </button>
+
                   {/* Pass History Quick Shortcut */}
                   <button
                     id="btn-view-pass-history-shortcut"
@@ -1776,6 +2071,257 @@ export default function EventDynamicQrPassModal({
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: OFFLINE LOCALSTORAGE PASS WALLET */}
+          {activeTab === 'offline-wallet' && (
+            <div id="offline-storage-wallet-view" className="pt-4 space-y-4">
+              {/* Header Hero Banner */}
+              <div className="p-4 sm:p-5 bg-gradient-to-r from-emerald-900 via-slate-900 to-emerald-950 text-white rounded-3xl border border-emerald-800 shadow-sm relative overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="p-2 bg-emerald-500/20 text-emerald-300 rounded-xl border border-emerald-400/30">
+                        <HardDrive className="w-5 h-5" />
+                      </span>
+                      <h3 className="text-base font-black tracking-tight text-white">
+                        Device Storage Pass Wallet (Zero-Data Mode)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-emerald-200/80 max-w-xl">
+                      Passes are stored directly in your browser's persistent localStorage. You can present these tickets at venue gates even with zero cellular bars or during venue Wi-Fi outages.
+                    </p>
+                  </div>
+
+                  {/* Connectivity Status & Quick Offline Simulation */}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSimulatedOffline(prev => !prev)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs ${
+                        isOfflineActive
+                          ? 'bg-amber-400 text-slate-950 hover:bg-amber-300 ring-2 ring-amber-300/50'
+                          : 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                      }`}
+                    >
+                      {isOfflineActive ? <WifiOff className="w-3.5 h-3.5" /> : <Wifi className="w-3.5 h-3.5" />}
+                      <span>{isOfflineActive ? 'Simulated Offline (Active)' : 'Test Venue Offline Mode'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleManualSaveToOfflineCache}
+                      className="px-3 py-1.5 bg-white text-slate-900 hover:bg-emerald-50 rounded-xl text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-xs"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Cache Current Pass</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Storage Metric Badges */}
+                <div className="mt-4 pt-3 border-t border-emerald-800/60 flex flex-wrap items-center gap-3 text-[11px] font-bold">
+                  <span className="flex items-center gap-1.5 bg-emerald-950/80 text-emerald-200 px-2.5 py-1 rounded-lg border border-emerald-700/50">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{offlineCachedPasses.length} Tickets Cached Locally</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 bg-emerald-950/80 text-emerald-200 px-2.5 py-1 rounded-lg border border-emerald-700/50">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Storage Engine: Browser LocalStorage (V1)</span>
+                  </span>
+                  <span className="flex items-center gap-1.5 bg-emerald-950/80 text-emerald-200 px-2.5 py-1 rounded-lg border border-emerald-700/50">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Status: {isOfflineActive ? 'Offline Ready (Zero-Network)' : 'Live Synced'}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Search & Actions Bar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                <div className="relative flex-1">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={offlineFilterQuery}
+                    onChange={(e) => setOfflineFilterQuery(e.target.value)}
+                    placeholder="Search cached passes by attendee, ticket #, or event..."
+                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  {offlineFilterQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setOfflineFilterQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-700"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {offlineCachedPasses.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearAllOfflinePasses}
+                      className="px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50 rounded-xl border border-rose-200 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Clear Cache</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOfflineCachedPasses(getOfflineCachedPasses());
+                      setOfflineSaveNotice('Refreshed offline ticket list from local device storage.');
+                      setTimeout(() => setOfflineSaveNotice(null), 3000);
+                    }}
+                    className="px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white rounded-xl border border-slate-200 transition cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Sync</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Passes Cards Grid */}
+              {offlineCachedPasses.length === 0 ? (
+                <div className="py-12 px-4 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+                  <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto border border-emerald-250 shadow-inner">
+                    <HardDrive className="w-7 h-7" />
+                  </div>
+                  <h4 className="text-sm font-black text-slate-900">No Offline Passes Cached Yet</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    When you view any ticket in the "Dynamic QR Pass" tab, it is automatically cached into your device storage for offline gate access.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleManualSaveToOfflineCache}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-extrabold transition cursor-pointer shadow-xs inline-flex items-center gap-2"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Cache Active Pass Now (#{currentMainAttendee?.ticketNumber || ticketNumber})</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {offlineCachedPasses
+                    .filter(p => {
+                      if (!offlineFilterQuery) return true;
+                      const q = offlineFilterQuery.toLowerCase();
+                      return (
+                        p.attendeeName.toLowerCase().includes(q) ||
+                        p.parentName.toLowerCase().includes(q) ||
+                        p.ticketNumber.toLowerCase().includes(q) ||
+                        p.eventTitle.toLowerCase().includes(q) ||
+                        (p.eventCategory && p.eventCategory.toLowerCase().includes(q))
+                      );
+                    })
+                    .map((pass) => (
+                      <div
+                        key={pass.id || pass.ticketNumber}
+                        className="bg-white rounded-2xl border border-slate-200 hover:border-emerald-300 p-4 shadow-2xs hover:shadow-md transition space-y-3.5"
+                      >
+                        {/* Top: Event Info & Status */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <span className="text-[10px] font-black uppercase text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 inline-flex items-center gap-1">
+                              {pass.eventEmoji || '🎟️'} {pass.eventCategory || 'Community Event'}
+                            </span>
+                            <h4 className="text-sm font-black text-slate-900 leading-snug line-clamp-1">
+                              {pass.eventTitle}
+                            </h4>
+                          </div>
+
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0 ${
+                            pass.status === 'Used'
+                              ? 'bg-slate-100 text-slate-700 border border-slate-200'
+                              : 'bg-emerald-100 text-emerald-850 border border-emerald-250'
+                          }`}>
+                            {pass.status || 'Upcoming'}
+                          </span>
+                        </div>
+
+                        {/* Middle: QR Preview and Details */}
+                        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-150">
+                          {/* QR Thumbnail */}
+                          <div className="w-20 h-20 bg-white p-1 rounded-lg border border-slate-200 shrink-0 shadow-2xs">
+                            <img
+                              src={pass.qrDataUrl}
+                              alt={`QR Pass ${pass.ticketNumber}`}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+
+                          {/* Attendee & Venue Meta */}
+                          <div className="space-y-1 text-xs text-slate-700 flex-1 min-w-0">
+                            <div className="font-black text-slate-900 truncate">
+                              {pass.attendeeName} <span className="text-[10px] text-slate-500 font-normal">({pass.tierName || 'General Pass'})</span>
+                            </div>
+                            <div className="text-[11px] text-slate-600 truncate flex items-center gap-1">
+                              <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{pass.eventDate} • {pass.eventTime}</span>
+                            </div>
+                            <div className="text-[10.5px] text-slate-500 truncate flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
+                              <span>{pass.venue}</span>
+                            </div>
+                            <div className="text-[10.5px] font-mono font-bold text-indigo-700">
+                              #{pass.ticketNumber}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Emergency Gate Code & Storage Timestamp */}
+                        <div className="flex items-center justify-between text-[10px] bg-emerald-50/70 p-2 rounded-lg border border-emerald-150">
+                          <div>
+                            <span className="text-[9px] text-slate-500 font-bold uppercase block">
+                              Gate Emergency PIN:
+                            </span>
+                            <span className="font-mono font-black text-slate-900 tracking-wider">
+                              {pass.offlinePasscode || generateOfflinePasscode(pass.ticketNumber)}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[9px] text-slate-500 block">Saved to Device:</span>
+                            <span className="text-slate-700 font-bold">{pass.cachedAtFormatted}</span>
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleLoadOfflinePass(pass)}
+                            className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                          >
+                            <QrCode className="w-3.5 h-3.5" />
+                            <span>Present at Gate</span>
+                          </button>
+
+                          <a
+                            href={pass.qrDataUrl}
+                            download={`vernunt-pass-${pass.ticketNumber}.png`}
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl transition cursor-pointer border border-slate-200"
+                            title="Download QR code image (.png)"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteOfflinePass(pass.ticketNumber)}
+                            className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl transition cursor-pointer border border-rose-200"
+                            title="Remove from offline cache"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           )}
 

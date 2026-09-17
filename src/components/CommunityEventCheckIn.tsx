@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
-import { QrCode, CheckCircle, Award, Sparkles, Scan, Smartphone, Info, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { QrCode, CheckCircle, Award, Sparkles, Scan, Smartphone, Info, RefreshCw, WifiOff, HardDrive } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import QRCode from 'qrcode';
 import { db, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { doc, updateDoc } from 'firebase/firestore';
 import { ChildProfile } from '../types.ts';
+import { savePassToOfflineCache, getOfflineCachedPassByEventId } from '../utils/offlineQrPassStorage.ts';
 
 interface CommunityEventCheckInProps {
   userProfile: ChildProfile | null;
@@ -141,8 +143,53 @@ export default function CommunityEventCheckIn({
   const qrPassPayload = `${baseDomain}/gate-pass?event=${eventId}&parent=${userProfile.id}&time=${Date.now()}`;
   const qrPosterPayload = `${baseDomain}/venue-checkin?event=${eventId}&lat=${userProfile.location?.lat || 19.0760}&lng=${userProfile.location?.lng || 72.8777}`;
 
-  // Embedded aesthetic qr server generator
-  const qrPassSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrPassPayload)}&color=0f172a&bgcolor=ffffff&qzone=2`;
+  const [localQrPassSrc, setLocalQrPassSrc] = useState<string>(() => {
+    const cached = getOfflineCachedPassByEventId(eventId);
+    return cached?.qrDataUrl || '';
+  });
+  const [isCachedOffline, setIsCachedOffline] = useState<boolean>(() => {
+    return Boolean(getOfflineCachedPassByEventId(eventId)?.qrDataUrl);
+  });
+
+  useEffect(() => {
+    QRCode.toDataURL(qrPassPayload, {
+      width: 250,
+      margin: 1.5,
+      color: { dark: '#0f172a', light: '#ffffff' },
+      errorCorrectionLevel: 'H'
+    })
+      .then(url => {
+        setLocalQrPassSrc(url);
+        setIsCachedOffline(true);
+        savePassToOfflineCache({
+          id: `gate-checkin-${eventId}-${userProfile.id}`,
+          ticketNumber: `VERN-EVT-GATE-${eventId.slice(-4).toUpperCase()}`,
+          eventId: eventId,
+          eventTitle: eventTitle,
+          eventDate: new Date().toISOString().split('T')[0],
+          eventTime: 'Gate Check-In Active',
+          venue: 'Neighborhood Event Venue',
+          attendeeName: userProfile.childName,
+          parentName: userProfile.parentName,
+          phone: userProfile.phone || '+91 98201 44821',
+          tierName: 'Gate Check-in Admission',
+          qrDataUrl: url,
+          qrPayload: qrPassPayload,
+          status: 'Upcoming'
+        });
+      })
+      .catch(err => {
+        console.warn('Local QR generation error, fallback to cached or remote:', err);
+        const cached = getOfflineCachedPassByEventId(eventId);
+        if (cached?.qrDataUrl) {
+          setLocalQrPassSrc(cached.qrDataUrl);
+          setIsCachedOffline(true);
+        }
+      });
+  }, [qrPassPayload, eventId, eventTitle, userProfile.id, userProfile.childName, userProfile.parentName, userProfile.phone]);
+
+  // Fallback remote source only if client generation is pending
+  const qrPassSrc = localQrPassSrc || `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrPassPayload)}&color=0f172a&bgcolor=ffffff&qzone=2`;
   const qrPosterSrc = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(qrPosterPayload)}&color=ea580c&bgcolor=ffffff&qzone=2`;
 
   return (
@@ -239,6 +286,15 @@ export default function CommunityEventCheckIn({
                   <span>STATED COMPANIONS:</span>
                   <span className="font-extrabold text-emerald-600">Verified</span>
                 </div>
+                {isCachedOffline && (
+                  <div className="flex justify-between text-emerald-700 font-bold pt-1 border-t border-slate-200">
+                    <span className="flex items-center gap-1">
+                      <HardDrive className="w-2.5 h-2.5 text-emerald-600" />
+                      OFFLINE CACHE:
+                    </span>
+                    <span className="text-[8.5px] bg-emerald-100 px-1 rounded">Saved on Device</span>
+                  </div>
+                )}
               </div>
 
               {/* Gate Pass Scan Action */}

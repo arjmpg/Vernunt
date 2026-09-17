@@ -22,8 +22,6 @@ steps:
       - '--platform'
       - 'managed'
       - '--allow-unauthenticated'
-      - '--port=8080'
-      - '--memory=1Gi'
 
 images:
   - 'gcr.io/$PROJECT_ID/vernunt:latest'

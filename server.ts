@@ -4,14 +4,6 @@ import fs from "fs";
 import os from "os";
 import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
-import {
-  resolveArticleFromSlug,
-  renderKnowledgeArticleHtml,
-  renderExploreCategoryHtml,
-  renderEventsHubHtml,
-  renderSpecialistsHubHtml,
-  renderHtmlSitemapDirectory
-} from "./server/seoPrerender.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
 // Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
@@ -2420,46 +2412,15 @@ async function startServer() {
   app.get("/robots.txt", (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.send(`User-agent: *
-# Strict Child & Parent Safety: Un-index and hide all sensitive child/family data from SEO
-Disallow: /radar
-Disallow: /profile
-Disallow: /playmates
-Disallow: /groups
-Disallow: /chat
-Disallow: /messages
-Disallow: /tracker
-Disallow: /vaccines
-Disallow: /api/
-Disallow: /*?token=*
-Disallow: /*?user=*
-Disallow: /*?child=*
-Disallow: /*?group=*
-
-# Allow only public educational guides, pediatric directories, verified clinic services & kid stories
 Allow: /
-Allow: /knowledge
-Allow: /knowledge/
-Allow: /guide/
-Allow: /explore/
-Allow: /events
-Allow: /specialists
-Allow: /doctors/
-Allow: /safety
-Allow: /directory
-Allow: /sitemap
-Allow: /pricing
-Allow: /kid-stories/
-Allow: /web-stories/
-Allow: /stories/
 
 Sitemap: https://app.vernunt.com/sitemap.xml
-Sitemap: https://app.vernunt.com/sitemap-guides.xml
 Sitemap: https://app.vernunt.com/sitemap-pages.xml
 Sitemap: https://app.vernunt.com/sitemap-events.xml
-Sitemap: https://app.vernunt.com/sitemap-doctors.xml
-Sitemap: https://app.vernunt.com/sitemap-localities.xml
 Sitemap: https://app.vernunt.com/sitemap-stories.xml
-Sitemap: https://app.vernunt.com/sitemap-kid-stories.xml
+Sitemap: https://app.vernunt.com/sitemap-guides.xml
+Sitemap: https://app.vernunt.com/sitemap-localities.xml
+Sitemap: https://app.vernunt.com/sitemap-doctors.xml
 `);
   });
 
@@ -4012,191 +3973,6 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   });
 
   // =========================================================================
-  // RANK MATH SEO SUITE: 301/302 REDIRECTIONS & 404 MONITORING MIDDLEWARE
-  // =========================================================================
-  const rankMathRedirects: Array<{ id: string; source: string; destination: string; type: number; hits: number }> = [
-    { id: "rm-1", source: "/guide/anti-inflammatory-diet", destination: "/knowledge/anti-inflammatory-toddler-diet-7-10-years-guide", type: 301, hits: 0 },
-    { id: "rm-2", source: "/toddler-meals-old", destination: "/knowledge/anti-inflammatory-toddler-diet-7-10-years-guide", type: 301, hits: 0 },
-    { id: "rm-3", source: "/guides", destination: "/knowledge", type: 301, hits: 0 },
-    { id: "rm-4", source: "/sitemap.html", destination: "/directory", type: 301, hits: 0 }
-  ];
-
-  const rankMath404Logs: Array<{ id: string; url: string; hits: number; lastDetected: string; userAgent: string; referrer: string }> = [];
-
-  // Redirection middleware
-  app.use((req, res, next) => {
-    const matched = rankMathRedirects.find(r => r.source === req.path);
-    if (matched) {
-      matched.hits++;
-      console.log(`[Rank Math Redirection] ${matched.type} ${req.path} -> ${matched.destination}`);
-      return res.redirect(matched.type, matched.destination);
-    }
-    next();
-  });
-
-  // =========================================================================
-  // RANK MATH SEO SUITE: REST API ENDPOINTS
-  // =========================================================================
-  
-  // 1. Instant Indexing (IndexNow API integration)
-  app.post("/api/seo/indexnow", async (req, res) => {
-    try {
-      const { url, urls } = req.body;
-      const targetUrls: string[] = urls || (url ? [url] : []);
-      if (!targetUrls.length) {
-        return res.status(400).json({ error: "Missing url or urls parameter" });
-      }
-
-      const payload = {
-        host: "app.vernunt.com",
-        key: "vernunt_indexnow_auth_2026",
-        keyLocation: "https://app.vernunt.com/vernunt-indexnow-key.txt",
-        urlList: targetUrls
-      };
-
-      try {
-        const fetchRes = await fetch("https://api.indexnow.org/indexnow", {
-          method: "POST",
-          headers: { "Content-Type": "application/json; charset=utf-8" },
-          body: JSON.stringify(payload)
-        });
-        console.log(`[Rank Math IndexNow] Submitted ${targetUrls.length} URLs to IndexNow. HTTP Status: ${fetchRes.status}`);
-      } catch (err: any) {
-        console.warn(`[Rank Math IndexNow] Ping dispatched with key: ${err.message}`);
-      }
-
-      return res.json({
-        success: true,
-        submittedUrls: targetUrls,
-        key: "vernunt_indexnow_auth_2026",
-        enginesNotified: ["Bing", "Yandex", "Seznam", "Naver"],
-        timestamp: new Date().toISOString()
-      });
-    } catch (e: any) {
-      return res.status(500).json({ error: e.message });
-    }
-  });
-
-  // 2. Redirections API
-  app.get("/api/seo/redirections", (req, res) => {
-    res.json({ rules: rankMathRedirects });
-  });
-
-  app.post("/api/seo/redirections", (req, res) => {
-    const { source, destination, type } = req.body;
-    if (!source || !destination) {
-      return res.status(400).json({ error: "Missing source or destination" });
-    }
-    const newRule = {
-      id: `rm-${Date.now()}`,
-      source: source.startsWith("/") ? source : `/${source}`,
-      destination: destination.startsWith("/") || destination.startsWith("http") ? destination : `/${destination}`,
-      type: type || 301,
-      hits: 0
-    };
-    rankMathRedirects.unshift(newRule);
-    res.json({ success: true, rule: newRule });
-  });
-
-  // 3. 404 Monitor API
-  app.get("/api/seo/404-log", (req, res) => {
-    res.json({ logs: rankMath404Logs.slice(0, 50) });
-  });
-
-  // 4. Site SEO Audit API
-  app.get("/api/seo/audit", (req, res) => {
-    res.json({
-      totalUrlsScanned: 706,
-      overallHealthScore: 96,
-      criticalIssuesCount: 0,
-      warningsCount: 4,
-      passedCount: 702,
-      canonicalTagsIntegrity: "100% Unique Self-Referential",
-      schemaTypesSupported: ["Article", "MedicalWebPage", "FAQPage", "HowTo", "BreadcrumbList", "Physician", "Event"],
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  // =========================================================================
-  // SERVER-SIDE SEO PRE-RENDERING & CRAWLER BOT DISCOVERY ENGINE
-  // Serves fully-formed semantic HTML, Schema.org JSON-LD & Self-Referential Canonical tags
-  // =========================================================================
-  app.get(["/knowledge/:slug", "/guide/:slug"], (req, res) => {
-    try {
-      const slug = req.params.slug;
-      const article = resolveArticleFromSlug(slug);
-      const html = renderKnowledgeArticleHtml(article);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    } catch (e: any) {
-      console.error("[SEO Engine] Error rendering knowledge guide:", e);
-      return res.status(500).send("Error rendering page");
-    }
-  });
-
-  app.get("/explore/:category", (req, res) => {
-    try {
-      const category = req.params.category;
-      const html = renderExploreCategoryHtml(category);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    } catch (e: any) {
-      console.error("[SEO Engine] Error rendering explore category:", e);
-      return res.status(500).send("Error rendering page");
-    }
-  });
-
-  app.get("/events", (req, res, next) => {
-    const isBot = /bot|googlebot|crawler|spider|robot|crawling|google-inspectiontool|bingbot|yandex|duckduckbot/i.test(req.headers["user-agent"] || "");
-    const wantsHtml = req.headers.accept && req.headers.accept.includes("text/html");
-    if (isBot || wantsHtml) {
-      const html = renderEventsHubHtml();
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    }
-    return next();
-  });
-
-  app.get("/specialists", (req, res, next) => {
-    const isBot = /bot|googlebot|crawler|spider|robot|crawling|google-inspectiontool|bingbot|yandex|duckduckbot/i.test(req.headers["user-agent"] || "");
-    const wantsHtml = req.headers.accept && req.headers.accept.includes("text/html");
-    if (isBot || wantsHtml) {
-      const html = renderSpecialistsHubHtml();
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    }
-    return next();
-  });
-
-  app.get(["/directory", "/sitemap-directory", "/sitemap.html", "/directory.html"], (req, res) => {
-    try {
-      const html = renderHtmlSitemapDirectory("https://app.vernunt.com", knowledgePillars);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    } catch (e: any) {
-      console.error("[SEO Engine] Error rendering directory:", e);
-      return res.status(500).send("Error rendering page");
-    }
-  });
-
-  app.get(["/knowledge", "/guides"], (req, res) => {
-    try {
-      const html = renderHtmlSitemapDirectory("https://app.vernunt.com", knowledgePillars);
-      res.setHeader("Content-Type", "text/html; charset=utf-8");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
-      return res.send(html);
-    } catch (e: any) {
-      console.error("[SEO Engine] Error rendering knowledge landing:", e);
-      return res.status(500).send("Error rendering page");
-    }
-  });
-
-  // =========================================================================
   // VITE DEV SERVER OR STATIC PRODUCTION BUILD HOSTING
   // =========================================================================
   if (process.env.NODE_ENV !== "production") {
@@ -4226,54 +4002,38 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
         },
       })
     );
-    app.get("{/*splat}", (req, res) => {
+    app.get("*all", (req, res) => {
       res.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
       res.setHeader("Pragma", "no-cache");
       res.setHeader("Expires", "0");
-
-      const cleanPath = req.path === "/" ? "" : req.path;
-      const canonicalUrl = `https://app.vernunt.com${cleanPath}`;
-
-      try {
-        let indexHtml = fs.readFileSync(path.join(distPath, "index.html"), "utf8");
-        indexHtml = indexHtml.replace(
-          /<link\s+rel="canonical"[^>]*>/i,
-          `<link rel="canonical" href="${canonicalUrl}" />`
-        );
-        indexHtml = indexHtml.replace(
-          /<meta\s+property="og:url"[^>]*>/i,
-          `<meta property="og:url" content="${canonicalUrl}" />`
-        );
-        res.setHeader("Content-Type", "text/html; charset=utf-8");
-        return res.send(indexHtml);
-      } catch {
-        return res.sendFile(path.join(distPath, "index.html"));
-      }
+      res.sendFile(path.join(distPath, "index.html"));
     });
-    console.log("[Vernunt Full-Stack Server] Serving Static Files with Dynamic Canonical Tags from Production Build");
+    console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  const PORT = 3000;
+  const defaultPort = 3000;
+  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
+  const primaryPort = isNaN(envPort) ? defaultPort : envPort;
 
-  const server = app.listen(PORT, "0.0.0.0", () => {
-    console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${PORT}`);
+  const server = app.listen(primaryPort, "0.0.0.0", () => {
+    console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${primaryPort}`);
+  });
+  server.on("error", (err: any) => {
+    console.error(`[Vernunt Full-Stack Server] Primary port ${primaryPort} error:`, err.message);
   });
 
-  // Cloud Run standalone support: Cloud Run directs container traffic to PORT (default 8080)
-  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : 0;
-  if (envPort && envPort !== PORT) {
+  // If primary port is not 3000, also bind to port 3000 to maintain internal reverse-proxy compatibility
+  if (primaryPort !== defaultPort) {
     try {
-      const secondaryServer = app.listen(envPort, "0.0.0.0", () => {
-        console.log(`[Vernunt Full-Stack Server] Cloud Run production port http://0.0.0.0:${envPort} active`);
+      const backupServer = app.listen(defaultPort, "0.0.0.0", () => {
+        console.log(`[Vernunt Full-Stack Server] Dual-port proxy listener active on http://0.0.0.0:${defaultPort}`);
       });
-      secondaryServer.on("error", (err: any) => {
-        // In AI Studio dev environment, port 8080 is used by reverse proxy, which is expected
-        if (err.code !== "EADDRINUSE") {
-          console.error(`[Vernunt Server] Secondary port ${envPort} notice:`, err.message);
-        }
+      backupServer.on("error", (err: any) => {
+        // EADDRINUSE is expected when an internal proxy already occupies port 3000
+        console.log(`[Vernunt Full-Stack Server] Port ${defaultPort} handled: ${err.message}`);
       });
-    } catch {
-      // Ignored if port is managed by host proxy
+    } catch (e: any) {
+      console.log(`[Vernunt Full-Stack Server] Dual-port initialization note: ${e.message}`);
     }
   }
 }

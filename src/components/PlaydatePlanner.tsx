@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ChildProfile, Playdate } from '../types.ts';
-import { CalendarRange, CalendarCheck2, MapPin, Clock, Trash2, HeartHandshake, Sparkles, BellRing, Star, CheckCircle2, Award } from 'lucide-react';
+import { CalendarRange, CalendarCheck2, MapPin, Clock, Trash2, HeartHandshake, Sparkles, BellRing } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { auth, db, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { onSnapshot, collection, query, where, or, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PlaydateActivitySuggestions } from './PlaydateActivitySuggestions.tsx';
 import { sendPlaydateRequestPush, sendPlaydateConfirmedPush } from '../utils/fcmMessaging.ts';
-import { PlaydateReviewModal } from './PlaydateReviewModal.tsx';
-import { ProfileReviewsListModal } from './ProfileReviewsListModal.tsx';
-import { getAverageRatingForProfile, subscribeToReviews } from '../services/reviewService.ts';
 
 interface PlaydatePlannerProps {
   playmates: ChildProfile[];
@@ -20,14 +17,6 @@ interface PlaydatePlannerProps {
 export default function PlaydatePlanner({ playmates, userProfile, activeCompanion, onOpenPushModal }: PlaydatePlannerProps) {
   // Local list of playdates
   const [playdates, setPlaydates] = useState<Playdate[]>([]);
-
-  // Rating & Review Flow Modal States
-  const [reviewTargetPlaydate, setReviewTargetPlaydate] = useState<{
-    profile: ChildProfile;
-    playdateId: string;
-    playdateTitle: string;
-  } | null>(null);
-  const [viewReviewsProfile, setViewReviewsProfile] = useState<ChildProfile | null>(null);
 
   // Real-time Firestore synchronisation for logged in users
   useEffect(() => {
@@ -215,41 +204,6 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
     });
   };
 
-  const handleCompletePlaydate = async (id: string) => {
-    const target = playdates.find(d => d.id === id);
-    if (auth.currentUser) {
-      try {
-        await updateDoc(doc(db, 'playdates', id), { status: 'Completed' });
-      } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `playdates/${id}`);
-      }
-    } else {
-      setPlaydates(playdates.map(d => {
-        if (d.id === id) {
-          return { ...d, status: 'Completed' as any };
-        }
-        return d;
-      }));
-    }
-
-    if (target) {
-      const child = playmates.find(p => p.id === target.guestId);
-      if (child) {
-        setReviewTargetPlaydate({
-          profile: child,
-          playdateId: target.id,
-          playdateTitle: target.title
-        });
-      }
-    }
-
-    confetti({
-      particleCount: 40,
-      spread: 60,
-      colors: ['#10b981', '#f59e0b']
-    });
-  };
-
   return (
     <div id="playdate-planner-tab" className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       {/* Column 1 & 2: Main Schedule Overviews & Request Creation */}
@@ -429,40 +383,19 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
               const childPhoto = childMatched ? childMatched.photoUrl : '';
 
               const isPending = d.status === 'Pending';
-              const isCompleted = (d.status as string) === 'Completed';
-              const isAccepted = d.status === 'Accepted';
-              const ratingInfo = childMatched ? getAverageRatingForProfile(childMatched.id) : null;
               
               return (
-                <div id={`playdate-item-${d.id}`} key={d.id} className={`p-4 rounded-2xl border space-y-3 transition-all ${isCompleted ? 'bg-emerald-50/40 border-emerald-100' : 'bg-slate-50 border-slate-100'}`}>
+                <div id={`playdate-item-${d.id}`} key={d.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2.5">
-                      {childPhoto && <img src={childPhoto} alt={childName} className="w-8 h-8 rounded-full object-cover border border-slate-200 shadow-2xs" referrerPolicy="no-referrer" />}
+                      {childPhoto && <img src={childPhoto} alt={childName} className="w-8 h-8 rounded-full object-cover border border-slate-200" referrerPolicy="no-referrer" />}
                       <div>
                         <span className="block text-xs font-bold text-slate-800">{d.title}</span>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[10px] text-slate-400 font-semibold uppercase">Meeting with: {childName}</span>
-                          {ratingInfo && (
-                            <button
-                              type="button"
-                              onClick={() => childMatched && setViewReviewsProfile(childMatched)}
-                              className="inline-flex items-center gap-1 text-[10px] bg-amber-50 text-amber-900 border border-amber-200/70 px-1.5 py-0.2 rounded-md font-bold hover:bg-amber-100 cursor-pointer"
-                              title="View playmate reviews"
-                            >
-                              <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
-                              <span>{ratingInfo.averageRating > 0 ? ratingInfo.averageRating.toFixed(1) : 'New'}</span>
-                              {ratingInfo.totalReviews > 0 && <span className="text-slate-400 font-normal">({ratingInfo.totalReviews})</span>}
-                            </button>
-                          )}
-                        </div>
+                        <span className="text-[10px] text-slate-400 font-semibold uppercase">Meeting with: {childName}</span>
                       </div>
                     </div>
                     
-                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                      isCompleted ? 'bg-emerald-100 text-emerald-800 border border-emerald-200' :
-                      isAccepted ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
-                      'bg-amber-50 text-amber-600 border border-amber-100'
-                    }`}>
+                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${d.status === 'Accepted' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
                       {d.status}
                     </span>
                   </div>
@@ -491,7 +424,6 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
                     </p>
                   )}
 
-                  {/* Actions Bar */}
                   {isPending ? (
                     <div id={`pending-actions-${d.id}`} className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                       <button
@@ -512,49 +444,15 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
                       </button>
                     </div>
                   ) : (
-                    <div id={`accepted-actions-${d.id}`} className="pt-2 border-t border-slate-100/80 space-y-2">
-                      <div className="flex items-center gap-1.5 flex-wrap justify-between">
-                        {isAccepted && (
-                          <button
-                            id={`btn-mark-complete-${d.id}`}
-                            onClick={() => handleCompletePlaydate(d.id)}
-                            type="button"
-                            className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-bold rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Mark Completed</span>
-                          </button>
-                        )}
-
-                        {childMatched && (
-                          <button
-                            id={`btn-rate-playdate-${d.id}`}
-                            onClick={() => {
-                              setReviewTargetPlaydate({
-                                profile: childMatched,
-                                playdateId: d.id,
-                                playdateTitle: d.title
-                              });
-                            }}
-                            type="button"
-                            className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white text-[10.5px] font-bold rounded-xl transition flex items-center gap-1 shadow-2xs cursor-pointer ml-auto"
-                          >
-                            <Star className="w-3.5 h-3.5 fill-white text-white" />
-                            <span>Rate & Review Family</span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex justify-end pt-1">
-                        <button
-                          id={`btn-delete-date-${d.id}`}
-                          onClick={() => handleDeclineRequest(d.id)}
-                          type="button"
-                          className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-1 font-semibold hover:underline cursor-pointer"
-                        >
-                          <Trash2 className="w-3 h-3" /> Cancel playdate
-                        </button>
-                      </div>
+                    <div id={`accepted-actions-${d.id}`} className="flex justify-end pt-1">
+                      <button
+                        id={`btn-delete-date-${d.id}`}
+                        onClick={() => handleDeclineRequest(d.id)}
+                        type="button"
+                        className="text-[10px] text-slate-400 hover:text-red-500 flex items-center gap-1 font-semibold hover:underline"
+                      >
+                        <Trash2 className="w-3 h-3" /> Cancel playdate
+                      </button>
                     </div>
                   )}
                 </div>
@@ -563,37 +461,6 @@ export default function PlaydatePlanner({ playmates, userProfile, activeCompanio
           </div>
         </div>
       </div>
-
-      {/* Review & Feedback Modals */}
-      {reviewTargetPlaydate && (
-        <PlaydateReviewModal
-          targetProfile={reviewTargetPlaydate.profile}
-          currentUserProfile={userProfile}
-          playdateId={reviewTargetPlaydate.playdateId}
-          playdateTitle={reviewTargetPlaydate.playdateTitle}
-          onClose={() => setReviewTargetPlaydate(null)}
-          onReviewSubmitted={() => {
-            setReviewTargetPlaydate(null);
-          }}
-        />
-      )}
-
-      {viewReviewsProfile && (
-        <ProfileReviewsListModal
-          targetProfile={viewReviewsProfile}
-          currentUserProfile={userProfile}
-          onClose={() => setViewReviewsProfile(null)}
-          onOpenLeaveReview={() => {
-            const p = viewReviewsProfile;
-            setViewReviewsProfile(null);
-            setReviewTargetPlaydate({
-              profile: p,
-              playdateId: 'planner-manual',
-              playdateTitle: 'Scheduled Playdate'
-            });
-          }}
-        />
-      )}
     </div>
   );
 }

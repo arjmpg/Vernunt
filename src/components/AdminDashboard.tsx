@@ -11,8 +11,9 @@ import {
   ShoppingCart, HelpCircle, MoreHorizontal, ExternalLink, Settings,
   CreditCard, Key, Server, CheckSquare, Square, Filter, ChevronLeft,
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
-  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu
+  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins
 } from 'lucide-react';
+import AdminKidsInvestmentsView from './admin/AdminKidsInvestmentsView.tsx';
 import { db, handleFirestoreError, OperationType, auth } from '../utils/firebase.ts';
 import { doc, setDoc, updateDoc, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { ChildProfile, VerificationStatus, CommunityEvent, SubscriptionPlan, AdminCouponCode } from '../types.ts';
@@ -50,7 +51,6 @@ import { AdminCommerceEngineDesk } from './admin/AdminCommerceEngineDesk.tsx';
 import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.tsx';
 import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
-import { AdminReviewModerationDesk } from './admin/AdminReviewModerationDesk.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -83,7 +83,7 @@ export default function AdminDashboard({
   
   // Navigation Menu States
   // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'reviews-moderation' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -1522,28 +1522,6 @@ export default function AdminDashboard({
               )}
             </button>
 
-            {/* MENU ITEM: Playdate Review & Abuse Moderation */}
-            <button
-              type="button"
-              onClick={() => { setActiveMenu('reviews-moderation'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center justify-between px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
-                activeMenu === 'reviews-moderation'
-                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-white'
-                  : 'hover:bg-[#135e96] hover:text-white'
-              }`}
-              title="Playdate Reviews & Abuse Shield Moderation"
-            >
-              <div className="flex items-center gap-2.5">
-                <Star className="w-4 h-4 shrink-0 text-amber-400 fill-amber-400" />
-                {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Review Moderation</span>}
-              </div>
-              {(isMobileMenuOpen || !isSidebarCollapsed) && (
-                <span className="bg-amber-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-xs">
-                  Abuse Shield
-                </span>
-              )}
-            </button>
-
             {/* MENU ITEM: Events & Classes */}
             <button
               type="button"
@@ -1729,6 +1707,28 @@ export default function AdminDashboard({
             >
               <Phone className="w-4 h-4 shrink-0 text-[#72aee6]" />
               {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Contact Audits</span>}
+            </button>
+
+            {/* MENU ITEM: Kids Wealth & Leads Tracking */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('kids-investments'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'kids-investments'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-amber-400'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Kids Wealth & Leads"
+            >
+              <Coins className="w-4 h-4 shrink-0 text-amber-300" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Kids Wealth Leads</span>
+                  <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                    SMS Track
+                  </span>
+                </div>
+              )}
             </button>
 
             {/* MENU ITEM: Security & Tools */}
@@ -3177,15 +3177,6 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-            </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* VIEW: REVIEWS & COMMUNITY ABUSE MODERATION CONSOLE                        */}
-          {/* ========================================================================= */}
-          {activeMenu === 'reviews-moderation' && (
-            <div className="space-y-5 animate-fadeIn">
-              <AdminReviewModerationDesk />
             </div>
           )}
 
@@ -5353,6 +5344,13 @@ export default function AdminDashboard({
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ========================================================================= */}
+          {/* VIEW H-2: KIDS FUTURE WEALTH & LEADS AUDIT                                */}
+          {/* ========================================================================= */}
+          {activeMenu === 'kids-investments' && (
+            <AdminKidsInvestmentsView />
           )}
 
           {/* ========================================================================= */}

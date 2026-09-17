@@ -49,7 +49,7 @@ interface LandingLoginGatewayProps {
     role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer', 
     details?: { phone?: string; email?: string; phoneVerified?: boolean }
   ) => void;
-  onQuickStart?: () => void;
+  onQuickStart: () => void;
   onGoogleSignIn?: () => void;
   onSelectGoogleAccount?: (account: { email: string; displayName: string; photoURL?: string; role?: string }) => void;
   onOpenKnowledgeBase?: (slug?: string) => void;
@@ -58,6 +58,7 @@ interface LandingLoginGatewayProps {
   onOpenContactUs?: () => void;
   onOpenKidStories?: () => void;
   onOpenEvents?: () => void;
+  onOpenKidsInvestments?: () => void;
   onOpenEventBuyerRegistration?: () => void;
   isAuthenticating?: boolean;
   externalAuthError?: string;
@@ -79,6 +80,7 @@ export default function LandingLoginGateway({
   onOpenContactUs,
   onOpenKidStories,
   onOpenEvents,
+  onOpenKidsInvestments,
   onOpenEventBuyerRegistration,
   isAuthenticating = false,
   externalAuthError = '',
@@ -134,6 +136,15 @@ export default function LandingLoginGateway({
   const homeBanners = banners.filter(b => b.active && (b.placement === 'home' || !b.placement));
   
   const defaultHomeBanners = [
+    {
+      title: "We Bring Low Cost Properties for Your Kid's Future! Verified Sites & Plots",
+      subtitle: "Smart future wealth planning: Curated verified plots & sites, mutual funds SIP, and gold/silver monthly schemes with transparent EMI calculations.",
+      imageUrl: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1200",
+      tag: "Kids Future Wealth",
+      badgeText: "Low Cost Properties",
+      linkUrl: "#",
+      ctaText: "Explore Kids Investments ↗"
+    },
     {
       title: "Bengaluru & Mumbai Monsoon Play Festival 2026: Outdoor Games & Pottery!",
       subtitle: "Join neighborhood friends in safe, parent-monitored community parks and creative playgroups.",
@@ -847,6 +858,13 @@ export default function LandingLoginGateway({
 
             {/* Quick Trust Pills */}
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1 text-slate-700">
+              <button
+                type="button"
+                onClick={onOpenKidsInvestments}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-full text-xs font-bold text-emerald-800 shadow-2xs transition cursor-pointer"
+              >
+                💰 Kids Investments &amp; Low Cost Properties
+              </button>
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/90 border border-amber-200/80 rounded-full text-xs font-bold shadow-2xs">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 100% Aadhaar Verified Safety
@@ -867,161 +885,95 @@ export default function LandingLoginGateway({
           </div>
         </div>
 
-        {/* TOP LEVEL GRID: BANNER & REGISTRATION (Left) + LOGIN GATEWAY (Right) */}
-        <div id="top-portal-grid" className="w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-stretch">
-          
-          {/* LEFT COLUMN (5 COLS): FEATURED BANNER + NEIGHBORHOOD TRUST HIGHLIGHTS */}
-          <div id="left-top-column" className="lg:col-span-5 flex flex-col gap-6 w-full justify-between">
-            
-            {/* 1. FEATURED PROMO BANNER CAROUSEL */}
-            <div id="landing-featured-promo-banner" className="w-full bg-white border border-amber-200/85 rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition duration-300 animate-fade-in text-left">
-              <div className="relative h-48 sm:h-56 w-full bg-slate-900 group">
-                <img 
-                  src={activeSlides[currentSlideIndex].imageUrl} 
-                  alt={activeSlides[currentSlideIndex].title || "Featured Announcement"} 
-                  className="w-full h-full object-cover opacity-90 transition duration-700 group-hover:scale-103"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/50 to-transparent flex flex-col justify-end p-4 sm:p-5">
-                  <div className="flex justify-between items-start w-full">
-                    <span className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-sm">
-                      <Megaphone className="w-3.5 h-3.5 text-white" />
-                      <span>{activeSlides[currentSlideIndex].tag || 'Community Spotlight'}</span>
-                      <span className="opacity-75">({currentSlideIndex + 1}/{activeSlides.length})</span>
-                    </span>
-                    {activeSlides.length > 1 && (
-                      <div className="flex items-center gap-1.5 bg-slate-950/40 backdrop-blur-xs p-1 rounded-full">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentSlideIndex((prev) => (prev - 1 + activeSlides.length) % activeSlides.length)}
-                          className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white cursor-pointer transition"
-                          title="Previous slide"
-                        >
-                          <ChevronLeft className="w-3 h-3" />
-                        </button>
-                        <div className="flex gap-1 px-1">
-                          {activeSlides.map((_, idx) => (
-                            <button
-                              key={idx}
-                              type="button"
-                              onClick={() => setCurrentSlideIndex(idx)}
-                              className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentSlideIndex === idx ? 'bg-orange-500 w-4' : 'bg-white/50 hover:bg-white w-2'}`}
-                              title={`Go to slide ${idx + 1}`}
-                            />
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setCurrentSlideIndex((prev) => (prev + 1) % activeSlides.length)}
-                          className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white cursor-pointer transition"
-                          title="Next slide"
-                        >
-                          <ChevronRight className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <h4 className="text-white text-base sm:text-lg font-serif font-black leading-tight tracking-wide drop-shadow-sm select-none mt-2">
-                    {activeSlides[currentSlideIndex].title}
-                  </h4>
-                  {activeSlides[currentSlideIndex].subtitle && (
-                    <p className="text-white/80 text-xs sm:text-sm mt-1 max-w-xl line-clamp-2">
-                      {activeSlides[currentSlideIndex].subtitle}
-                    </p>
-                  )}
-                  <div className="pt-2">
+        {/* 1. HERO BANNER CAROUSEL (Always directly below logo) */}
+        <div id="landing-featured-promo-banner" className="w-full max-w-4xl mx-auto bg-white border border-amber-200/90 rounded-3xl overflow-hidden shadow-md hover:shadow-lg transition duration-300 animate-fade-in text-left">
+          <div className="relative h-52 sm:h-64 md:h-72 w-full bg-slate-900 group">
+            <img 
+              src={activeSlides[currentSlideIndex].imageUrl} 
+              alt={activeSlides[currentSlideIndex].title || "Featured Announcement"} 
+              className="w-full h-full object-cover opacity-90 transition duration-700 group-hover:scale-103"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent flex flex-col justify-end p-4 sm:p-6">
+              <div className="flex justify-between items-start w-full">
+                <span className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-lg shadow-sm">
+                  <Megaphone className="w-3.5 h-3.5 text-white" />
+                  <span>{activeSlides[currentSlideIndex].tag || 'Community Spotlight'}</span>
+                  <span className="opacity-75">({currentSlideIndex + 1}/{activeSlides.length})</span>
+                </span>
+                {activeSlides.length > 1 && (
+                  <div className="flex items-center gap-1.5 bg-slate-950/40 backdrop-blur-xs p-1 rounded-full">
                     <button
                       type="button"
-                      onClick={() => {
-                        if (activeSlides[currentSlideIndex].linkUrl && activeSlides[currentSlideIndex].linkUrl !== '#') {
-                          window.open(activeSlides[currentSlideIndex].linkUrl, '_blank');
-                        } else if (currentSlideIndex === 0 && onOpenEvents) {
-                          onOpenEvents();
-                        } else if (currentSlideIndex === 1 && onOpenKidStories) {
-                          onOpenKidStories();
-                        } else if (currentSlideIndex === 2) {
-                          onStartSignUp('Daycare Center');
-                        } else if (onOpenEvents) {
-                          onOpenEvents();
-                        }
-                      }}
-                      className="text-xs text-white font-extrabold inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 px-3.5 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
+                      onClick={() => setCurrentSlideIndex((prev) => (prev - 1 + activeSlides.length) % activeSlides.length)}
+                      className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white cursor-pointer transition"
+                      title="Previous slide"
                     >
-                      <span>{activeSlides[currentSlideIndex].ctaText || 'Explore Spotlight ↗'}</span>
+                      <ChevronLeft className="w-3 h-3" />
+                    </button>
+                    <div className="flex gap-1 px-1">
+                      {activeSlides.map((_, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => setCurrentSlideIndex(idx)}
+                          className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${currentSlideIndex === idx ? 'bg-orange-500 w-4' : 'bg-white/50 hover:bg-white w-2'}`}
+                          title={`Go to slide ${idx + 1}`}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentSlideIndex((prev) => (prev + 1) % activeSlides.length)}
+                      className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center text-white cursor-pointer transition"
+                      title="Next slide"
+                    >
+                      <ChevronRight className="w-3 h-3" />
                     </button>
                   </div>
-                </div>
+                )}
+              </div>
+              <h4 className="text-white text-base sm:text-lg md:text-xl font-serif font-black leading-tight tracking-wide drop-shadow-sm select-none mt-2">
+                {activeSlides[currentSlideIndex].title}
+              </h4>
+              {activeSlides[currentSlideIndex].subtitle && (
+                <p className="text-white/80 text-xs sm:text-sm mt-1 max-w-xl line-clamp-2">
+                  {activeSlides[currentSlideIndex].subtitle}
+                </p>
+              )}
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const slide = activeSlides[currentSlideIndex];
+                    if (slide.linkUrl && slide.linkUrl !== '#') {
+                      window.open(slide.linkUrl, '_blank');
+                    } else if (slide.tag === 'Kids Future Wealth' || slide.ctaText?.includes('Investments')) {
+                      if (onOpenKidsInvestments) onOpenKidsInvestments();
+                    } else if (currentSlideIndex === 0 && onOpenKidsInvestments) {
+                      onOpenKidsInvestments();
+                    } else if (currentSlideIndex === 1 && onOpenEvents) {
+                      onOpenEvents();
+                    } else if (currentSlideIndex === 2 && onOpenKidStories) {
+                      onOpenKidStories();
+                    } else if (currentSlideIndex === 3) {
+                      onStartSignUp('Daycare Center');
+                    } else if (onOpenEvents) {
+                      onOpenEvents();
+                    }
+                  }}
+                  className="text-xs text-white font-extrabold inline-flex items-center gap-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 px-3.5 py-1.5 rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  <span>{activeSlides[currentSlideIndex].ctaText || 'Explore Spotlight ↗'}</span>
+                </button>
               </div>
             </div>
-
-            {/* 2. NEIGHBORHOOD TRUST & COMMUNITY GUARANTEES */}
-            <div id="neighborhood-trust-showcase" className="bg-white/95 backdrop-blur-xs border border-amber-200/90 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4 text-left animate-fade-in flex-1 flex flex-col justify-between">
-              <div className="flex items-center justify-between border-b border-amber-100 pb-3">
-                <div>
-                  <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200/60">
-                    Neighborhood Trust Guarantee
-                  </span>
-                  <h3 className="text-base font-black text-slate-900 mt-1">
-                    Why Families &amp; Hosts Love Vernunt
-                  </h3>
-                </div>
-                <span className="text-xl">🌟</span>
-              </div>
-
-              <div className="space-y-3.5">
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                    <ShieldCheck className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">100% Aadhaar Verified Guardians</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Only verified parents &amp; guardians can message, join groups, or arrange playdates.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0 mt-0.5">
-                    <KeyRound className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">4-Digit Handshake PIN Handover</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Dual-code verification prevents unauthorized pick-up or drop-off at daycares &amp; sitters.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
-                    <Users className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">Moms &amp; Dads Local Circles</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Dedicated parent circles to share advice, arrange sports clubs &amp; neighborhood playgroups.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5">
-                    <BookOpen className="w-4.5 h-4.5" />
-                  </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-800">YourStory Kids Flipbooks</h4>
-                    <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Publish drawings, poetry, creative stories &amp; trophies in interactive Google flipbooks.</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 rounded-2xl border border-amber-200 text-center">
-                <span className="text-xs font-extrabold text-amber-900">
-                  🎁 1-Year Free Access for Every Verified Family Registering Today!
-                </span>
-              </div>
-            </div>
-
           </div>
+        </div>
 
-          {/* RIGHT COLUMN (7 COLS): FLAGSHIP MERGED LOGIN & REGISTRATION GATEWAY */}
-          <div id="right-top-column" className="lg:col-span-7 w-full flex flex-col">
-            <div id="auth-card" className="bg-white rounded-3xl border-2 border-orange-200/90 shadow-xl shadow-orange-950/5 overflow-hidden text-left animate-fade-in flex flex-col justify-between h-full">
+        {/* 2. SIGN IN OR REGISTER FORM BLOCK (Always placed directly below banner) */}
+        <div id="landing-auth-container" className="w-full max-w-2xl mx-auto animate-fade-in">
+          <div id="auth-card" className="bg-white rounded-3xl border-2 border-orange-200/90 shadow-xl shadow-orange-950/5 overflow-hidden text-left animate-fade-in flex flex-col justify-between">
               
               {/* Card Accent Topline */}
               <div className="bg-gradient-to-r from-orange-500 via-rose-500 to-amber-500 h-2.5 w-full"></div>
@@ -1808,10 +1760,72 @@ export default function LandingLoginGateway({
             </div>
           </div>
         </div>
-      </div>
 
-        {/* 3. REMAINING EVERYTHING (Directly Below Registration & Login Top Grid) */}
-        <div id="remaining-features-section" className="w-full space-y-6 md:space-y-8 animate-fade-in pt-2">
+        {/* 3. NEIGHBORHOOD TRUST & COMMUNITY GUARANTEES (Below Sign In / Register Form) */}
+        <div id="neighborhood-trust-showcase" className="w-full max-w-4xl mx-auto bg-white/95 backdrop-blur-xs border border-amber-200/90 rounded-3xl p-5 sm:p-7 shadow-sm space-y-5 text-left animate-fade-in">
+          <div className="flex items-center justify-between border-b border-amber-100 pb-3">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full border border-orange-200/60">
+                Neighborhood Trust Guarantee
+              </span>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1">
+                Why Families &amp; Hosts Love Vernunt
+              </h3>
+            </div>
+            <span className="text-2xl">🌟</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3 bg-amber-50/40 p-3 rounded-2xl border border-amber-100/70">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
+                <ShieldCheck className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">100% Aadhaar Verified Guardians</h4>
+                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Only verified parents &amp; guardians can message, join groups, or arrange playdates.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 bg-amber-50/40 p-3 rounded-2xl border border-amber-100/70">
+              <div className="w-9 h-9 rounded-xl bg-teal-50 border border-teal-200 flex items-center justify-center text-teal-600 shrink-0 mt-0.5">
+                <KeyRound className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">4-Digit Handshake PIN Handover</h4>
+                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Dual-code verification prevents unauthorized pick-up or drop-off at daycares &amp; sitters.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 bg-amber-50/40 p-3 rounded-2xl border border-amber-100/70">
+              <div className="w-9 h-9 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
+                <Users className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">Moms &amp; Dads Local Circles</h4>
+                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Dedicated parent circles to share advice, arrange sports clubs &amp; neighborhood playgroups.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3 bg-amber-50/40 p-3 rounded-2xl border border-amber-100/70">
+              <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-600 shrink-0 mt-0.5">
+                <BookOpen className="w-4.5 h-4.5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800">YourStory Kids Flipbooks</h4>
+                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Publish drawings, poetry, creative stories &amp; trophies in interactive Google flipbooks.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 rounded-2xl border border-amber-200 text-center">
+            <span className="text-xs font-extrabold text-amber-900">
+              🎁 1-Year Free Access for Every Verified Family Registering Today!
+            </span>
+          </div>
+        </div>
+
+        {/* 4. PLATFORM FEATURES & SAFETY (Below Trust Guarantees) */}
+        <div id="remaining-features-section" className="w-full max-w-4xl mx-auto space-y-6 md:space-y-8 animate-fade-in pt-2">
           
           <div className="text-center">
             <span className="text-[10.5px] uppercase font-black tracking-widest text-amber-700 bg-amber-100/80 px-3.5 py-1 rounded-full border border-amber-200/60">

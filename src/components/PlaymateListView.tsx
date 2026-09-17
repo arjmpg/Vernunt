@@ -3,8 +3,7 @@ import { ChildProfile, VerificationStatus } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
-import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye, Lock, Star } from 'lucide-react';
-import { getAverageRatingForProfile } from '../services/reviewService.ts';
+import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye, Lock } from 'lucide-react';
 
 interface PlaymateListViewProps {
   playmates: ChildProfile[];
@@ -115,7 +114,6 @@ export function PlaymateListView({
           const dKm = (p as any)._cachedDistance ?? getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
           const proxBadge = getProximityBadge(dKm);
           const matchResult = calculateMatchScore(userProfile, p);
-          const ratingStats = getAverageRatingForProfile(p.id);
 
           return (
             <div
@@ -185,26 +183,6 @@ export function PlaymateListView({
                         <Sparkles className="w-2.5 h-2.5 text-amber-500" />
                         {matchResult.score}% Match
                       </span>
-
-                      {ratingStats.totalReviews > 0 ? (
-                        <span 
-                          id={`list-rating-badge-${p.id}`}
-                          className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-lg bg-amber-50 text-amber-900 border border-amber-200/70"
-                          title={`${ratingStats.totalReviews} verified playdate reviews`}
-                        >
-                          <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-500" />
-                          <span>{ratingStats.averageRating.toFixed(1)}</span>
-                          <span className="text-slate-400 font-normal">({ratingStats.totalReviews})</span>
-                        </span>
-                      ) : (
-                        <span 
-                          id={`list-rating-badge-${p.id}`}
-                          className="inline-flex items-center gap-1 text-[9.5px] font-semibold px-1.5 py-0.5 rounded-lg bg-slate-50 text-slate-400 border border-slate-200/50"
-                        >
-                          <Star className="w-2.5 h-2.5 text-slate-300" />
-                          <span>New</span>
-                        </span>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-1 text-[10.5px] text-slate-500 font-medium mt-1">
