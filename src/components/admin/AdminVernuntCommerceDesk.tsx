@@ -577,13 +577,13 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
           </span>
           <div>
             <h1 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-              Vernunt Commerce &amp; Dokan Marketplace Suite
+              Vernunt Commerce &amp; Marketplace Suite
               <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-300">
                 Admin Master Control
               </span>
             </h1>
             <p className="text-xs text-slate-500">
-              Full control over Store Switches (COD, UPI), Multi-Vendor Dokan Sellers, Payout Settlements &amp; GST Invoices
+              Full control over Store Switches (COD, UPI), Multi-Vendor Vernunt Sellers, Payout Settlements &amp; GST Invoices
             </p>
           </div>
         </div>
@@ -623,7 +623,7 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-2xs">
-          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Dokan Marketplace Vendors</span>
+          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-500 block">Vernunt Marketplace Vendors</span>
           <span className="text-2xl font-black font-mono text-teal-700 block mt-1">{vendors.length} Stores</span>
           <span className="text-[10.5px] text-slate-500 font-medium">
             {vendors.filter(v => v.status === 'active').length} Active • {vendors.filter(v => v.status === 'pending').length} Pending
@@ -656,7 +656,7 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
           { id: 'search_analytics', label: '🔍 Product Searches (45 Days)' },
           { id: 'categories', label: `📁 Categories & Kids Food (${categories.length})` },
           { id: 'attributes', label: `🏷️ Attributes & Terms (${attributes.length})` },
-          { id: 'vendors', label: `🏪 Dokan Vendors (${vendors.length})` },
+          { id: 'vendors', label: `🏪 Vernunt Vendors (${vendors.length})` },
           { id: 'withdrawals', label: `💳 Seller Payouts (${pendingWithdrawals.length})` },
           { id: 'moderation', label: `🛡️ Moderation (${pendingModerationProducts.length})` },
           { id: 'settings', label: `⚙️ Store Switches & COD` },
@@ -985,13 +985,13 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
       )}
 
       {/* ========================================================================= */}
-      {/* SUBTAB 3: DOKAN MARKETPLACE VENDORS                                       */}
+      {/* SUBTAB 3: VERNUNT MARKETPLACE VENDORS                                     */}
       {/* ========================================================================= */}
       {activeTab === 'vendors' && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs">
             <div>
-              <h3 className="font-bold text-base text-slate-900">Dokan Multi-Vendor Stores &amp; Sellers</h3>
+              <h3 className="font-bold text-base text-slate-900">Vernunt Multi-Vendor Stores &amp; Sellers</h3>
               <p className="text-xs text-slate-500">Approve new sellers, configure commission splits, and manage store statuses.</p>
             </div>
             <div className="flex items-center gap-2">
@@ -1318,9 +1318,9 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
               </div>
             </div>
 
-            {/* Dokan Marketplace Configuration */}
+            {/* Vernunt Marketplace Configuration */}
             <div className="border-t border-slate-200 pt-6">
-              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-3">Dokan Multi-Vendor Marketplace Rules</h4>
+              <h4 className="font-bold text-xs text-slate-800 uppercase tracking-wider mb-3">Vernunt Multi-Vendor Marketplace Rules</h4>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">Global Marketplace Commission (%)</label>

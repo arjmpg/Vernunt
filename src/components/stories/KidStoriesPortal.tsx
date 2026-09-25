@@ -25,6 +25,7 @@ import GoogleWebStoryModal from './GoogleWebStoryModal.tsx';
 interface KidStoriesPortalProps {
   currentUser: ChildProfile | null;
   onOpenWriteModal: (kidName?: string, chapter?: number) => void;
+  onOpenSignUp?: () => void;
   selectedSlug?: string;
   onSelectStory?: (slug?: string) => void;
   onOpenReferral?: () => void;
@@ -44,6 +45,7 @@ const CATEGORIES = [
 export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
   currentUser,
   onOpenWriteModal,
+  onOpenSignUp,
   selectedSlug,
   onSelectStory,
   onOpenReferral
@@ -53,6 +55,49 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeStory, setActiveStory] = useState<KidStory | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Resolve effective user authentication state from props, auth session cache, or active profile
+  const effectiveUser = useMemo(() => {
+    if (currentUser && currentUser.id && currentUser.id !== 'guest-explorer') return currentUser;
+    try {
+      const cachedSession = localStorage.getItem('vernunt_auth_session');
+      if (cachedSession) {
+        const parsed = JSON.parse(cachedSession);
+        if (parsed?.userProfile && parsed.userProfile.id && parsed.userProfile.id !== 'guest-explorer') {
+          return parsed.userProfile;
+        }
+      }
+      const lastUid = localStorage.getItem('vernunt_active_user_id') || localStorage.getItem('vernunt_last_logged_in_user');
+      if (lastUid && lastUid !== 'guest-explorer') {
+        const raw = localStorage.getItem('vernunt_cached_profile_' + lastUid);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.id && parsed.id !== 'guest-explorer') return parsed;
+        }
+      }
+      const rawUser = localStorage.getItem('vernunt_user_profile');
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser);
+        if (parsed && parsed.id && parsed.id !== 'guest-explorer') return parsed;
+      }
+    } catch (e) {
+      console.debug('Error resolving cached user in KidStoriesPortal', e);
+    }
+    return currentUser;
+  }, [currentUser]);
+
+  const isLoggedIn = Boolean(effectiveUser && effectiveUser.id && effectiveUser.id !== 'guest-explorer');
+
+  const handleWriteStoryClick = (kidName?: string, chapter?: number) => {
+    if (!isLoggedIn) {
+      if (onOpenSignUp) {
+        onOpenSignUp();
+        return;
+      }
+    }
+    // If user is already logged in, allow them to start writing story immediately
+    onOpenWriteModal(kidName, chapter);
+  };
 
   // Modals state
   const [portalViewMode, setPortalViewMode] = useState<'books' | 'articles'>('books');
@@ -326,10 +371,10 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
 
             <button
               type="button"
-              onClick={onOpenWriteModal}
+              onClick={() => handleWriteStoryClick(activeStory.kidName, (activeStory.chapterNumber || 1) + 1)}
               className="flex items-center gap-1 text-xs font-bold text-white bg-gradient-to-r from-orange-600 to-rose-600 px-3.5 py-2 rounded-xl transition shadow-xs cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5" /> Write Story
+              <Plus className="w-3.5 h-3.5" /> Write story of your child
             </button>
           </div>
         </div>
@@ -649,94 +694,6 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-8 font-sans">
       
-      {/* Hero Header (YourStory for Kids style) */}
-      <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 rounded-3xl p-6 sm:p-10 text-white shadow-xl relative overflow-hidden">
-        <div className="absolute -right-16 -top-16 w-80 h-80 bg-white/10 rounded-full blur-2xl pointer-events-none" />
-        
-        <div className="max-w-2xl space-y-3 relative z-10">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/20 text-white text-[11px] font-bold uppercase tracking-wider backdrop-blur-xs">
-            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-            <span>Vernunt Little Achievers • YourStory for Kids</span>
-          </div>
-
-          <h1 className="text-2xl sm:text-4xl font-extrabold font-serif tracking-tight leading-tight">
-            Inspiring Stories of Young Minds & Future Leaders
-          </h1>
-
-          <p className="text-xs sm:text-sm text-orange-100 leading-relaxed">
-            Every child has a remarkable spark. Discover real stories of junior innovators, chess prodigies, robotics builders, and young athletes written by their parents and published after editorial review.
-          </p>
-
-          <div className="pt-2 flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={onOpenWriteModal}
-              className="px-5 py-2.5 bg-white text-orange-700 hover:bg-orange-50 font-bold text-xs sm:text-sm rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-orange-600" />
-              <span>Write & Submit Your Kid's Story</span>
-            </button>
-
-            {/* Read in Interactive Flipbook */}
-            <button
-              type="button"
-              onClick={() => handleOpenBookReader(filteredStories, 0)}
-              className="px-4 py-2.5 bg-white/15 hover:bg-white/25 text-white font-bold text-xs sm:text-sm rounded-xl transition backdrop-blur-xs flex items-center gap-2 cursor-pointer border border-white/20"
-            >
-              <Book className="w-4 h-4 text-amber-300" />
-              <span>Read in Book Mode</span>
-            </button>
-
-            <div className="text-[11px] text-orange-100/90 flex items-center gap-1.5">
-              <ShieldCheck className="w-4 h-4 text-emerald-300 shrink-0" />
-              <span>Admin approved & Google SEO indexed</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Parent Referral & Lifetime Free Writing Incentive Banner */}
-      <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 rounded-3xl p-5 sm:p-6 text-white shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-start gap-3.5 max-w-2xl">
-          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 mt-0.5">
-            <Gift className="w-5 h-5 text-amber-200" />
-          </div>
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-black uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-md text-amber-100">
-                Parent Referral Reward
-              </span>
-              {isLifetimeUnlocked && (
-                <span className="text-xs font-bold bg-emerald-500 text-white px-2 py-0.5 rounded-md flex items-center gap-1">
-                  ✓ Lifetime Free Access Unlocked
-                </span>
-              )}
-            </div>
-            <h3 className="text-base font-bold">
-              Refer Parents: Unlock Free Lifetime Story Publishing & 1-Year Free Search Radar!
-            </h3>
-            <p className="text-xs text-orange-100 leading-relaxed">
-              Invite other parents to document their child's achievements. As soon as your referee signs up, you immediately unlock permanent free lifetime access to publish multiple stories and get one full year free of child radar discovery.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (onOpenReferral) {
-              onOpenReferral();
-            } else {
-              setShowReferralModal(true);
-            }
-          }}
-          className="px-5 py-3 bg-white text-orange-700 hover:bg-orange-50 font-bold text-xs sm:text-sm rounded-2xl shadow-lg transition flex items-center gap-2 shrink-0 cursor-pointer"
-        >
-          <Users className="w-4 h-4 text-orange-600" />
-          <span>{isLifetimeUnlocked ? 'View Referral Hub' : 'Invite & Unlock Lifetime Access'}</span>
-        </button>
-      </div>
-
       {/* Search, View Mode Switcher & Category Filter Navigation */}
       <div className="space-y-4">
         
@@ -827,11 +784,11 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
             </div>
             <button
               type="button"
-              onClick={() => onOpenWriteModal()}
+              onClick={() => handleWriteStoryClick()}
               className="px-4 py-2 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Write Story for Child</span>
+              <span>Write story of your child</span>
             </button>
           </div>
 
@@ -846,10 +803,10 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
               </p>
               <button
                 type="button"
-                onClick={() => onOpenWriteModal()}
+                onClick={() => handleWriteStoryClick()}
                 className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
               >
-                Write First Story
+                Write story of your child
               </button>
             </div>
           ) : (
@@ -859,7 +816,7 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
                   key={book.kidName}
                   book={book}
                   onOpenBook={handleOpenKidBook}
-                  onAddStoryToKid={(kidName, nextChapter) => onOpenWriteModal(kidName, nextChapter)}
+                  onAddStoryToKid={(kidName, nextChapter) => handleWriteStoryClick(kidName, nextChapter)}
                   onOpenInstagram={(b) => handleOpenInstagramShare(b.latestStory)}
                   onOpenGoogleWebStory={(s) => handleOpenGoogleWebStory(s)}
                   currentUser={currentUser}
@@ -955,10 +912,10 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
                 </p>
                 <button
                   type="button"
-                  onClick={() => onOpenWriteModal()}
+                  onClick={() => handleWriteStoryClick()}
                   className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer"
                 >
-                  Write First Story
+                  Write story of your child
                 </button>
               </div>
             ) : (
@@ -1069,7 +1026,7 @@ export const KidStoriesPortal: React.FC<KidStoriesPortalProps> = ({
           }}
           onAddStoryToKid={(kidName, nextChapter) => {
             setShowBookReader(false);
-            onOpenWriteModal(kidName, nextChapter);
+            handleWriteStoryClick(kidName, nextChapter);
           }}
           isLoggedInParent={Boolean(currentUser)}
           currentParentIdentifier={currentUser?.email || currentUser?.phoneNumber}

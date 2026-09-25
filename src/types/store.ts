@@ -133,7 +133,7 @@ export interface StoreSettings {
   showAnnouncementBanner: boolean;
   announcementBannerText: string;
 
-  // Dokan Multi-Vendor Configuration
+  // Vernunt Multi-Vendor Configuration
   allowVendorRegistration: boolean;
   autoApproveVendors: boolean;
   autoApproveVendorProducts: boolean;
@@ -243,6 +243,8 @@ export interface StoreOrder {
   taxAmountGst: number;
   totalAmount: number;
   paymentMethod: PaymentMethod;
+  walletAmountUsed?: number;
+  onlineAmountPaid?: number;
   paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded';
   paymentReferenceId?: string; // UPI ref or Gateway txn id
   orderStatus: OrderStatus;

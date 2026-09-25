@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ChildProfile } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
-import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
+import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 import { 
   Heart, 
@@ -19,7 +19,9 @@ import {
   Flame,
   Award,
   Maximize2,
-  Minimize2
+  Minimize2,
+  MessageSquare,
+  Navigation
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -28,6 +30,7 @@ interface PlaymateSwipeDeckProps {
   userProfile: ChildProfile | null;
   onSelectPlaymate?: (profile: ChildProfile) => void;
   onOpenDetailModal: (profile: ChildProfile) => void;
+  onQuickChat?: (profile: ChildProfile, templateMessage?: string) => void;
   connectedIds?: string[];
   interestsSent?: string[];
   interestsReceived?: string[];
@@ -44,6 +47,7 @@ export function PlaymateSwipeDeck({
   userProfile,
   onSelectPlaymate,
   onOpenDetailModal,
+  onQuickChat,
   connectedIds = [],
   interestsSent = [],
   interestsReceived = [],
@@ -359,11 +363,34 @@ export function PlaymateSwipeDeck({
 
               {/* Top Floating Badges Area */}
               <div className="relative z-20 pt-4 px-4 sm:px-5 flex items-center justify-between pointer-events-none">
-                {/* Proximity Pill */}
-                <span className="inline-flex items-center gap-1.5 bg-black/60 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-full border border-white/20 shadow-md">
-                  <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                  <span>{distance.toFixed(1)} km • {proxBadge.label}</span>
-                </span>
+                {/* Proximity Pill & Navigation Action */}
+                <div className="flex items-center gap-1.5 flex-wrap pointer-events-auto">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (currentProfile) {
+                        openDeviceNavigation(currentProfile.location.lat, currentProfile.location.lng, `${currentProfile.childName}'s Play Area`);
+                      }
+                    }}
+                    className={`inline-flex items-center gap-1.5 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-full border shadow-md transition hover:scale-105 active:scale-95 cursor-pointer ${
+                      distance <= 0.5 
+                        ? 'bg-emerald-600/90 hover:bg-emerald-600 border-emerald-300 ring-2 ring-emerald-400/50 animate-pulse' 
+                        : 'bg-black/65 hover:bg-black/80 border-white/20'
+                    }`}
+                    title="Click to Start Navigation in Map"
+                  >
+                    {distance <= 0.5 ? (
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-80"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                      </span>
+                    ) : (
+                      <Navigation className="w-3.5 h-3.5 text-emerald-400 fill-emerald-400/30 shrink-0" />
+                    )}
+                    <span>{proxBadge.exactText} &bull; {distance <= 0.5 ? 'Spontaneous Walk' : proxBadge.subtext}</span>
+                  </button>
+                </div>
 
                 {/* Compatibility Score & Quick Fullscreen Button */}
                 <div className="flex items-center gap-2 pointer-events-auto">
@@ -478,17 +505,50 @@ export function PlaymateSwipeDeck({
                     </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenDetailModal(currentProfile);
-                    }}
-                    className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-white/20 hover:bg-white/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/30 transition cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    <span>Full Profile</span>
-                    <Info className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {onQuickChat && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const template = distance <= 0.5
+                            ? 'Hi! Saw you are nearby (<500m). Would you like to meet at the park?'
+                            : 'Hi! Would you like to meet at the park?';
+                          onQuickChat(currentProfile, template);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 px-3 py-1.5 rounded-xl transition cursor-pointer active:scale-95 shadow-md"
+                        title="Quick Chat: 'Hi! Would you like to meet at the park?'"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Quick Chat</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openDeviceNavigation(currentProfile.location.lat, currentProfile.location.lng, `${currentProfile.childName}'s Play Area`);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-emerald-600/90 hover:bg-emerald-600 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-400/40 transition cursor-pointer active:scale-95 shadow-xs"
+                      title="Open device's map app with pinned playmate location and walking directions"
+                    >
+                      <Navigation className="w-3.5 h-3.5 fill-current" />
+                      <span>Start Navigation</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenDetailModal(currentProfile);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-white/20 hover:bg-white/30 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/30 transition cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      <span>Full Profile</span>
+                      <Info className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

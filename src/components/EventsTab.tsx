@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { CommunityEvent, Booking } from '../types.ts';
 import { 
   CalendarRange, MapPin, PersonStanding, Check, Search, X, 
-  Map as MapIcon, List, Compass, Star, Calendar, Plus, Award, 
+  Compass, Star, Calendar, Plus, Award, 
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
-  Ticket, QrCode, UserCheck, CalendarDays, Wallet, Clock, ArrowRight, ShieldCheck,
-  Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing
+  Ticket, QrCode, UserCheck, Wallet, Clock, ArrowRight, ShieldCheck,
+  Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing, Users,
+  ChevronDown, SlidersHorizontal, RotateCcw, Filter
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
@@ -16,16 +17,36 @@ import CommunityEventCheckIn from './CommunityEventCheckIn.tsx';
 import EventTicketPassModal from './events/EventTicketPassModal.tsx';
 import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.tsx';
 import EventBookingModal from './events/EventBookingModal.tsx';
-import EventInteractiveCalendar from './events/EventInteractiveCalendar.tsx';
 import CreateEventWizardModal from './events/CreateEventWizardModal.tsx';
 import EventBuyerRegistrationModal from './events/EventBuyerRegistrationModal.tsx';
 import UserPurchasesModal from './events/UserPurchasesModal.tsx';
-import EventSeoSitemapModal from './events/EventSeoSitemapModal.tsx';
+import EventCarouselSection from './events/EventCarouselSection.tsx';
+import EventHostQrShareModal from './events/EventHostQrShareModal.tsx';
+import EventQrScannerModal from './events/EventQrScannerModal.tsx';
 import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
 import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 import { MOCK_EVENTS } from '../data/mockData.ts';
+
+// Calculate status: 'Upcoming' | 'Full' | 'Past'
+export const getEventStatus = (evt: CommunityEvent): 'Upcoming' | 'Full' | 'Past' => {
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  
+  const eventDate = evt.endDate || evt.date;
+  if (eventDate && eventDate < todayStr) {
+    return 'Past';
+  }
+  
+  const maxCap = evt.maxCapacity || (evt.freeTicketsQuota ? evt.freeTicketsQuota : 0);
+  const attendees = evt.attendeesCount || 0;
+  if ((maxCap > 0 && attendees >= maxCap) || (evt as any).isFull) {
+    return 'Full';
+  }
+  
+  return 'Upcoming';
+};
 
 interface EventsTabProps {
   userProfile: any;
@@ -52,9 +73,13 @@ export default function EventsTab({
   initialOpenCreateWizard = false,
   onOpenPushModal
 }: EventsTabProps) {
+  // Core Filter and Sort States declared upfront to eliminate TDZ
+  const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('nearby_only');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'map' | 'calendar'>('list');
+  const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
+  const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
+  const [showFilterSortBlock, setShowFilterSortBlock] = useState<boolean>(false);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(eventsList[0]?.id || null);
 
   // Guest / Event Buyer Registration and Account Purchases
@@ -62,7 +87,6 @@ export default function EventsTab({
   const [buyerRegActionLabel, setBuyerRegActionLabel] = useState<string>('Book tickets and access digital passes');
   const [pendingBookingEvent, setPendingBookingEvent] = useState<CommunityEvent | null>(null);
   const [showUserPurchasesModal, setShowUserPurchasesModal] = useState<boolean>(false);
-  const [showSeoSitemapModal, setShowSeoSitemapModal] = useState<boolean>(false);
 
   // WooEvents state
   const [activeTicketModalBooking, setActiveTicketModalBooking] = useState<Booking | null>(null);
@@ -73,9 +97,17 @@ export default function EventsTab({
   const [myTickets, setMyTickets] = useState<Booking[]>([]);
   const [showMyTicketsDrawer, setShowMyTicketsDrawer] = useState<boolean>(false);
   const [organizerRoleAlertEvent, setOrganizerRoleAlertEvent] = useState<CommunityEvent | null>(null);
-  const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('featured_nearby');
-  const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
-  const [onlyNearbyFilter, setOnlyNearbyFilter] = useState<boolean>(false);
+
+  // Helper properties for unified filter and sort
+  const isAnyFilterActive = categoryFilter !== 'All' || sortMode !== 'nearby_only' || onlyNearbyFilter || searchQuery.trim() !== '';
+
+  const handleResetAllFilters = () => {
+    setCategoryFilter('All');
+    setSortMode('nearby_only');
+    setOnlyNearbyFilter(false);
+    setMaxDistanceRadiusKm(15.0);
+    setSearchQuery('');
+  };
 
   useEffect(() => {
     if (initialOpenCreateWizard) {
@@ -240,24 +272,59 @@ export default function EventsTab({
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const [shareToast, setShareToast] = useState<{ title: string; link: string } | null>(null);
 
-  // Parse deep link if ?eventId= or ?ticket= is present in URL
+  // Event Host QR Code Pass & Share Station state
+  const [hostQrModalEvent, setHostQrModalEvent] = useState<CommunityEvent | null>(null);
+  const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
+
+  // Parse deep link if ?eventId= or ?ticket= is present in URL (e.g. from scanned QR code)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
       const targetEventId = params.get('eventId') || params.get('event');
-      if (targetEventId && eventsList.some(e => e.id === targetEventId)) {
-        setSelectedEventId(targetEventId);
-        // If element exists on DOM, scroll to it smoothly
-        setTimeout(() => {
-          const el = document.getElementById(`event-card-${targetEventId}`);
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            el.classList.add('ring-4', 'ring-orange-400', 'ring-offset-2');
-            setTimeout(() => {
-              el.classList.remove('ring-4', 'ring-orange-400', 'ring-offset-2');
-            }, 3000);
+      const shouldDirectBook = params.get('book') === 'true' || params.get('action') === 'book' || params.get('scan') === '1';
+
+      if (targetEventId) {
+        let found = eventsList.find(e => e.id === targetEventId);
+
+        // Fallback: Check local storage for newly created custom events if not in current state
+        if (!found) {
+          try {
+            const stored = localStorage.getItem('vernunt_user_created_events');
+            if (stored) {
+              const localList: CommunityEvent[] = JSON.parse(stored);
+              const matched = localList.find(e => e.id === targetEventId);
+              if (matched) {
+                found = matched;
+                setEventsList(prev => [matched, ...prev]);
+              }
+            }
+          } catch (e) {
+            console.warn('LocalStorage events parse note:', e);
           }
-        }, 300);
+        }
+
+        if (found) {
+          setSelectedEventId(targetEventId);
+
+          // If scanned with ?book=true, automatically launch the booking modal!
+          if (shouldDirectBook) {
+            setTimeout(() => {
+              handleInitiateBooking(found!);
+            }, 400);
+          }
+
+          // If element exists on DOM, scroll to it smoothly and highlight with animated pulse ring
+          setTimeout(() => {
+            const el = document.getElementById(`event-card-${targetEventId}`);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              el.classList.add('ring-4', 'ring-orange-500', 'ring-offset-4');
+              setTimeout(() => {
+                el.classList.remove('ring-4', 'ring-orange-500', 'ring-offset-4');
+              }, 4000);
+            }
+          }, 300);
+        }
       }
 
       // Check for direct ticket pass deep link: ?ticket=VERN-EVT-...
@@ -710,6 +777,18 @@ export default function EventsTab({
     onUpdateRole('Event Organizer'); // Change user role automatically to Event Organizer
     setShowAddModal(false);
 
+    // Save to local storage cache so direct booking link works reliably across sessions
+    try {
+      const stored = localStorage.getItem('vernunt_user_created_events');
+      const existing = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('vernunt_user_created_events', JSON.stringify([newlyCreated, ...existing]));
+    } catch (e) {
+      console.warn('Local storage save event note:', e);
+    }
+
+    // Present official Host QR Code Pass & Share Station immediately
+    setHostQrModalEvent(newlyCreated);
+
     // Reset fields
     setNewEventTitle('');
     setNewEventDesc('');
@@ -735,14 +814,7 @@ export default function EventsTab({
   // 2. Calculate proximity distance from current user coordinates
   // 3. Filter by category, query keywords, and optional radius
   // 4. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
-  const isAdmin = userProfile?.userRole === 'Admin';
-  const effectiveEvents = isAdmin
-    ? eventsList
-    : eventsList.filter(evt => {
-        const isMockId = evt.id?.startsWith('blr-event-') || evt.id?.startsWith('mock-');
-        const isMockTitle = MOCK_EVENTS.some(m => m.title.toLowerCase() === evt.title.toLowerCase());
-        return !isMockId && !isMockTitle;
-      });
+  const effectiveEvents = eventsList;
 
   const filteredEvents = effectiveEvents
     .map(evt => {
@@ -755,6 +827,11 @@ export default function EventsTab({
       };
     })
     .filter(evt => {
+      // 0. Do not show past events (User explicit instruction: "And do not show past events")
+      if (getEventStatus(evt) === 'Past') {
+        return false;
+      }
+
       // 1. Category check
       if (categoryFilter !== 'All' && evt.category !== categoryFilter) {
         return false;
@@ -800,6 +877,44 @@ export default function EventsTab({
       }
       return 0;
     });
+
+  // Categorized & Ranked Event Pools for Carousel Exploration (BookMyShow UX Pattern)
+  const popularEvents = useMemo(() => {
+    return [...filteredEvents].sort((a, b) => (b.attendeesCount || 0) - (a.attendeesCount || 0));
+  }, [filteredEvents]);
+
+  const featuredEvents = useMemo(() => {
+    const list = filteredEvents.filter(e => e.featured || e.isSponsored || (e.tags && e.tags.some(t => /celebration|fest|weekend|special|gala/i.test(t))));
+    return list.length > 0 ? list : filteredEvents.slice(0, 10);
+  }, [filteredEvents]);
+
+  const sportsEvents = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')} ${e.category}`.toLowerCase();
+      return /sport|game|football|cricket|chess|race|skating|swimming|athletics|badminton|olympiad|championship/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const creativeArtsEvents = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')} ${e.category}`.toLowerCase();
+      return /art|theatre|theater|music|dance|craft|pottery|drawing|painting|story|acting|clay|creative/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const stemScienceEvents = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')} ${e.category}`.toLowerCase();
+      return /stem|science|robot|coding|tech|math|nature|astronomy|ecology|butterfly|seed/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const toddlerEvents = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')} ${e.category}`.toLowerCase();
+      return /toddler|baby|infant|montessori|sensory|bubble|rhyme|early/i.test(matchText);
+    });
+  }, [filteredEvents]);
 
   // Map representation positions with extra backup locations to avoid overlaps
   const getEventPosition = (id: string, index: number) => {
@@ -985,7 +1100,7 @@ ${deepLink}`;
         </div>
       )}
 
-      {/* Tab Header Description */}
+      {/* Tab Header Description & Main Actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 id="events-main-title" className="text-xl font-bold text-slate-800 font-serif flex items-center gap-1.5">
@@ -996,57 +1111,37 @@ ${deepLink}`;
           </p>
         </div>
 
-        {/* View Mode Switching Segments + My Passes & Search Box */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Segmented Control with Calendar */}
-          <div className="flex p-0.5 bg-slate-100 rounded-xl" id="events-view-switcher">
-            <button
-              id="btn-events-view-list"
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                viewMode === 'list'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <List className="w-3.5 h-3.5" />
-              <span>List Grid</span>
-            </button>
-            <button
-              id="btn-events-view-calendar"
-              type="button"
-              onClick={() => setViewMode('calendar')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                viewMode === 'calendar'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5 text-orange-500" />
-              <span>Calendar</span>
-            </button>
-            <button
-              id="btn-events-view-map"
-              type="button"
-              onClick={() => setViewMode('map')}
-              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
-                viewMode === 'map'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <MapIcon className="w-3.5 h-3.5" />
-              <span>Map</span>
-            </button>
-          </div>
+        {/* Top Header Actions: Publish Vernunt Event, My Passes, and Search Input */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Host/Publish button */}
+          <button
+            id="btn-trigger-propose-event"
+            type="button"
+            onClick={() => setShowCreateWizard(true)}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Publish Vernunt Event</span>
+          </button>
+
+          {/* Scan Event QR Code Button */}
+          <button
+            id="btn-scan-event-qr-code"
+            type="button"
+            onClick={() => setShowScannerModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-slate-200"
+            title="Scan an event QR code to open event page and book directly"
+          >
+            <QrCode className="w-3.5 h-3.5 text-orange-600" />
+            <span>Scan Event QR</span>
+          </button>
 
           {/* My Passes & Tickets Wallet Button */}
           <button
             id="btn-my-event-passes"
             type="button"
             onClick={() => setShowUserPurchasesModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
             title="View your booked event tickets & passes"
           >
             <Wallet className="w-3.5 h-3.5 text-orange-400" />
@@ -1056,35 +1151,6 @@ ${deepLink}`;
                 {myTickets.length}
               </span>
             )}
-          </button>
-
-          {/* FCM Push Notification Alerts Button */}
-          {onOpenPushModal && (
-            <button
-              id="btn-events-push-alerts"
-              type="button"
-              onClick={onOpenPushModal}
-              className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border border-orange-200"
-              title="Configure real-time Firebase Cloud Messaging push event reminders"
-            >
-              <BellRing className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
-              <span>Push Alerts</span>
-            </button>
-          )}
-
-          {/* Google SEO & Sitemap Portal Button */}
-          <button
-            id="btn-events-seo-sitemap"
-            type="button"
-            onClick={() => setShowSeoSitemapModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-1.5 bg-blue-950 hover:bg-blue-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer border border-blue-700/60"
-            title="View SEO URLs, Canonical Slugs & Ping Google Search Sitemap"
-          >
-            <Globe className="w-3.5 h-3.5 text-blue-400" />
-            <span>Google SEO</span>
-            <span className="bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
-              Sitemap
-            </span>
           </button>
 
           {/* Dynamic Search Input Bar */}
@@ -1098,7 +1164,7 @@ ${deepLink}`;
               placeholder="Search title, host, venue..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 py-1.5 bg-white hover:bg-slate-50/50 focus:bg-white text-xs border border-slate-200 focus:border-orange-300 rounded-xl outline-none focus:ring-4 focus:ring-orange-100 transition shadow-xs placeholder-slate-400 text-slate-700"
+              className="w-full pl-9 pr-9 py-2 bg-white hover:bg-slate-50/50 focus:bg-white text-xs border border-slate-200 focus:border-orange-300 rounded-xl outline-none focus:ring-4 focus:ring-orange-100 transition shadow-xs placeholder-slate-400 text-slate-700"
             />
             {searchQuery && (
               <button
@@ -1115,784 +1181,415 @@ ${deepLink}`;
         </div>
       </div>
 
-      {/* Specialty Filter Hub */}
-      <div className="bg-slate-50/80 border border-slate-100 p-3 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        {/* Category quick filters */}
-        <div className="flex flex-wrap gap-1.5" id="events-category-filters">
-          {[
-            { key: 'All', label: 'All Gatherings', icon: Sparkles, iconColor: 'text-orange-500' },
-            { key: 'Event', label: 'Nearby Events', icon: MapPin, iconColor: 'text-blue-500' },
-            { key: 'Activity', label: 'Daily Activities', icon: Compass, iconColor: 'text-emerald-500' },
-            { key: 'Competition', label: 'Competitions', icon: Award, iconColor: 'text-amber-500' },
-            { key: 'Class', label: 'Classes & Labs', icon: CalendarRange, iconColor: 'text-purple-500' },
-            ...customCats.map(cc => ({ key: cc.value, label: cc.name, icon: CalendarRange, iconColor: 'text-indigo-500' }))
-          ].map((cat) => {
-            const isSelected = categoryFilter === cat.key;
-            const count = cat.key === 'All' 
-              ? eventsList.length 
-              : eventsList.filter(e => e.category === cat.key).length;
-            const CatIcon = cat.icon;
-
-            return (
-              <button
-                key={cat.key}
-                id={`btn-cat-filter-${cat.key}`}
-                type="button"
-                onClick={() => setCategoryFilter(cat.key)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                  isSelected 
-                    ? 'bg-slate-900 border-slate-950 text-white shadow-xs' 
-                    : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
-                }`}
-              >
-                <CatIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : cat.iconColor}`} />
-                <span>{cat.label}</span>
-                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-slate-800 text-slate-250' : 'bg-slate-100 text-slate-500'}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Host/Publish button */}
+      {/* Aligned Filter & Sort Options in One Collapsible Block (Hidden by default) */}
+      <div id="events-filter-sort-block" className="space-y-3">
+        {/* Clickable Header Strip / Trigger */}
         <button
-          id="btn-trigger-propose-event"
+          id="btn-toggle-filter-sort-block"
           type="button"
-          onClick={() => setShowCreateWizard(true)}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 self-start md:self-auto cursor-pointer"
+          onClick={() => setShowFilterSortBlock(prev => !prev)}
+          className="w-full bg-white hover:bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-3.5 shadow-2xs cursor-pointer transition-all flex items-center justify-between gap-3 text-left group"
         >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Publish Vernunt Event</span>
-        </button>
-      </div>
-
-      {/* Proximity & Sorting Control Bar for Parents */}
-      <div id="events-proximity-sort-bar" className="bg-white border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 text-slate-500 font-bold pr-2 border-r border-slate-200">
-            <ArrowUpDown className="w-3.5 h-3.5 text-orange-500" />
-            <span className="text-[11px] uppercase tracking-wider text-slate-400">Sort By:</span>
-          </div>
-
-          <button
-            type="button"
-            id="btn-sort-featured-nearby"
-            onClick={() => setSortMode('featured_nearby')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              sortMode === 'featured_nearby'
-                ? 'bg-orange-500 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Featured & Nearby</span>
-            <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-mono">Recommended</span>
-          </button>
-
-          <button
-            type="button"
-            id="btn-sort-nearby-only"
-            onClick={() => setSortMode('nearby_only')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              sortMode === 'nearby_only'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Navigation className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Closest Distance First</span>
-          </button>
-
-          <button
-            type="button"
-            id="btn-sort-date"
-            onClick={() => setSortMode('date')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              sortMode === 'date'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Calendar className="w-3.5 h-3.5 text-blue-400" />
-            <span>Upcoming Date</span>
-          </button>
-
-          <button
-            type="button"
-            id="btn-sort-price"
-            onClick={() => setSortMode('price_low')}
-            className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
-              sortMode === 'price_low'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <Ticket className="w-3.5 h-3.5 text-amber-500" />
-            <span>Price: Low to High</span>
-          </button>
-        </div>
-
-        {/* Nearby Distance Radius Filter */}
-        <div className="flex items-center gap-3 self-end lg:self-center">
-          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              id="chk-only-nearby"
-              checked={onlyNearbyFilter}
-              onChange={(e) => setOnlyNearbyFilter(e.target.checked)}
-              className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
-            />
-            <span className="flex items-center gap-1 text-slate-700">
-              <MapPin className="w-3.5 h-3.5 text-rose-500" />
-              <span>Only Within</span>
-            </span>
-          </label>
-
-          {onlyNearbyFilter && (
-            <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl text-xs font-bold animate-fadeIn">
-              <input
-                type="range"
-                min="1"
-                max="25"
-                step="1"
-                value={maxDistanceRadiusKm}
-                onChange={(e) => setMaxDistanceRadiusKm(Number(e.target.value))}
-                className="w-20 accent-orange-500 cursor-pointer"
-              />
-              <span className="text-orange-600 font-extrabold w-12 text-right">{maxDistanceRadiusKm} km</span>
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-orange-50 group-hover:bg-orange-100 text-orange-600 flex items-center justify-center shrink-0 transition">
+              <SlidersHorizontal className="w-4 h-4" />
             </div>
-          )}
-
-          <div className="text-[11px] text-slate-400 pl-2 border-l border-slate-200 flex items-center gap-1">
-            <span>📍 Your Location:</span>
-            <span className="font-bold text-slate-700 truncate max-w-[180px]" title={userLocationDisplay}>{userLocationDisplay}</span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-bold text-slate-800 text-xs sm:text-sm">Filter & Sort Options</span>
+                {isAnyFilterActive && (
+                  <span className="bg-orange-500 text-white text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full">
+                    Active Filters
+                  </span>
+                )}
+              </div>
+              <p className="text-[11px] text-slate-500 truncate hidden sm:block">
+                {isAnyFilterActive
+                  ? `Category: ${categoryFilter} • Sort: ${sortMode === 'nearby_only' ? 'Closest First' : sortMode === 'featured_nearby' ? 'Featured' : sortMode === 'date' ? 'Date' : 'Price'}${onlyNearbyFilter ? ` • Radius: ${maxDistanceRadiusKm} km` : ''}`
+                  : 'Click to filter categories, adjust proximity radius and customize event sort order'}
+              </p>
+            </div>
           </div>
-        </div>
+
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="text-right hidden sm:block">
+              <span className="text-xs font-bold text-slate-700 block">
+                {filteredEvents.length} {filteredEvents.length === 1 ? 'Event' : 'Events'}
+              </span>
+              <span className="text-[10px] text-slate-400 font-medium">
+                {showFilterSortBlock ? 'Click to hide' : 'Click to view options'}
+              </span>
+            </div>
+            <div className={`w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:text-slate-800 transition transform ${showFilterSortBlock ? 'rotate-180 bg-orange-100 text-orange-700' : ''}`}>
+              <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+        </button>
+
+        {/* Collapsible Panel: Filter & Sort Controls */}
+        {showFilterSortBlock && (
+          <div id="events-filter-sort-panel" className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4">
+            {/* Header & Reset row */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-orange-500" />
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Refine & Sort Gatherings</span>
+              </div>
+              {isAnyFilterActive && (
+                <button
+                  id="btn-reset-all-event-filters"
+                  type="button"
+                  onClick={handleResetAllFilters}
+                  className="flex items-center gap-1 text-[11px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Reset All</span>
+                </button>
+              )}
+            </div>
+
+            {/* Category Quick Filters */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                Event Categories & Formats
+              </span>
+              <div className="flex flex-wrap gap-1.5" id="events-category-filters">
+                {[
+                  { key: 'All', label: 'All Gatherings', icon: Sparkles, iconColor: 'text-orange-500' },
+                  { key: 'Event', label: 'Nearby Events', icon: MapPin, iconColor: 'text-blue-500' },
+                  { key: 'Activity', label: 'Daily Activities', icon: Compass, iconColor: 'text-emerald-500' },
+                  { key: 'Competition', label: 'Competitions', icon: Award, iconColor: 'text-amber-500' },
+                  { key: 'Class', label: 'Classes & Labs', icon: CalendarRange, iconColor: 'text-purple-500' },
+                  ...customCats.map(cc => ({ key: cc.value, label: cc.name, icon: CalendarRange, iconColor: 'text-indigo-500' }))
+                ].map((cat) => {
+                  const isSelected = categoryFilter === cat.key;
+                  const count = cat.key === 'All' 
+                    ? eventsList.length 
+                    : eventsList.filter(e => e.category === cat.key).length;
+                  const CatIcon = cat.icon;
+
+                  return (
+                    <button
+                      key={cat.key}
+                      id={`btn-cat-filter-${cat.key}`}
+                      type="button"
+                      onClick={() => setCategoryFilter(cat.key)}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                        isSelected 
+                          ? 'bg-slate-900 border-slate-950 text-white shadow-xs' 
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border-slate-200/80'
+                      }`}
+                    >
+                      <CatIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : cat.iconColor}`} />
+                      <span>{cat.label}</span>
+                      <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-slate-800 text-slate-250' : 'bg-white text-slate-500 border border-slate-200/60'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Sort Options */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <ArrowUpDown className="w-3.5 h-3.5 text-orange-500" />
+                <span>Sort Order</span>
+              </span>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <button
+                  type="button"
+                  id="btn-sort-nearby-only"
+                  onClick={() => setSortMode('nearby_only')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    sortMode === 'nearby_only'
+                      ? 'bg-orange-500 text-white shadow-xs ring-2 ring-orange-400/30'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                  }`}
+                >
+                  <Navigation className="w-3.5 h-3.5 text-white" />
+                  <span>Closest Distance First (Default)</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-sort-featured-nearby"
+                  onClick={() => setSortMode('featured_nearby')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    sortMode === 'featured_nearby'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Featured & Nearby</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-sort-date"
+                  onClick={() => setSortMode('date')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    sortMode === 'date'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                  }`}
+                >
+                  <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Upcoming Date</span>
+                </button>
+
+                <button
+                  type="button"
+                  id="btn-sort-price"
+                  onClick={() => setSortMode('price_low')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    sortMode === 'price_low'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80'
+                  }`}
+                >
+                  <Ticket className="w-3.5 h-3.5 text-amber-500" />
+                  <span>Price: Low to High</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Proximity Radius Filter */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 font-bold text-slate-700 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    id="chk-only-nearby"
+                    checked={onlyNearbyFilter}
+                    onChange={(e) => setOnlyNearbyFilter(e.target.checked)}
+                    className="w-4 h-4 rounded text-orange-500 accent-orange-500 cursor-pointer"
+                  />
+                  <span className="flex items-center gap-1 text-slate-700">
+                    <MapPin className="w-3.5 h-3.5 text-rose-500" />
+                    <span>Only Within Distance</span>
+                  </span>
+                </label>
+
+                {onlyNearbyFilter && (
+                  <div className="flex items-center gap-1.5 bg-slate-100 px-2.5 py-1 rounded-xl text-xs font-bold">
+                    <input
+                      type="range"
+                      min="1"
+                      max="25"
+                      step="1"
+                      value={maxDistanceRadiusKm}
+                      onChange={(e) => setMaxDistanceRadiusKm(Number(e.target.value))}
+                      className="w-24 accent-orange-500 cursor-pointer"
+                    />
+                    <span className="text-orange-600 font-extrabold w-12 text-right">{maxDistanceRadiusKm} km</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[11px] text-slate-400 flex items-center gap-1">
+                <span>📍 Your Location:</span>
+                <span className="font-bold text-slate-700 truncate max-w-[200px]" title={userLocationDisplay}>{userLocationDisplay}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {searchQuery && (
-        <div id="search-filter-stats" className="text-xs text-slate-500 font-medium">
-          Found <strong className="text-slate-800">{filteredEvents.length}</strong> {filteredEvents.length === 1 ? 'event' : 'events'} matching "{searchQuery}"
+        <div id="search-filter-stats" className="text-xs text-slate-500 font-medium flex items-center justify-between">
+          <span>
+            Found <strong className="text-slate-800">{filteredEvents.length}</strong> {filteredEvents.length === 1 ? 'event' : 'events'} matching "{searchQuery}"
+          </span>
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="text-[11px] text-orange-600 font-bold hover:underline cursor-pointer"
+          >
+            Clear Search
+          </button>
         </div>
       )}
 
-      {/* View Switch Dispatch */}
-      {viewMode === 'calendar' ? (
-        /* WooEvents Interactive Calendar View */
-        <EventInteractiveCalendar
-          events={filteredEvents}
-          onSelectEvent={(evt) => {
-            setSelectedEventId(evt.id);
-            setViewMode('list');
-          }}
-          onBookEvent={(evt) => handleInitiateBooking(evt)}
-        />
-      ) : viewMode === 'list' ? (
-        /* List / Grid View layout */
-        filteredEvents.length > 0 ? (
-          <div id="events-grids-container" className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {filteredEvents.map((evt) => {
-              // Find if current user has an issued ticket for this event
-              const userTicket = myTickets.find(t => t.itemId === evt.id);
-              const isEventJoined = evt.joined || !!userTicket;
-
-              return (
-                <div id={`event-card-${evt.id}`} key={evt.id} className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:shadow-md transition">
-                  {/* Image banner */}
-                  <div id="event-pic" className="h-44 bg-slate-100 relative">
-                    <img src={evt.photoUrl} alt={evt.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                    
-                    {/* Featured / Sponsored Promoted Badge */}
-                    {(evt.featured || evt.isSponsored) && (
-                      <div className="absolute top-3 left-3 flex flex-col gap-1 z-10">
-                        {evt.featured && (
-                          <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider shadow-lg border border-amber-300/40 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3 text-white fill-white animate-pulse" />
-                            <span>Featured</span>
-                          </div>
-                        )}
-                        {evt.isSponsored && (
-                          <div className="bg-slate-900/90 backdrop-blur-md text-amber-300 px-2 py-0.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider border border-amber-400/30 flex items-center gap-1 shadow-md">
-                            <Flame className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                            <span>Sponsored</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Price Badge */}
-                    <div className="absolute bottom-3 left-3 bg-slate-900/90 backdrop-blur-md text-white px-2.5 py-1 rounded-xl text-xs font-black shadow-md border border-white/20 flex items-center gap-1">
-                      <Ticket className="w-3.5 h-3.5 text-orange-400" />
-                      <span>{evt.ticketPrice && evt.ticketPrice > 0 ? `₹${evt.ticketPrice}` : 'FREE Entry'}</span>
-                    </div>
-
-                    {/* Distance Proximity Pill on Image */}
-                    {evt.distance !== undefined && (
-                      <div className="absolute bottom-3 right-3 bg-white/95 backdrop-blur-md text-slate-800 px-2 py-0.5 rounded-xl text-[10px] font-extrabold shadow-md border border-slate-200 flex items-center gap-1">
-                        <Navigation className="w-2.5 h-2.5 text-emerald-600" />
-                        <span>{evt.distance < 1 ? '< 1 km away' : `${evt.distance.toFixed(1)} km away`}</span>
-                      </div>
-                    )}
-
-                    {/* Category badge */}
-                    <div 
-                      id="event-tag" 
-                      className={`absolute top-3 right-3 text-[10px] font-black uppercase tracking-widest py-1.5 px-3 rounded-xl border ${getCategoryBadgeStyles(evt.category)}`}
-                    >
-                      {getCategoryLabel(evt.category)}
-                    </div>
-
-                    {/* Quick Share floating icon buttons: WhatsApp & Copy Link */}
-                    <div className="absolute top-12 left-3 flex flex-col gap-1.5 z-10">
-                      <button
-                        id={`btn-quick-whatsapp-${evt.id}`}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleWhatsAppShareEvent(evt);
-                        }}
-                        className="w-8 h-8 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white shadow-md flex items-center justify-center transition active:scale-90 cursor-pointer border border-emerald-600"
-                        title="Share on WhatsApp with affiliate referral link"
-                      >
-                        <Share2 className="w-4 h-4" />
-                      </button>
-
-                      <button
-                        id={`btn-quick-share-${evt.id}`}
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleShareEvent(evt);
-                        }}
-                        className="w-8 h-8 rounded-xl bg-white/90 backdrop-blur-md hover:bg-white text-slate-700 shadow-md flex items-center justify-center transition active:scale-90 cursor-pointer border border-white/40"
-                        title="Copy event details & affiliate link"
-                      >
-                        {copiedEventId === evt.id ? (
-                          <Check className="w-4 h-4 text-emerald-600" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-slate-700" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Event Info Details */}
-                  <div id="event-body" className="p-5 flex-1 flex flex-col space-y-3">
-                    {/* Sponsored Subheader */}
-                    {evt.sponsoredBy && (
-                      <div className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-lg w-max flex items-center gap-1">
-                        <Sparkles className="w-3 h-3 text-amber-600" />
-                        <span>Presented by: <strong className="text-amber-900">{evt.sponsoredBy}</strong></span>
-                      </div>
-                    )}
-
-                    <h4 id={`event-title-${evt.id}`} className="font-bold text-slate-800 font-serif text-sm leading-snug">{evt.title}</h4>
-
-                    {/* Google SEO Clean URL with title & type */}
-                    <div className="flex items-center justify-between gap-1 text-[10px] text-slate-500 bg-blue-50/60 border border-blue-100 rounded-lg px-2 py-1">
-                      <div className="flex items-center gap-1 truncate">
-                        <Globe className="w-3 h-3 text-blue-500 shrink-0" />
-                        <span className="font-mono text-[9px] text-blue-900 truncate">
-                          /events/{normalizeEventType(evt.category, evt.itemCategoryType)}/{slugifyEventTitle(evt.title)}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const directUrl = getEventDirectUrl(evt);
-                          navigator.clipboard.writeText(directUrl);
-                          setCopiedEventId(evt.id);
-                          setTimeout(() => setCopiedEventId(null), 2000);
-                        }}
-                        className="text-[9px] font-bold text-blue-600 hover:text-blue-800 shrink-0 cursor-pointer px-1 py-0.5 rounded bg-white border border-blue-200"
-                        title="Copy clean Google-indexed SEO URL"
-                      >
-                        {copiedEventId === evt.id ? 'Copied ✓' : 'SEO Link'}
-                      </button>
-                    </div>
-
-                    <p id={`event-desc-${evt.id}`} className="text-[11px] text-slate-600 leading-relaxed line-clamp-2">
-                      {evt.description}
-                    </p>
-
-                    {/* Ticket Tiers preview if present */}
-                    {evt.ticketTiers && evt.ticketTiers.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {evt.ticketTiers.map(tier => (
-                          <span key={tier.id} className="text-[9px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
-                            {tier.name} (₹{tier.price})
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Sub-categories or tags */}
-                    {evt.tags && evt.tags.length > 0 && (
-                      <div id={`event-tags-list-${evt.id}`} className="flex flex-wrap gap-1 pt-0.5 opacity-95">
-                        {evt.tags.map((tag, tagIndex) => (
-                          <button
-                            key={tagIndex}
-                            id={`btn-tag-${evt.id}-${tagIndex}`}
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSearchQuery(tag);
-                            }}
-                            className="bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border border-orange-100/30 transition-colors cursor-pointer"
-                            title={`Click to filter by tag: #${tag}`}
-                          >
-                            #{tag}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-
-                    {/* Event stats (time/address) */}
-                    <div className="space-y-1.5 pt-2 border-t border-slate-100 text-[11px] text-slate-500 font-medium">
-                      <div className="flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                        <span className="truncate text-slate-700">{evt.location}</span>
-                      </div>
-                      <div className="flex items-start gap-1.5">
-                        <CalendarRange className="w-3.5 h-3.5 text-slate-400 shrink-0 mt-0.5" />
-                        <div className="text-slate-700 leading-tight">
-                          {evt.startDate ? (
-                            <span>
-                              <strong className="text-slate-900 font-semibold">Start:</strong> {evt.startDate}
-                              {evt.endDate && evt.endDate !== evt.startDate && (
-                                <> • <strong className="text-slate-900 font-semibold">End:</strong> {evt.endDate}</>
-                              )}
-                              {evt.time && ` • ${evt.time}`}
-                            </span>
-                          ) : (
-                            <span>{evt.date} at {evt.time}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Delivery Mode & Google Chat/Meet link */}
-                      {evt.deliveryMode === 'Virtual' && (
-                        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200/80 rounded-xl px-2.5 py-1.5 flex items-center justify-between text-[10px]">
-                          <span className="font-bold flex items-center gap-1">
-                            💻 Virtual {evt.itemCategoryType || 'Class'}
-                          </span>
-                          {evt.googleChatLink ? (
-                            <a 
-                              href={evt.googleChatLink} 
-                              target="_blank" 
-                              rel="noreferrer" 
-                              onClick={(e) => e.stopPropagation()}
-                              className="text-emerald-700 hover:text-emerald-900 font-black underline flex items-center gap-1"
-                            >
-                              Open Google Meet/Chat <ExternalLink className="w-3 h-3" />
-                            </a>
-                          ) : (
-                            <span className="text-emerald-600 font-semibold">Link sent on registration</span>
-                          )}
-                        </div>
-                      )}
-
-                      {evt.itemCategoryType && evt.itemCategoryType !== 'Event' && (
-                        <div className="flex items-center gap-1 text-[10px]">
-                          <span className="font-bold text-slate-500">Type:</span>
-                          <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-bold rounded-md uppercase tracking-wider text-[9px]">
-                            {evt.itemCategoryType}
-                          </span>
-                          {evt.subjectTaught && (
-                            <span className="text-slate-600 font-medium">({evt.subjectTaught})</span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                          <PersonStanding className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                          <span className="text-slate-700">Host: <strong className="text-slate-800 font-semibold">{evt.hostName}</strong></span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleOpenGateDesk(evt)}
-                          className="text-[10px] font-bold text-orange-600 hover:text-orange-700 bg-orange-50 hover:bg-orange-100 px-2 py-0.5 rounded-md flex items-center gap-1 border border-orange-200/60"
-                          title="Open Gate Check-In & Scanner Station (Event Organizers only)"
-                        >
-                          <UserCheck className="w-3 h-3" />
-                          <span>Gate Desk</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Roster attendance & Actions */}
-                    <div className="flex justify-between items-center pt-2.5 mt-auto border-t border-slate-100/80 gap-2">
-                      <span className="text-[11px] text-slate-500 font-bold flex items-center gap-1">
-                        🧒 {evt.attendeesCount} RSVP'd
-                      </span>
-
-                      <div className="flex items-center gap-1.5">
-                        {/* If attendee already has ticket, provide E-Ticket Pass Modal trigger */}
-                        {isEventJoined && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const pass = userTicket || {
-                                id: `booking-${evt.id}`,
-                                itemId: evt.id,
-                                itemTitle: evt.title,
-                                type: 'EventTicket',
-                                buyerName: userProfile?.parentName || 'Parent Attendee',
-                                buyerEmail: userProfile?.email || 'parent@vernunt.com',
-                                buyerPhone: userProfile?.phoneNumber || '+91 98765 43210',
-                                amountPaid: evt.ticketPrice || 0,
-                                commissionPercentage: 10,
-                                commissionEarned: 0,
-                                hostEarned: 0,
-                                dateStr: evt.date,
-                                timeSelected: evt.time,
-                                status: 'Paid',
-                                ticketNumber: `VERN-EVT-7721-${evt.id.slice(-3).toUpperCase()}`,
-                                ticketTierName: evt.ticketTiers?.[0]?.name || 'General Admission',
-                                childName: userProfile?.childName || 'Aarav',
-                                childAge: userProfile?.childAge || 5,
-                                eventVenue: evt.location,
-                                checkedIn: false,
-                                quantity: 1,
-                                createdAt: new Date().toISOString()
-                              };
-                              setActiveTicketEvent(evt);
-                              setActiveTicketModalBooking(pass);
-                            }}
-                            className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 py-1.5 px-2.5 rounded-xl text-[10px] font-bold transition flex items-center gap-1 border border-emerald-200 cursor-pointer shadow-xs"
-                            title="View QR Code E-Ticket"
-                          >
-                            <QrCode className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>E-Pass</span>
-                          </button>
-                        )}
-
-                        {/* WooEvents Multi-Tier Ticket Booking Modal */}
-                        <button
-                          id={`btn-event-book-${evt.id}`}
-                          onClick={() => handleInitiateBooking(evt)}
-                          type="button"
-                          className="bg-orange-600 hover:bg-orange-700 text-white py-1.5 px-3 rounded-xl text-[10px] font-bold transition shadow-xs flex items-center gap-1 active:scale-95 cursor-pointer"
-                        >
-                          <Ticket className="w-3 h-3" />
-                          <span>{isEventJoined ? 'Book More' : 'Book Pass'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Events Carousel View (Default and Only View) */}
+      {filteredEvents.length === 0 ? (
+        <div id="events-empty-state" className="bg-white rounded-3xl p-12 border border-slate-100 shadow-xs text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto">
+          <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-500">
+            <Search className="w-6 h-6" />
           </div>
-        ) : (
-          <div id="events-empty-state" className="bg-white rounded-3xl p-12 border border-slate-100 shadow-xs text-center flex flex-col items-center justify-center space-y-4 max-w-lg mx-auto">
-            <div className="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-500">
-              <Search className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="font-bold text-slate-800 font-serif text-base">
-                {searchQuery ? 'No matching events found' : 'No verified events, classes or activities published yet'}
-              </h4>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                {searchQuery 
-                  ? `We couldn't find any listings matching "${searchQuery}".` 
-                  : 'Be the first organizer or teacher to host an event, physical or virtual class, or community activity!'}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-center gap-2.5">
-              {searchQuery && (
-                <button
-                  id="btn-reset-event-filter"
-                  type="button"
-                  onClick={() => { setSearchQuery(''); setCategoryFilter('All'); }}
-                  className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer"
-                >
-                  Clear Filters
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setShowCreateWizard(true)}
-                className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Host Event / Classes / Activity</span>
-              </button>
-            </div>
-          </div>
-        )
-      ) : (
-        /* Geolocation Map View layout */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Map Interactive Canvas */}
-          <div className="lg:col-span-2 bg-white rounded-3xl p-5 border border-slate-100 shadow-sm flex flex-col space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold text-orange-500 uppercase tracking-widest block">Geographic Gathering Points</span>
-                <span className="text-xs text-slate-400">Interactive community spots surrounding Central Park and local venues</span>
-              </div>
-              <span className="text-[9px] font-bold text-slate-400 bg-slate-50 border border-slate-200 py-1 px-2.5 rounded-xl flex items-center gap-1 select-none">
-                <Star className="w-3 h-3 text-orange-500 fill-orange-500" /> Nearby Public Locations
-              </span>
-            </div>
-
-            {/* Sandbox Canvas */}
-            <div id="events-map-canvas" className="relative w-full h-96 bg-amber-50/40 rounded-2xl border border-amber-100 overflow-hidden shadow-inner flex items-center justify-center">
-              {/* Grass details background dots */}
-              <div className="absolute inset-0 opacity-15" style={{ 
-                backgroundImage: 'radial-gradient(#f59e0b 1.5px, transparent 1.5px), radial-gradient(#10b981 1.5px, #fef3c7 1.5px)', 
-                backgroundSize: '28px 28px', 
-                backgroundPosition: '0 0, 14px 14px' 
-              }}></div>
-
-              {/* Central Park Lake decoration */}
-              <div id="events-map-lake" className="absolute top-1/3 left-1/4 w-40 h-24 bg-cyan-100/60 border border-cyan-200/55 rounded-full blur-xs pointer-events-none transform -rotate-6 flex items-center justify-center">
-                <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">Main Basin Meadow</span>
-              </div>
-
-              {/* Soccer field decoration outline */}
-              <div className="absolute bottom-12 right-20 w-32 h-16 border-2 border-dashed border-emerald-300 pointer-events-none rounded-xl transform -rotate-12 flex items-center justify-center">
-                <span className="text-[9px] text-emerald-400/80 font-bold uppercase tracking-wider">Playground Field</span>
-              </div>
-
-              {/* Host pins mapping */}
-              {filteredEvents.map((evt, index) => {
-                const pos = getEventPosition(evt.id, index);
-                const isSelected = selectedEventId === evt.id;
-
-                return (
-                  <button
-                    id={`events-map-btn-pin-${evt.id}`}
-                    key={evt.id}
-                    onClick={() => setSelectedEventId(evt.id)}
-                    type="button"
-                    className="absolute -translate-x-1/2 -translate-y-1/2 z-10 transition-all duration-300 hover:scale-110 flex flex-col items-center group cursor-pointer"
-                    style={{ top: pos.top, left: pos.left }}
-                  >
-                    {/* Hover Card Tooltip */}
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-slate-900 text-white text-[10px] py-1.5 px-2.5 rounded-xl mb-1.5 flex flex-col gap-0.5 shadow-lg whitespace-nowrap pointer-events-none z-30">
-                      <span className="font-bold">{evt.title}</span>
-                      <span className="text-[9px] text-slate-300">Organizer: {evt.hostName} • {evt.attendeesCount} families</span>
-                    </div>
-
-                    {/* Highly polished Pin with visual tag */}
-                    <div className={`p-1.5 rounded-full border-2 transition-all shadow-md flex items-center justify-center ${
-                      isSelected 
-                        ? 'bg-orange-500 border-white ring-4 ring-orange-400/20 scale-110 text-white font-bold' 
-                        : 'bg-white border-slate-300 text-slate-700 hover:border-slate-500'
-                    }`}>
-                      <MapPin className="w-5 h-5" />
-                    </div>
-
-                    {/* Miniature category bubble */}
-                    <span className={`text-[8px] font-extrabold px-1.5 py-0.5 rounded-lg mt-1 block shadow-xs select-none ${
-                      isSelected ? 'bg-orange-600 text-white' : 'bg-slate-800 text-white'
-                    }`}>
-                      {evt.category}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Family Home Base Marker */}
-              <div id="events-map-user-marker" className="absolute top-1/2 right-1/3 -translate-y-1/2 flex flex-col items-center select-none">
-                <div className="p-1 px-2.5 bg-slate-900 text-white border border-slate-700 text-[10px] rounded-full font-bold shadow-md flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping animate-duration-1000"></span>
-                  <span>Your Home Base</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Hint guidelines */}
-            <p className="text-[10px] text-slate-400 text-center italic font-medium pt-1">
-              * Exact coordinates are approximate for community event locations to promote safety and easy public gathering.
+          <div>
+            <h4 className="font-bold text-slate-800 font-serif text-base">
+              {searchQuery ? 'No matching events found' : 'No verified events found for this filter'}
+            </h4>
+            <p className="text-xs text-slate-500 mt-1 max-w-sm">
+              {searchQuery 
+                ? `We couldn't find any listings matching "${searchQuery}". Try clearing search or adjusting your filters.` 
+                : 'Try adjusting your categories or distance radius, or publish a new community event!'}
             </p>
           </div>
-
-          {/* Map Side-Inspecting Card Panel for selected meet */}
-          <div className="lg:col-span-1">
-            {selectedEvent ? (
-              <div id="events-map-drawer-card" className="bg-white rounded-3xl border border-slate-100 shadow-md p-5 h-full flex flex-col space-y-4">
-                <div className="relative h-40 rounded-2xl overflow-hidden bg-slate-50">
-                  <img src={selectedEvent.photoUrl} alt={selectedEvent.title} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                  <span className={`absolute top-3 right-3 text-[9px] py-1 px-2.5 rounded-xl font-bold uppercase tracking-wider border ${getCategoryBadgeStyles(selectedEvent.category)}`}>
-                    {selectedEvent.category}
-                  </span>
-
-                  {/* Share floating button on map drawer */}
-                  <button
-                    id={`btn-share-map-event-${selectedEvent.id}`}
-                    type="button"
-                    onClick={() => handleShareEvent(selectedEvent)}
-                    className="absolute top-3 left-3 px-2.5 py-1 rounded-xl bg-white/90 backdrop-blur-md hover:bg-white text-slate-700 text-[10px] font-bold shadow-md flex items-center gap-1.5 transition active:scale-95 cursor-pointer border border-white/40"
-                    title="Copy event details & deep link"
-                  >
-                    {copiedEventId === selectedEvent.id ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600" />
-                        <span className="text-emerald-700">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Share2 className="w-3.5 h-3.5 text-slate-700" />
-                        <span>Share</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="space-y-2 flex-1">
-                  <div>
-                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">{getCategoryLabel(selectedEvent.category)} Detail</span>
-                    <h4 className="font-bold text-slate-800 font-serif text-base leading-snug">{selectedEvent.title}</h4>
-                  </div>
-
-                  <p className="text-xs text-slate-600 leading-relaxed italic">
-                    "{selectedEvent.description}"
-                  </p>
-
-                  {/* Selected Event Tags */}
-                  {selectedEvent.tags && selectedEvent.tags.length > 0 && (
-                    <div id="selected-event-tags-container" className="flex flex-wrap gap-1 py-0.5">
-                      {selectedEvent.tags.map((tag, tagIndex) => (
-                        <button
-                          key={tagIndex}
-                          id={`selected-tag-pill-${tagIndex}`}
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSearchQuery(tag);
-                          }}
-                          className="bg-orange-50 hover:bg-orange-100 text-orange-700 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-lg border border-orange-100/30 transition-colors cursor-pointer"
-                          title={`Search tag #${tag}`}
-                        >
-                          #{tag}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5 text-xs text-slate-600 font-medium select-none">
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="truncate text-slate-700">{selectedEvent.location}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Calendar className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-slate-700">{selectedEvent.date} at {selectedEvent.time}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <PersonStanding className="w-4 h-4 text-slate-400 shrink-0" />
-                      <span className="text-slate-700">Organizer: <strong className="text-slate-800 font-semibold">{selectedEvent.hostName}</strong></span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-slate-150 flex flex-col gap-2">
-                  <div className="flex justify-between items-center text-xs font-bold text-slate-500">
-                    <span>Attendance list</span>
-                    <span className="text-slate-800">{selectedEvent.attendeesCount} Families RSVP'd</span>
-                  </div>
-
-                  {selectedEvent.ticketPrice && selectedEvent.ticketPrice > 0 ? (
-                    selectedEvent.joined ? (
-                      <div className="space-y-4">
-                        <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl text-[11px] text-emerald-800 space-y-1 font-medium">
-                          <div className="flex items-center gap-1 font-bold text-emerald-900">
-                            <Check className="w-4 h-4 text-emerald-600" />
-                            <span>Ticket Confirmed!</span>
-                          </div>
-                          <p>You bought 1 pass for ₹{selectedEvent.ticketPrice}.00. Present your secure digital code pass upon entering.</p>
-                        </div>
-
-                        {/* Interactive Gate QR Check-in */}
-                        <CommunityEventCheckIn
-                          userProfile={userProfile}
-                          onUpdateUserProfile={(profileObj) => {
-                            if (onUpdateUserProfile) {
-                              onUpdateUserProfile(profileObj);
-                            }
-                          }}
-                          eventId={selectedEvent.id}
-                          eventTitle={selectedEvent.title}
-                          eventHostName={selectedEvent.hostName}
-                        />
-
-                        <button
-                          id={`btn-event-cancel-ticket-${selectedEvent.id}`}
-                          onClick={() => handleToggleJoinEvent(selectedEvent.id, false)}
-                          type="button"
-                          className="w-full py-2 border border-slate-200 text-slate-500 rounded-xl text-xs hover:bg-slate-50 transition cursor-pointer"
-                        >
-                          Cancel Booking & Request Refund
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        id={`btn-event-buy-ticket-${selectedEvent.id}`}
-                        onClick={() => {
-                          setCheckoutEvent(selectedEvent);
-                          setCheckoutStep('details');
-                          setBuyerName(userProfile?.parentName || '');
-                          setBypassSubCheck(false);
-                          setShowCheckoutModal(true);
-                        }}
-                        type="button"
-                        className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition cursor-pointer"
-                      >
-                        <CreditCard className="w-4 h-4" />
-                        <span>Buy Ticket (₹{selectedEvent.ticketPrice}) via Razorpay</span>
-                      </button>
-                    )
-                  ) : (
-                    selectedEvent.joined ? (
-                      <div className="space-y-4">
-                        <button
-                          id={`btn-map-joined-${selectedEvent.id}`}
-                          onClick={() => handleToggleJoinEvent(selectedEvent.id, false)}
-                          type="button"
-                          className="w-full py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                        >
-                          <Check className="w-4 h-4 text-emerald-600" />
-                          <span>You are RSVP'd Attending</span>
-                        </button>
-
-                        {/* Interactive Gate QR Check-in */}
-                        <CommunityEventCheckIn
-                          userProfile={userProfile}
-                          onUpdateUserProfile={(profileObj) => {
-                            if (onUpdateUserProfile) {
-                              onUpdateUserProfile(profileObj);
-                            }
-                          }}
-                          eventId={selectedEvent.id}
-                          eventTitle={selectedEvent.title}
-                          eventHostName={selectedEvent.hostName}
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        id={`btn-map-join-${selectedEvent.id}`}
-                        onClick={() => handleToggleJoinEvent(selectedEvent.id, true)}
-                        type="button"
-                        className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition active:scale-95 shadow-md shadow-slate-900/10 flex items-center justify-center gap-1 cursor-pointer"
-                      >
-                        <span>RSVP Join Gathering</span>
-                      </button>
-                    )
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-white rounded-3xl p-6 border border-dashed border-slate-200 text-center text-slate-400 h-full flex flex-col items-center justify-center">
-                <Compass className="w-8 h-8 text-slate-300 animate-bounce mb-2" />
-                <p className="text-xs font-bold">Please select an event pin on the map to inspect details.</p>
-              </div>
+          <div className="flex flex-wrap items-center justify-center gap-2.5">
+            {isAnyFilterActive && (
+              <button
+                id="btn-reset-event-filter"
+                type="button"
+                onClick={handleResetAllFilters}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition active:scale-95 cursor-pointer"
+              >
+                Clear All Filters
+              </button>
             )}
+            <button
+              type="button"
+              onClick={() => setShowCreateWizard(true)}
+              className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Host Event / Classes / Activity</span>
+            </button>
           </div>
+        </div>
+      ) : (
+        <div id="events-carousel-explorer" className="space-y-12">
+          {/* Active Filter / Search Matching Section */}
+          {isAnyFilterActive && (
+            <EventCarouselSection
+              title={categoryFilter !== 'All' ? `${categoryFilter} Matches` : 'Filtered Gathering Results'}
+              subtitle={`Displaying ${filteredEvents.length} events tailored to your filter and sort criteria`}
+              events={filteredEvents}
+              defaultBadge="FEATURED"
+              onSelectEvent={(evt) => {
+                setSelectedEventId(evt.id);
+                handleInitiateBooking(evt);
+              }}
+              onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
+              myTickets={myTickets}
+            />
+          )}
+
+          {/* 1. Top Selling & Popular Events */}
+          <EventCarouselSection
+            title="Popular & Top Selling Events"
+            subtitle="Most booked weekend activities, kids shows, and workshops"
+            events={popularEvents}
+            defaultBadge="PROMOTED"
+            onSeeAll={() => {
+              setShowFilterSortBlock(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSelectEvent={(evt) => {
+              setSelectedEventId(evt.id);
+              handleInitiateBooking(evt);
+            }}
+            onBookEvent={(evt) => handleInitiateBooking(evt)}
+            onShareQr={(evt) => setHostQrModalEvent(evt)}
+            myTickets={myTickets}
+          />
+
+          {/* 2. Featured Celebrations & Family Fests */}
+          <EventCarouselSection
+            title="Featured Celebrations & Family Fests"
+            subtitle="Curated family carnivals, seasonal celebrations & special passes"
+            events={featuredEvents}
+            defaultBadge="FEATURED"
+            onSeeAll={() => {
+              setShowFilterSortBlock(true);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onSelectEvent={(evt) => {
+              setSelectedEventId(evt.id);
+              handleInitiateBooking(evt);
+            }}
+            onBookEvent={(evt) => handleInitiateBooking(evt)}
+            onShareQr={(evt) => setHostQrModalEvent(evt)}
+            myTickets={myTickets}
+          />
+
+          {/* 3. Top Games & Sports Events */}
+          {sportsEvents.length > 0 && (
+            <EventCarouselSection
+              title="Top Games & Sports Events"
+              subtitle="Weekend football turfs, cricket academies, skating rallies & chess tourneys"
+              events={sportsEvents}
+              onSeeAll={() => {
+                setCategoryFilter('Competition');
+                setShowFilterSortBlock(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onSelectEvent={(evt) => {
+                setSelectedEventId(evt.id);
+                handleInitiateBooking(evt);
+              }}
+              onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
+              myTickets={myTickets}
+            />
+          )}
+
+          {/* 4. Creative Arts, Music & Theatre */}
+          {creativeArtsEvents.length > 0 && (
+            <EventCarouselSection
+              title="Creative Arts, Theatre & Music"
+              subtitle="Pottery wheels, Broadway drama, live puppet shows & paint studios"
+              events={creativeArtsEvents}
+              onSeeAll={() => {
+                setCategoryFilter('Activity');
+                setShowFilterSortBlock(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onSelectEvent={(evt) => {
+                setSelectedEventId(evt.id);
+                handleInitiateBooking(evt);
+              }}
+              onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
+              myTickets={myTickets}
+            />
+          )}
+
+          {/* 5. STEM, Robotics & Science Camps */}
+          {stemScienceEvents.length > 0 && (
+            <EventCarouselSection
+              title="STEM, Robotics & Science Camps"
+              subtitle="Hands-on coding, space astronomy, bot challenges & nature walks"
+              events={stemScienceEvents}
+              onSeeAll={() => {
+                setCategoryFilter('Class');
+                setShowFilterSortBlock(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onSelectEvent={(evt) => {
+                setSelectedEventId(evt.id);
+                handleInitiateBooking(evt);
+              }}
+              onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
+              myTickets={myTickets}
+            />
+          )}
+
+          {/* 6. Toddler & Early Years Circles */}
+          {toddlerEvents.length > 0 && (
+            <EventCarouselSection
+              title="Toddler & Early Years Discovery"
+              subtitle="Gentle sensory play, bubble rhymes & infant social playgroups"
+              events={toddlerEvents}
+              onSeeAll={() => {
+                setCategoryFilter('Event');
+                setShowFilterSortBlock(true);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onSelectEvent={(evt) => {
+                setSelectedEventId(evt.id);
+                handleInitiateBooking(evt);
+              }}
+              onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
+              myTickets={myTickets}
+            />
+          )}
         </div>
       )}
 
@@ -2547,7 +2244,61 @@ ${deepLink}`;
           onAddEvent={(newEvent) => {
             setEventsList(prev => [newEvent, ...prev]);
             setSelectedEventId(newEvent.id);
+          }}
+          onDirectBook={(evt) => {
             setShowCreateWizard(false);
+            handleInitiateBooking(evt);
+          }}
+        />
+      )}
+
+      {/* Dedicated Event Host QR Code & Direct Booking Share Station */}
+      {hostQrModalEvent && (
+        <EventHostQrShareModal
+          event={hostQrModalEvent}
+          onClose={() => setHostQrModalEvent(null)}
+          onDirectBook={(evt) => {
+            setHostQrModalEvent(null);
+            handleInitiateBooking(evt);
+          }}
+        />
+      )}
+
+      {/* In-App Camera / Image QR Scanner for Event Direct Booking */}
+      {showScannerModal && (
+        <EventQrScannerModal
+          onClose={() => setShowScannerModal(false)}
+          onScanEventFound={(scannedId, autoBook) => {
+            setShowScannerModal(false);
+            let targetEvt = eventsList.find(e => e.id === scannedId);
+            if (!targetEvt) {
+              try {
+                const stored = localStorage.getItem('vernunt_user_created_events');
+                if (stored) {
+                  const list = JSON.parse(stored);
+                  targetEvt = list.find((e: any) => e.id === scannedId);
+                  if (targetEvt) setEventsList(prev => [targetEvt!, ...prev]);
+                }
+              } catch (e) {
+                console.warn('LocalStorage QR scan retrieval note:', e);
+              }
+            }
+            if (targetEvt) {
+              setSelectedEventId(targetEvt.id);
+              setTimeout(() => {
+                const el = document.getElementById(`event-card-${scannedId}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('ring-4', 'ring-orange-500', 'ring-offset-4');
+                  setTimeout(() => {
+                    el.classList.remove('ring-4', 'ring-orange-500', 'ring-offset-4');
+                  }, 4000);
+                }
+                if (autoBook) {
+                  handleInitiateBooking(targetEvt!);
+                }
+              }, 350);
+            }
           }}
         />
       )}
@@ -2690,15 +2441,6 @@ ${deepLink}`;
         <UserPurchasesModal
           userProfile={userProfile}
           onClose={() => setShowUserPurchasesModal(false)}
-        />
-      )}
-
-      {/* Google SEO & XML Sitemap Engine Modal */}
-      {showSeoSitemapModal && (
-        <EventSeoSitemapModal
-          isOpen={showSeoSitemapModal}
-          onClose={() => setShowSeoSitemapModal(false)}
-          events={eventsList}
         />
       )}
     </div>

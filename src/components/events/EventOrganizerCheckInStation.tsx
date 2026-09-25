@@ -26,6 +26,7 @@ export default function EventOrganizerCheckInStation({
   const [filterStatus, setFilterStatus] = useState<'all' | 'checked_in' | 'pending'>('all');
   const [filterTier, setFilterTier] = useState<string>('all');
   const [manualCodeInput, setManualCodeInput] = useState('');
+  const [isShakeError, setIsShakeError] = useState(false);
   const [scanResult, setScanResult] = useState<{
     status: 'success' | 'already_checked' | 'invalid' | null;
     message: string;
@@ -191,10 +192,41 @@ export default function EventOrganizerCheckInStation({
     localStorage.setItem(`vernunt_attendees_${event.id}`, JSON.stringify(newList));
   };
 
+  // Immediate non-visual haptic feedback and red border shake on invalid/expired ticket
+  const triggerInvalidFeedback = () => {
+    // 1. Device Haptic Feedback (Sharp double pulse)
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([140, 60, 180]);
+      } catch (e) {
+        console.debug('Haptic vibration not available on this device');
+      }
+    }
+    // 2. Subtle Red Border Shake Animation
+    setIsShakeError(true);
+    setTimeout(() => {
+      setIsShakeError(false);
+    }, 700);
+  };
+
   // Check-In Logic
   const handleCheckInByCode = (rawCode: string) => {
     const trimmed = rawCode.trim().toUpperCase();
     if (!trimmed) return;
+
+    // Check if event itself is past or ticket explicitly marked expired
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isEventExpired = (event.endDate && event.endDate < todayStr) || (event.date && event.date < todayStr);
+    const isCodeExpired = trimmed.includes('EXPIRED');
+
+    if (isEventExpired || isCodeExpired) {
+      triggerInvalidFeedback();
+      setScanResult({
+        status: 'invalid',
+        message: `⛔ TICKET EXPIRED: This pass for "${event.title}" has expired (${event.date || 'past event'}). Not valid for gate admission.`
+      });
+      return;
+    }
 
     // Search attendee by ticketNumber, bookingId, or childName/buyerName
     const matchedIndex = attendees.findIndex(
@@ -206,9 +238,10 @@ export default function EventOrganizerCheckInStation({
     );
 
     if (matchedIndex === -1) {
+      triggerInvalidFeedback();
       setScanResult({
         status: 'invalid',
-        message: `Ticket "${trimmed}" was not found in this event's roster. Please check the ticket number.`
+        message: `❌ INVALID PASS: Ticket "${trimmed}" was not found in this event's roster. Please check the QR pass.`
       });
       return;
     }
@@ -216,6 +249,7 @@ export default function EventOrganizerCheckInStation({
     const attendee = attendees[matchedIndex];
 
     if (attendee.checkedIn) {
+      triggerInvalidFeedback();
       setScanResult({
         status: 'already_checked',
         message: `⚠️ ALREADY CHECKED IN: ${attendee.childName || attendee.buyerName} was already admitted at ${attendee.checkedInAt || 'earlier today'}.`,
@@ -454,11 +488,22 @@ export default function EventOrganizerCheckInStation({
           <div className="lg:col-span-5 space-y-4">
             
             {/* Camera / Manual Scanner Card */}
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+            <div className={`bg-slate-50 border rounded-2xl p-4 shadow-xs space-y-3 transition-all duration-200 ${
+              isShakeError 
+                ? 'border-rose-500 ring-4 ring-rose-400/50 animate-shake bg-rose-50/60 shadow-lg shadow-rose-500/20' 
+                : 'border-slate-200'
+            }`}>
               <div className="flex items-center justify-between">
-                <span className="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <QrCode className="w-4 h-4 text-orange-600" />
+                <span className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${
+                  isShakeError ? 'text-rose-700 font-black' : 'text-slate-700'
+                }`}>
+                  <QrCode className={`w-4 h-4 ${isShakeError ? 'text-rose-600' : 'text-orange-600'}`} />
                   Live Gate Scanner
+                  {isShakeError && (
+                    <span className="text-[10px] bg-rose-600 text-white font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse ml-1">
+                      Scan Error
+                    </span>
+                  )}
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
@@ -492,7 +537,9 @@ export default function EventOrganizerCheckInStation({
 
               {/* Video Camera Preview */}
               {cameraActive ? (
-                <div className="relative aspect-video bg-black rounded-xl overflow-hidden border border-slate-300">
+                <div className={`relative aspect-video bg-black rounded-xl overflow-hidden border transition-colors ${
+                  isShakeError ? 'border-rose-500 ring-4 ring-rose-500/40' : 'border-slate-300'
+                }`}>
                   <video
                     ref={videoRef}
                     autoPlay
@@ -505,9 +552,13 @@ export default function EventOrganizerCheckInStation({
                     <div className="absolute inset-0 pointer-events-none bg-radial from-amber-100/30 via-amber-200/10 to-transparent ring-4 ring-amber-300/40 animate-pulse"></div>
                   )}
 
-                  <div className="absolute inset-0 border-2 border-orange-500/80 rounded-xl m-6 pointer-events-none animate-pulse flex items-center justify-center">
-                    <span className="text-[11px] bg-black/70 text-white px-2 py-1 rounded font-medium">
-                      Align Attendee QR Code Here
+                  <div className={`absolute inset-0 border-2 rounded-xl m-6 pointer-events-none flex items-center justify-center transition-colors ${
+                    isShakeError ? 'border-rose-500 bg-rose-950/30' : 'border-orange-500/80 animate-pulse'
+                  }`}>
+                    <span className={`text-[11px] px-2.5 py-1 rounded-md font-bold shadow-md ${
+                      isShakeError ? 'bg-rose-600 text-white' : 'bg-black/70 text-white'
+                    }`}>
+                      {isShakeError ? '⚠️ Invalid / Expired QR Code' : 'Align Attendee QR Code Here'}
                     </span>
                   </div>
 
@@ -530,7 +581,9 @@ export default function EventOrganizerCheckInStation({
                   {cameraError}
                 </div>
               ) : (
-                <div className="p-4 bg-white rounded-xl border border-dashed-2 border-slate-300 text-center space-y-1">
+                <div className={`p-4 bg-white rounded-xl border border-dashed-2 text-center space-y-1 transition-colors ${
+                  isShakeError ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'
+                }`}>
                   <p className="text-xs font-semibold text-slate-700">Camera Scanner Ready</p>
                   <p className="text-[11px] text-slate-500">
                     Click "Start Camera" to scan passes or enter ticket ID below.
@@ -555,7 +608,11 @@ export default function EventOrganizerCheckInStation({
                     value={manualCodeInput}
                     onChange={(e) => setManualCodeInput(e.target.value)}
                     placeholder="Enter Ticket ID, Child Name, or Phone..."
-                    className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-orange-500 font-mono"
+                    className={`flex-1 text-xs px-3 py-2 rounded-xl border font-mono transition-all focus:outline-none ${
+                      isShakeError 
+                        ? 'border-rose-500 ring-2 ring-rose-400 bg-rose-50/60 text-rose-900' 
+                        : 'border-slate-300 focus:ring-2 focus:ring-orange-500'
+                    }`}
                   />
                   <button
                     type="submit"

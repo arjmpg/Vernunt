@@ -201,6 +201,10 @@ export interface ChildProfile {
   // Mobile Phone Contacts Privacy & Visibility Settings
   contactsPrivacy?: UserContactsPrivacy;
 
+  // Vernunt User In-App Wallet
+  walletBalance?: number; // In-App Wallet available funds (INR)
+  wallet?: UserWallet;
+
   // WooCommerce Affiliate Model Settings & Stats
   isAffiliate?: boolean;
   affiliateStatus?: 'active' | 'pending' | 'rejected' | 'inactive';
@@ -352,6 +356,42 @@ export interface TicketTier {
   ageGroup?: string; // e.g. "3-6 years", "All Ages"
 }
 
+export interface EventMenuItem {
+  id: string;
+  name: string; // e.g. "Fresh Mango Smoothie", "Kid-Safe Fruit Platter", "Nut-Free Energy Muffin"
+  price: number; // Price per item in INR
+  photoUrl?: string; // Optional food/refreshment photo
+  description?: string; // Short item description/ingredients
+  category?: 'Drink' | 'Snack' | 'Meal' | 'Dessert' | 'Kit' | 'Other';
+  availableQuantity?: number; // Optional host inventory limit
+  isVegetarian?: boolean;
+}
+
+export interface EventSelectedMenuItem {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  photoUrl?: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: 'deposit' | 'withdrawal' | 'payment_debit' | 'refund_credit';
+  amount: number; // In INR
+  description: string;
+  timestamp: string; // ISO 8601
+  referenceId?: string; // e.g. Razorpay payment ID, bank reference, or order ID
+  channel?: 'UPI' | 'Razorpay' | 'Bank Transfer' | 'App Checkout';
+  status: 'Completed' | 'Pending' | 'Failed';
+}
+
+export interface UserWallet {
+  balance: number; // Current spendable wallet balance in INR
+  transactions: WalletTransaction[];
+  lastUpdated: string;
+}
+
 export interface EventScheduleItem {
   id: string;
   time: string; // e.g. "10:00 AM"
@@ -464,6 +504,7 @@ export interface CommunityEvent {
   isMock?: boolean;
   // Vernunt Events Advanced Parameters
   ticketTiers?: TicketTier[];
+  menuItems?: EventMenuItem[]; // Host-configured event refreshments, meal combos & activity kits
   scheduleAgenda?: EventScheduleItem[];
   targetAgeRange?: string; // e.g. "2 - 8 Years"
   maxCapacity?: number;
@@ -589,6 +630,11 @@ export interface Booking {
   checkedInAt?: string;
   checkedInBy?: string;
   quantity?: number;
+  selectedMenuItems?: EventSelectedMenuItem[]; // Menu pre-orders with quantities
+  menuSubtotal?: number; // Total spent on event menu items
+  walletAmountUsed?: number; // Amount debited from wallet
+  onlineAmountPaid?: number; // Remainder paid online through Razorpay
+  paymentMethodUsed?: 'Razorpay' | 'VernuntWallet' | 'Hybrid';
   createdAt?: string;
 }
 

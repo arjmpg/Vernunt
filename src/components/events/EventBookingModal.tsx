@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
-import { CommunityEvent, Booking, TicketTier, EventCoupon } from '../../types.ts';
+import React, { useState, useEffect } from 'react';
+import { CommunityEvent, Booking, TicketTier, EventCoupon, EventSelectedMenuItem, UserWallet } from '../../types.ts';
 import { 
   X, Ticket, Calendar, Clock, MapPin, Check, Sparkles, 
   CreditCard, ShieldCheck, Tag, AlertCircle, Plus, Minus, 
-  User, Phone, ChevronRight, CheckCircle2, Mail, Send
+  User, Phone, ChevronRight, CheckCircle2, Mail, Send, Wallet, Utensils
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendEventBookingNotifications, NotificationStatus } from '../../utils/notifications.ts';
 import { attributeAffiliateBooking } from '../../utils/affiliate.ts';
 import { saveEventPurchase } from '../../data/eventPurchases.ts';
+import EventMenuComponent from './EventMenuComponent.tsx';
+import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
+import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -83,9 +86,33 @@ export default function EventBookingModal({
   const [createdBooking, setCreatedBooking] = useState<Booking | null>(null);
   const [notificationStatus, setNotificationStatus] = useState<NotificationStatus | null>(null);
 
+  // Menu items pre-ordered with offline local storage persistence
+  const [selectedMenuItems, setSelectedMenuItems] = useState<EventSelectedMenuItem[]>(() => 
+    getStoredEventCart(event.id)
+  );
+
+  const handleSelectedMenuItemsChange = (items: EventSelectedMenuItem[]) => {
+    setSelectedMenuItems(items);
+    saveStoredEventCart(event.id, items);
+  };
+  
+  // In-app Wallet state (Prioritized payment source)
+  const [wallet, setWallet] = useState<UserWallet>(() => getStoredWallet());
+  const [useWalletFunds, setUseWalletFunds] = useState<boolean>(true);
+
+  useEffect(() => {
+    const handleWalletSync = (e: any) => {
+      if (e.detail) setWallet(e.detail);
+    };
+    window.addEventListener('vernunt_wallet_updated', handleWalletSync);
+    return () => window.removeEventListener('vernunt_wallet_updated', handleWalletSync);
+  }, []);
+
   const selectedTier = defaultTiers.find(t => t.id === selectedTierId) || defaultTiers[0];
   const unitPrice = selectedTier ? selectedTier.price : (event.ticketPrice || 0);
-  const subtotal = unitPrice * quantity;
+  const ticketsSubtotal = unitPrice * quantity;
+  const menuSubtotal = selectedMenuItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
+  const subtotal = ticketsSubtotal + menuSubtotal;
 
   // Calculate Discounts
   let discountAmount = 0;
@@ -100,6 +127,14 @@ export default function EventBookingModal({
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
   const convenienceFee = discountedSubtotal > 0 ? Math.round(discountedSubtotal * 0.02) : 0;
   const finalTotal = discountedSubtotal + convenienceFee;
+
+  // Real-time wallet balance lookup and prioritized deduction
+  const latestWallet = getStoredWallet();
+  const walletAvailable = latestWallet?.balance !== undefined ? latestWallet.balance : (wallet?.balance || 0);
+  const walletDeduction = (useWalletFunds && finalTotal > 0)
+    ? Math.min(walletAvailable, finalTotal)
+    : 0;
+  const remainingOnlinePayable = Math.max(0, finalTotal - walletDeduction);
 
   const handleApplyPromo = (e: React.FormEvent) => {
     e.preventDefault();
@@ -123,12 +158,31 @@ export default function EventBookingModal({
       return;
     }
 
-    // For free registration or 0 amount: bypass payment gateway completely and generate ticket immediately!
-    if (finalTotal === 0) {
-      finalizeOrder('FREE_COMMUNITY_PASS_' + Date.now().toString().slice(-6));
+    // Perform real-time check of user wallet balance right at checkout trigger
+    const realTimeWallet = getStoredWallet();
+    const currentBalance = realTimeWallet.balance || 0;
+    const realTimeWalletDeduction = useWalletFunds ? Math.min(currentBalance, finalTotal) : 0;
+    const realTimeRemainingOnline = Math.max(0, finalTotal - realTimeWalletDeduction);
+
+    // If remainingOnlinePayable is 0 (paid fully via wallet or free registration):
+    if (realTimeRemainingOnline === 0) {
+      if (realTimeWalletDeduction > 0) {
+        debitFromWallet(
+          realTimeWalletDeduction,
+          `Event Pass: ${event.title} (${quantity} tickets + ${selectedMenuItems.length} menu items)`
+        );
+      }
+      finalizeOrder(
+        realTimeWalletDeduction > 0 ? 'PAID_BY_VERNUNT_WALLET' : 'FREE_COMMUNITY_PASS_' + Date.now().toString().slice(-6),
+        realTimeWalletDeduction,
+        0,
+        realTimeWalletDeduction > 0 ? 'VernuntWallet' : 'Razorpay'
+      );
       return;
     }
 
+    // Wallet funds insufficient to cover full amount:
+    // Only trigger Razorpay payment gateway UI for the remaining balance!
     setStep('payment_processing');
 
     setTimeout(() => {
@@ -136,7 +190,20 @@ export default function EventBookingModal({
     }, 1000);
   };
 
-  const finalizeOrder = (paymentId: string) => {
+  const finalizeOrder = (
+    paymentId: string,
+    walletUsed: number = walletDeduction,
+    onlinePaid: number = remainingOnlinePayable,
+    methodUsed: 'Razorpay' | 'VernuntWallet' | 'Hybrid' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Razorpay'
+  ) => {
+    // If hybrid/online payment and wallet was debited:
+    if (walletUsed > 0 && methodUsed === 'Hybrid') {
+      debitFromWallet(
+        walletUsed,
+        `Hybrid Payment: ${event.title} (${quantity} tickets + ${selectedMenuItems.length} menu items)`
+      );
+    }
+
     const ticketNum = `VERN-EVT-${Math.floor(1000 + Math.random() * 9000)}-${Math.floor(100 + Math.random() * 900)}`;
     const effectiveCommission = event.commissionPercentage !== undefined ? event.commissionPercentage : globalCommissionRate;
     const commEarned = Math.round((finalTotal * effectiveCommission) / 100);
@@ -168,6 +235,11 @@ export default function EventBookingModal({
       eventVenue: event.location,
       checkedIn: false,
       quantity: quantity,
+      selectedMenuItems: selectedMenuItems.length > 0 ? selectedMenuItems : undefined,
+      menuSubtotal: menuSubtotal > 0 ? menuSubtotal : undefined,
+      walletAmountUsed: walletUsed > 0 ? walletUsed : undefined,
+      onlineAmountPaid: onlinePaid > 0 ? onlinePaid : undefined,
+      paymentMethodUsed: methodUsed,
       createdAt: new Date().toISOString()
     };
 
@@ -216,6 +288,27 @@ export default function EventBookingModal({
     }).catch((affErr) => {
       console.warn('Affiliate attribution note:', affErr);
     });
+
+    // Clear local storage event cart after purchase confirmation
+    clearStoredEventCart(event.id);
+
+    // Sync menu order to sync outbox for offline persistence & background sync
+    if (selectedMenuItems.length > 0) {
+      try {
+        syncEventCartOrderToOutbox(event.id, event.title, selectedMenuItems, {
+          name: buyerName || userProfile?.parentName || 'Event Attendee',
+          email: buyerEmail || userProfile?.email || 'attendee@vernunt.com',
+          phone: buyerPhone || userProfile?.phoneNumber,
+          bookingId: newBooking.id,
+          paymentMethod: methodUsed,
+          paymentId: paymentId,
+          walletDebited: walletUsed,
+          onlinePaid: onlinePaid
+        });
+      } catch (syncErr) {
+        console.warn('Outbox event cart sync note:', syncErr);
+      }
+    }
 
     confetti({
       particleCount: 80,
@@ -392,6 +485,16 @@ export default function EventBookingModal({
                 </div>
               </div>
 
+              {/* Event Host Refreshments & Menu Pre-order List View (Offline-First) */}
+              <EventMenuComponent
+                eventId={event.id}
+                eventTitle={event.title}
+                initialMenuItems={event.menuItems}
+                isHost={userProfile?.id === (event as any).hostId || userProfile?.parentName === event.hostName}
+                selectedItems={selectedMenuItems}
+                onCartChange={(items) => handleSelectedMenuItemsChange(items)}
+              />
+
               {/* Promo Code Input */}
               <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
                 <form onSubmit={handleApplyPromo} className="flex gap-2">
@@ -540,8 +643,19 @@ export default function EventBookingModal({
                 </span>
                 <div className="flex justify-between text-slate-600">
                   <span>{selectedTier.name} × {quantity}</span>
-                  <span className="font-semibold text-slate-800">₹{subtotal}</span>
+                  <span className="font-semibold text-slate-800">₹{ticketsSubtotal}</span>
                 </div>
+
+                {menuSubtotal > 0 && (
+                  <div className="flex justify-between text-amber-800 bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200/60">
+                    <span className="flex items-center gap-1 font-semibold">
+                      <Utensils className="w-3 h-3 text-amber-600" />
+                      Pre-ordered Menu ({selectedMenuItems.reduce((a, b) => a + b.quantity, 0)} items)
+                    </span>
+                    <span className="font-bold">+₹{menuSubtotal}</span>
+                  </div>
+                )}
+
                 {discountAmount > 0 && (
                   <div className="flex justify-between text-emerald-700">
                     <span>Discount ({appliedCoupon?.code})</span>
@@ -555,8 +669,67 @@ export default function EventBookingModal({
                   </div>
                 )}
                 <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm">
-                  <span className="font-bold text-slate-900">Total Payable:</span>
-                  <span className="font-black text-orange-600 text-base">₹{finalTotal}</span>
+                  <span className="font-bold text-slate-900">Total Order Amount:</span>
+                  <span className="font-black text-slate-900 text-base">₹{finalTotal}</span>
+                </div>
+
+                {/* Prioritized Vernunt In-App Wallet Deduction */}
+                {finalTotal > 0 && (
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-200/80 bg-rose-50/80 p-3 rounded-2xl border border-rose-200 space-y-1.5">
+                    <label className="flex items-center justify-between cursor-pointer select-none">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={useWalletFunds}
+                          onChange={(e) => setUseWalletFunds(e.target.checked)}
+                          className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
+                        />
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-extrabold text-rose-950 flex items-center gap-1 text-xs">
+                              <Wallet className="w-3.5 h-3.5 text-rose-700" />
+                              Prioritize In-App Wallet
+                            </span>
+                            <span className="text-[9px] font-bold uppercase tracking-wider bg-rose-200/80 text-rose-900 px-1.5 py-0.5 rounded">
+                              Priority 1
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-rose-700 block">
+                            Available Balance: <strong>₹{walletAvailable}</strong>
+                          </span>
+                        </div>
+                      </div>
+                      <span className="text-xs font-mono font-black text-rose-800">
+                        {useWalletFunds && walletDeduction > 0 ? `-₹${walletDeduction}` : '₹0'}
+                      </span>
+                    </label>
+
+                    {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable === 0 && (
+                      <div className="text-[11px] text-emerald-800 bg-emerald-100/70 p-2 rounded-xl font-medium flex items-center gap-1.5 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Full amount covered by your Vernunt Wallet! No Razorpay checkout needed.</span>
+                      </div>
+                    )}
+
+                    {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable > 0 && (
+                      <div className="text-[10px] text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-xl font-medium border border-amber-200">
+                        ⚡ Priority Deduction: <strong>₹{walletDeduction}</strong> deducted from wallet first. Remaining balance of <strong>₹{remainingOnlinePayable}</strong> defaults to Razorpay gateway.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Final Net Payable Online via Razorpay */}
+                <div className="pt-2 flex justify-between items-center text-sm font-bold border-t border-slate-100">
+                  <div>
+                    <span className="text-slate-900 block">Remaining via Razorpay:</span>
+                    <span className="text-[10px] text-slate-400 font-normal">
+                      {walletDeduction > 0 ? `After ₹${walletDeduction} wallet deduction` : 'Standard card / UPI / netbanking'}
+                    </span>
+                  </div>
+                  <span className="font-black text-orange-600 text-lg">
+                    ₹{remainingOnlinePayable}
+                  </span>
                 </div>
               </div>
 
@@ -564,19 +737,30 @@ export default function EventBookingModal({
                 <button
                   type="button"
                   onClick={() => setStep('tier_selection')}
-                  className="py-3 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                  className="py-3 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
-                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-colors"
+                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                 >
-                  <CreditCard className="w-4 h-4" />
-                  <span>
-                    {finalTotal === 0 ? 'Confirm Free Registration' : `Pay ₹${finalTotal} with Razorpay`}
-                  </span>
+                  {remainingOnlinePayable === 0 ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>{walletDeduction > 0 ? `Confirm & Pay ₹${walletDeduction} with Wallet` : 'Confirm Free Registration'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4" />
+                      <span>
+                        {walletDeduction > 0 
+                          ? `Pay Remaining ₹${remainingOnlinePayable} with Razorpay (₹${walletDeduction} via Wallet)` 
+                          : `Pay ₹${finalTotal} with Razorpay`}
+                      </span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -592,7 +776,12 @@ export default function EventBookingModal({
                 Connecting to Razorpay Gateway...
               </h4>
               <p className="text-xs text-slate-500">
-                Securing ₹{finalTotal} transaction with 256-bit bank encryption.
+                Securing ₹{remainingOnlinePayable} transaction with 256-bit bank encryption.
+                {walletDeduction > 0 && (
+                  <span className="block text-[11px] text-emerald-700 font-semibold mt-1">
+                    (₹{walletDeduction} already deducted from Vernunt Wallet)
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -602,8 +791,13 @@ export default function EventBookingModal({
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-center space-y-1 text-xs">
                 <span className="font-bold text-blue-900 block">Bank 3D Secure OTP</span>
                 <p className="text-blue-700">
-                  Enter the 6-digit test OTP sent to {buyerPhone} to confirm ₹{finalTotal} payment.
+                  Enter the 6-digit test OTP sent to {buyerPhone} to confirm ₹{remainingOnlinePayable} payment.
                 </p>
+                {walletDeduction > 0 && (
+                  <p className="text-[11px] text-emerald-800 font-semibold">
+                    (₹{walletDeduction} deducted from your Vernunt Wallet balance)
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -626,7 +820,12 @@ export default function EventBookingModal({
 
               <button
                 type="button"
-                onClick={() => finalizeOrder('RZP_PROD_' + Date.now().toString().slice(-8))}
+                onClick={() => finalizeOrder(
+                  'RZP_PROD_' + Date.now().toString().slice(-8),
+                  walletDeduction,
+                  remainingOnlinePayable,
+                  walletDeduction > 0 ? 'Hybrid' : 'Razorpay'
+                )}
                 className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-colors"
               >
                 Verify & Generate E-Ticket
@@ -654,6 +853,26 @@ export default function EventBookingModal({
                 <div><strong>Date & Time:</strong> {createdBooking.dateStr} at {createdBooking.timeSelected}</div>
                 <div><strong>Attendee:</strong> {createdBooking.childName || createdBooking.buyerName}</div>
                 <div><strong>Pass Tier:</strong> {createdBooking.ticketTierName} (Qty: {createdBooking.quantity})</div>
+                {createdBooking.selectedMenuItems && createdBooking.selectedMenuItems.length > 0 && (
+                  <div className="pt-1 border-t border-slate-200 text-amber-900">
+                    <strong>Pre-ordered Refreshments:</strong>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[11px] text-slate-700">
+                      {createdBooking.selectedMenuItems.map(m => (
+                        <li key={m.id}>{m.name} × {m.quantity} (₹{m.price * m.quantity})</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {createdBooking.walletAmountUsed ? (
+                  <div className="pt-1 border-t border-slate-200 text-[11px] text-slate-600">
+                    <span>Payment Mode: </span>
+                    <strong className="text-slate-900">
+                      {createdBooking.paymentMethodUsed === 'Hybrid' 
+                        ? `Hybrid (₹${createdBooking.walletAmountUsed} Wallet + ₹${createdBooking.onlineAmountPaid} Online)`
+                        : 'Vernunt Wallet (₹' + createdBooking.walletAmountUsed + ')'}
+                    </strong>
+                  </div>
+                ) : null}
               </div>
 
               {/* Automated Email & SMS delivery badge */}

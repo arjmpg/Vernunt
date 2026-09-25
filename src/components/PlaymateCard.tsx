@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
-import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin } from 'lucide-react';
-import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
+import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin, Navigation } from 'lucide-react';
+import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 
 export function formatLastActive(timestamp?: string): string {
@@ -167,7 +167,7 @@ export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile, c
 interface PlaymateCardProps {
   profile: ChildProfile;
   onInitiatePlaydate: (profile: ChildProfile) => void;
-  onOpenChat: (profile: ChildProfile) => void;
+  onOpenChat: (profile: ChildProfile, templateMessage?: string) => void;
   onOpenReport: (profile: ChildProfile) => void;
   onOpenVerify: (profile: ChildProfile) => void;
   isConnected?: boolean;
@@ -222,7 +222,11 @@ export default function PlaymateCard({
   const currentDisplayPhoto = activePhotoTab === 'parent' ? parentPhoto : (hasChildPhoto ? childPhoto : parentPhoto);
 
   return (
-    <div id={`playmate-card-${profile.id}`} className="bg-white rounded-2xl border border-rose-100/80 shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full overflow-hidden hover:border-rose-300">
+    <div id={`playmate-card-${profile.id}`} className={`bg-white rounded-2xl border shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col h-full overflow-hidden ${
+      distKm <= 0.5 
+        ? 'border-emerald-400 ring-2 ring-emerald-400/30 shadow-emerald-500/10' 
+        : 'border-rose-100/80 hover:border-rose-300'
+    }`}>
       {/* Premium Verified Top Badge Bar */}
       <div className="bg-gradient-to-r from-rose-800 via-red-800 to-rose-900 text-white px-4 py-2 flex items-center justify-between text-xs">
         <div className="flex items-center gap-1.5 font-bold">
@@ -235,6 +239,25 @@ export default function PlaymateCard({
           </span>
         )}
       </div>
+
+      {/* Spontaneous Meetup Proximity Indicator Banner (Within 0.5km) */}
+      {distKm <= 0.5 && (
+        <div 
+          id={`spontaneous-nearby-banner-${profile.id}`}
+          className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white px-3.5 py-1.5 flex items-center justify-between text-xs font-black shadow-xs"
+        >
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-90"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"></span>
+            </span>
+            <span className="uppercase tracking-wider text-[10px]">Nearby &bull; &lt;0.5 km ({Math.round(distKm * 1000)}m)</span>
+          </div>
+          <span className="text-[10px] bg-white/20 backdrop-blur-xs px-2 py-0.5 rounded-full font-extrabold flex items-center gap-1">
+            <Zap className="w-2.5 h-2.5 text-amber-300" /> Spontaneous Meetup
+          </span>
+        </div>
+      )}
 
       {/* Photo Header with Dual Parent (Mandatory) & Child (Optional) Toggle */}
       <div id="card-photo-wrapper" className="relative h-52 bg-slate-900 overflow-hidden group">
@@ -315,14 +338,30 @@ export default function PlaymateCard({
         )}
 
         {/* Top-Left: Color-Coded Proximity Badge Overlay */}
-        <div 
-          id={`proximity-pill-overlay-${profile.id}`} 
-          className={`absolute top-3 left-3 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs ${proxBadge.badgeOverlayClass}`}
-          title={`Proximity distance: ${proxBadge.distanceText} (${proxBadge.subtext})`}
-        >
-          <span className={`w-2 h-2 rounded-full ${proxBadge.dotColor} animate-pulse shrink-0`} />
-          <span className="font-mono">{proxBadge.distanceText}</span>
-          <span className="text-[8.5px] font-black opacity-90 tracking-normal">({proxBadge.label})</span>
+        <div className="absolute top-3 left-3 z-20 flex items-center gap-1.5 flex-wrap">
+          <div 
+            id={`proximity-pill-overlay-${profile.id}`} 
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs ${proxBadge.badgeOverlayClass}`}
+            title={`Proximity distance: ${proxBadge.distanceText} (${proxBadge.subtext})`}
+          >
+            <span className={`w-2 h-2 rounded-full ${proxBadge.dotColor} animate-pulse shrink-0`} />
+            <span className="font-mono">{proxBadge.distanceText}</span>
+            <span className="text-[8.5px] font-black opacity-90 tracking-normal">({proxBadge.label})</span>
+          </div>
+
+          {distKm <= 0.5 && (
+            <span 
+              id={`proximity-pulse-tag-${profile.id}`}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9px] font-black shadow-md border border-emerald-300 ring-2 ring-emerald-400/50 animate-pulse"
+              title="Within 0.5km of you! Perfect for spontaneous park meetups."
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-80"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+              </span>
+              <span>Nearby</span>
+            </span>
+          )}
         </div>
 
         {/* Top Photo Switcher Pills: Parent (Mandatory) & Child (Optional) */}
@@ -505,17 +544,21 @@ export default function PlaymateCard({
             </p>
           </div>
 
-          {/* Color-Coded Proximity Badge */}
+          {/* Cleaner Exact Distance Proximity Badge */}
           <div 
             id="proximity-badge" 
-            className={`text-right text-[10.5px] font-black px-3 py-1.5 rounded-xl border flex items-center gap-1.5 shadow-2xs transition-all ${proxBadge.badgeClass}`}
-            title={`Distance: ${proxBadge.distanceText} • Category: ${proxBadge.label} (${proxBadge.subtext})`}
+            className={`text-right text-xs font-black px-2.5 py-1 rounded-full border flex items-center gap-1.5 shadow-2xs transition-all shrink-0 ${proxBadge.badgeClass}`}
+            title={`Exact distance: ${distKm < 1 ? `${Math.round(distKm * 1000)} meters` : `${distKm.toFixed(2)} km`} • ${proxBadge.subtext}`}
           >
-            <span className={`w-2 h-2 rounded-full ${proxBadge.dotColor} shrink-0`}></span>
-            <div className="flex flex-col text-right leading-none">
-              <span className="font-mono">{proxBadge.distanceText} away</span>
-              <span className="text-[8.5px] font-bold opacity-80 uppercase tracking-wider mt-0.5">{proxBadge.label} • {proxBadge.subtext}</span>
-            </div>
+            <span className="relative flex h-2 w-2 shrink-0">
+              {distKm <= 0.5 && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${proxBadge.dotColor}`}></span>
+            </span>
+            <span className="font-bold tracking-tight">{proxBadge.exactText}</span>
+            <span className="text-slate-300 font-normal select-none">&bull;</span>
+            <span className="text-[10px] font-semibold opacity-90">{proxBadge.subtext}</span>
           </div>
         </div>
 
@@ -563,17 +606,35 @@ export default function PlaymateCard({
           );
         })()}
 
-        {/* Child Safety Protected Location: Area Name Only */}
-        <div id={`safe-location-area-${profile.id}`} className="flex items-center justify-between text-xs bg-slate-50/80 border border-slate-200/80 rounded-2xl p-2 px-3 shadow-3xs">
+        {/* Child Safety Protected Location & Start Navigation Action */}
+        <div id={`safe-location-area-${profile.id}`} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs bg-slate-50/90 border border-slate-200/90 rounded-2xl p-2.5 px-3 shadow-3xs">
           <div className="flex items-center gap-1.5 min-w-0">
             <MapPin className="w-3.5 h-3.5 text-rose-500 shrink-0" />
-            <span className="text-[11px] font-bold text-slate-800 truncate">
-              Area: {getSafeChildAreaName(profile.location?.address)}
-            </span>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-slate-800 block truncate">
+                Area: {getSafeChildAreaName(profile.location?.address)}
+              </span>
+              <span className="text-[9.5px] text-slate-500 font-medium flex items-center gap-1">
+                Exact: <strong className="text-slate-700">{proxBadge.exactText}</strong> away &bull; Verified Safe Zone
+              </span>
+            </div>
           </div>
-          <span className="ml-2 text-[9px] uppercase font-black tracking-wider text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-            <ShieldCheck className="w-2.5 h-2.5 text-emerald-700" /> Area Only
-          </span>
+
+          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0">
+            <button
+              id={`btn-start-navigation-${profile.id}`}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                openDeviceNavigation(profile.location.lat, profile.location.lng, `${profile.childName}'s Play Area`);
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[11px] font-black shadow-xs transition active:scale-95 cursor-pointer"
+              title="Open device's map app with pinned playmate location and walking directions"
+            >
+              <Navigation className="w-3 h-3 fill-current shrink-0" />
+              <span>Start Navigation</span>
+            </button>
+          </div>
         </div>
 
         {/* Playdate Chemistry Match Score */}
@@ -975,8 +1036,28 @@ export default function PlaymateCard({
           )}
         </div>
 
-        {/* Primary Interaction Buttons Grid */}
-        <div id="interaction-buttons-grid" className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-100 mt-auto">
+        {/* Action Controls & Quick Chat */}
+        <div className="pt-3 border-t border-slate-100 mt-auto space-y-2">
+          {/* Quick Chat Button with pre-filled message template */}
+          <button
+            id={`btn-card-quick-chat-action-${profile.id}`}
+            type="button"
+            onClick={() => {
+              const template = distKm <= 0.5
+                ? 'Hi! Saw you are nearby (<500m). Would you like to meet at the park?'
+                : 'Hi! Would you like to meet at the park?';
+              onOpenChat(profile, template);
+            }}
+            className="w-full py-2.5 px-3 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold rounded-xl text-xs flex items-center justify-center gap-2 active:scale-98 transition-all cursor-pointer shadow-xs shadow-orange-500/20"
+            title="Quick Chat with pre-filled message template: 'Hi! Would you like to meet at the park?'"
+          >
+            <MessageSquare className="w-4 h-4 fill-white/20 shrink-0" />
+            <span className="truncate">Quick Chat: "Hi! Would you like to meet at the park?"</span>
+            <Sparkles className="w-3.5 h-3.5 text-amber-200 shrink-0" />
+          </button>
+
+          {/* Primary Interaction Buttons Grid */}
+          <div id="interaction-buttons-grid" className="grid grid-cols-2 gap-2">
           <button
             id={`btn-card-planner-${profile.id}`}
             onClick={() => {
@@ -1042,6 +1123,7 @@ export default function PlaymateCard({
               <MessageSquare className="w-4 h-4" /> Connect Parents
             </button>
           )}
+          </div>
         </div>
 
         {/* Refer & Get Free Subscription Badge (When parent is not currently subscribed) */}

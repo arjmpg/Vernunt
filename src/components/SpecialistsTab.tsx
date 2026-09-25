@@ -4,7 +4,8 @@ import {
   Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, 
   SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
   CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
-  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp
+  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp,
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { MutualFundAdvisor } from '../types/investment.ts';
 import { INITIAL_MUTUAL_FUND_ADVISORS } from '../data/kidsInvestmentData.ts';
@@ -40,6 +41,7 @@ interface SpecialistsTabProps {
   globalCommissionRate: number; // default global percentage
   onUpdateUserProfile?: (profile: ChildProfile) => void;
   onUpdateSpecialist?: (specialist: SpecialistProfile) => void;
+  initialCategory?: string;
 }
 
 const BANGALORE_AREAS = [
@@ -73,10 +75,35 @@ export default function SpecialistsTab({
   onAddBooking,
   globalCommissionRate,
   onUpdateUserProfile,
-  onUpdateSpecialist
+  onUpdateSpecialist,
+  initialCategory
 }: SpecialistsTabProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('All');
+  // Category-first flow: null indicates the Specialist Category Hub is shown; a category string shows that category's profiles
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(() => {
+    if (initialCategory && initialCategory !== 'All') {
+      return initialCategory;
+    }
+    return null;
+  });
+  const [categoryFilter, setCategoryFilter] = useState<string>(initialCategory || 'All');
+
+  // Merged Filter & Sort bar: location and sort option panels are hidden by default and only show when user clicks
+  const [showLocationPanel, setShowLocationPanel] = useState<boolean>(false);
+  const [showSortPanel, setShowSortPanel] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialCategory && initialCategory !== 'All') {
+      setSelectedCategory(initialCategory);
+      setCategoryFilter(initialCategory);
+    }
+  }, [initialCategory]);
+
+  useEffect(() => {
+    if (selectedCategory) {
+      setCategoryFilter(selectedCategory);
+    }
+  }, [selectedCategory]);
   const [selectedCity, setSelectedCity] = useState<string>('all');
   const [selectedLocality, setSelectedLocality] = useState<string>('All Areas');
   const [viewingPortfolioSpec, setViewingPortfolioSpec] = useState<SpecialistProfile | null>(null);
@@ -418,14 +445,143 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
   const [buyerEmail, setBuyerEmail] = useState('guardian@vernunt.org');
 
   const categories = [
-    { key: 'All', label: 'All Specialists', icon: Compass, color: 'text-orange-500' },
-    { key: 'Pediatrician', label: 'Pediatrician', icon: Stethoscope, color: 'text-rose-500' },
-    { key: 'Gynecologist', label: 'Gynecologists & OB/GYN', icon: Heart, color: 'text-fuchsia-500' },
-    { key: 'Nutritionist', label: 'Nutritionists & Dietitians', icon: Utensils, color: 'text-emerald-500' },
-    { key: 'Coach', label: 'Sports Coaches & Mentors', icon: Trophy, color: 'text-amber-500' },
-    { key: 'Kids Wealth & Investment Planners', label: 'Kids Wealth & MF Planners', icon: TrendingUp, color: 'text-indigo-600' },
-    ...customSpecCats.map(cs => ({ key: cs.value, label: cs.name, icon: Briefcase, color: 'text-indigo-500' }))
+    { 
+      key: 'Pediatrician', 
+      label: 'Pediatricians', 
+      shortLabel: 'Pediatrician',
+      icon: Stethoscope, 
+      color: 'text-rose-600', 
+      bgColor: 'bg-rose-50',
+      borderColor: 'border-rose-200',
+      gradient: 'from-rose-500/10 to-rose-500/5',
+      accentColor: 'bg-rose-600',
+      badgeBg: 'bg-rose-100 text-rose-800',
+      subtitle: 'Infant wellness, pediatric care, routine vaccines, fever & childhood illnesses',
+      tags: ['Vaccination', 'Newborn Care', 'Growth Milestones', 'Pediatric Pulmonology']
+    },
+    { 
+      key: 'Therapist', 
+      label: 'Child Therapists & Psychologists', 
+      shortLabel: 'Child Therapist',
+      icon: Sparkles, 
+      color: 'text-purple-600', 
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200',
+      gradient: 'from-purple-500/10 to-purple-500/5',
+      accentColor: 'bg-purple-600',
+      badgeBg: 'bg-purple-100 text-purple-800',
+      subtitle: 'Speech therapy, autism support, ADHD guidance & emotional behavioral psychology',
+      tags: ['Speech Therapy', 'ADHD Support', 'Autism Care', 'Occupational Therapy']
+    },
+    { 
+      key: 'Gynecologist', 
+      label: 'Gynecologists & OB/GYN', 
+      shortLabel: 'Gynecologist',
+      icon: Heart, 
+      color: 'text-fuchsia-600', 
+      bgColor: 'bg-fuchsia-50',
+      borderColor: 'border-fuchsia-200',
+      gradient: 'from-fuchsia-500/10 to-fuchsia-500/5',
+      accentColor: 'bg-fuchsia-600',
+      badgeBg: 'bg-fuchsia-100 text-fuchsia-800',
+      subtitle: 'Maternal health, prenatal care, fertility, high-risk pregnancy & safe delivery',
+      tags: ['Prenatal Care', 'Normal Delivery', 'Fetal Medicine', 'Lactation Consulting']
+    },
+    { 
+      key: 'Nutritionist', 
+      label: 'Nutritionists & Dietitians', 
+      shortLabel: 'Nutritionist',
+      icon: Utensils, 
+      color: 'text-emerald-600', 
+      bgColor: 'bg-emerald-50',
+      borderColor: 'border-emerald-200',
+      gradient: 'from-emerald-500/10 to-emerald-500/5',
+      accentColor: 'bg-emerald-600',
+      badgeBg: 'bg-emerald-100 text-emerald-800',
+      subtitle: 'Child dietetics, infant weaning schedules, picky eating & pediatric food allergies',
+      tags: ['Child Dietetics', 'Weaning Plans', 'Picky Eaters', 'Allergy Diets']
+    },
+    { 
+      key: 'Coach', 
+      label: 'Sports Coaches & Mentors', 
+      shortLabel: 'Sports Coach',
+      icon: Trophy, 
+      color: 'text-amber-600', 
+      bgColor: 'bg-amber-50',
+      borderColor: 'border-amber-200',
+      gradient: 'from-amber-500/10 to-amber-500/5',
+      accentColor: 'bg-amber-600',
+      badgeBg: 'bg-amber-100 text-amber-800',
+      subtitle: 'Youth athletics, swimming, gymnastics, football training & motor skill conditioning',
+      tags: ['Swimming', 'Gymnastics', 'Football Training', 'Motor Skills']
+    },
+    { 
+      key: 'Kids Wealth & Investment Planners', 
+      label: 'Kids Wealth & MF Planners', 
+      shortLabel: 'Wealth & MF',
+      icon: TrendingUp, 
+      color: 'text-indigo-600', 
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      gradient: 'from-indigo-500/10 to-indigo-500/5',
+      accentColor: 'bg-indigo-600',
+      badgeBg: 'bg-indigo-100 text-indigo-800',
+      subtitle: 'AMFI certified advisors for minor Demats, college education funds & goal SIPs',
+      tags: ['Child Education Fund', 'Minor Demat', 'Equity SIP', 'AMFI Verified']
+    },
+    { 
+      key: 'All', 
+      label: 'All Verified Specialists', 
+      shortLabel: 'All Specialists',
+      icon: Compass, 
+      color: 'text-slate-800', 
+      bgColor: 'bg-slate-50',
+      borderColor: 'border-slate-200',
+      gradient: 'from-slate-500/10 to-slate-500/5',
+      accentColor: 'bg-slate-900',
+      badgeBg: 'bg-slate-200 text-slate-900',
+      subtitle: 'Explore the complete directory of 120+ verified pediatric & family specialists across India',
+      tags: ['Pediatricians', 'Gynecologists', 'Nutritionists', 'Coaches', 'Pan-India']
+    },
+    ...customSpecCats.map(cs => ({ 
+      key: cs.value, 
+      label: cs.name, 
+      shortLabel: cs.name,
+      icon: Briefcase, 
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      borderColor: 'border-indigo-200',
+      gradient: 'from-indigo-500/10 to-indigo-500/5',
+      accentColor: 'bg-indigo-600',
+      badgeBg: 'bg-indigo-100 text-indigo-800',
+      subtitle: `Verified ${cs.name} specialists`,
+      tags: ['Specialist']
+    }))
   ];
+
+  const getCategoryCount = useCallback((catKey: string) => {
+    if (catKey === 'All') {
+      return combinedSpecialistsList.length;
+    }
+    if (catKey === 'Therapist') {
+      return combinedSpecialistsList.filter(s => 
+        s.category === 'Therapist' ||
+        s.title?.toLowerCase().includes('therap') ||
+        s.title?.toLowerCase().includes('psycholog') ||
+        s.title?.toLowerCase().includes('development') ||
+        s.specialties?.some(sp => 
+          sp.toLowerCase().includes('therap') || 
+          sp.toLowerCase().includes('psycholog') || 
+          sp.toLowerCase().includes('autism') || 
+          sp.toLowerCase().includes('adhd') || 
+          sp.toLowerCase().includes('development') ||
+          sp.toLowerCase().includes('speech') ||
+          sp.toLowerCase().includes('behavior')
+        )
+      ).length;
+    }
+    return combinedSpecialistsList.filter(s => s.category === catKey).length;
+  }, [combinedSpecialistsList]);
 
   const handleRegisterSpecialist = (e: React.FormEvent) => {
     e.preventDefault();
@@ -873,7 +1029,26 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       if (!spec || !spec.id || seenIds.has(spec.id)) return false;
       seenIds.add(spec.id);
 
-      if (categoryFilter !== 'All' && spec.category !== categoryFilter) return false;
+      if (categoryFilter !== 'All') {
+        if (categoryFilter === 'Therapist') {
+          const isTherapist = spec.category === 'Therapist' ||
+            spec.title?.toLowerCase().includes('therap') ||
+            spec.title?.toLowerCase().includes('psycholog') ||
+            spec.title?.toLowerCase().includes('development') ||
+            spec.specialties?.some(s => 
+              s.toLowerCase().includes('therap') || 
+              s.toLowerCase().includes('psycholog') || 
+              s.toLowerCase().includes('autism') || 
+              s.toLowerCase().includes('adhd') || 
+              s.toLowerCase().includes('development') ||
+              s.toLowerCase().includes('speech') ||
+              s.toLowerCase().includes('behavior')
+            );
+          if (!isTherapist) return false;
+        } else if (spec.category !== categoryFilter) {
+          return false;
+        }
+      }
 
       // City Filter
       if (selectedCity !== 'all') {
@@ -921,12 +1096,18 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         spec.specialties.some(s => s.toLowerCase().includes(query))
       );
     });
-  }, [specialistsList, categoryFilter, selectedCity, selectedLocality, searchQuery]);
+  }, [combinedSpecialistsList, categoryFilter, selectedCity, selectedLocality, searchQuery]);
 
-  // Derive center coordinates for live distance calculation: User GPS > Selected City center > Default Bangalore
+  // Derive center coordinates for live distance calculation: User GPS > Profile location > Selected City center > Default Bangalore
   const centerCoords = useMemo(() => {
     if (userCoords) {
       return userCoords;
+    }
+    if (currentProfile?.location && typeof currentProfile.location === 'object' && (currentProfile.location as any).lat) {
+      return { lat: Number((currentProfile.location as any).lat), lng: Number((currentProfile.location as any).lng) };
+    }
+    if (typeof (currentProfile as any)?.lat === 'number' && typeof (currentProfile as any)?.lng === 'number') {
+      return { lat: (currentProfile as any).lat, lng: (currentProfile as any).lng };
     }
     if (selectedCity !== 'all' && (CITY_COORDINATES as any)[selectedCity]) {
       const c = (CITY_COORDINATES as any)[selectedCity];
@@ -934,7 +1115,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     }
     // Default Bangalore center
     return { lat: 12.9716, lng: 77.5946 };
-  }, [userCoords, selectedCity]);
+  }, [userCoords, currentProfile, selectedCity]);
 
   // Calculate distance for each specialist and sort according to user selection
   const sortedAndFilteredSpecs = useMemo(() => {
@@ -1023,391 +1204,577 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     }
   };
 
+  const activeCategoryObj = categories.find(c => c.key === (selectedCategory || categoryFilter)) || categories[0];
+
   return (
     <div id="specialists-tab-view" className="space-y-6">
-      {/* Header and Callouts */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h3 id="specs-main-title" className="text-xl font-bold text-slate-800 font-serif flex items-center gap-2">
-            🧬 Vernunt Verified Specialists Network &amp; Pan-India Directory
-          </h3>
-          <p id="specs-main-subtitle" className="text-xs text-slate-500">
-            Find and consult verified specialists across India — including pediatricians, gynecologists, child psychologists, dietitians, and health specialists.
-          </p>
-        </div>
-
-        {/* Action buttons: Register Practice & MF Advisor Dashboard */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            id="btn-trigger-mf-advisor-dashboard"
-            onClick={() => setShowAdvisorDashboard(true)}
-            type="button"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-            title="Mutual Fund Advisors: Manage Profile & Showcase AMFI Credentials"
-          >
-            <TrendingUp className="w-4 h-4" />
-            <span>MF Advisor Dashboard</span>
-          </button>
-
-          <button
-            id="btn-trigger-register-specialist"
-            onClick={() => setShowRegModal(true)}
-            type="button"
-            className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 px-4 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <Briefcase className="w-4 h-4" />
-            <span>Register Practice</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Pan-India City Bar & Locality Filter */}
-      <div className="bg-gradient-to-r from-rose-50 via-amber-50/50 to-orange-50 border border-rose-200/80 p-4 rounded-3xl space-y-3.5 shadow-xs">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-sm">
-              <Stethoscope className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h4 className="font-extrabold text-sm text-slate-900 font-serif">
-                  Pan-India Specialists Directory
-                </h4>
-                <span className="px-2 py-0.5 bg-rose-600 text-white text-[9.5px] font-black rounded-full uppercase tracking-wider">
-                  Vernunt Verified
-                </span>
+      {/* STEP 1: CATEGORY SELECTION HUB (Shown first when user opens Specialists tab) */}
+      {!selectedCategory && (
+        <div id="specialists-category-hub" className="space-y-6 animate-fade-in">
+          {/* Hub Header */}
+          <div className="bg-gradient-to-br from-rose-50 via-amber-50/40 to-indigo-50/30 border border-rose-100 rounded-3xl p-6 sm:p-8 shadow-xs">
+            <div className="max-w-3xl space-y-3">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-100 text-rose-800 text-xs font-bold uppercase tracking-wider">
+                <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+                <span>Vernunt Verified Specialists Network</span>
               </div>
-              <p className="text-[11.5px] text-slate-600">
-                100% verified authentic clinical portfolios from top hospitals and trusted clinics across Indian metros.
+              <h2 id="specs-main-title" className="text-2xl sm:text-3xl font-extrabold text-slate-900 font-serif tracking-tight">
+                Consult Verified Specialists Across India
+              </h2>
+              <p id="specs-main-subtitle" className="text-sm text-slate-600 leading-relaxed">
+                Connect with verified pediatricians, child therapists, gynecologists, nutritionists, sports mentors, and certified wealth planners. Choose a category below to explore authentic clinical portfolios.
               </p>
+
+              {/* Quick Search across all doctors */}
+              <div className="pt-2">
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      setSelectedCategory('All');
+                      setCategoryFilter('All');
+                    }
+                  }}
+                  className="flex items-center gap-2 max-w-xl bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm focus-within:ring-4 focus-within:ring-rose-100 focus-within:border-rose-400 transition"
+                >
+                  <Search className="w-4 h-4 text-slate-400 ml-3 shrink-0" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search doctor name, hospital, clinic, locality or condition..."
+                    className="w-full bg-transparent py-2 px-1 text-xs sm:text-sm text-slate-800 placeholder-slate-400 font-medium outline-none"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="p-1.5 text-slate-400 hover:text-slate-600 transition"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    type="submit"
+                    onClick={() => {
+                      setSelectedCategory('All');
+                      setCategoryFilter('All');
+                    }}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-xs"
+                  >
+                    Search Directory
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              type="button"
-              id="filter-only-pediatricians-btn"
-              onClick={() => {
-                setCategoryFilter('Pediatrician');
-                setSelectedLocality('All Areas');
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                categoryFilter === 'Pediatrician'
-                  ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-rose-50 border-rose-200'
-              }`}
-            >
-              Pediatrician ({specialistsList.filter(s => s.category === 'Pediatrician').length})
-            </button>
-            <button
-              type="button"
-              id="filter-only-gynecologists-btn"
-              onClick={() => {
-                setCategoryFilter('Gynecologist');
-                setSelectedLocality('All Areas');
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                categoryFilter === 'Gynecologist'
-                  ? 'bg-fuchsia-600 text-white border-fuchsia-700 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-fuchsia-50 border-fuchsia-200'
-              }`}
-            >
-              Gynecologists & OB/GYN ({specialistsList.filter(s => s.category === 'Gynecologist').length})
-            </button>
-            <button
-              type="button"
-              id="filter-only-nutritionists-btn"
-              onClick={() => {
-                setCategoryFilter('Nutritionist');
-                setSelectedLocality('All Areas');
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                categoryFilter === 'Nutritionist'
-                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-emerald-50 border-emerald-200'
-              }`}
-            >
-              Child Nutritionists ({specialistsList.filter(s => s.category === 'Nutritionist').length})
-            </button>
-            <button
-              type="button"
-              id="filter-only-coaches-btn"
-              onClick={() => {
-                setCategoryFilter('Coach');
-                setSelectedLocality('All Areas');
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                categoryFilter === 'Coach'
-                  ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-amber-50 border-amber-200'
-              }`}
-            >
-              Kids Coaches ({specialistsList.filter(s => s.category === 'Coach').length})
-            </button>
-            <button
-              type="button"
-              id="filter-only-wealth-advisors-btn"
-              onClick={() => {
-                setCategoryFilter('Kids Wealth & Investment Planners');
-                setSelectedLocality('All Areas');
-              }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
-                categoryFilter === 'Kids Wealth & Investment Planners'
-                  ? 'bg-indigo-600 text-white border-indigo-700 shadow-xs'
-                  : 'bg-white text-slate-700 hover:bg-indigo-50 border-indigo-200'
-              }`}
-            >
-              Kids Wealth &amp; MF Planners ({combinedSpecialistsList.filter(s => s.category === 'Kids Wealth & Investment Planners').length})
-            </button>
+          {/* Specialist Category Cards Grid */}
+          <div>
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div>
+                <h3 className="text-base font-bold text-slate-800 font-serif">
+                  Specialist Categories
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Select a category to browse verified doctor profiles and book appointments
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                {combinedSpecialistsList.length}+ Total Specialists
+              </span>
+            </div>
+
+            <div id="specs-category-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+              {categories.map((cat) => {
+                const CatIcon = cat.icon;
+                const count = getCategoryCount(cat.key);
+
+                return (
+                  <div
+                    key={cat.key}
+                    id={`card-spec-cat-${cat.key}`}
+                    onClick={() => {
+                      setSelectedCategory(cat.key);
+                      setCategoryFilter(cat.key);
+                    }}
+                    className="group bg-white hover:bg-slate-50/60 border border-slate-200/90 hover:border-slate-300 rounded-3xl p-5 sm:p-6 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-4 relative overflow-hidden"
+                  >
+                    {/* Top Row: Icon and Count Badge */}
+                    <div className="flex items-start justify-between">
+                      <div className={`w-12 h-12 rounded-2xl ${cat.bgColor} ${cat.color} flex items-center justify-center transition-transform group-hover:scale-105 shadow-xs`}>
+                        <CatIcon className="w-6 h-6" />
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cat.badgeBg}`}>
+                        {count} {count === 1 ? 'Specialist' : 'Specialists'}
+                      </span>
+                    </div>
+
+                    {/* Middle: Title & Description */}
+                    <div className="space-y-1.5">
+                      <h4 className="text-lg font-bold text-slate-900 group-hover:text-rose-600 transition-colors font-serif">
+                        {cat.label}
+                      </h4>
+                      <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
+                        {cat.subtitle}
+                      </p>
+                    </div>
+
+                    {/* Tags */}
+                    {cat.tags && cat.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {cat.tags.slice(0, 3).map((tag, idx) => (
+                          <span
+                            key={idx}
+                            className="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 text-[10.5px] font-medium"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Bottom Action */}
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700 group-hover:text-rose-600 transition-colors">
+                      <span>View Profiles</span>
+                      <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1 text-slate-400 group-hover:text-rose-600" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Secondary Hub Actions: Registration and Claims Desk */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-slate-600">
+              <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>Are you a doctor, clinic director, or pediatric specialist?</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowRegModal(true)}
+                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-bold rounded-xl transition cursor-pointer shadow-xs"
+              >
+                Register Specialist Profile
+              </button>
+              {isSuperAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdminClaimsModal(true)}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold shadow-xs transition cursor-pointer"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Claims Desk</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* Pan-India Cities Row */}
-        <div className="pt-2 border-t border-rose-200/60 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-          <span className="text-[10px] uppercase font-black text-rose-800 tracking-wider whitespace-nowrap mr-1 flex items-center gap-1">
-            <Globe className="w-3 h-3 text-rose-600" /> City:
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedCity('all');
-              setSelectedLocality('All Areas');
-            }}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
-              selectedCity === 'all'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-white/85 hover:bg-white text-slate-700 border border-slate-200/80'
-            }`}
-          >
-            🇮🇳 All India ({specialistsList.length})
-          </button>
-          {INDIAN_CITIES.filter(city => city.id !== 'all').map((city) => {
-            const isCitySelected = selectedCity === city.id;
-            const countInCity = specialistsList.filter(s => {
-              const cName = city.name.toLowerCase();
-              return (s.location && s.location.toLowerCase().includes(cName)) ||
-                     (s.clinicAddress && s.clinicAddress.toLowerCase().includes(cName)) ||
-                     (s.hospitalAffiliation && s.hospitalAffiliation.toLowerCase().includes(cName));
-            }).length;
-
-            return (
+      {/* STEP 2: PROFILES VIEW (Rendered after user clicks a category) */}
+      {selectedCategory && (
+        <div id="specialists-profiles-view" className="space-y-5 animate-fade-in">
+          {/* Top Breadcrumb & Category Switcher */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-slate-200/80">
+            <div className="flex items-center gap-3">
               <button
-                key={city.id}
                 type="button"
                 onClick={() => {
-                  setSelectedCity(city.id);
-                  setSelectedLocality('All Areas');
+                  setSelectedCategory(null);
+                  setShowLocationPanel(false);
+                  setShowSortPanel(false);
                 }}
-                className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1 ${
-                  isCitySelected
-                    ? 'bg-slate-900 text-white shadow-xs'
-                    : 'bg-white/85 hover:bg-white text-slate-700 border border-slate-200/80'
-                }`}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 text-xs font-bold transition shadow-xs cursor-pointer group"
               >
-                <span>{city.name}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                  isCitySelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {countInCity}
+                <ArrowLeft className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-x-0.5 transition-transform" />
+                <span>All Categories</span>
+              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm sm:text-base font-bold text-slate-900 font-serif">
+                  {activeCategoryObj.label}
                 </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Dynamic Locality Chips for selected city */}
-        <div className="pt-2 border-t border-rose-200/40 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
-          <span className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap mr-1 flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-rose-500" /> Locality:
-          </span>
-          {currentLocalityList.map((area) => {
-            const isSelected = selectedLocality === area;
-            return (
-              <button
-                key={area}
-                type="button"
-                onClick={() => setSelectedLocality(area)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
-                  isSelected
-                    ? 'bg-rose-600 text-white shadow-xs'
-                    : 'bg-white/80 hover:bg-white text-slate-700 border border-slate-200/80'
-                }`}
-              >
-                {area}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* SEO Trending Searches & Keywords Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-        <span className="text-[10.5px] font-extrabold text-slate-500 uppercase tracking-wider whitespace-nowrap flex items-center gap-1">
-          🔥 Trending:
-        </span>
-        {[
-          { label: 'Kids Doctors Near Me', query: 'kids doctor' },
-          { label: 'Pediatrician', query: 'pediatrician' },
-          { label: 'Gynecologists & OB/GYN', query: 'gynecologist' },
-          { label: 'Newborn Vaccinations', query: 'vaccination' },
-          { label: 'Pediatric Pulmonology', query: 'pulmonology' },
-          { label: 'Child Neurology', query: 'neurology' },
-          { label: 'Pediatric Allergy & Asthma', query: 'asthma' },
-          { label: 'Child Dietitian', query: 'nutrition' },
-        ].map(item => (
-          <button
-            key={item.label}
-            type="button"
-            onClick={() => {
-              setSearchQuery(item.query);
-              if (item.query === 'gynecologist') {
-                setCategoryFilter('Gynecologist');
-              } else {
-                setCategoryFilter('Pediatrician');
-              }
-            }}
-            className={`px-2.5 py-1 rounded-full text-[11px] font-bold whitespace-nowrap transition border cursor-pointer ${
-              searchQuery.toLowerCase() === item.query.toLowerCase()
-                ? 'bg-rose-600 text-white border-rose-600 shadow-2xs'
-                : 'bg-slate-100/80 hover:bg-rose-50 text-slate-700 border-slate-200/80 hover:border-rose-200'
-            }`}
-          >
-            {item.label}
-          </button>
-        ))}
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="text-[11px] text-rose-600 hover:text-rose-800 font-bold whitespace-nowrap ml-1 cursor-pointer"
-          >
-            ✕ Clear filter
-          </button>
-        )}
-      </div>
-
-      {/* Specialty Filter Hub */}
-      <div className="bg-slate-50/80 border border-slate-100 p-3 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-wrap gap-1.5" id="specs-category-filters">
-          {categories.map((cat) => {
-            const isSelected = categoryFilter === cat.key;
-            const count = cat.key === 'All' 
-              ? specialistsList.length 
-              : specialistsList.filter(s => s.category === cat.key).length;
-            const CatIcon = cat.icon;
-
-            return (
-              <button
-                key={cat.key}
-                id={`btn-spec-cat-${cat.key}`}
-                type="button"
-                onClick={() => setCategoryFilter(cat.key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
-                  isSelected 
-                    ? 'bg-slate-900 border-slate-950 text-white shadow-xs' 
-                    : 'bg-white hover:bg-slate-100 text-slate-600 border-slate-200'
-                }`}
-              >
-                <CatIcon className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : cat.color}`} />
-                <span>{cat.label}</span>
-                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-slate-800 text-slate-250' : 'bg-slate-100 text-slate-500'}`}>
-                  {count}
+                <span className="text-xs bg-rose-100 text-rose-800 font-bold px-2 py-0.5 rounded-full">
+                  {sortedAndFilteredSpecs.length} Profiles
                 </span>
+              </div>
+            </div>
+
+            {/* Compact Category Switcher Strip */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+              {categories.map((cat) => {
+                const isSelected = selectedCategory === cat.key;
+                return (
+                  <button
+                    key={cat.key}
+                    type="button"
+                    onClick={() => {
+                      setSelectedCategory(cat.key);
+                      setCategoryFilter(cat.key);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                      isSelected
+                        ? 'bg-slate-900 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
+                    }`}
+                  >
+                    {cat.shortLabel || cat.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* UNIFIED MERGED TOOLBAR: Search, Clickable Location, Clickable Sort */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-2.5 sm:p-3 shadow-xs space-y-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2.5">
+              {/* 1. Search Input */}
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="Search doctor, clinic, hospital, locality, or specialty..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white text-xs border border-slate-200 focus:border-rose-400 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 transition text-slate-800 font-medium placeholder-slate-400"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* 2. Location Filter Button (Click to reveal location options) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLocationPanel(prev => !prev);
+                  setShowSortPanel(false);
+                }}
+                className={`flex items-center justify-between md:justify-start gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer shadow-xs shrink-0 ${
+                  showLocationPanel || selectedCity !== 'all' || selectedLocality !== 'All Areas'
+                    ? 'bg-rose-50 border-rose-300 text-rose-900 ring-2 ring-rose-100'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+                title="Filter by City and Locality"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin className={`w-3.5 h-3.5 shrink-0 ${selectedCity !== 'all' ? 'text-rose-600' : 'text-slate-500'}`} />
+                  <span className="truncate">
+                    {selectedCity === 'all' ? 'All India' : activeCityInfo?.name || selectedCity}
+                    {selectedLocality !== 'All Areas' ? ` • ${selectedLocality}` : ''}
+                  </span>
+                </div>
+                {showLocationPanel ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                )}
               </button>
-            );
-          })}
-        </div>
 
-        {/* Quick Search */}
-        <div id="spec-search-bar" className="relative w-full md:w-72">
-          <SlidersHorizontal className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
-          <input
-            type="text"
-            placeholder="Search specialist, clinic, doctor, or specialty..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-4 py-1.5 bg-white text-xs border border-slate-200 focus:border-rose-400 rounded-xl outline-none focus:ring-4 focus:ring-rose-100 transition shadow-xs placeholder-slate-400 text-slate-700 font-bold"
-          />
-        </div>
-      </div>
+              {/* 3. Sort & Distance Button (Click to reveal sort options) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSortPanel(prev => !prev);
+                  setShowLocationPanel(false);
+                }}
+                className={`flex items-center justify-between md:justify-start gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border transition cursor-pointer shadow-xs shrink-0 ${
+                  showSortPanel || sortOption !== 'distance'
+                    ? 'bg-amber-50 border-amber-300 text-amber-950 ring-2 ring-amber-100'
+                    : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+                }`}
+                title="Change sorting and GPS distance preferences"
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span className="truncate">
+                    {sortOption === 'distance' ? 'Nearest to Me' :
+                     sortOption === 'recommended' ? 'Top Rated' :
+                     sortOption === 'experience' ? 'Experience' :
+                     sortOption === 'fee-asc' ? 'Fee: Low to High' : 'Fee: High to Low'}
+                  </span>
+                  {userCoords && (
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active GPS Proximity" />
+                  )}
+                </div>
+                {showSortPanel ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                )}
+              </button>
+            </div>
 
-      {/* Distance Sort & Proximity Bar */}
-      <div id="distance-sort-bar" className="bg-white border border-slate-200/90 p-3 sm:p-4 rounded-2xl shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-        {/* Left: Location indicator & GPS detect button */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-orange-950 font-bold">
-            <Navigation className="w-3.5 h-3.5 text-orange-600 animate-pulse" />
-            <span>{locationLabel}</span>
-            {userCoords && (
-              <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.5 rounded-full ml-1 flex items-center gap-0.5">
-                <CheckCircle className="w-2.5 h-2.5 text-emerald-600" /> Active GPS
+            {/* HIDDEN PANEL 1: Location & Proximity Drawer (Revealed ONLY when user clicks Location button) */}
+            {showLocationPanel && (
+              <div className="pt-3 border-t border-slate-200/80 space-y-3 bg-slate-50/70 p-3.5 rounded-xl animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-rose-600" />
+                    Select City &amp; Locality
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowLocationPanel(false)}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-bold p-1 cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Done</span>
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </button>
+                </div>
+
+                {/* City Selection Buttons */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedCity('all');
+                      setSelectedLocality('All Areas');
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer ${
+                      selectedCity === 'all'
+                        ? 'bg-rose-600 text-white shadow-xs'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    🇮🇳 All India ({specialistsList.length})
+                  </button>
+
+                  {INDIAN_CITIES.filter(city => city.id !== 'all').map((city) => {
+                    const isCitySelected = selectedCity === city.id;
+                    const countInCity = specialistsList.filter(s => {
+                      const cName = city.name.toLowerCase();
+                      return (s.location && s.location.toLowerCase().includes(cName)) ||
+                             (s.clinicAddress && s.clinicAddress.toLowerCase().includes(cName)) ||
+                             (s.hospitalAffiliation && s.hospitalAffiliation.toLowerCase().includes(cName));
+                    }).length;
+
+                    return (
+                      <button
+                        key={city.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedCity(city.id);
+                          setSelectedLocality('All Areas');
+                        }}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer flex items-center gap-1 ${
+                          isCitySelected
+                            ? 'bg-slate-900 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                        }`}
+                      >
+                        <span>{city.name}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                          isCitySelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                        }`}>
+                          {countInCity}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Locality Chips Row (for Bangalore or selected city) */}
+                {currentLocalityList.length > 1 && (
+                  <div className="pt-2 border-t border-slate-200/60 flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 whitespace-nowrap mr-1 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-rose-500" /> Locality:
+                    </span>
+                    {currentLocalityList.map((area) => {
+                      const isSelected = selectedLocality === area;
+                      return (
+                        <button
+                          key={area}
+                          type="button"
+                          onClick={() => setSelectedLocality(area)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap transition cursor-pointer ${
+                            isSelected
+                              ? 'bg-rose-600 text-white shadow-xs'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {area}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Live GPS Trigger in Drawer */}
+                <div className="pt-2 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-slate-600">
+                    <Navigation className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Distance from: <strong>{locationLabel}</strong></span>
+                    {userCoords && (
+                      <span className="text-[10px] text-emerald-700 bg-emerald-100 font-bold px-1.5 py-0.2 rounded-full">
+                        GPS Active
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleTriggerDetectLocation}
+                    disabled={isDetectingLocation}
+                    className="flex items-center gap-1 px-3 py-1 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold text-[11px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {isDetectingLocation ? (
+                      <>
+                        <RefreshCw className="w-3 h-3 animate-spin text-slate-600" />
+                        <span>Locating...</span>
+                      </>
+                    ) : (
+                      <>
+                        <MapPin className="w-3 h-3 text-rose-600" />
+                        <span>{userCoords ? 'Refresh GPS' : 'Detect Live GPS'}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* HIDDEN PANEL 2: Sort & Order Drawer (Revealed ONLY when user clicks Sort button) */}
+            {showSortPanel && (
+              <div className="pt-3 border-t border-slate-200/80 space-y-3 bg-slate-50/70 p-3.5 rounded-xl animate-fade-in">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
+                    Sort Specialists By
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowSortPanel(false)}
+                    className="text-xs text-slate-500 hover:text-slate-800 font-bold p-1 cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Done</span>
+                    <Check className="w-3 h-3 text-emerald-600" />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs">
+                  {[
+                    { id: 'distance', label: '📍 Distance: Nearest to Me First (Default)', desc: 'Clinics closest to your GPS or city' },
+                    { id: 'recommended', label: '⭐ Top Patient Rated & Recommended', desc: '4.9+ star ratings and reviews' },
+                    { id: 'experience', label: '🏆 Clinical Experience: Highest First', desc: 'Doctors with 15+ years practice' },
+                    { id: 'fee-asc', label: '💰 Consultation Fee: Low to High', desc: 'Most affordable consultation first' },
+                    { id: 'fee-desc', label: '💎 Consultation Fee: High to Low', desc: 'Comprehensive senior specialist consult' }
+                  ].map((opt) => {
+                    const isSelected = sortOption === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setSortOption(opt.id as any);
+                          setShowSortPanel(false);
+                        }}
+                        className={`p-2.5 rounded-xl text-left transition border cursor-pointer ${
+                          isSelected
+                            ? 'bg-slate-900 border-slate-950 text-white shadow-xs'
+                            : 'bg-white hover:bg-slate-100 text-slate-800 border-slate-200'
+                        }`}
+                      >
+                        <div className="font-bold">{opt.label}</div>
+                        <div className={`text-[10.5px] mt-0.5 ${isSelected ? 'text-slate-300' : 'text-slate-500'}`}>
+                          {opt.desc}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {isSuperAdmin && (
+                  <div className="pt-2 border-t border-slate-200/60 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminClaimsModal(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Doctor Claims Desk</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Active Filter Chips Row (shown if any filter is active) */}
+            {(selectedCity !== 'all' || selectedLocality !== 'All Areas' || searchQuery) && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
+                <span className="text-[11px] text-slate-400 font-medium">Active filters:</span>
+                {selectedCity !== 'all' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-semibold">
+                    <span>City: {activeCityInfo?.name || selectedCity}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCity('all');
+                        setSelectedLocality('All Areas');
+                      }}
+                      className="hover:text-rose-950 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {selectedLocality !== 'All Areas' && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-rose-50 text-rose-800 border border-rose-200 text-[11px] font-semibold">
+                    <span>Locality: {selectedLocality}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLocality('All Areas')}
+                      className="hover:text-rose-950 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {searchQuery && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold">
+                    <span>Search: "{searchQuery}"</span>
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="hover:text-amber-950 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCity('all');
+                    setSelectedLocality('All Areas');
+                    setSearchQuery('');
+                  }}
+                  className="text-[11px] text-slate-500 hover:text-slate-800 underline font-semibold ml-1 cursor-pointer"
+                >
+                  Reset all
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Results Summary Counter */}
+          <div className="flex items-center justify-between text-xs text-slate-500 px-1">
+            <span>
+              Showing <strong className="text-slate-800">{Math.min(visibleCount, sortedAndFilteredSpecs.length)}</strong> of <strong className="text-slate-800">{sortedAndFilteredSpecs.length}</strong> verified {activeCategoryObj.label.toLowerCase()} {selectedCity === 'all' ? 'across Pan-India' : `in ${activeCityInfo?.name || 'selected city'}`}
+            </span>
+            {sortedAndFilteredSpecs.length > visibleCount && (
+              <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+                Scroll or click "Load More" below
               </span>
             )}
           </div>
-
-          <button
-            type="button"
-            onClick={handleTriggerDetectLocation}
-            disabled={isDetectingLocation}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition cursor-pointer border border-slate-200/60 disabled:opacity-50"
-            title="Use your phone or computer GPS to calculate accurate kilometer distances to clinics"
-          >
-            {isDetectingLocation ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-600" />
-                <span>Locating you...</span>
-              </>
-            ) : (
-              <>
-                <MapPin className="w-3.5 h-3.5 text-slate-600" />
-                <span>{userCoords ? 'Refresh GPS Location' : '📍 Detect Live GPS Location'}</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        {/* Right: Sort dropdown & Admin claims desk button */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-between md:justify-end">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-            <span className="whitespace-nowrap text-slate-500">Sort by:</span>
-            <select
-              value={sortOption}
-              onChange={(e) => setSortOption(e.target.value as any)}
-              className="bg-slate-50 hover:bg-slate-100 border border-slate-300 font-bold text-slate-800 text-xs rounded-xl px-3 py-2 outline-none focus:ring-2 focus:ring-orange-400 cursor-pointer shadow-xs transition"
-            >
-              <option value="distance">📍 Distance: Nearest to Me First</option>
-              <option value="recommended">⭐ Top Patient Rated &amp; Recommended</option>
-              <option value="experience">🏆 Clinical Experience: Highest First</option>
-              <option value="fee-asc">💰 Consultation Fee: Low to High</option>
-              <option value="fee-desc">💎 Consultation Fee: High to Low</option>
-            </select>
-          </div>
-
-          {isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => setShowAdminClaimsModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer border border-slate-950"
-              title="Review uploaded doctor ID cards and verify ownership"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Doctor Claims Desk</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Counter Banner */}
-      <div className="flex items-center justify-between text-xs text-slate-500 px-1">
-        <span>
-          Showing <strong className="text-slate-800">{Math.min(visibleCount, sortedAndFilteredSpecs.length)}</strong> of <strong className="text-slate-800">{sortedAndFilteredSpecs.length}</strong> verified specialists &amp; doctors {selectedCity === 'all' ? 'across Pan-India' : `in ${activeCityInfo?.name || 'India'}`}
-        </span>
-        {sortedAndFilteredSpecs.length > visibleCount && (
-          <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
-            Scroll or click "Load More" below
-          </span>
-        )}
-      </div>
 
       {/* Directory Cards Grid */}
       <div id="specs-cards-grid" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1501,6 +1868,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         <div className="text-center py-6 text-xs text-slate-500 font-medium flex items-center justify-center gap-2">
           <Check className="w-4 h-4 text-emerald-500" />
           <span>All {filteredSpecs.length} verified child specialists displayed</span>
+        </div>
+      )}
         </div>
       )}
 

@@ -238,9 +238,16 @@ service cloud.firestore {
       }
 
       allow read, list: if isSignedIn() && (isChatParticipant(chatId) || isAdmin());
-      allow create: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && incoming().senderId == request.auth.uid;
-      allow update: if isSignedIn() && isChatParticipant(chatId) && isValidMessage(incoming()) && existing().senderId == request.auth.uid;
-      allow delete: if isSignedIn() && isChatParticipant(chatId) && (existing().senderId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidMessage(incoming());
+      allow update: if isSignedIn() && isValidMessage(incoming());
+      allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || isAdmin());
+    }
+
+    // Top-Level chat_messages Collection for Offline Local DB Direct Sync & Outbox
+    match /chat_messages/{messageId} {
+      allow read, list: if isSignedIn();
+      allow create, update: if isSignedIn() && isValidMessage(incoming());
+      allow delete: if isSignedIn() && (existing().senderId == request.auth.uid || isAdmin());
     }
 
     // Bookings Collection

@@ -28,7 +28,11 @@ import {
   Building2,
   Award,
   ArrowLeft,
-  Edit3
+  Edit3,
+  ShoppingBag,
+  Coins,
+  Stethoscope,
+  X
 } from 'lucide-react';
 import { 
   signInWithEmailAndPassword, 
@@ -53,12 +57,17 @@ interface LandingLoginGatewayProps {
   onGoogleSignIn?: () => void;
   onSelectGoogleAccount?: (account: { email: string; displayName: string; photoURL?: string; role?: string }) => void;
   onOpenKnowledgeBase?: (slug?: string) => void;
-  onOpenSpecialists?: () => void;
+  onOpenSpecialists?: (category?: string) => void;
   onOpenKannadaVoice?: (language?: string) => void;
   onOpenContactUs?: () => void;
   onOpenKidStories?: () => void;
   onOpenEvents?: () => void;
   onOpenKidsInvestments?: () => void;
+  onOpenStore?: () => void;
+  onOpenDaycare?: () => void;
+  onOpenGroups?: () => void;
+  onOpenTracker?: () => void;
+  onOpenCommunity?: () => void;
   onOpenEventBuyerRegistration?: () => void;
   isAuthenticating?: boolean;
   externalAuthError?: string;
@@ -81,6 +90,11 @@ export default function LandingLoginGateway({
   onOpenKidStories,
   onOpenEvents,
   onOpenKidsInvestments,
+  onOpenStore,
+  onOpenDaycare,
+  onOpenGroups,
+  onOpenTracker,
+  onOpenCommunity,
   onOpenEventBuyerRegistration,
   isAuthenticating = false,
   externalAuthError = '',
@@ -93,8 +107,23 @@ export default function LandingLoginGateway({
   const [emailMode, setEmailMode] = useState<EmailSubMode>('otp');
   const [activeReferral, setActiveReferral] = useState<string | null>(null);
 
+  // Connect with Kids flow trigger & smooth scroll
+  const [connectIntentActive, setConnectIntentActive] = useState(false);
+  const authContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const handleSelectConnectNearby = () => {
+    setConnectIntentActive(true);
+    if (authContainerRef.current) {
+      authContainerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      const el = document.getElementById('landing-auth-container');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
+
   // Modal for role selection on unregistered user verification
   const [showRoleSelectModal, setShowRoleSelectModal] = useState(false);
+  const [showSpecialistCategoriesModal, setShowSpecialistCategoriesModal] = useState(false);
   const [pendingVerifiedDetails, setPendingVerifiedDetails] = useState<{
     phone?: string;
     email?: string;
@@ -885,6 +914,339 @@ export default function LandingLoginGateway({
           </div>
         </div>
 
+        {/* ============================================================ */}
+        {/* ALL AVAILABLE FEATURES SELECTOR (Directly visible on launch) */}
+        {/* ============================================================ */}
+        <div id="all-features-selector-hub" className="w-full max-w-6xl mx-auto space-y-4 animate-fade-in text-center">
+          <div className="flex flex-col items-center justify-center space-y-1.5">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-rose-50 to-orange-50 text-rose-900 border border-rose-200/80 px-4 py-1 rounded-full text-xs font-bold shadow-2xs">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500 animate-pulse" />
+              <span>All Available Features &amp; Services</span>
+            </div>
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-black text-slate-900 font-serif">
+              What would you like to explore today?
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">
+              Select an option below to shop, browse activities, read stories, plan investments, or connect with verified nearby families.
+            </p>
+          </div>
+
+          {/* Feature Grid with High Contrast Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 text-left pt-1">
+            
+            {/* 1. Connect with Nearby Kids/Parents (Asks for Login/Registration) */}
+            <button
+              id="feature-btn-connect-playmates"
+              type="button"
+              onClick={handleSelectConnectNearby}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-rose-200 hover:border-rose-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-rose-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Navigation className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-rose-100 text-rose-800 border-rose-200">
+                    Safe Radar
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-rose-600 transition leading-snug">
+                    Connect with Nearby Kids &amp; Parents
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Verified neighborhood playmates, nearby families &amp; safe playdates.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-rose-100 flex items-center justify-between text-[11px] font-extrabold text-rose-600 group-hover:text-rose-700">
+                <span>Connect (Login / Register)</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 2. Vernunt Kids Store */}
+            <button
+              id="feature-btn-store"
+              type="button"
+              onClick={() => onOpenStore ? onOpenStore() : onOpenKidsInvestments && onOpenKidsInvestments()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-amber-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <ShoppingBag className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-amber-100 text-amber-900 border-amber-200">
+                    Online Store
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-amber-600 transition leading-snug">
+                    Vernunt Kids Store
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Montessori kits, STEM learning toys, books &amp; child essentials.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-amber-100 flex items-center justify-between text-[11px] font-extrabold text-amber-600 group-hover:text-amber-700">
+                <span>Explore Store 🛍️</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 3. Kids Investments & Low Cost Plots */}
+            <button
+              id="feature-btn-kids-investments"
+              type="button"
+              onClick={() => onOpenKidsInvestments && onOpenKidsInvestments()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-emerald-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Coins className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-200">
+                    Future Wealth
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-emerald-600 transition leading-snug">
+                    Kids Investments &amp; Plots
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Low-cost verified family plots, child mutual funds SIP, Sukanya Samriddhi &amp; gold.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] font-extrabold text-emerald-600 group-hover:text-emerald-700">
+                <span>View Investments 💰</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 4. Activities, Classes & Events */}
+            <button
+              id="feature-btn-events"
+              type="button"
+              onClick={() => onOpenEvents && onOpenEvents()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-indigo-200 hover:border-indigo-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-indigo-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-indigo-100 text-indigo-900 border-indigo-200">
+                    Workshops
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-indigo-600 transition leading-snug">
+                    Activities, Classes &amp; Events
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Weekend workshops, sports camps, art, pottery, coding &amp; playfests.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-indigo-100 flex items-center justify-between text-[11px] font-extrabold text-indigo-600 group-hover:text-indigo-700">
+                <span>Browse Events 🎟️</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 5. Kids Specialists */}
+            <button
+              id="feature-btn-specialists"
+              type="button"
+              onClick={() => setShowSpecialistCategoriesModal(true)}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-purple-200 hover:border-purple-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-purple-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-pink-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Award className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-purple-100 text-purple-900 border-purple-200">
+                    Directory
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-purple-600 transition leading-snug">
+                    Kids Specialists
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Verified child doctors, developmental therapists, nutritionists &amp; coaches.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-purple-100 flex items-center justify-between text-[11px] font-extrabold text-purple-600 group-hover:text-purple-700">
+                <span>View Categories 🩺</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 6. Kids Stories Flipbooks */}
+            <button
+              id="feature-btn-kid-stories"
+              type="button"
+              onClick={() => onOpenKidStories && onOpenKidStories()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-pink-200 hover:border-pink-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-pink-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-pink-600 to-rose-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-pink-100 text-pink-900 border-pink-200">
+                    YourStory
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-pink-600 transition leading-snug">
+                    Kids Stories &amp; Flipbooks
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Publish child achievements, awards, poetry &amp; creative tales in Google flipbooks.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-pink-100 flex items-center justify-between text-[11px] font-extrabold text-pink-600 group-hover:text-pink-700">
+                <span>Read &amp; Publish 📖</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 7. Daycare & Babysitting */}
+            <button
+              id="feature-btn-daycare"
+              type="button"
+              onClick={() => onOpenDaycare ? onOpenDaycare() : onStartSignUp('Daycare Center')}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-teal-200 hover:border-teal-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-teal-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Baby className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-teal-100 text-teal-900 border-teal-200">
+                    Verified PIN
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-teal-600 transition leading-snug">
+                    Daycare &amp; Babysitting
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Nearest home playhomes, certified creches &amp; safe 4-digit PIN handshakes.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-teal-100 flex items-center justify-between text-[11px] font-extrabold text-teal-600 group-hover:text-teal-700">
+                <span>Find Daycare 🍼</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 8. Vernunt Groups & Circles */}
+            <button
+              id="feature-btn-groups"
+              type="button"
+              onClick={() => onOpenGroups ? onOpenGroups() : onStartSignUp('Parent')}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-rose-200 hover:border-rose-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-rose-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-500 to-amber-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Users className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-rose-100 text-rose-900 border-rose-200">
+                    Circles
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-rose-600 transition leading-snug">
+                    Parent Groups &amp; Circles
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Neighborhood parent circles, school districts &amp; moms meetups.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-rose-100 flex items-center justify-between text-[11px] font-extrabold text-rose-600 group-hover:text-rose-700">
+                <span>Explore Groups 🌸</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 9. Baby & Pregnancy Tracker */}
+            <button
+              id="feature-btn-tracker"
+              type="button"
+              onClick={() => onOpenTracker ? onOpenTracker() : onStartSignUp('Parent')}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-cyan-200 hover:border-cyan-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-cyan-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Baby className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-cyan-100 text-cyan-900 border-cyan-200">
+                    Health
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-cyan-600 transition leading-snug">
+                    Baby &amp; Pregnancy Tracker
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Vaccine schedules, pregnancy guide &amp; pediatric growth charts.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-cyan-100 flex items-center justify-between text-[11px] font-extrabold text-cyan-600 group-hover:text-cyan-700">
+                <span>Open Tracker 👶</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+            {/* 10. 1000+ Child Care Guides */}
+            <button
+              id="feature-btn-guides"
+              type="button"
+              onClick={() => onOpenKnowledgeBase && onOpenKnowledgeBase()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-slate-200 hover:border-slate-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-slate-100"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-slate-100 text-slate-800 border-slate-200">
+                    Guides
+                  </span>
+                </div>
+                <div>
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-slate-700 transition leading-snug">
+                    1,000+ Child Guides
+                  </h3>
+                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
+                    Pediatric health guides, nutrition encyclopedia &amp; child safety wisdom.
+                  </p>
+                </div>
+              </div>
+              <div className="pt-2.5 mt-2 border-t border-slate-100 flex items-center justify-between text-[11px] font-extrabold text-slate-700 group-hover:text-slate-900">
+                <span>Read Guides 📚</span>
+                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
+              </div>
+            </button>
+
+          </div>
+        </div>
+
         {/* 1. HERO BANNER CAROUSEL (Always directly below logo) */}
         <div id="landing-featured-promo-banner" className="w-full max-w-4xl mx-auto bg-white border border-amber-200/90 rounded-3xl overflow-hidden shadow-md hover:shadow-lg transition duration-300 animate-fade-in text-left">
           <div className="relative h-52 sm:h-64 md:h-72 w-full bg-slate-900 group">
@@ -972,13 +1334,40 @@ export default function LandingLoginGateway({
         </div>
 
         {/* 2. SIGN IN OR REGISTER FORM BLOCK (Always placed directly below banner) */}
-        <div id="landing-auth-container" className="w-full max-w-2xl mx-auto animate-fade-in">
+        <div id="landing-auth-container" ref={authContainerRef} className="w-full max-w-2xl mx-auto animate-fade-in scroll-mt-6">
           <div id="auth-card" className="bg-white rounded-3xl border-2 border-orange-200/90 shadow-xl shadow-orange-950/5 overflow-hidden text-left animate-fade-in flex flex-col justify-between">
               
               {/* Card Accent Topline */}
               <div className="bg-gradient-to-r from-orange-500 via-rose-500 to-amber-500 h-2.5 w-full"></div>
               
               <div className="p-5 sm:p-6 md:p-7 space-y-5">
+                {/* Connect Intent Feedback Banner if triggered from Connect Feature Card */}
+                {connectIntentActive && (
+                  <div id="connect-intent-callout" className="bg-gradient-to-r from-rose-600 via-orange-600 to-amber-600 text-white p-3.5 sm:p-4 rounded-2xl shadow-md flex items-center justify-between gap-3 animate-fade-in">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0 shadow-xs">
+                        🤝
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black font-serif tracking-wide">
+                          Connect with Nearby Verified Kids &amp; Parents
+                        </h4>
+                        <p className="text-[11px] text-white/95 leading-snug mt-0.5 font-medium">
+                          Please sign in or register below to access the neighborhood proximity radar safely with 100% Aadhaar guardian verification.
+                        </p>
+                      </div>
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => setConnectIntentActive(false)} 
+                      className="text-white/80 hover:text-white p-1 rounded-lg text-xs shrink-0 cursor-pointer transition hover:bg-white/10"
+                      title="Dismiss notice"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
                 {/* DYNAMIC FLOW HEADER */}
                 <div id="auth-header" className="text-left space-y-1.5 border-b border-slate-100 pb-4">
                   <div className="flex items-center justify-between">
@@ -1653,9 +2042,9 @@ export default function LandingLoginGateway({
                             🎁 6 Mos Free
                           </span>
                         </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-purple-950 mt-2">Specialist Pro &amp; Doctor</h4>
+                        <h4 className="font-black text-sm text-slate-900 group-hover:text-purple-950 mt-2">Kids Specialist &amp; Doctor</h4>
                         <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Pediatric doctors, child psychologists, speech therapists, art mentors &amp; sports trainers.
+                          Child doctors, developmental therapists, nutritionists, speech coaches &amp; sports mentors.
                         </p>
                       </div>
                       <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-purple-700">
@@ -1824,61 +2213,47 @@ export default function LandingLoginGateway({
           </div>
         </div>
 
-        {/* 4. PLATFORM FEATURES & SAFETY (Below Trust Guarantees) */}
-        <div id="remaining-features-section" className="w-full max-w-4xl mx-auto space-y-6 md:space-y-8 animate-fade-in pt-2">
-          
-          <div className="text-center">
-            <span className="text-[10.5px] uppercase font-black tracking-widest text-amber-700 bg-amber-100/80 px-3.5 py-1 rounded-full border border-amber-200/60">
-              Platform Features &amp; Safety
-            </span>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-2 font-serif">Explore Vernunt Verified Community Services</h3>
-            <p className="text-xs sm:text-sm text-slate-600 max-w-lg mx-auto mt-1 font-medium">
-              Built for Indian neighborhoods with end-to-end child protection, verified daycare, and localized playmate matching.
-            </p>
-          </div>
-
-          {/* Feature list in responsive 2-column grid */}
-          <div id="feat-list" className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left w-full">
-            <div className="flex gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-orange-100/90 shadow-2xs hover:shadow-xs transition">
-              <div className="w-10 h-10 rounded-xl bg-orange-50 border border-orange-200/60 flex items-center justify-center text-orange-600 shrink-0 mt-0.5">
-                <Navigation className="w-5 h-5" />
-              </div>
+        {/* 4. VERIFIED SAFETY & COMMUNITY STANDARDS (Merged cleanly to remove duplication) */}
+        <div id="remaining-features-section" className="w-full max-w-4xl mx-auto space-y-5 animate-fade-in pt-1">
+          <div className="bg-gradient-to-br from-white via-amber-50/40 to-orange-50/30 border border-amber-200/90 rounded-3xl p-5 sm:p-6 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-100 pb-3 mb-4">
               <div>
-                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800">Concentric Playmate Radar</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Find companions based on matching age, traditional/modern play styles, and local neighborhood distances.</p>
+                <span className="text-[10px] uppercase font-black tracking-wider text-rose-800 bg-rose-50 px-3 py-1 rounded-full border border-rose-200/60 inline-flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  Vernunt Child Safety Standard
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1 font-serif">
+                  Strict 4-Tier Protection for Indian Neighborhoods
+                </h3>
               </div>
+              <span className="text-xs font-bold text-amber-900 bg-amber-100/90 px-3 py-1 rounded-xl self-start sm:self-auto">
+                100% Privacy Protected
+              </span>
             </div>
 
-            <div className="flex gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-orange-100/90 shadow-2xs hover:shadow-xs transition">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-center text-amber-600 shrink-0 mt-0.5">
-                <CalendarRange className="w-5 h-5" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-left">
+              <div className="p-3 bg-white/90 rounded-2xl border border-slate-100">
+                <span className="text-base">🛡️</span>
+                <h4 className="font-extrabold text-xs text-slate-800 mt-1">Aadhaar Guardian Check</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Every adult profile is verified against government records.</p>
               </div>
-              <div>
-                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800">Interactive Date Planner</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Book indoor board meets or outdoor traditional playground gatherings with nearby families.</p>
-              </div>
-            </div>
 
-            <div className="flex gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-orange-100/90 shadow-2xs hover:shadow-xs transition">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-200/60 flex items-center justify-center text-emerald-600 shrink-0 mt-0.5">
-                <ShieldCheck className="w-5 h-5" />
+              <div className="p-3 bg-white/90 rounded-2xl border border-slate-100">
+                <span className="text-base">📍</span>
+                <h4 className="font-extrabold text-xs text-slate-800 mt-1">Concentric Radar</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Locate verified companions by age &amp; distance without exposing exact home address.</p>
               </div>
-              <div>
-                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800">Rigorous Identity &amp; SMS Badges</h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Secure OTP verification and custom school clinic checks ensure a trusted, child-friendly network.</p>
-              </div>
-            </div>
 
-            <div className="flex gap-3.5 bg-white p-4 sm:p-5 rounded-2xl border border-orange-100/90 shadow-2xs hover:shadow-xs transition">
-              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-200/60 flex items-center justify-center text-rose-600 shrink-0 mt-0.5">
-                <Baby className="w-5 h-5" />
+              <div className="p-3 bg-white/90 rounded-2xl border border-slate-100">
+                <span className="text-base">🔐</span>
+                <h4 className="font-extrabold text-xs text-slate-800 mt-1">4-Digit PIN Handshakes</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Secure check-in &amp; check-out verification for all daycare appointments.</p>
               </div>
-              <div>
-                <h4 className="font-extrabold text-xs sm:text-sm text-slate-800 flex items-center gap-1.5">
-                  <span>🍼 Babysitting &amp; Daycare Marketplace</span>
-                  <span className="bg-amber-100 text-amber-900 text-[8px] font-black px-1.5 py-0.5 rounded uppercase">New</span>
-                </h4>
-                <p className="text-xs text-slate-500 mt-1 leading-relaxed">Need to head out? Match nearest available neighbour playhomes or certified daycares distance-wise, verify hourly rates, and book care sessions with secure 4-digit PIN handshakes.</p>
+
+              <div className="p-3 bg-white/90 rounded-2xl border border-slate-100">
+                <span className="text-base">🏅</span>
+                <h4 className="font-extrabold text-xs text-slate-800 mt-1">School &amp; Clinic Badges</h4>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Verified kids specialists, child clinics and parent peer reviews.</p>
               </div>
             </div>
           </div>
@@ -2033,6 +2408,291 @@ export default function LandingLoginGateway({
         verifiedPhone={pendingVerifiedDetails.phone}
         language={language}
       />
+
+      {/* Kids Specialist Categories Modal */}
+      {showSpecialistCategoriesModal && (
+        <div 
+          id="specialist-categories-modal" 
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in"
+          onClick={() => setShowSpecialistCategoriesModal(false)}
+        >
+          <div 
+            className="bg-white rounded-3xl max-w-2xl w-full border-2 border-purple-200 shadow-2xl overflow-hidden animate-scale-up text-left max-h-[90vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-purple-700 via-indigo-700 to-rose-600 text-white p-4 sm:p-5 flex items-center justify-between shrink-0 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-xl shrink-0 shadow-xs border border-white/20">
+                  🩺
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-purple-200 bg-white/15 px-2.5 py-0.5 rounded-full">
+                      Kids Specialists Directory
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-400/30">
+                      Verified
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black font-serif text-white mt-1">
+                    Select a Kids Specialist Category
+                  </h3>
+                </div>
+              </div>
+              <button
+                type="button"
+                id="close-specialist-categories-modal-btn"
+                onClick={() => setShowSpecialistCategoriesModal(false)}
+                className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white text-sm cursor-pointer transition active:scale-95"
+                title="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Context Subbar */}
+            <div className="px-5 py-2.5 bg-purple-50/60 border-b border-purple-100 flex items-center justify-between gap-3">
+              <p className="text-xs text-slate-600 font-medium">
+                Choose a verified medical, therapy, nutritional, or coaching specialty:
+              </p>
+              <button
+                type="button"
+                id="btn-modal-view-all-specialists-top"
+                onClick={() => {
+                  setShowSpecialistCategoriesModal(false);
+                  if (onOpenSpecialists) onOpenSpecialists('All');
+                }}
+                className="text-xs font-black text-purple-700 hover:text-purple-900 underline whitespace-nowrap cursor-pointer hover:opacity-80 transition"
+              >
+                View All Directory ↗
+              </button>
+            </div>
+
+            {/* Categories Grid */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-3 flex-1 bg-slate-50/30">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="kids-specialists-categories-list">
+                {/* 1. Pediatricians */}
+                <button
+                  id="cat-select-pediatrician"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Pediatrician');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-rose-200 hover:border-rose-400 bg-rose-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-rose-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    🩺
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-rose-700 transition leading-snug">
+                        Pediatricians &amp; Child Doctors
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      Infant care, fever, vaccinations, routine health &amp; pediatric sickness.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-rose-200 text-rose-700">
+                        Child Doctors
+                      </span>
+                      <span className="text-[11px] font-bold text-rose-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 2. Therapists & Psychologists */}
+                <button
+                  id="cat-select-therapist"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Therapist');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-purple-200 hover:border-purple-400 bg-purple-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-purple-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    🧠
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-purple-700 transition leading-snug">
+                        Child Psychologists &amp; Therapists
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      Speech delay, occupational therapy, ADHD/autism support &amp; child counseling.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-purple-200 text-purple-700">
+                        Therapy &amp; Speech
+                      </span>
+                      <span className="text-[11px] font-bold text-purple-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 3. Nutritionists */}
+                <button
+                  id="cat-select-nutritionist"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Nutritionist');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-emerald-200 hover:border-emerald-400 bg-emerald-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-emerald-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    🥗
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-emerald-700 transition leading-snug">
+                        Child Nutritionists &amp; Dietitians
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      Infant weaning, picky eater guides, food allergies &amp; growth meal plans.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-emerald-200 text-emerald-700">
+                        Nutrition &amp; Diet
+                      </span>
+                      <span className="text-[11px] font-bold text-emerald-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 4. Gynecologists & OB/GYN */}
+                <button
+                  id="cat-select-gynecologist"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Gynecologist');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-fuchsia-200 hover:border-fuchsia-400 bg-fuchsia-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-fuchsia-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    🤱
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-fuchsia-700 transition leading-snug">
+                        Gynecologists &amp; OB/GYN
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      Maternal wellness, prenatal care, lactation support &amp; postpartum healing.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-fuchsia-200 text-fuchsia-700">
+                        Maternal Care
+                      </span>
+                      <span className="text-[11px] font-bold text-fuchsia-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 5. Sports Coaches & Mentors */}
+                <button
+                  id="cat-select-coach"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Coach');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-amber-200 hover:border-amber-400 bg-amber-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-amber-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    🏆
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-amber-700 transition leading-snug">
+                        Sports Coaches &amp; Skill Mentors
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      Swimming, martial arts, chess, gymnastics, athletics &amp; youth sports camps.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-amber-200 text-amber-700">
+                        Sports &amp; Skills
+                      </span>
+                      <span className="text-[11px] font-bold text-amber-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+
+                {/* 6. Kids Wealth & Investment Planners */}
+                <button
+                  id="cat-select-wealth"
+                  type="button"
+                  onClick={() => {
+                    setShowSpecialistCategoriesModal(false);
+                    if (onOpenSpecialists) onOpenSpecialists('Kids Wealth & Investment Planners');
+                  }}
+                  className="p-3.5 rounded-2xl border-2 border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
+                    💰
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-indigo-700 transition leading-snug">
+                        Kids Wealth &amp; Investment Planners
+                      </h4>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
+                      AMFI certified advisors for minor mutual fund portfolios, education SIP &amp; wealth.
+                    </p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700">
+                        Future Wealth
+                      </span>
+                      <span className="text-[11px] font-bold text-indigo-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
+                        Consult <span>→</span>
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+              <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>All specialists are verified with registration &amp; clinic credentials</span>
+              </div>
+              <button
+                type="button"
+                id="btn-browse-all-specialists-modal"
+                onClick={() => {
+                  setShowSpecialistCategoriesModal(false);
+                  if (onOpenSpecialists) onOpenSpecialists('All');
+                }}
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-700 via-indigo-700 to-rose-600 hover:opacity-95 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer active:scale-98"
+              >
+                Browse All Kids Specialists Directory
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

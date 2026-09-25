@@ -1,15 +1,16 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
-import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
+import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
-import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye, Lock } from 'lucide-react';
+import { Heart, ShieldCheck, MapPin, Sparkles, User, MessageSquare, ArrowRight, Check, Bookmark, ChevronDown, Eye, Lock, Navigation } from 'lucide-react';
 
 interface PlaymateListViewProps {
   playmates: ChildProfile[];
   userProfile: ChildProfile | null;
   onSelectPlaymate: (profile: ChildProfile) => void;
   onOpenDetailModal: (profile: ChildProfile) => void;
+  onQuickChat?: (profile: ChildProfile, templateMessage?: string) => void;
   selectedPlaymateId?: string;
   connectedIds: string[];
   interestsSent: string[];
@@ -26,6 +27,7 @@ export function PlaymateListView({
   userProfile,
   onSelectPlaymate,
   onOpenDetailModal,
+  onQuickChat,
   selectedPlaymateId,
   connectedIds,
   interestsSent,
@@ -115,6 +117,8 @@ export function PlaymateListView({
           const proxBadge = getProximityBadge(dKm);
           const matchResult = calculateMatchScore(userProfile, p);
 
+          const isCloseNeighbor = dKm <= 0.5;
+
           return (
             <div
               key={p.id}
@@ -122,9 +126,28 @@ export function PlaymateListView({
               className={`bg-white rounded-3xl border p-4 transition-all duration-200 flex flex-col justify-between hover:shadow-md relative overflow-hidden group ${
                 isSelected 
                   ? 'border-orange-300 ring-2 ring-orange-100 bg-orange-50/20' 
+                  : isCloseNeighbor
+                  ? 'border-emerald-400 ring-1 ring-emerald-300/40 shadow-emerald-500/10'
                   : 'border-slate-100/90 hover:border-slate-200'
               }`}
             >
+              {/* Spontaneous Nearby Pulse Banner for <0.5km */}
+              {isCloseNeighbor && (
+                <div 
+                  id={`list-nearby-spontaneous-tag-${p.id}`}
+                  className="mb-2.5 -mx-4 -mt-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-3.5 py-1 text-[10px] font-black flex items-center justify-between shadow-xs"
+                >
+                  <span className="flex items-center gap-1.5 uppercase tracking-wider">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-80"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                    </span>
+                    Nearby &bull; &lt;0.5 km ({Math.round(dKm * 1000)}m)
+                  </span>
+                  <span className="bg-white/20 px-2 py-0.5 rounded-full text-[9px]">Spontaneous Meetup</span>
+                </div>
+              )}
+
               {/* Top Accent Stripe / Badges */}
               <div className="flex items-start justify-between gap-2 mb-3">
                 <div className="flex items-center gap-3">
@@ -168,15 +191,21 @@ export function PlaymateListView({
                     </p>
 
                     <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      {/* Color-Coded Visual Distance Badge */}
+                      {/* Cleaner Exact Distance Badge */}
                       <span 
                         id={`list-dist-badge-${p.id}`}
-                        className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-0.5 rounded-lg border shadow-3xs ${proxBadge.badgeClass}`}
-                        title={`Distance: ${proxBadge.distanceText} • ${proxBadge.subtext}`}
+                        className={`inline-flex items-center gap-1.5 text-[10px] font-black px-2.5 py-0.5 rounded-full border shadow-3xs ${proxBadge.badgeClass}`}
+                        title={`Exact distance: ${distKm < 1 ? `${Math.round(distKm * 1000)} meters` : `${distKm.toFixed(2)} km`} • ${proxBadge.subtext}`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${proxBadge.dotColor} shrink-0`}></span>
-                        <span>{proxBadge.distanceText}</span>
-                        <span className="text-[8.5px] opacity-75 uppercase font-bold">({proxBadge.label})</span>
+                        <span className="relative flex h-1.5 w-1.5 shrink-0">
+                          {distKm <= 0.5 && (
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          )}
+                          <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${proxBadge.dotColor}`}></span>
+                        </span>
+                        <span>{proxBadge.exactText}</span>
+                        <span className="text-slate-300 font-normal select-none">&bull;</span>
+                        <span className="text-[9px] font-semibold opacity-85">{proxBadge.subtext}</span>
                       </span>
 
                       <span className="text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded-lg border border-amber-100/60 flex items-center gap-0.5 text-[10px]">
@@ -192,8 +221,22 @@ export function PlaymateListView({
                   </div>
                 </div>
 
-                {/* Save & Like Action Buttons */}
+                {/* Save, Navigate & Like Action Buttons */}
                 <div className="flex items-center gap-1.5">
+                  <button
+                    id={`btn-list-navigate-${p.id}`}
+                    type="button"
+                    title="Start Navigation: Open device's map app with pinned location"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openDeviceNavigation(p.location.lat, p.location.lng, `${p.childName}'s Play Area`);
+                    }}
+                    className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition border border-emerald-200/70 cursor-pointer flex items-center gap-1"
+                    aria-label="Start Navigation"
+                  >
+                    <Navigation className="w-4 h-4 fill-emerald-600/30" />
+                  </button>
+
                   <button
                     id={`btn-save-friend-${p.id}`}
                     type="button"
@@ -272,9 +315,27 @@ export function PlaymateListView({
 
               {/* Action bar */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 mt-auto">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  {p.playStyle || 'Playmate'}
-                </span>
+                {onQuickChat ? (
+                  <button
+                    id={`btn-list-quick-chat-${p.id}`}
+                    type="button"
+                    onClick={() => {
+                      const template = isCloseNeighbor
+                        ? 'Hi! Saw you are nearby (<500m). Would you like to meet at the park?'
+                        : 'Hi! Would you like to meet at the park?';
+                      onQuickChat(p, template);
+                    }}
+                    className="px-2.5 py-1.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-[11px] font-bold transition flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-xs"
+                    title="Quick Chat: 'Hi! Would you like to meet at the park?'"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Quick Chat</span>
+                  </button>
+                ) : (
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {p.playStyle || 'Playmate'}
+                  </span>
+                )}
 
                 <button
                   id={`btn-view-detailed-profile-${p.id}`}

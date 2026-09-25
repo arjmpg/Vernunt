@@ -253,6 +253,10 @@
       "schema": "Message",
       "description": "Subcollection storing real messaging transactions between matched parents"
     },
+    "/chat_messages/{messageId}": {
+      "schema": "Message",
+      "description": "Top-level collection for offline-first local database message synchronization"
+    },
     "/custom_roles/{roleId}": {
       "schema": "CustomRole",
       "description": "Secure security access level records created dynamically by supervisors"

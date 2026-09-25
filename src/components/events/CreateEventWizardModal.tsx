@@ -10,11 +10,13 @@ import { sendEventPublishedNotification } from '../../utils/notifications.ts';
 import { calculateEventCommissionPolicy } from '../../utils/ticketingCommission.ts';
 import { db } from '../../utils/firebase.ts';
 import { doc, setDoc } from 'firebase/firestore';
+import EventHostQrShareModal from './EventHostQrShareModal.tsx';
 
 interface CreateEventWizardModalProps {
   userProfile: any;
   onClose: () => void;
   onAddEvent: (newEvent: CommunityEvent) => void;
+  onDirectBook?: (newEvent: CommunityEvent) => void;
   customCategories?: any[];
 }
 
@@ -22,8 +24,12 @@ export default function CreateEventWizardModal({
   userProfile,
   onClose,
   onAddEvent,
+  onDirectBook,
   customCategories = []
 }: CreateEventWizardModalProps) {
+  // Published Event QR Stage
+  const [publishedEvent, setPublishedEvent] = useState<CommunityEvent | null>(null);
+
   // Top-Level Classification: Event vs Classes vs Activity
   const [itemCategoryType, setItemCategoryType] = useState<'event' | 'classes' | 'activity'>('event');
 
@@ -351,13 +357,31 @@ export default function CreateEventWizardModal({
       }
 
       setIsSubmitting(false);
-      onClose();
+      // Present Host QR Pass Station so host can immediately share with others
+      setPublishedEvent(newEvent);
     } catch (err: any) {
       console.error('Failed to complete event creation:', err);
       setValidationError('Failed to complete registration: ' + (err.message || 'Please check inputs and retry.'));
       setIsSubmitting(false);
     }
   };
+
+  // If newly published, render dedicated Host Event QR Code Station
+  if (publishedEvent) {
+    return (
+      <EventHostQrShareModal
+        event={publishedEvent}
+        isNewCreated={true}
+        onClose={onClose}
+        onDirectBook={(evt) => {
+          onClose();
+          if (onDirectBook) {
+            onDirectBook(evt);
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fadeIn">

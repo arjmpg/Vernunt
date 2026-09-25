@@ -42,7 +42,37 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
   defaultKidName = '',
   defaultChapter = 1
 }) => {
-  const isParent = currentUser && (currentUser.userRole === 'Parent' || !currentUser.userRole);
+  // Resolve effective user authentication state from props, auth session cache, or active profile
+  const effectiveUser = useMemo(() => {
+    if (currentUser && currentUser.id && currentUser.id !== 'guest-explorer') return currentUser;
+    try {
+      const cachedSession = localStorage.getItem('vernunt_auth_session');
+      if (cachedSession) {
+        const parsed = JSON.parse(cachedSession);
+        if (parsed?.userProfile && parsed.userProfile.id && parsed.userProfile.id !== 'guest-explorer') {
+          return parsed.userProfile;
+        }
+      }
+      const lastUid = localStorage.getItem('vernunt_active_user_id') || localStorage.getItem('vernunt_last_logged_in_user');
+      if (lastUid && lastUid !== 'guest-explorer') {
+        const raw = localStorage.getItem('vernunt_cached_profile_' + lastUid);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.id && parsed.id !== 'guest-explorer') return parsed;
+        }
+      }
+      const rawUser = localStorage.getItem('vernunt_user_profile');
+      if (rawUser) {
+        const parsed = JSON.parse(rawUser);
+        if (parsed && parsed.id && parsed.id !== 'guest-explorer') return parsed;
+      }
+    } catch (e) {
+      console.debug('Error resolving cached user in WriteKidStoryModal', e);
+    }
+    return currentUser;
+  }, [currentUser]);
+
+  const isLoggedIn = Boolean(effectiveUser && effectiveUser.id && effectiveUser.id !== 'guest-explorer');
 
   const existingKidBooks = useMemo(() => {
     try {
@@ -54,7 +84,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
 
   const [kidName, setKidName] = useState(defaultKidName);
   const [kidAge, setKidAge] = useState<number | ''>('');
-  const [kidCity, setKidCity] = useState(currentUser?.location?.address || 'Bangalore');
+  const [kidCity, setKidCity] = useState(effectiveUser?.location?.address || 'Bangalore');
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [chapterNumber, setChapterNumber] = useState<number>(defaultChapter);
   const [title, setTitle] = useState('');
@@ -253,7 +283,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
     e.preventDefault();
     setErrorMsg('');
 
-    if (!currentUser) {
+    if (!isLoggedIn) {
       setErrorMsg('Please sign in or register with your parent profile first.');
       return;
     }
@@ -294,6 +324,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      const activeUser = effectiveUser || currentUser;
       const created = submitParentKidStory({
         kidName: kidName.trim(),
         kidAge: Number(kidAge),
@@ -307,9 +338,10 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
         photoUrl: finalPhoto,
         category,
         chapterNumber: Number(chapterNumber) || 1,
-        parentName: currentUser.parentName || 'Vernunt Parent',
-        parentEmail: (currentUser as any).email || currentUser.phone || 'parent@vernunt.com',
-        parentPhone: currentUser.phone || currentUser.phoneNumber
+        parentId: activeUser?.id,
+        parentName: activeUser?.parentName || 'Vernunt Parent',
+        parentEmail: (activeUser as any)?.email || activeUser?.phone || 'parent@vernunt.com',
+        parentPhone: activeUser?.phone || activeUser?.phoneNumber
       });
 
       setSubmittedStory(created);
@@ -355,25 +387,25 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
           </div>
 
           <h2 className="text-xl font-bold font-serif leading-tight">
-            Share Your Child's Inspiring Story
+            Write Story of Your Child
           </h2>
           <p className="text-xs text-orange-100 mt-0.5">
             Celebrate achievements, creative inventions, sports accolades, and talents with the parenting community.
           </p>
         </div>
 
-        {/* Not Logged In as Parent Gate */}
-        {!isParent ? (
+        {/* Not Logged In Gate */}
+        {!isLoggedIn ? (
           <div className="p-8 text-center space-y-4">
             <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
               <ShieldCheck className="w-8 h-8" />
             </div>
             <div className="max-w-md mx-auto space-y-2">
               <h3 className="text-base font-bold text-slate-900">
-                Parent Profile Verification Required
+                Sign Up to Write & Publish Your Child's Story
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                To protect child privacy, verify genuine achievements, and prevent impersonation, only registered and verified parents can publish stories about their children.
+                Please sign up or log in to document your child's milestones, achievements, and awards in the community storybook.
               </p>
             </div>
 

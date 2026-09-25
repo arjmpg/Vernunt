@@ -8,7 +8,9 @@ export type OutboxActionType =
   | 'ACCEPT_CONNECTION_REQUEST'
   | 'CARE_BOOKING_REQUEST'
   | 'CARE_STATUS_UPDATE'
-  | 'SAVE_PROFILE_UPDATE';
+  | 'SAVE_PROFILE_UPDATE'
+  | 'EVENT_MENU_ORDER'
+  | 'EVENT_CART_SYNC';
 
 export type OutboxItemStatus = 'queued' | 'syncing' | 'synced' | 'failed';
 
@@ -210,6 +212,8 @@ export function enqueueOutboxAction(
   return newItem;
 }
 
+export const enqueueOutboxItem = enqueueOutboxAction;
+
 /**
  * Helper: Queue Chat Message
  */
@@ -401,6 +405,40 @@ async function processOutboxItem(item: OutboxItem): Promise<boolean> {
         return false;
       } catch (err: any) {
         handleFirestoreError(err, OperationType.WRITE, 'users');
+        return false;
+      }
+    }
+
+    case 'EVENT_MENU_ORDER': {
+      const order = item.payload;
+      try {
+        const orderId = order.id || `evt-order-${Date.now()}`;
+        const orderRef = doc(db, 'event_menu_orders', orderId);
+        await setDoc(orderRef, {
+          ...order,
+          syncedAt: new Date().toISOString()
+        }, { merge: true });
+        console.log(`✅ [Sync Outbox] Synced offline event menu order ${orderId} to Firebase`);
+        return true;
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.CREATE, 'event_menu_orders');
+        return false;
+      }
+    }
+
+    case 'EVENT_CART_SYNC': {
+      const cartData = item.payload;
+      try {
+        const cartDocId = cartData.cartDocId || `${cartData.userId || 'guest'}_${cartData.eventId}`;
+        const cartRef = doc(db, 'event_carts', cartDocId);
+        await setDoc(cartRef, {
+          ...cartData,
+          syncedAt: new Date().toISOString()
+        }, { merge: true });
+        console.log(`✅ [Sync Outbox] Synced offline event cart state for event ${cartData.eventId} to Firestore`);
+        return true;
+      } catch (err: any) {
+        handleFirestoreError(err, OperationType.WRITE, 'event_carts');
         return false;
       }
     }

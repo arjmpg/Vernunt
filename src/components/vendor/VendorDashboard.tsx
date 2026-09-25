@@ -173,7 +173,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
       ageLabel: productForm.ageLabel || 'Ages 3 - 6 Years',
       featuredImage: productForm.featuredImage || 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80',
       galleryImages: [productForm.featuredImage || 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80'],
-      tags: ['Dokan Vendor', currentVendor.storeName, productForm.category || 'Toys'],
+      tags: ['Vernunt Vendor', currentVendor.storeName, productForm.category || 'Toys'],
       rating: 5.0,
       reviewCount: 1,
       reviews: [],
@@ -345,14 +345,14 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
               </button>
             )}
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-amber-400 to-teal-400 flex items-center justify-center font-bold text-slate-950 text-base shadow-xs">
-                D
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-rose-500 to-amber-400 flex items-center justify-center font-bold text-white text-base shadow-xs">
+                V
               </div>
               <div>
                 <h1 className="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-                  Vernunt Dokan Seller Portal
+                  Vernunt Seller Portal
                   <span className="bg-teal-500/20 text-teal-300 text-[10px] font-mono px-2 py-0.2 rounded-full border border-teal-500/40">
-                    v3.8 Multi-Vendor
+                    Multi-Vendor
                   </span>
                 </h1>
                 <p className="text-[10px] text-slate-400">Independent Vendor Marketplace & Payout Console</p>
@@ -643,7 +643,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                       className="w-full p-3 bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-between transition"
                     >
                       <span className="flex items-center gap-2">
-                        <Eye className="w-4 h-4 text-slate-600" /> Preview Dokan Store Page
+                        <Eye className="w-4 h-4 text-slate-600" /> Preview Vernunt Store Page
                       </span>
                       <ChevronRight className="w-4 h-4 text-slate-400" />
                     </button>
@@ -963,7 +963,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
           <div className="space-y-4 animate-fadeIn">
             <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
               <h3 className="font-bold text-base text-slate-900">Direct Parent & Buyer Questions</h3>
-              <p className="text-xs text-slate-500">Inquiries sent directly from product pages or your Dokan store profile.</p>
+              <p className="text-xs text-slate-500">Inquiries sent directly from product pages or your Vernunt store profile.</p>
             </div>
 
             {vendorInquiriesList.length === 0 ? (
@@ -1030,7 +1030,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
         {activeTab === 'settings' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-6 animate-fadeIn max-w-4xl">
             <div>
-              <h3 className="font-bold text-base text-slate-900">Dokan Store Settings & Customization</h3>
+              <h3 className="font-bold text-base text-slate-900">Vernunt Store Settings & Customization</h3>
               <p className="text-xs text-slate-500">Configure your public storefront banner, payout details, and return policies.</p>
             </div>
 

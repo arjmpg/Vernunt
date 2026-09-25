@@ -1,13 +1,27 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ChildProfile, Message } from '../types.ts';
-import { Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { 
+  Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck, AlertTriangle, 
+  Sparkles, Wifi, WifiOff, RefreshCw, Clock, Database, Check, CloudUpload
+} from 'lucide-react';
 import { evaluateChildSafetyText } from '../utils/childSafetyFilter.ts';
+import { 
+  saveMessageToLocalDB, 
+  getAllLocalConversations, 
+  subscribeToLocalConversations, 
+  subscribeToChatSyncStatus, 
+  syncPendingMessagesWithFirebase,
+  LocalChatMessage,
+  LocalChatSyncStatus 
+} from '../utils/localChatDatabase.ts';
 import { queueMessage } from '../utils/syncOutbox.ts';
 
 interface ChatPanelProps {
   playmates: ChildProfile[];
   userProfile: ChildProfile | null;
   activePlaymate: ChildProfile | null;
+  initialMessage?: string;
+  onClearInitialMessage?: () => void;
   onBackToRadar?: () => void;
   connectedIds?: string[];
   interestsSent?: string[];
@@ -21,6 +35,8 @@ export default function ChatPanel({
   playmates, 
   userProfile, 
   activePlaymate, 
+  initialMessage,
+  onClearInitialMessage,
   onBackToRadar,
   connectedIds = ['playmate-1', 'playmate-2'],
   interestsSent = [],
@@ -38,22 +54,18 @@ export default function ChatPanel({
     return connectedPlaymates[0] || playmates[0];
   });
   
-  // Set of messages by companion ID with beautiful simulated historical chats
-  const [conversations, setConversations] = useState<{ [key: string]: Message[] }>({
-    'playmate-1': [
-      { id: '1', chatId: 'playmate-1', senderId: 'playmate-1', content: 'Hi! I saw you just moved to the neighborhood. Liam would love to meet up at the park playground for some Lego building sometime soon!', timestamp: '2:12 PM' },
-      { id: '2', chatId: 'playmate-1', senderId: 'user', content: 'Oh that would be amazing! He is very friendly and loves board games.', timestamp: '2:15 PM' },
-      { id: '3', chatId: 'playmate-1', senderId: 'playmate-1', content: 'Fantastic! Liam is obsessed with drawing space rockets too. Let us know when you would like to arrange a joint park playtime.', timestamp: '2:16 PM' },
-    ],
-    'playmate-2': [
-      { id: '1', chatId: 'playmate-2', senderId: 'playmate-2', content: 'Hello! Is your child comfortable with energetic outdoor games? Chloe is active but incredibly cooperative and loves tag.', timestamp: 'Yesterday' },
-    ],
-    'playmate-3': [
-      { id: '1', chatId: 'playmate-3', senderId: 'playmate-3', content: 'Oh, hi Arjun! Thank you for accepting my connection request. Leo is a bit quiet but would love to do some finger-painting at Central Park with Ayaan! 🎨', timestamp: 'Just now' },
-    ],
-    'playmate-4': [
-      { id: '1', chatId: 'playmate-4', senderId: 'playmate-4', content: "Hello Arjun! Emma is very excited to meet Ayaan. She was reading about your space rocket drawing idea. Let's plan a playdate!", timestamp: 'Just now' },
-    ]
+  // Local Database and Sync status
+  const [syncStatus, setSyncStatus] = useState<LocalChatSyncStatus>({
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    isSyncing: false,
+    pendingCount: 0,
+    lastSyncTime: null,
+    syncedCount: 0
+  });
+
+  // Set of messages by companion ID loaded from local database
+  const [conversations, setConversations] = useState<{ [key: string]: LocalChatMessage[] }>(() => {
+    return getAllLocalConversations();
   });
 
   const [inputText, setInputText] = useState('');
@@ -61,12 +73,39 @@ export default function ChatPanel({
   const [safetyAlert, setSafetyAlert] = useState<{ message: string; severity: string } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Subscribe to local database updates and sync status
+  useEffect(() => {
+    // Initial sync with local DB
+    setConversations(getAllLocalConversations());
+
+    const unsubscribeConvs = subscribeToLocalConversations((allConvs) => {
+      setConversations(allConvs);
+    });
+
+    const unsubscribeStatus = subscribeToChatSyncStatus((status) => {
+      setSyncStatus(status);
+    });
+
+    return () => {
+      unsubscribeConvs();
+      unsubscribeStatus();
+    };
+  }, []);
+
   // Sync with active companion choice from radar/parent prop changes
   useEffect(() => {
     if (activePlaymate) {
       setSelectedCompanion(activePlaymate);
     }
   }, [activePlaymate]);
+
+  // Handle pre-filled message template (e.g. from Quick Chat button)
+  useEffect(() => {
+    if (initialMessage) {
+      setInputText(initialMessage);
+      onClearInitialMessage?.();
+    }
+  }, [initialMessage, selectedCompanion?.id, onClearInitialMessage]);
 
   // Handle scroll to bottom of chat
   useEffect(() => {
@@ -98,26 +137,30 @@ export default function ChatPanel({
 
     setSafetyAlert(null);
     const companionId = selectedCompanion.id;
-    const userMsg: Message = {
+    const currentInput = inputText.trim();
+
+    const userMsg: LocalChatMessage = {
       id: `user-msg-${Date.now()}`,
       chatId: companionId,
       senderId: 'user',
       content: safetyCheck.sanitizedText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      syncStatus: 'pending',
+      createdAt: Date.now()
     };
 
-    setConversations(prev => ({
-      ...prev,
-      [companionId]: [...(prev[companionId] || []), userMsg]
-    }));
-    setInputText('');
+    // 1. Immediately store in local database (IndexedDB with localStorage fallback)
+    // and trigger auto-sync if connected
+    saveMessageToLocalDB(userMsg, userProfile);
 
-    // Push to background sync outbox (handles offline queueing and auto-sync to Firebase)
+    // 2. Also keep outbox compatibility
     try {
       queueMessage(companionId, userMsg, userProfile);
     } catch (e) {
       console.debug('Sync outbox note:', e);
     }
+
+    setInputText('');
 
     // Simulated responses from the other parent!
     setIsTyping(true);
@@ -130,18 +173,17 @@ export default function ChatPanel({
       ];
       const randomReply = parentResponses[Math.floor(Math.random() * parentResponses.length)];
       
-      const replyMsg: Message = {
+      const replyMsg: LocalChatMessage = {
         id: `reply-msg-${Date.now()}`,
         chatId: companionId,
         senderId: companionId,
-        content: replyMsgGenerator(inputText.trim(), selectedCompanion.childName, randomReply),
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        content: replyMsgGenerator(currentInput, selectedCompanion.childName, randomReply),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        syncStatus: 'synced',
+        createdAt: Date.now()
       };
 
-      setConversations(prev => ({
-        ...prev,
-        [companionId]: [...(prev[companionId] || []), replyMsg]
-      }));
+      saveMessageToLocalDB(replyMsg, null);
       setIsTyping(false);
     }, 1500);
   };
@@ -187,6 +229,7 @@ export default function ChatPanel({
                 const isSelected = selectedCompanion.id === p.id;
                 const lastMsgs = conversations[p.id] || [];
                 const lastMsgText = lastMsgs.length > 0 ? lastMsgs[lastMsgs.length - 1].content : "Connected safely. Start chatting!";
+                const hasPending = lastMsgs.some(m => (m as LocalChatMessage).syncStatus === 'pending');
 
                 return (
                   <button
@@ -199,7 +242,12 @@ export default function ChatPanel({
                     <img src={p.photoUrl} alt={p.childName} className="w-10 h-10 rounded-full object-cover border border-slate-200" referrerPolicy="no-referrer" />
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-baseline">
-                        <span className="font-bold text-sm block truncate text-slate-800">{p.childName}</span>
+                        <span className="font-bold text-sm truncate text-slate-800 flex items-center gap-1">
+                          {p.childName}
+                          {hasPending && (
+                            <Clock className="w-3 h-3 text-amber-500 shrink-0 animate-pulse" title="Has pending unsynced messages" />
+                          )}
+                        </span>
                         <span className="text-[9px] text-slate-400">Parent: {p.parentName.split(' ')[0]}</span>
                       </div>
                       <p className="text-xs text-slate-500 truncate mt-0.5">{lastMsgText}</p>
@@ -270,6 +318,21 @@ export default function ChatPanel({
             </div>
           </div>
         )}
+
+        {/* Local Database Storage Footer in Sidebar */}
+        <div id="sidebar-local-db-footer" className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[10.5px] text-slate-500">
+          <div className="flex items-center gap-1.5 font-medium">
+            <Database className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>Local Database Active</span>
+          </div>
+          <span className={`px-2 py-0.5 rounded-md font-bold text-[9.5px] ${
+            syncStatus.pendingCount > 0 
+              ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+              : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+          }`}>
+            {syncStatus.pendingCount > 0 ? `${syncStatus.pendingCount} pending sync` : 'All Synced'}
+          </span>
+        </div>
       </div>
 
       {/* Main chat log output */}
@@ -345,8 +408,57 @@ export default function ChatPanel({
               </div>
               
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold uppercase py-1 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hidden sm:flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-emerald-600" /> Guardian Supervised & COPPA Safe
+                {/* Local Database & Cloud Sync Badge */}
+                <div 
+                  id="chat-sync-status-badge"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-extrabold border transition ${
+                    !syncStatus.isOnline
+                      ? 'bg-amber-50 text-amber-900 border-amber-300 shadow-xs'
+                      : syncStatus.pendingCount > 0
+                      ? 'bg-sky-50 text-sky-800 border-sky-300 shadow-xs'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}
+                  title={
+                    !syncStatus.isOnline
+                      ? 'Offline Mode: Messages are saved securely in local device database (IndexedDB) and will auto-sync with Firebase upon reconnection.'
+                      : syncStatus.pendingCount > 0
+                      ? `${syncStatus.pendingCount} message(s) stored locally pending Firebase cloud sync.`
+                      : 'Local database active & fully synchronized with Firebase.'
+                  }
+                >
+                  <div className="flex items-center gap-1">
+                    <Database className="w-3 h-3 text-slate-700" />
+                    {syncStatus.isOnline ? (
+                      <Wifi className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <WifiOff className="w-3 h-3 text-amber-600" />
+                    )}
+                  </div>
+                  <span>
+                    {!syncStatus.isOnline 
+                      ? `Offline (${syncStatus.pendingCount} local)`
+                      : syncStatus.isSyncing
+                      ? 'Syncing to Firebase...'
+                      : syncStatus.pendingCount > 0
+                      ? `${syncStatus.pendingCount} Pending Sync`
+                      : 'Local DB Synced'
+                    }
+                  </span>
+                  {syncStatus.isOnline && syncStatus.pendingCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => syncPendingMessagesWithFirebase()}
+                      disabled={syncStatus.isSyncing}
+                      className="p-0.5 hover:bg-sky-100 rounded text-sky-700 transition cursor-pointer"
+                      title="Sync pending messages now"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${syncStatus.isSyncing ? 'animate-spin' : ''}`} />
+                    </button>
+                  )}
+                </div>
+
+                <span className="text-[9px] font-bold uppercase py-1 px-2.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl hidden lg:flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-600" /> COPPA Safe
                 </span>
                 {onBackToRadar && (
                   <button
@@ -360,6 +472,34 @@ export default function ChatPanel({
                 )}
               </div>
             </div>
+
+            {/* Offline or Pending Local Database Sync Banner */}
+            {(!syncStatus.isOnline || syncStatus.pendingCount > 0) && (
+              <div 
+                id="chat-offline-sync-banner" 
+                className="px-4 py-2 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border-b border-amber-200 flex items-center justify-between text-xs"
+              >
+                <div className="flex items-center gap-2 text-amber-950 font-medium">
+                  <Database className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>
+                    <strong>Offline-First Storage:</strong> {!syncStatus.isOnline ? 'Unstable/No internet.' : 'Network online.'} Messages are safely cached in IndexedDB and synchronize with Firebase automatically.
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {syncStatus.isOnline && syncStatus.pendingCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => syncPendingMessagesWithFirebase()}
+                      disabled={syncStatus.isSyncing}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[11px] font-bold transition shadow-xs cursor-pointer active:scale-95"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${syncStatus.isSyncing ? 'animate-spin' : ''}`} />
+                      <span>{syncStatus.isSyncing ? 'Syncing...' : 'Sync to Cloud'}</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* In-chat safety alert banner if inappropriate text attempted */}
             {safetyAlert && (
@@ -392,6 +532,7 @@ export default function ChatPanel({
               ) : (
                 currentMessages.map((msg) => {
                   const fromMe = msg.senderId === 'user';
+                  const localMsg = msg as LocalChatMessage;
                   return (
                     <div
                       id={`msg-line-${msg.id}`}
@@ -400,9 +541,42 @@ export default function ChatPanel({
                     >
                       <div className={`max-w-[75%] p-4 rounded-2xl shadow-sm border text-xs leading-relaxed ${fromMe ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-white border-orange-500 rounded-br-none' : 'bg-white text-slate-800 border-slate-100 rounded-bl-none'}`}>
                         <p className="font-medium whitespace-pre-wrap">{msg.content}</p>
-                        <span className={`block text-[9px] text-right mt-1.5 font-bold ${fromMe ? 'text-amber-100' : 'text-slate-400'}`}>
-                          {msg.timestamp}
-                        </span>
+                        
+                        {/* Timestamp & Sync Status indicator */}
+                        <div className="flex items-center justify-end gap-1.5 mt-1.5">
+                          <span className={`text-[9px] font-bold ${fromMe ? 'text-amber-100' : 'text-slate-400'}`}>
+                            {msg.timestamp}
+                          </span>
+                          {fromMe && (
+                            <span 
+                              className="inline-flex items-center text-[9px] font-semibold"
+                              title={
+                                localMsg.syncStatus === 'synced'
+                                  ? 'Synced with Firebase Cloud Database'
+                                  : localMsg.syncStatus === 'pending'
+                                  ? 'Saved to Local Device Database • Will sync when online'
+                                  : 'Sync failed • Will retry automatically'
+                              }
+                            >
+                              {localMsg.syncStatus === 'synced' ? (
+                                <span className="inline-flex items-center gap-0.5 text-emerald-200">
+                                  <CheckCircle2 className="w-2.5 h-2.5 fill-emerald-500 text-white" />
+                                  <span className="text-[8.5px]">Synced</span>
+                                </span>
+                              ) : localMsg.syncStatus === 'pending' ? (
+                                <span className="inline-flex items-center gap-0.5 text-amber-200">
+                                  <Clock className="w-2.5 h-2.5 animate-pulse" />
+                                  <span className="text-[8.5px]">Local DB</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-0.5 text-rose-200">
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  <span className="text-[8.5px]">Retry</span>
+                                </span>
+                              )}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -443,23 +617,50 @@ export default function ChatPanel({
                 </button>
               </div>
             ) : (
-              <form id="chat-input-row" onSubmit={handleSendMessage} className="p-4 bg-white border-t border-slate-100 flex items-center gap-2">
-                <input
-                  id="chat-text-input"
-                  type="text"
-                  value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  placeholder={`Say hello to ${selectedCompanion.childName} and ${selectedCompanion.parentName.split(' ')[0]}...`}
-                  className="flex-1 bg-slate-50 hover:bg-slate-100/50 focus:bg-white text-sm px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-orange-200 transition-all placeholder-slate-400 text-slate-700"
-                />
-                <button
-                  id="btn-chat-send"
-                  type="submit"
-                  className="p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl active:scale-95 transition flex items-center justify-center shadow-md cursor-pointer"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-              </form>
+              <div className="bg-white border-t border-slate-100">
+                {/* Quick Starter Templates Bar */}
+                <div id="chat-quick-templates-bar" className="px-4 pt-2.5 pb-1 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-amber-500" /> Templates:
+                  </span>
+                  {[
+                    'Hi! Would you like to meet at the park?',
+                    'Hi! Are the kids free for a playdate this weekend?',
+                    'Hello! Would love to connect our kids for playtime.'
+                  ].map((tmpl, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setInputText(tmpl)}
+                      className={`text-[11px] font-semibold px-2.5 py-1 rounded-full whitespace-nowrap transition cursor-pointer border shrink-0 ${
+                        inputText === tmpl
+                          ? 'bg-orange-500 text-white border-orange-500 shadow-xs'
+                          : 'bg-slate-50 hover:bg-orange-50 text-slate-600 hover:text-orange-700 border-slate-200/80 hover:border-orange-200'
+                      }`}
+                    >
+                      "{tmpl}"
+                    </button>
+                  ))}
+                </div>
+
+                <form id="chat-input-row" onSubmit={handleSendMessage} className="p-3 sm:p-4 flex items-center gap-2">
+                  <input
+                    id="chat-text-input"
+                    type="text"
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    placeholder={`Say hello to ${selectedCompanion.childName} and ${selectedCompanion.parentName.split(' ')[0]}...`}
+                    className="flex-1 bg-slate-50 hover:bg-slate-100/50 focus:bg-white text-sm px-4 py-3 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-orange-200 transition-all placeholder-slate-400 text-slate-700"
+                  />
+                  <button
+                    id="btn-chat-send"
+                    type="submit"
+                    className="p-3 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl active:scale-95 transition flex items-center justify-center shadow-md cursor-pointer"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </form>
+              </div>
             )}
           </>
         )}

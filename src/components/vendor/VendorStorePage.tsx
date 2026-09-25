@@ -76,7 +76,7 @@ export const VendorStorePage: React.FC<VendorStorePageProps> = ({
             <ArrowLeft className="w-4 h-4" /> Back to Vernunt Marketplace
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-slate-500 font-medium">Verified Dokan Marketplace Seller</span>
+            <span className="text-[11px] text-slate-500 font-medium">Verified Vernunt Marketplace Seller</span>
             {vendor.isVerified && (
               <span className="inline-flex items-center gap-1 bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-teal-200">
                 <ShieldCheck className="w-3 h-3 text-teal-600" /> BIS Verified Store

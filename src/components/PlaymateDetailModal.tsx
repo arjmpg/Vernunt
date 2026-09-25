@@ -1,13 +1,14 @@
 import React from 'react';
 import { ChildProfile } from '../types.ts';
 import PlaymateCard from './PlaymateCard.tsx';
-import { X, User } from 'lucide-react';
+import { X, User, Navigation } from 'lucide-react';
+import { openDeviceNavigation } from '../utils/distance.ts';
 
 interface PlaymateDetailModalProps {
   profile: ChildProfile;
   onClose: () => void;
   onInitiatePlaydate: (profile: ChildProfile) => void;
-  onOpenChat: (profile: ChildProfile) => void;
+  onOpenChat: (profile: ChildProfile, templateMessage?: string) => void;
   onOpenReport: (profile: ChildProfile) => void;
   onOpenVerify: (profile: ChildProfile) => void;
   isConnected?: boolean;
@@ -74,15 +75,27 @@ export function PlaymateDetailModal({
               </p>
             </div>
           </div>
-          <button
-            id="btn-close-detail-modal"
-            type="button"
-            onClick={onClose}
-            className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
-            aria-label="Close modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              id="btn-modal-start-navigation"
+              type="button"
+              onClick={() => openDeviceNavigation(profile.location.lat, profile.location.lng, `${profile.childName}'s Play Area`)}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
+              title="Open device map with pinned location and navigation"
+            >
+              <Navigation className="w-3.5 h-3.5 fill-current" />
+              <span>Start Navigation</span>
+            </button>
+            <button
+              id="btn-close-detail-modal"
+              type="button"
+              onClick={onClose}
+              className="p-1.5 hover:bg-slate-800 rounded-xl text-slate-400 hover:text-white transition cursor-pointer"
+              aria-label="Close modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Body - Card Container & AI Activity Suggestions */}
@@ -93,8 +106,8 @@ export function PlaymateDetailModal({
               onInitiatePlaydate(p);
               onClose();
             }}
-            onOpenChat={(p) => {
-              onOpenChat(p);
+            onOpenChat={(p, template) => {
+              onOpenChat(p, template);
               onClose();
             }}
             onOpenReport={onOpenReport}

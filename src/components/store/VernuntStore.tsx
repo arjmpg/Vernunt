@@ -33,6 +33,7 @@ import { ChildProfile } from '../../types.ts';
 import { logProductSearch } from '../../data/productSearchAnalytics.ts';
 import { AdminProductSearchesDesk } from '../admin/AdminProductSearchesDesk.tsx';
 import { CommerceApiClient } from '../../services/commerceApiClient.ts';
+import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 
 // Helper to load Razorpay script
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -65,10 +66,10 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   onNavigateToTab,
   onContactSupport
 }) => {
-  // Master Dokan Store Settings
+  // Master Vernunt Store Settings
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(getStoredStoreSettings);
 
-  // Dokan Vendors state
+  // Vernunt Vendors state
   const [vendors, setVendors] = useState<VendorProfile[]>(getStoredVendors);
   const [selectedVendor, setSelectedVendor] = useState<VendorProfile | null>(null);
   const [inquiryVendor, setInquiryVendor] = useState<VendorProfile | null>(null);
@@ -388,7 +389,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const shippingFee = useMemo(() => {
     if (appliedCoupon?.discountType === 'free_shipping') return 0;
     const threshold = storeSettings?.freeShippingThreshold ?? 499;
-    if (cartSubtotal >= threshold) return 0; // Free shipping threshold from Dokan settings
+    if (cartSubtotal >= threshold) return 0; // Free shipping threshold from Vernunt settings
     if (shippingMethod === 'instant') return 149;
     if (shippingMethod === 'express') return 99;
     return storeSettings?.standardShippingFee ?? 49;
@@ -677,7 +678,41 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    // Handle Razorpay Payment Gateway
+    // Perform a real-time check of the user's wallet balance
+    const freshWallet = getStoredWallet();
+    const currentBalance = freshWallet?.balance || 0;
+
+    // Prioritize deducting funds from wallet first
+    if (currentBalance >= cartGrandTotal) {
+      setIsProcessingPayment(true);
+      debitFromWallet(
+        cartGrandTotal,
+        `Store Order: ${cartItemCount} item${cartItemCount > 1 ? 's' : ''}`
+      );
+      setTimeout(() => {
+        completeOrder(
+          'VernuntWallet',
+          `WALLET-ORD-${Date.now().toString().slice(-8)}`,
+          'paid',
+          `Paid 100% via Vernunt In-App Wallet (₹${cartGrandTotal} deducted)`
+        );
+      }, 700);
+      return;
+    }
+
+    // If wallet has partial balance, deduct from wallet first and pay remaining via Razorpay
+    const walletDeducted = currentBalance > 0 ? currentBalance : 0;
+    const remainingOnlinePayable = cartGrandTotal - walletDeducted;
+
+    if (walletDeducted > 0) {
+      debitFromWallet(
+        walletDeducted,
+        `Split Payment (Wallet): Store Order (${cartItemCount} items)`
+      );
+      showToast(`Deducted ₹${walletDeducted} from your wallet. Paying remaining ₹${remainingOnlinePayable} via Gateway.`);
+    }
+
+    // Handle Razorpay Payment Gateway for remaining balance only
     setIsProcessingPayment(true);
 
     try {
@@ -686,13 +721,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: cartGrandTotal,
+          amount: remainingOnlinePayable,
           planId: 'store_checkout',
           notes: {
             customerName: shippingAddress.fullName,
             email: shippingAddress.email,
             phone: shippingAddress.phone,
-            itemCount: String(cartItemCount)
+            itemCount: String(cartItemCount),
+            walletDeducted: String(walletDeducted)
           }
         })
       });
@@ -708,18 +744,27 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         // Fallback simulation if script is blocked by browser/ad-blocker
         console.warn('Razorpay SDK script not directly reachable, simulating test authorization');
         setTimeout(() => {
-          completeOrder('Razorpay', `RZP-TEST-${Date.now().toString().slice(-8)}`, 'paid', 'Authorized via Test Gateway');
+          completeOrder(
+            walletDeducted > 0 ? 'Razorpay' : 'Razorpay',
+            `RZP-TEST-${Date.now().toString().slice(-8)}`,
+            'paid',
+            walletDeducted > 0
+              ? `Split Paid: ₹${walletDeducted} via Wallet + ₹${remainingOnlinePayable} via Test Gateway`
+              : 'Authorized via Test Gateway'
+          );
         }, 1200);
         return;
       }
 
-      // 3. Configure and open Razorpay modal
+      // 3. Configure and open Razorpay modal for remaining balance
       const options = {
         key: orderData.keyId || 'rzp_test_simulated_key_123456',
-        amount: orderData.amount || cartGrandTotal * 100,
+        amount: orderData.amount || remainingOnlinePayable * 100,
         currency: orderData.currency || 'INR',
         name: 'Vernunt Kids Store',
-        description: `Order for ${cartItemCount} item${cartItemCount > 1 ? 's' : ''} • BIS Certified Playgear`,
+        description: walletDeducted > 0
+          ? `Remaining ₹${remainingOnlinePayable} (₹${walletDeducted} paid from Wallet)`
+          : `Order for ${cartItemCount} item${cartItemCount > 1 ? 's' : ''} • BIS Certified Playgear`,
         image: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=128&auto=format&fit=crop&q=80',
         order_id: orderData.orderId,
         prefill: {
@@ -823,7 +868,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           const matchCatId = p.category.toLowerCase() === catObj.id.toLowerCase();
           const matchCatSlug = p.category.toLowerCase() === (catObj.slug || '').toLowerCase();
           const matchIncludes = p.category.toLowerCase().includes(catObj.id.toLowerCase()) || p.category.toLowerCase().includes(catObj.name.toLowerCase());
-          if (!matchCatName && !matchCatId && !matchCatSlug && !matchIncludes) {
+          const matchSpecial = 
+            (catObj.id === 'kids-clothing' && (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('apparel'))) ||
+            (catObj.id === 'kids-jewellery' && (p.category.toLowerCase().includes('jewel') || p.category.toLowerCase().includes('jewelry'))) ||
+            (catObj.id === 'baby-care' && (p.category.toLowerCase().includes('care') || p.category.toLowerCase().includes('diaper') || p.category.toLowerCase().includes('lotion') || p.category.toLowerCase().includes('soap'))) ||
+            (catObj.id === 'kids-food' && (p.category.toLowerCase().includes('food') || p.category.toLowerCase().includes('nutrition')));
+          if (!matchCatName && !matchCatId && !matchCatSlug && !matchIncludes && !matchSpecial) {
             return false;
           }
         }
@@ -831,7 +881,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
       // Subcategory
       if (selectedSubcategory !== 'all') {
-        if (p.subcategory && p.subcategory.toLowerCase() !== selectedSubcategory.toLowerCase()) {
+        if (!p.subcategory || p.subcategory.toLowerCase() !== selectedSubcategory.toLowerCase()) {
           return false;
         }
       }
@@ -872,207 +922,86 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         </div>
       )}
 
-      {/* Top Value Banner */}
-      <div className="bg-gradient-to-r from-rose-700 via-rose-600 to-amber-600 text-white py-2 px-4 shadow-sm text-xs font-semibold">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
-            <span className="bg-white/20 text-white px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
-              🎁 Vernunt Guarantee
-            </span>
-            <span className="text-rose-100 hidden sm:inline">•</span>
-            <span>100% Non-Toxic & BIS Certified Play Gear</span>
-            <span className="text-rose-100 hidden md:inline">•</span>
-            <span className="hidden md:inline">Free 24H Courier over ₹499</span>
-            <span className="text-rose-100 hidden lg:inline">•</span>
-            <span className="hidden lg:inline">7-Day Easy Parent Returns</span>
-          </div>
-
-          <div className="flex items-center gap-3 text-[11px] ml-auto">
-            <button
-              type="button"
-              onClick={() => setActiveView('orders')}
-              className={`hover:underline flex items-center gap-1 cursor-pointer ${activeView === 'orders' ? 'font-black text-amber-300' : 'text-white'}`}
-            >
-              <Package className="w-3.5 h-3.5" />
-              <span>Track Orders ({orders.length})</span>
-            </button>
-            <span>|</span>
-            <button
-              type="button"
-              onClick={() => setActiveView('wishlist')}
-              className={`hover:underline flex items-center gap-1 cursor-pointer ${activeView === 'wishlist' ? 'font-black text-amber-300' : 'text-white'}`}
-            >
-              <Heart className="w-3.5 h-3.5" />
-              <span>Wishlist ({wishlist.length})</span>
-            </button>
-            <span>|</span>
-            <button
-              type="button"
-              onClick={() => {
-                setActiveView('shop');
-                setTimeout(() => {
-                  const el = document.getElementById('recently-viewed-section');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }, 50);
-              }}
-              className="hover:underline flex items-center gap-1 cursor-pointer text-white hover:text-amber-200 transition"
-              title="Jump to Recently Viewed Products"
-            >
-              <Clock className="w-3.5 h-3.5 text-amber-300" />
-              <span>Recently Viewed ({recentlyViewedProducts.length})</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Header & Search Bar */}
+      {/* Streamlined Store Header: Search, Track Orders, Wishlist, Cart & Categories */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
-        <div className="max-w-7xl mx-auto px-4 py-3 sm:py-4">
-          <div className="flex items-center justify-between gap-3 sm:gap-6">
-            {/* Logo and Tag */}
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0 cursor-pointer" onClick={() => setActiveView('shop')}>
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-600 to-amber-500 flex items-center justify-center text-white font-black text-xl shadow-md shadow-rose-600/20">
-                <ShoppingBag className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-none">
-                    Vernunt Store
-                  </h1>
-                  <span className="bg-rose-100 text-rose-800 text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
-                    Official
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-500 font-medium">Safe Developmental Play, STEM & Books</p>
-              </div>
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5">
+          {/* Top Row: Search Input & Controls (Track Orders, Wishlist, Cart) */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Search Input Bar */}
+            <div className="flex-1 relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search kids products, STEM kits..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 sm:pl-10 pr-9 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs sm:text-sm text-slate-800 border border-slate-200 focus:border-rose-500 rounded-xl outline-hidden transition shadow-2xs font-medium"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
 
-            {/* Central Search Bar */}
-            <div className="flex-1 max-w-xl relative hidden md:block">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder="Search toys, Montessori blocks, bilingual books, safety guards..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs text-slate-800 border border-slate-200 focus:border-rose-500 rounded-xl outline-hidden transition shadow-2xs font-medium"
-                />
-                {searchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Right Action Icons */}
-            <div className="flex items-center gap-2 shrink-0">
-              {/* Verified Sellers Button */}
+            {/* Track Orders & Wishlist */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 type="button"
-                onClick={() => setActiveView('vendors')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
-                  activeView === 'vendors' || activeView === 'vendor_store'
+                onClick={() => setActiveView('orders')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                  activeView === 'orders'
                     ? 'bg-rose-50 border-rose-400 text-rose-800 shadow-xs'
                     : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
                 }`}
-                title="Explore Verified Maker & Brand Stores"
+                title="Track Orders"
               >
-                <Store className="w-4 h-4 text-rose-700" />
-                <span className="hidden sm:inline">Seller Stores</span>
-                <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.2 rounded-full font-mono">
-                  {vendors.filter(v => v.status === 'active').length}
-                </span>
+                <Package className="w-3.5 h-3.5 text-rose-600" />
+                <span className="hidden sm:inline">Track Orders</span>
+                {orders.length > 0 && (
+                  <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.2 rounded-full font-mono">
+                    {orders.length}
+                  </span>
+                )}
               </button>
 
-              {/* Dokan Seller Portal Button */}
-              <button
-                type="button"
-                onClick={() => setActiveView('vendor_dashboard')}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-black transition cursor-pointer ${
-                  activeView === 'vendor_dashboard'
-                    ? 'bg-slate-900 border-slate-900 text-white shadow-xs'
-                    : 'bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 border-amber-300'
-                }`}
-                title="Open Dokan Multi-Vendor Management Portal"
-              >
-                <Building className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Seller Portal</span>
-              </button>
-
-              {/* Admin 45-Day Search Logs Shortcut */}
-              {userProfile?.userRole === 'Admin' && (
-                <button
-                  type="button"
-                  onClick={() => setShowAdminSearchLogsModal(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-950 text-xs font-black transition cursor-pointer shadow-2xs"
-                  title="View Products Searched by All Users (45-Day Retention Window)"
-                >
-                  <Search className="w-3.5 h-3.5 text-rose-700" />
-                  <span className="hidden sm:inline">Search Logs (45d)</span>
-                </button>
-              )}
-
-              {/* Wishlist Button */}
               <button
                 type="button"
                 onClick={() => setActiveView('wishlist')}
-                className="relative p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 transition cursor-pointer"
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border text-xs font-bold transition cursor-pointer ${
+                  activeView === 'wishlist'
+                    ? 'bg-rose-50 border-rose-400 text-rose-800 shadow-xs'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}
                 title="View Wishlist"
               >
-                <Heart className={`w-4 h-4 ${wishlist.length > 0 ? 'text-rose-600 fill-rose-600' : 'text-slate-600'}`} />
+                <Heart className={`w-3.5 h-3.5 ${wishlist.length > 0 ? 'text-rose-600 fill-rose-600' : 'text-slate-500'}`} />
+                <span className="hidden sm:inline">Wishlist</span>
                 {wishlist.length > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center shadow-xs">
+                  <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.2 rounded-full font-mono">
                     {wishlist.length}
                   </span>
                 )}
               </button>
 
-              {/* Cart Drawer Trigger */}
               <button
                 type="button"
                 onClick={() => setIsCartOpen(true)}
-                className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-800 hover:to-rose-700 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-gradient-to-r from-rose-700 to-rose-600 hover:from-rose-800 hover:to-rose-700 text-white text-xs font-extrabold shadow-sm transition active:scale-95 cursor-pointer"
                 title="View Cart & Checkout"
               >
-                <ShoppingBag className="w-4 h-4" />
-                <span className="hidden sm:inline">Cart</span>
-                <span className="bg-white/25 px-2 py-0.5 rounded-full text-[11px] font-mono">
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span className="hidden md:inline">Cart</span>
+                <span className="bg-white/25 px-1.5 py-0.2 rounded-full text-[10px] font-mono">
                   {cartItemCount}
                 </span>
-                {cartSubtotal > 0 && (
-                  <span className="font-mono text-amber-200 font-bold hidden md:inline">
-                    • ₹{cartSubtotal.toLocaleString('en-IN')}
-                  </span>
-                )}
               </button>
             </div>
-          </div>
-
-          {/* Mobile Search Bar */}
-          <div className="mt-2.5 block md:hidden relative">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search kids products, STEM kits..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 bg-slate-100 text-xs border border-slate-200 rounded-xl outline-hidden"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
           </div>
         </div>
 
@@ -1099,7 +1028,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               const isSelected = selectedCategory === cat.id;
               const catProdCount = products.filter(p => 
                 p.category.toLowerCase() === cat.name.toLowerCase() || 
-                p.category.toLowerCase().includes(cat.id.toLowerCase())
+                p.category.toLowerCase().includes(cat.id.toLowerCase()) ||
+                p.category.toLowerCase() === cat.id.toLowerCase() ||
+                (cat.id === 'kids-clothing' && (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('apparel'))) ||
+                (cat.id === 'kids-jewellery' && (p.category.toLowerCase().includes('jewel') || p.category.toLowerCase().includes('jewelry'))) ||
+                (cat.id === 'baby-care' && (p.category.toLowerCase().includes('care') || p.category.toLowerCase().includes('diaper') || p.category.toLowerCase().includes('lotion') || p.category.toLowerCase().includes('soap'))) ||
+                (cat.id === 'kids-food' && (p.category.toLowerCase().includes('food') || p.category.toLowerCase().includes('nutrition')))
               ).length;
               return (
                 <button
@@ -1141,47 +1075,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           <div className="space-y-6 animate-fade-in">
             {/* CATEGORY-FIRST MODE: When selectedCategory is 'all' and no active search query */}
             {selectedCategory === 'all' && !searchQuery ? (
-              <div className="space-y-8 animate-fade-in">
-                {/* Hero Promotion & Quality Guarantee */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white p-6 sm:p-8 shadow-md border border-rose-900/40">
-                  <div className="relative z-10 max-w-2xl space-y-3">
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-600/30 border border-rose-500/40 text-amber-300 text-[10px] font-black uppercase tracking-wider">
-                      <Sparkles className="w-3.5 h-3.5" /> Vernunt Curated Kids Marketplace 2026
-                    </div>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight">
-                      Explore by Department: Safe Toys, Organic Nutrition & Learning
-                    </h2>
-                    <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
-                      Select a category below to browse pediatrician-tested foods, non-toxic sensory play, Montessori STEM kits, and bilingual books.
-                    </p>
-                    <div className="flex flex-wrap items-center gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory('kids-food');
-                          setSelectedSubcategory('all');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition shadow-sm cursor-pointer active:scale-95 flex items-center gap-1.5"
-                      >
-                        <span>🥑 Browse Kids Organic Food</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCategory('stem-toys');
-                          setSelectedSubcategory('all');
-                        }}
-                        className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition shadow-sm cursor-pointer active:scale-95 flex items-center gap-1.5"
-                      >
-                        <span>🧩 Montessori & STEM Toys</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Decorative background shape */}
-                  <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gradient-to-l from-rose-600/20 to-transparent pointer-events-none hidden md:block"></div>
-                </div>
-
+              <div className="space-y-6 animate-fade-in">
                 {/* Section Header */}
                 <div className="flex items-center justify-between">
                   <div>
@@ -1199,118 +1093,17 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   </button>
                 </div>
 
-                {/* Spotlight Card: Kids Food & Organic Nutrition */}
-                {(() => {
-                  const kidsFoodCat = categories.find(c => c.id === 'kids-food' || c.slug === 'kids-food');
-                  const kidsFoodProducts = products.filter(p => 
-                    p.category.toLowerCase().includes('food') || 
-                    p.category.toLowerCase().includes('nutrition') ||
-                    p.category === 'Kids Food & Organic Nutrition'
-                  );
-                  if (kidsFoodCat) {
-                    return (
-                      <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white rounded-3xl p-6 sm:p-8 border border-emerald-800/40 shadow-xl relative overflow-hidden group">
-                        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                          <div className="lg:col-span-7 space-y-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 text-[10.5px] font-black uppercase px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                                <Sparkles className="w-3.5 h-3.5" /> Featured Department
-                              </span>
-                              <span className="bg-white/10 text-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                Age: {kidsFoodCat.ageRange}
-                              </span>
-                              <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                                100% Certified Organic & Preservative-Free
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                              <span className="text-4xl sm:text-5xl">{kidsFoodCat.icon}</span>
-                              <div>
-                                <h3 className="text-2xl sm:text-3xl font-black text-white group-hover:text-emerald-300 transition">
-                                  {kidsFoodCat.name}
-                                </h3>
-                                <p className="text-xs text-emerald-100/80 font-medium line-clamp-2 mt-0.5">
-                                  {kidsFoodCat.description}
-                                </p>
-                              </div>
-                            </div>
-
-                            {/* Subcategories preview tags */}
-                            {kidsFoodCat.subcategories && kidsFoodCat.subcategories.length > 0 && (
-                              <div className="space-y-1.5 pt-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Popular Subcategories:</span>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {kidsFoodCat.subcategories.map(sub => (
-                                    <button
-                                      key={sub}
-                                      type="button"
-                                      onClick={() => {
-                                        setSelectedCategory(kidsFoodCat.id);
-                                        setSelectedSubcategory(sub);
-                                      }}
-                                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-emerald-600/60 text-slate-200 text-xs font-semibold border border-white/10 transition cursor-pointer"
-                                    >
-                                      {sub}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="pt-2 flex flex-wrap items-center gap-3">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedCategory(kidsFoodCat.id);
-                                  setSelectedSubcategory('all');
-                                }}
-                                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition shadow-lg flex items-center gap-2 cursor-pointer active:scale-95"
-                              >
-                                <span>Explore All Kids Foods ({kidsFoodProducts.length} Items)</span>
-                                <span>→</span>
-                              </button>
-                              <span className="text-xs text-emerald-300 font-bold flex items-center gap-1">
-                                <CheckCircle2 className="w-3.5 h-3.5" /> FSSAI Certified & Pediatric Approved
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Right preview thumbnails */}
-                          <div className="lg:col-span-5 grid grid-cols-3 gap-2.5">
-                            {kidsFoodProducts.slice(0, 3).map(prod => (
-                              <div
-                                key={prod.id}
-                                onClick={() => {
-                                  setSelectedCategory(kidsFoodCat.id);
-                                  setSelectedSubcategory('all');
-                                }}
-                                className="bg-slate-900/80 border border-emerald-800/50 rounded-xl p-2 space-y-1.5 hover:border-emerald-400 transition cursor-pointer group/item"
-                              >
-                                <div className="aspect-square rounded-lg overflow-hidden bg-slate-800">
-                                  <img src={prod.featuredImage} alt={prod.name} className="w-full h-full object-cover group-hover/item:scale-105 transition" />
-                                </div>
-                                <h5 className="text-[11px] font-bold text-slate-200 line-clamp-1 group-hover/item:text-emerald-300">{prod.name}</h5>
-                                <span className="text-xs font-black text-amber-300 font-mono">₹{prod.price}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Background subtle glow */}
-                        <div className="absolute -right-20 -top-20 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-                      </div>
-                    );
-                  }
-                  return null;
-                })()}
-
                 {/* All Categories Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                  {categories.filter(c => c.id !== 'all' && c.id !== 'kids-food').map(cat => {
+                  {categories.filter(c => c.id !== 'all').map(cat => {
                     const catProducts = products.filter(p => 
                       p.category.toLowerCase() === cat.name.toLowerCase() || 
-                      p.category.toLowerCase().includes(cat.id.toLowerCase())
+                      p.category.toLowerCase().includes(cat.id.toLowerCase()) ||
+                      p.category.toLowerCase() === cat.id.toLowerCase() ||
+                      (cat.id === 'kids-clothing' && (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('apparel'))) ||
+                      (cat.id === 'kids-jewellery' && (p.category.toLowerCase().includes('jewel') || p.category.toLowerCase().includes('jewelry'))) ||
+                      (cat.id === 'baby-care' && (p.category.toLowerCase().includes('care') || p.category.toLowerCase().includes('diaper') || p.category.toLowerCase().includes('lotion') || p.category.toLowerCase().includes('soap'))) ||
+                      (cat.id === 'kids-food' && (p.category.toLowerCase().includes('food') || p.category.toLowerCase().includes('nutrition')))
                     );
                     return (
                       <div
@@ -1347,15 +1140,24 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
                           {/* Subcategories tags */}
                           {cat.subcategories && cat.subcategories.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-1">
-                              {cat.subcategories.slice(0, 3).map(sub => (
-                                <span key={sub} className="text-[10px] bg-slate-100 text-slate-600 font-semibold px-2 py-0.5 rounded-md">
-                                  {sub}
-                                </span>
+                            <div className="flex flex-wrap gap-1.5 pt-1">
+                              {cat.subcategories.slice(0, 4).map(sub => (
+                                <button
+                                  key={sub}
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedCategory(cat.id);
+                                    setSelectedSubcategory(sub);
+                                  }}
+                                  className="text-[10px] bg-slate-100 hover:bg-rose-100 hover:text-rose-800 text-slate-700 font-bold px-2 py-0.5 rounded-md transition cursor-pointer"
+                                >
+                                  {sub === 'Boy' ? '👦 Boy' : sub === 'Girl' ? '👧 Girl' : sub}
+                                </button>
                               ))}
-                              {cat.subcategories.length > 3 && (
+                              {cat.subcategories.length > 4 && (
                                 <span className="text-[10px] bg-slate-50 text-slate-400 font-bold px-1.5 py-0.5 rounded-md">
-                                  +{cat.subcategories.length - 3} more
+                                  +{cat.subcategories.length - 4} more
                                 </span>
                               )}
                             </div>
@@ -1418,6 +1220,67 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                             </span>
                           </div>
 
+                          {/* Dedicated Boy & Girl Collection Selector for Kids Clothing */}
+                          {currentCat.id === 'kids-clothing' && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSubcategory(selectedSubcategory.toLowerCase() === 'boy' ? 'all' : 'Boy')}
+                                className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer text-left ${
+                                  selectedSubcategory.toLowerCase() === 'boy'
+                                    ? 'bg-blue-50/90 border-blue-500 shadow-xs ring-2 ring-blue-200'
+                                    : 'bg-white border-slate-200 hover:border-blue-300 hover:bg-blue-50/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-2xl shrink-0">
+                                    👦
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-sm text-slate-900">Boy Collection</span>
+                                      {selectedSubcategory.toLowerCase() === 'boy' && (
+                                        <span className="text-[10px] font-bold bg-blue-600 text-white px-2 py-0.5 rounded-full">Showing</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-slate-500">T-shirts, festive kurta sets, hoodies & shorts</p>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-mono font-bold px-2 py-1 rounded-lg bg-blue-100/70 text-blue-800 shrink-0 ml-2">
+                                  {products.filter(p => (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('kids clothing')) && p.subcategory?.toLowerCase() === 'boy').length} Items
+                                </span>
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => setSelectedSubcategory(selectedSubcategory.toLowerCase() === 'girl' ? 'all' : 'Girl')}
+                                className={`p-3.5 rounded-xl border transition-all flex items-center justify-between cursor-pointer text-left ${
+                                  selectedSubcategory.toLowerCase() === 'girl'
+                                    ? 'bg-rose-50/90 border-rose-500 shadow-xs ring-2 ring-rose-200'
+                                    : 'bg-white border-slate-200 hover:border-rose-300 hover:bg-rose-50/40'
+                                }`}
+                              >
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-2xl shrink-0">
+                                    👧
+                                  </div>
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-black text-sm text-slate-900">Girl Collection</span>
+                                      {selectedSubcategory.toLowerCase() === 'girl' && (
+                                        <span className="text-[10px] font-bold bg-rose-600 text-white px-2 py-0.5 rounded-full">Showing</span>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-slate-500">Twirl dresses, anarkalis, dungarees & sets</p>
+                                  </div>
+                                </div>
+                                <span className="text-xs font-mono font-bold px-2 py-1 rounded-lg bg-rose-100/70 text-rose-800 shrink-0 ml-2">
+                                  {products.filter(p => (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('kids clothing')) && p.subcategory?.toLowerCase() === 'girl').length} Items
+                                </span>
+                              </button>
+                            </div>
+                          )}
+
                           {/* Subcategory Filter Pills */}
                           {currentCat.subcategories && currentCat.subcategories.length > 0 && (
                             <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
@@ -1439,12 +1302,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                                   type="button"
                                   onClick={() => setSelectedSubcategory(sub)}
                                   className={`px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap cursor-pointer ${
-                                    selectedSubcategory === sub
+                                    selectedSubcategory.toLowerCase() === sub.toLowerCase()
                                       ? 'bg-rose-700 text-white shadow-2xs'
                                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                                   }`}
                                 >
-                                  {sub}
+                                  {sub === 'Boy' ? '👦 Boy' : sub === 'Girl' ? '👧 Girl' : sub}
                                 </button>
                               ))}
                             </div>
@@ -1659,7 +1522,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         {/* Card Info Body */}
                         <div className="p-4 flex-1 flex flex-col justify-between space-y-2.5">
                           <div>
-                            {/* Age & Dokan Vendor Pill */}
+                            {/* Age & Vernunt Vendor Pill */}
                             <div className="flex items-center justify-between text-[10px] text-slate-500 font-semibold mb-1 gap-1">
                               <span className="text-rose-700 font-bold shrink-0">{product.ageLabel}</span>
                               {(() => {
@@ -2188,7 +2051,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 4: VENDORS DIRECTORY (DOKAN STORES)                                  */}
+        {/* VIEW 4: VENDORS DIRECTORY (VERNUNT STORES)                                */}
         {/* ========================================================================= */}
         {activeView === 'vendors' && (
           <div className="space-y-6 animate-fade-in">
@@ -2211,7 +2074,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     className="px-4 py-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
                   >
                     <Building className="w-3.5 h-3.5" />
-                    <span>Become a Seller / Open Dokan Portal</span>
+                    <span>Become a Seller / Open Vernunt Seller Portal</span>
                   </button>
                 </div>
               </div>
@@ -2301,7 +2164,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 5: DOKAN PUBLIC VENDOR STOREFRONT                                    */}
+        {/* VIEW 5: VERNUNT PUBLIC VENDOR STOREFRONT                                  */}
         {/* ========================================================================= */}
         {activeView === 'vendor_store' && selectedVendor && (
           <div className="animate-fade-in">
@@ -2317,7 +2180,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         )}
 
         {/* ========================================================================= */}
-        {/* VIEW 6: DOKAN VENDOR MANAGEMENT PORTAL                                    */}
+        {/* VIEW 6: VERNUNT VENDOR MANAGEMENT PORTAL                                  */}
         {/* ========================================================================= */}
         {activeView === 'vendor_dashboard' && (
           <div className="animate-fade-in">
@@ -2329,7 +2192,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         )}
       </main>
 
-      {/* Dokan Customer Inquiry Modal */}
+      {/* Vernunt Customer Inquiry Modal */}
       {inquiryVendor && (
         <VendorInquiryModal
           vendor={inquiryVendor}
@@ -2576,7 +2439,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   </div>
                 </div>
 
-                {/* Dokan Verified Merchant Profile Box */}
+                {/* Vernunt Verified Merchant Profile Box */}
                 {(() => {
                   const matchingVendor = vendors.find(v => v.id === selectedProduct.vendorId || v.slug === selectedProduct.vendorSlug || v.storeName === selectedProduct.brand) || vendors[0];
                   if (!matchingVendor) return null;
@@ -2593,7 +2456,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                           <div>
                             <div className="flex items-center gap-1.5">
                               <span className="text-[10px] font-black uppercase text-amber-300 tracking-wider">
-                                🏬 Dokan Verified Merchant
+                                🏬 Vernunt Verified Merchant
                               </span>
                               {matchingVendor.isVerified && (
                                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
