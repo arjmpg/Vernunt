@@ -457,6 +457,14 @@ export interface EventAttendee {
   qrPayload?: string;
   paymentId?: string;
   createdAt: string;
+  // Extended event registration & pass tracking fields
+  registrationStatus?: 'Upcoming' | 'Checking In' | 'Completed' | 'Attended' | 'Cancelled';
+  checkInStatus?: 'Upcoming' | 'Checking In' | 'Completed';
+  isPastEvent?: boolean;
+  downloadUrl?: string;
+  seatNumber?: string;
+  bookingRef?: string;
+  passType?: 'General' | 'VIP' | 'Workshop' | 'EarlyBird' | 'ParentPass' | string;
 }
 
 export interface CommunityEvent {
@@ -781,6 +789,18 @@ export interface EventTicketPurchase {
   status: 'confirmed' | 'cancelled' | 'attended';
   qrPassCode: string;
   bookingReference: string;
+  // Extended event registration & pass history fields
+  registrationStatus?: 'Upcoming' | 'Checking In' | 'Completed' | 'Attended' | 'Cancelled';
+  checkInStatus?: 'Upcoming' | 'Checking In' | 'Completed';
+  isPastEvent?: boolean;
+  childName?: string;
+  childAge?: number;
+  downloadUrl?: string;
+  seatNumber?: string;
+  venueAddress?: string;
+  organizerName?: string;
+  organizerPhone?: string;
+  notes?: string;
 }
 
 export interface KidStory {

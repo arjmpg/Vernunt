@@ -4,9 +4,11 @@ import {
   QrCode, Camera, CheckCircle2, AlertTriangle, XCircle, Search, 
   UserCheck, Users, Download, RefreshCw, X, ShieldCheck, 
   Clock, MapPin, Sparkles, Filter, Check, ArrowRight,
-  Flashlight, FlashlightOff
+  Flashlight, FlashlightOff, Upload, SwitchCamera, Volume2, VolumeX,
+  Scan, CheckCheck
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
+import jsQR from 'jsqr';
 
 interface EventOrganizerCheckInStationProps {
   event: CommunityEvent;
@@ -36,8 +38,96 @@ export default function EventOrganizerCheckInStation({
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [isTorchOn, setIsTorchOn] = useState(false);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const scanCooldownRef = useRef<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Web Audio API Synthesizer Feedback for Instant Gate Validation
+  const playAudioFeedback = (type: 'success' | 'error' | 'already') => {
+    if (!audioFeedbackEnabled || typeof window === 'undefined') return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      if (type === 'success') {
+        // High ascending melodic two-tone chime
+        osc.frequency.setValueAtTime(659.25, ctx.currentTime); // E5
+        osc.frequency.setValueAtTime(987.77, ctx.currentTime + 0.1); // B5
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.35);
+      } else if (type === 'already') {
+        // Warning double tone
+        osc.frequency.setValueAtTime(440, ctx.currentTime);
+        osc.frequency.setValueAtTime(440, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.18, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.3);
+      } else {
+        // Low descending error buzz
+        osc.frequency.setValueAtTime(260, ctx.currentTime);
+        osc.frequency.setValueAtTime(170, ctx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.25, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.32);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.32);
+      }
+    } catch {
+      // Audio playback unavailable
+    }
+  };
+
+  // Helper to extract clean ticket ID/payload from QR code data
+  const parseTicketFromQr = (rawText: string): string => {
+    const trimmed = rawText.trim();
+    if (!trimmed) return '';
+
+    // 1. JSON payload
+    if (trimmed.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return (
+          parsed.ticketNumber ||
+          parsed.qrPassCode ||
+          parsed.bookingReference ||
+          parsed.bookingId ||
+          parsed.id ||
+          parsed.ticketId ||
+          trimmed
+        );
+      } catch {
+        // fallback
+      }
+    }
+
+    // 2. URL payload
+    if (trimmed.includes('ticket=') || trimmed.includes('ticketNumber=') || trimmed.includes('eventId=')) {
+      try {
+        const url = new URL(trimmed.startsWith('http') ? trimmed : `https://example.com/${trimmed}`);
+        const code = url.searchParams.get('ticket') || url.searchParams.get('ticketNumber') || url.searchParams.get('code');
+        if (code) return decodeURIComponent(code);
+      } catch {
+        const match = trimmed.match(/(?:ticket|ticketNumber|code)=([^&]+)/);
+        if (match && match[1]) return decodeURIComponent(match[1]);
+      }
+    }
+
+    // 3. Fallback raw text
+    return trimmed;
+  };
 
   // Toggle Camera Torch / Flashlight in low light conditions
   const toggleCameraTorch = async () => {
@@ -58,6 +148,18 @@ export default function EventOrganizerCheckInStation({
           console.warn('Torch constraint not supported, applying screen illuminator', err);
         }
       }
+    }
+  };
+
+  // Switch between Environment (Back) and User (Front) camera
+  const toggleFacingMode = () => {
+    const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+    setFacingMode(nextMode);
+    if (cameraActive) {
+      stopCamera();
+      setTimeout(() => {
+        startCamera(nextMode);
+      }, 250);
     }
   };
 
@@ -211,8 +313,11 @@ export default function EventOrganizerCheckInStation({
 
   // Check-In Logic
   const handleCheckInByCode = (rawCode: string) => {
-    const trimmed = rawCode.trim().toUpperCase();
+    const parsed = parseTicketFromQr(rawCode);
+    const trimmed = parsed.trim().toUpperCase();
     if (!trimmed) return;
+
+    setLastScannedCode(trimmed);
 
     // Check if event itself is past or ticket explicitly marked expired
     const todayStr = new Date().toISOString().split('T')[0];
@@ -221,6 +326,7 @@ export default function EventOrganizerCheckInStation({
 
     if (isEventExpired || isCodeExpired) {
       triggerInvalidFeedback();
+      playAudioFeedback('error');
       setScanResult({
         status: 'invalid',
         message: `⛔ TICKET EXPIRED: This pass for "${event.title}" has expired (${event.date || 'past event'}). Not valid for gate admission.`
@@ -234,11 +340,13 @@ export default function EventOrganizerCheckInStation({
            a.id.toUpperCase() === trimmed ||
            a.buyerPhone.includes(trimmed) ||
            a.buyerEmail.toLowerCase() === trimmed.toLowerCase() ||
-           trimmed.includes(a.ticketNumber.toUpperCase())
+           trimmed.includes(a.ticketNumber.toUpperCase()) ||
+           a.ticketNumber.toUpperCase().includes(trimmed)
     );
 
     if (matchedIndex === -1) {
       triggerInvalidFeedback();
+      playAudioFeedback('error');
       setScanResult({
         status: 'invalid',
         message: `❌ INVALID PASS: Ticket "${trimmed}" was not found in this event's roster. Please check the QR pass.`
@@ -250,6 +358,7 @@ export default function EventOrganizerCheckInStation({
 
     if (attendee.checkedIn) {
       triggerInvalidFeedback();
+      playAudioFeedback('already');
       setScanResult({
         status: 'already_checked',
         message: `⚠️ ALREADY CHECKED IN: ${attendee.childName || attendee.buyerName} was already admitted at ${attendee.checkedInAt || 'earlier today'}.`,
@@ -269,6 +378,7 @@ export default function EventOrganizerCheckInStation({
     };
 
     saveAttendees(updatedList);
+    playAudioFeedback('success');
 
     setScanResult({
       status: 'success',
@@ -277,8 +387,8 @@ export default function EventOrganizerCheckInStation({
     });
 
     confetti({
-      particleCount: 50,
-      spread: 60,
+      particleCount: 60,
+      spread: 70,
       origin: { y: 0.6 }
     });
 
@@ -289,6 +399,9 @@ export default function EventOrganizerCheckInStation({
     const updated = attendees.map(a => {
       if (a.id === attendeeId) {
         const isNowChecked = !a.checkedIn;
+        if (isNowChecked) {
+          playAudioFeedback('success');
+        }
         return {
           ...a,
           checkedIn: isNowChecked,
@@ -302,32 +415,119 @@ export default function EventOrganizerCheckInStation({
     saveAttendees(updated);
   };
 
+  // Continuous Camera QR Scanner Frame Loop with jsQR
+  const scanVideoFrame = () => {
+    if (!videoRef.current || !streamRef.current) return;
+    const video = videoRef.current;
+
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: 'dontInvert'
+          });
+
+          if (code && code.data && !scanCooldownRef.current) {
+            scanCooldownRef.current = true;
+            setTimeout(() => {
+              scanCooldownRef.current = false;
+            }, 1800);
+
+            handleCheckInByCode(code.data);
+          }
+        }
+      } catch (err) {
+        console.debug('Error reading video frame for QR decoding', err);
+      }
+    }
+
+    animationFrameRef.current = requestAnimationFrame(scanVideoFrame);
+  };
+
   // Camera QR Scanner setup using MediaDevices
-  const startCamera = async () => {
+  const startCamera = async (mode: 'environment' | 'user' = facingMode) => {
     setCameraError('');
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access not supported in this browser. Please use the Upload Image or Manual Search tool.');
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }
+        video: { 
+          facingMode: mode, 
+          width: { ideal: 1280 }, 
+          height: { ideal: 720 } 
+        }
       });
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        videoRef.current.play();
+        videoRef.current.setAttribute('playsinline', 'true');
+        await videoRef.current.play();
+        setCameraActive(true);
+        animationFrameRef.current = requestAnimationFrame(scanVideoFrame);
       }
-      setCameraActive(true);
     } catch (err: any) {
       console.warn('Camera access error:', err);
-      setCameraError('Camera access unavailable. You can use the instant Manual Ticket Search / Scanner below.');
+      setCameraError(err.message || 'Camera access unavailable. You can use the instant Manual Ticket Search or Image Scanner below.');
       setCameraActive(false);
     }
   };
 
   const stopCamera = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => track.stop());
       streamRef.current = null;
     }
     setCameraActive(false);
+  };
+
+  // Scan uploaded image containing QR code
+  const handleImageFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imgData.data, imgData.width, imgData.height);
+          if (code && code.data) {
+            handleCheckInByCode(code.data);
+          } else {
+            setScanResult({
+              status: 'invalid',
+              message: '❌ No QR code detected in the uploaded image. Please ensure the pass QR code is clearly visible.'
+            });
+            triggerInvalidFeedback();
+            playAudioFeedback('error');
+          }
+        }
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+    // Reset file input so user can re-upload same file if needed
+    e.target.value = '';
   };
 
   useEffect(() => {
@@ -437,16 +637,37 @@ export default function EventOrganizerCheckInStation({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Camera-based QR Scanner Button in Header */}
+            <button
+              id="btn-station-header-camera-scanner"
+              type="button"
+              onClick={cameraActive ? stopCamera : () => startCamera()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md cursor-pointer ${
+                cameraActive
+                  ? 'bg-rose-600 hover:bg-rose-700 text-white ring-2 ring-rose-400'
+                  : 'bg-orange-500 hover:bg-orange-600 text-white shadow-orange-500/30'
+              }`}
+              title="Camera-based QR scanner to instantly validate attendee passes"
+            >
+              <Camera className={`w-3.5 h-3.5 ${cameraActive ? 'animate-bounce' : ''}`} />
+              <span>{cameraActive ? 'Stop Scanner' : 'Camera QR Scanner'}</span>
+              {!cameraActive && (
+                <span className="bg-white/20 text-[9px] font-black px-1.5 py-0.2 rounded-md uppercase tracking-wider">
+                  Live
+                </span>
+              )}
+            </button>
+
             <button
               onClick={exportAttendeesCSV}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors cursor-pointer"
             >
               <Download className="w-3.5 h-3.5" />
               <span>Export CSV</span>
             </button>
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors"
+              className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -506,27 +727,58 @@ export default function EventOrganizerCheckInStation({
                   )}
                 </span>
                 <div className="flex items-center gap-1.5">
+                  {/* Sound feedback toggle */}
                   <button
-                    id="btn-camera-flash-station"
                     type="button"
-                    onClick={toggleCameraTorch}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
-                      isTorchOn 
-                        ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 shadow-xs animate-pulse' 
-                        : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    onClick={() => setAudioFeedbackEnabled(!audioFeedbackEnabled)}
+                    className={`p-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      audioFeedbackEnabled ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-400'
                     }`}
-                    title="Toggle camera flash / low-light torch"
+                    title={audioFeedbackEnabled ? 'Audio chime enabled on scan' : 'Audio chime muted'}
                   >
-                    {isTorchOn ? <Flashlight className="w-3.5 h-3.5 fill-slate-950" /> : <FlashlightOff className="w-3.5 h-3.5" />}
-                    <span>{isTorchOn ? 'Flash ON' : 'Flash'}</span>
+                    {audioFeedbackEnabled ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
                   </button>
 
+                  {cameraActive && (
+                    <>
+                      {/* Flip Camera front/back */}
+                      <button
+                        type="button"
+                        onClick={toggleFacingMode}
+                        className="px-2 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer"
+                        title="Switch between front and back camera"
+                      >
+                        <SwitchCamera className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">{facingMode === 'environment' ? 'Back' : 'Front'}</span>
+                      </button>
+
+                      {/* Torch button */}
+                      <button
+                        id="btn-camera-flash-station"
+                        type="button"
+                        onClick={toggleCameraTorch}
+                        className={`px-2 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition cursor-pointer ${
+                          isTorchOn 
+                            ? 'bg-amber-400 text-slate-950 ring-2 ring-amber-300 shadow-xs animate-pulse' 
+                            : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                        }`}
+                        title="Toggle camera flash / low-light torch"
+                      >
+                        {isTorchOn ? <Flashlight className="w-3.5 h-3.5 fill-slate-950" /> : <FlashlightOff className="w-3.5 h-3.5" />}
+                        <span className="hidden sm:inline">{isTorchOn ? 'Torch' : 'Torch'}</span>
+                      </button>
+                    </>
+                  )}
+
+                  {/* Primary Camera QR Scanner Button */}
                   <button
-                    onClick={cameraActive ? stopCamera : startCamera}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                    id="btn-main-camera-scanner-toggle"
+                    type="button"
+                    onClick={cameraActive ? stopCamera : () => startCamera()}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
                       cameraActive 
                         ? 'bg-rose-100 text-rose-700 hover:bg-rose-200' 
-                        : 'bg-orange-600 text-white hover:bg-orange-700'
+                        : 'bg-orange-600 text-white hover:bg-orange-700 shadow-sm'
                     }`}
                   >
                     <Camera className="w-3.5 h-3.5" />
@@ -552,6 +804,10 @@ export default function EventOrganizerCheckInStation({
                     <div className="absolute inset-0 pointer-events-none bg-radial from-amber-100/30 via-amber-200/10 to-transparent ring-4 ring-amber-300/40 animate-pulse"></div>
                   )}
 
+                  {/* Laser scan line animation */}
+                  <div className="absolute inset-x-8 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_12px_rgba(249,115,22,1)] animate-bounce pointer-events-none" style={{ top: '48%' }}></div>
+
+                  {/* Scanning Reticle */}
                   <div className={`absolute inset-0 border-2 rounded-xl m-6 pointer-events-none flex items-center justify-center transition-colors ${
                     isShakeError ? 'border-rose-500 bg-rose-950/30' : 'border-orange-500/80 animate-pulse'
                   }`}>
@@ -562,32 +818,78 @@ export default function EventOrganizerCheckInStation({
                     </span>
                   </div>
 
-                  {/* Torch Pill in top corner */}
-                  <div className="absolute top-2 right-2">
+                  {/* Top bar controls in camera preview */}
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={toggleFacingMode}
+                      className="px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 bg-black/60 text-white hover:bg-black/80 backdrop-blur-md transition cursor-pointer"
+                    >
+                      <SwitchCamera className="w-3 h-3" />
+                      <span>{facingMode === 'environment' ? 'Rear' : 'Front'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={toggleCameraTorch}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 backdrop-blur-md transition ${
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold flex items-center gap-1 backdrop-blur-md transition cursor-pointer ${
                         isTorchOn ? 'bg-amber-400 text-slate-950 ring-1 ring-amber-300' : 'bg-black/60 text-white hover:bg-black/80'
                       }`}
                     >
                       {isTorchOn ? <Flashlight className="w-3 h-3 fill-slate-950" /> : <FlashlightOff className="w-3 h-3" />}
-                      <span>{isTorchOn ? 'Torch Active' : 'Torch Off'}</span>
+                      <span>{isTorchOn ? 'Torch On' : 'Torch Off'}</span>
                     </button>
                   </div>
                 </div>
               ) : cameraError ? (
-                <div className="p-3 bg-amber-50 rounded-xl text-amber-800 text-xs border border-amber-200">
-                  {cameraError}
+                <div className="p-3 bg-amber-50 rounded-xl text-amber-800 text-xs border border-amber-200 space-y-2">
+                  <p>{cameraError}</p>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Upload QR Pass Screenshot</span>
+                  </button>
                 </div>
               ) : (
-                <div className={`p-4 bg-white rounded-xl border border-dashed-2 text-center space-y-1 transition-colors ${
-                  isShakeError ? 'border-rose-400 bg-rose-50/50' : 'border-slate-300'
-                }`}>
-                  <p className="text-xs font-semibold text-slate-700">Camera Scanner Ready</p>
-                  <p className="text-[11px] text-slate-500">
-                    Click "Start Camera" to scan passes or enter ticket ID below.
-                  </p>
+                /* Prominent Camera-based QR Scanner Button View */
+                <div className="space-y-2">
+                  <button
+                    id="btn-launch-camera-scanner-box"
+                    type="button"
+                    onClick={() => startCamera()}
+                    className="w-full py-4 px-4 bg-gradient-to-r from-orange-500 via-amber-500 to-rose-500 hover:from-orange-600 hover:via-amber-600 hover:to-rose-600 text-white rounded-2xl font-bold shadow-md shadow-orange-500/20 flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer group"
+                  >
+                    <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Camera className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-sm font-black block">Camera-based QR Scanner</span>
+                      <span className="text-[11px] text-white/90 font-medium">
+                        Instant live ticket validation for attendees
+                      </span>
+                    </div>
+                  </button>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex-1 py-2 px-3 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Upload Pass QR Photo</span>
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileUpload}
+                      className="hidden"
+                    />
+                  </div>
                 </div>
               )}
 

@@ -24,6 +24,7 @@ import EventCarouselSection from './events/EventCarouselSection.tsx';
 import EventHostQrShareModal from './events/EventHostQrShareModal.tsx';
 import EventQrScannerModal from './events/EventQrScannerModal.tsx';
 import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
+import { downloadTicketPass } from '../data/eventPurchases.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
 import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
@@ -2357,10 +2358,14 @@ ${deepLink}`;
                   return (
                     <div
                       key={pass.id}
-                      className="p-4 bg-slate-50 hover:bg-orange-50/40 border border-slate-200 hover:border-orange-300 rounded-2xl transition-all flex items-center justify-between gap-3 shadow-xs"
+                      className="p-4 bg-slate-50 hover:bg-orange-50/40 border border-slate-200 hover:border-orange-300 rounded-2xl transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs"
                     >
                       <div className="space-y-1 min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                            <span>Upcoming</span>
+                          </span>
                           <span className="text-[10px] font-extrabold bg-orange-100 text-orange-800 px-2 py-0.5 rounded">
                             {pass.ticketTierName || 'General Pass'}
                           </span>
@@ -2377,17 +2382,49 @@ ${deepLink}`;
                         </div>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setActiveTicketEvent(matchingEvt);
-                          setActiveTicketModalBooking(pass);
-                          setShowMyTicketsDrawer(false);
-                        }}
-                        className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 flex-shrink-0 shadow-xs"
-                      >
-                        <QrCode className="w-3.5 h-3.5 text-orange-400" />
-                        <span>View Pass</span>
-                      </button>
+                      <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            downloadTicketPass({
+                              id: pass.id,
+                              eventId: pass.itemId,
+                              eventTitle: pass.itemTitle,
+                              eventDate: pass.dateStr,
+                              eventTime: pass.timeSelected,
+                              eventLocation: pass.eventVenue || 'Venue Location',
+                              ticketTierName: pass.ticketTierName || 'General Pass',
+                              ticketQuantity: pass.ticketQuantity || 1,
+                              ticketPrice: pass.amountPaid,
+                              totalPaid: pass.amountPaid,
+                              purchasedAt: pass.createdAt || new Date().toISOString(),
+                              buyerName: pass.buyerName,
+                              buyerPhone: pass.buyerPhone,
+                              status: 'confirmed',
+                              qrPassCode: pass.ticketNumber,
+                              bookingReference: pass.ticketNumber,
+                              childName: pass.childName
+                            });
+                          }}
+                          className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                          title="Download ticket pass"
+                        >
+                          <Download className="w-3.5 h-3.5 text-slate-600" />
+                          <span className="hidden sm:inline">Download</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveTicketEvent(matchingEvt);
+                            setActiveTicketModalBooking(pass);
+                            setShowMyTicketsDrawer(false);
+                          }}
+                          className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <QrCode className="w-3.5 h-3.5 text-orange-400" />
+                          <span>View Pass</span>
+                        </button>
+                      </div>
                     </div>
                   );
                 })
@@ -2405,7 +2442,7 @@ ${deepLink}`;
                   }}
                   className="px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 font-bold rounded-xl transition-colors border border-orange-200 cursor-pointer"
                 >
-                  Full Order Ledger
+                  Full 'My Tickets' History
                 </button>
                 <button
                   onClick={() => setShowMyTicketsDrawer(false)}
@@ -2424,6 +2461,7 @@ ${deepLink}`;
       {showBuyerRegistrationModal && (
         <EventBuyerRegistrationModal
           actionLabel={buyerRegActionLabel}
+          eventTitle={pendingBookingEvent?.title}
           onClose={() => {
             setShowBuyerRegistrationModal(false);
             setPendingBookingEvent(null);

@@ -2718,6 +2718,7 @@ export default function App() {
     ensureAadhaarVerified(
       "Aadhaar verification is mandatory to send direct messages and connect with other parents.",
       () => {
+        setConnectedIds(prev => prev.includes(profile.id) ? prev : [...prev, profile.id]);
         setSelectedPlaymate(profile);
         if (templateMessage) {
           setChatPreFilledMessage(templateMessage);
@@ -3372,24 +3373,6 @@ export default function App() {
               </span>
             </button>
 
-            {/* Contacts Sync Active Status Button */}
-            <button
-              id="btn-mob-contacts-privacy"
-              type="button"
-              onClick={() => setShowContactsPrivacyModal(true)}
-              className="flex items-center gap-1.5 bg-white/95 border border-rose-200 hover:border-rose-300 rounded-xl px-2.5 py-1.5 shadow-2xs transition active:scale-95 text-rose-900 font-bold text-[10px] cursor-pointer shrink-0"
-              title="Contacts sync is active — tap to manage contacts privacy & ghost mode"
-            >
-              <Smartphone className="w-3.5 h-3.5 text-rose-700 shrink-0" />
-              {userProfile?.contactsPrivacy?.autoHideFromAllContacts ? (
-                <span className="text-[8px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-black">Ghost Mode</span>
-              ) : (
-                <span className="flex items-center gap-1.5 text-[10px] text-emerald-800 font-bold bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-lg">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                  <span>Contacts sync is active</span>
-                </span>
-              )}
-            </button>
 
             {/* User Parent Name & Aadhaar Badge */}
             <div className="flex items-center gap-1 min-w-0 flex-1 justify-center overflow-hidden">
@@ -4223,153 +4206,7 @@ export default function App() {
       <footer id="global-page-footer" className="bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-12 pb-28 sm:pb-32 mt-auto text-slate-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           
-          {/* Dedicated Host & Provider Registration Portals Card */}
-          <div className="bg-white border border-rose-100 rounded-3xl p-6 sm:p-7 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-5">
-              <div className="space-y-1.5 text-left">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] uppercase font-black tracking-wider text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-200/60">
-                    Partner With Vernunt
-                  </span>
-                  <span className="text-[11px] font-bold bg-amber-50 text-amber-900 px-3 py-0.5 rounded-full border border-amber-200/80 flex items-center gap-1.5">
-                    <span>🎁</span> 6 – 12 Months Free Introductory Offer
-                  </span>
-                </div>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 font-serif">
-                  Join India's Verified Childcare, Daycare &amp; Activity Network
-                </h3>
-                <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
-                  Register your playhome, daycare center, pediatric clinic, or children's activity workshops for trusted visibility among verified local families.
-                </p>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600 shrink-0">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl border border-emerald-200/70 font-bold text-[11px]">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>Aadhaar Verified</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 rounded-xl border border-amber-200/70 font-bold text-[11px]">
-                  <Zap className="w-3.5 h-3.5 text-amber-600" />
-                  <span>0% Commission Trial</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Provider Portal Action Buttons Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-5">
-              <button
-                id="footer-btn-host-sitter-playhome"
-                type="button"
-                onClick={() => {
-                  if (userProfile && appMode === 'dashboard') {
-                    setActiveTab('daycare');
-                    setTimeout(() => {
-                      const regBtn = document.getElementById('btn-open-sitter-provider-modal');
-                      if (regBtn) regBtn.click();
-                    }, 100);
-                  } else {
-                    handleStartSignUp('Parent', { isParentHostingDaycare: true });
-                  }
-                }}
-                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-rose-50/70 border border-slate-200/80 hover:border-rose-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                  🏠
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-rose-700 transition-colors">
-                    Host Sitter / Playhome
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Turn your home into a trusted neighborhood care hub
-                  </p>
-                </div>
-              </button>
-
-              <button
-                id="footer-btn-register-daycare-center"
-                type="button"
-                onClick={() => {
-                  if (userProfile && appMode === 'dashboard') {
-                    setActiveTab('daycare');
-                  } else {
-                    handleStartSignUp('Daycare Center');
-                  }
-                }}
-                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-teal-50/70 border border-slate-200/80 hover:border-teal-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                  🏫
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-teal-700 transition-colors">
-                    Daycare / Creche Center
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    List facility slots, CCTV access &amp; hourly bookings
-                  </p>
-                </div>
-              </button>
-
-              <button
-                id="footer-btn-host-class"
-                type="button"
-                onClick={() => {
-                  if (userProfile && appMode === 'dashboard') {
-                    setActiveTab('events');
-                    setTimeout(() => {
-                      const hostBtn = document.getElementById('btn-trigger-propose-event');
-                      if (hostBtn) hostBtn.click();
-                    }, 100);
-                  } else {
-                    handleStartSignUp('Event Organizer');
-                  }
-                }}
-                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-orange-50/70 border border-slate-200/80 hover:border-orange-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                  🎉
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-orange-700 transition-colors">
-                    Host Activity or Event
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Workshops, weekend camps &amp; sports sessions
-                  </p>
-                </div>
-              </button>
-
-              <button
-                id="footer-btn-register-spec"
-                type="button"
-                onClick={() => {
-                  if (userProfile && appMode === 'dashboard') {
-                    setActiveTab('specialists');
-                    setTimeout(() => {
-                      const regBtn = document.getElementById('btn-trigger-register-specialist');
-                      if (regBtn) regBtn.click();
-                    }, 100);
-                  } else {
-                    handleStartSignUp('Portfolio Professional');
-                  }
-                }}
-                className="group flex items-start gap-3 p-3.5 bg-slate-50/80 hover:bg-purple-50/70 border border-slate-200/80 hover:border-purple-300 rounded-2xl transition-all duration-200 text-left cursor-pointer shadow-2xs hover:shadow-xs"
-              >
-                <div className="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center text-xl shrink-0 group-hover:scale-105 transition-transform">
-                  💼
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="text-xs font-bold text-slate-900 group-hover:text-purple-700 transition-colors">
-                    Kids Specialists
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-snug mt-0.5">
-                    Child doctors, therapists, nutritionists, coaches &amp; clinics
-                  </p>
-                </div>
-              </button>
-            </div>
-          </div>
 
           {/* Structured 4-Column Navigation & Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 text-left pt-2">

@@ -23,6 +23,9 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
+  ClipboardList,
+  UserPlus,
   Star,
   Heart,
   Building2,
@@ -46,7 +49,8 @@ import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db } from '../utils/firebase.ts';
 import VernuntLogo from './VernuntLogo.tsx';
 import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts';
-import RoleSelectionModal, { UserPlatformRole } from './RoleSelectionModal.tsx';
+import RoleSelectionModal from './RoleSelectionModal.tsx';
+import { UserPlatformRole, USER_ROLES_CONFIG } from '../data/userRoles.ts';
 
 interface LandingLoginGatewayProps {
   onStartSignUp: (
@@ -148,6 +152,7 @@ export default function LandingLoginGateway({
   // Merged Login & Registration Step State: 'initial' | 'registered' | 'unregistered'
   const [authFlowStep, setAuthFlowStep] = useState<'initial' | 'registered' | 'unregistered'>('initial');
   const [registeredContact, setRegisteredContact] = useState<string>('');
+  const [selectedSignupUserType, setSelectedSignupUserType] = useState<UserPlatformRole>('Parent');
 
   // Ultra-Fast Database Pre-Search and In-Memory Cache
   const [contactSearchStatus, setContactSearchStatus] = useState<'idle' | 'searching' | 'registered' | 'unregistered'>('idle');
@@ -1608,101 +1613,34 @@ export default function LandingLoginGateway({
                     )}
                   </button>
 
-                  {/* Direct Role Registration Shortcuts */}
-                  <div className="pt-2 border-t border-slate-100 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-bold text-slate-600">
-                        ✨ Or directly choose your registration role:
-                      </span>
-                      <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        1-Year Free
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {/* Single Clean Option for Sign Up */}
+                  <div className="pt-3 border-t border-slate-150/80">
+                    <div className="p-3.5 bg-gradient-to-r from-orange-50 via-amber-50/70 to-rose-50 border border-orange-200/80 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
+                      <div className="text-left min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm">✨</span>
+                          <span className="text-xs font-black text-slate-900">New to Vernunt?</span>
+                          <span className="text-[9.5px] font-black uppercase tracking-wider bg-orange-600 text-white px-2 py-0.5 rounded-full">
+                            Free Sign Up
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Sign up with a single tap. Choose your user type and view all required fields.
+                        </p>
+                      </div>
                       <button
                         type="button"
-                        id="btn-shortcut-parent"
+                        id="btn-single-signup"
                         onClick={() => {
-                          const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                          onStartSignUp('Parent', { phone: formatted, email: email.includes('@') ? email : undefined });
+                          setAuthFlowStep('unregistered');
+                          setRegisteredContact(phoneNumber ? `+91 ${phoneNumber}` : (email || 'New User'));
+                          setErrorMsg('');
                         }}
-                        className="p-2.5 bg-gradient-to-br from-rose-50 to-orange-50 hover:from-rose-100 hover:to-orange-100 border border-rose-200/90 rounded-xl text-left transition cursor-pointer active:scale-97 group shadow-2xs"
+                        className="w-full sm:w-auto px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-extrabold text-xs rounded-xl shadow-xs transition active:scale-95 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg group-hover:scale-110 transition">👪</span>
-                          <span className="text-[8px] font-black uppercase bg-rose-600 text-white px-1.5 py-0.5 rounded-full">Free</span>
-                        </div>
-                        <h4 className="text-[11px] font-extrabold text-slate-800 group-hover:text-rose-900 mt-1 leading-tight">Parent &amp; Kid</h4>
-                        <p className="text-[9px] text-slate-500 leading-tight">Playmates &amp; sitters</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="btn-shortcut-daycare"
-                        onClick={() => {
-                          const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                          onStartSignUp('Daycare Center', { phone: formatted, email: email.includes('@') ? email : undefined });
-                        }}
-                        className="p-2.5 bg-gradient-to-br from-teal-50 to-emerald-50 hover:from-teal-100 hover:to-emerald-100 border border-teal-200/90 rounded-xl text-left transition cursor-pointer active:scale-97 group shadow-2xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg group-hover:scale-110 transition">🏫</span>
-                          <span className="text-[8px] font-black uppercase bg-teal-600 text-white px-1.5 py-0.5 rounded-full">Free</span>
-                        </div>
-                        <h4 className="text-[11px] font-extrabold text-slate-800 group-hover:text-teal-900 mt-1 leading-tight">Daycare / Creche</h4>
-                        <p className="text-[9px] text-slate-500 leading-tight">Infant &amp; playhome</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="btn-shortcut-events"
-                        onClick={() => {
-                          const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                          onStartSignUp('Event Organizer', { phone: formatted, email: email.includes('@') ? email : undefined });
-                        }}
-                        className="p-2.5 bg-gradient-to-br from-amber-50 to-orange-50 hover:from-amber-100 hover:to-orange-100 border border-amber-200/90 rounded-xl text-left transition cursor-pointer active:scale-97 group shadow-2xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg group-hover:scale-110 transition">🎪</span>
-                          <span className="text-[8px] font-black uppercase bg-amber-600 text-white px-1.5 py-0.5 rounded-full">Free</span>
-                        </div>
-                        <h4 className="text-[11px] font-extrabold text-slate-800 group-hover:text-amber-900 mt-1 leading-tight">Events &amp; Classes</h4>
-                        <p className="text-[9px] text-slate-500 leading-tight">Workshops &amp; camps</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="btn-shortcut-specialist"
-                        onClick={() => {
-                          const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                          onStartSignUp('Portfolio Professional', { phone: formatted, email: email.includes('@') ? email : undefined });
-                        }}
-                        className="p-2.5 bg-gradient-to-br from-purple-50 to-indigo-50 hover:from-purple-100 hover:to-indigo-100 border border-purple-200/90 rounded-xl text-left transition cursor-pointer active:scale-97 group shadow-2xs"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg group-hover:scale-110 transition">🩺</span>
-                          <span className="text-[8px] font-black uppercase bg-purple-600 text-white px-1.5 py-0.5 rounded-full">Free</span>
-                        </div>
-                        <h4 className="text-[11px] font-extrabold text-slate-800 group-hover:text-purple-900 mt-1 leading-tight">Specialist Doctor</h4>
-                        <p className="text-[9px] text-slate-500 leading-tight">Pediatric &amp; therapy</p>
-                      </button>
-
-                      <button
-                        type="button"
-                        id="btn-shortcut-creator"
-                        onClick={() => {
-                          const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                          onStartSignUp('Influencer', { phone: formatted, email: email.includes('@') ? email : undefined });
-                        }}
-                        className="p-2.5 bg-gradient-to-br from-pink-50 to-rose-50 hover:from-pink-100 hover:to-rose-100 border border-pink-200/90 rounded-xl text-left transition cursor-pointer active:scale-97 group shadow-2xs col-span-2 sm:col-span-2"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-lg group-hover:scale-110 transition">⭐</span>
-                          <span className="text-[8px] font-black uppercase bg-pink-600 text-white px-1.5 py-0.5 rounded-full">VIP Pass</span>
-                        </div>
-                        <h4 className="text-[11px] font-extrabold text-slate-800 group-hover:text-pink-900 mt-1 leading-tight">Community Creator &amp; Ambassador</h4>
-                        <p className="text-[9px] text-slate-500 leading-tight">Parenting creators &amp; lifestyle bloggers (1,000 Free Tickets)</p>
+                        <UserPlus className="w-3.5 h-3.5" />
+                        <span>Sign Up</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
@@ -1929,158 +1867,96 @@ export default function LandingLoginGateway({
                     </button>
                   </div>
 
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider">
-                      Select Your Profile Category to Register:
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Registration takes less than 30 seconds. No credit card required.
-                    </p>
-                  </div>
+                  {/* ONE Option for Sign Up with Dropdown & Dynamically Required Fields */}
+                  <div className="bg-white border-2 border-orange-200/90 rounded-2xl p-4 sm:p-5 shadow-xs space-y-4" id="single-signup-card">
+                    <div className="flex items-center justify-between border-b border-slate-150 pb-3 flex-wrap gap-2">
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-orange-700 bg-orange-100/80 px-2 py-0.5 rounded-md border border-orange-200">
+                          Single Sign Up Gateway
+                        </span>
+                        <h3 className="text-sm sm:text-base font-black text-slate-900 mt-1">
+                          Select User Type to Sign Up
+                        </h3>
+                      </div>
+                      <span className="text-xs px-2.5 py-1 rounded-full font-black bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-2xs">
+                        {USER_ROLES_CONFIG[selectedSignupUserType].badge}
+                      </span>
+                    </div>
 
-                  {/* 5 Distinctive, High-Conversion Registration Cards */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" id="unified-registration-roles">
-                    
-                    {/* 1. Parent & Kid */}
+                    {/* Drop Down for User Type Selection */}
+                    <div className="space-y-1.5">
+                      <label htmlFor="user-type-dropdown" className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center justify-between">
+                        <span>Select User Type:</span>
+                        <span className="text-[10.5px] font-normal text-slate-500">Pick account role below</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="user-type-dropdown"
+                          value={selectedSignupUserType}
+                          onChange={(e) => setSelectedSignupUserType(e.target.value as UserPlatformRole)}
+                          className="w-full appearance-none px-3.5 py-3 bg-slate-50 hover:bg-slate-100/90 focus:bg-white border-2 border-orange-200 focus:border-orange-500 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none shadow-2xs transition cursor-pointer pr-10"
+                        >
+                          <option value="Parent">👪 Parent &amp; Kid Profile (Family Playmates, Sitters, Daycare)</option>
+                          <option value="Daycare Center">🏫 Daycare Center / Creche (Pre-schools &amp; Care Facilities)</option>
+                          <option value="Event Organizer">🎪 Events, Activity &amp; Classes Host (Workshops &amp; Camps)</option>
+                          <option value="Portfolio Professional">🩺 Kids Specialist, Doctor &amp; Pediatrician</option>
+                          <option value="Influencer">⭐ Community Creator &amp; Influencer Ambassador (VIP Pass)</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">
+                          <ChevronDown className="w-4 h-4" />
+                        </div>
+                      </div>
+                      <p className="text-[11.5px] text-slate-600 mt-1 leading-relaxed">
+                        {USER_ROLES_CONFIG[selectedSignupUserType].description}
+                      </p>
+                    </div>
+
+                    {/* Dynamically Required Registered Fields based on Dropdown Selection */}
+                    <div className="bg-slate-50/90 border border-slate-200 rounded-xl p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <ClipboardList className="w-3.5 h-3.5 text-orange-600" />
+                          <span>Required Registered Fields for {USER_ROLES_CONFIG[selectedSignupUserType].label}:</span>
+                        </h4>
+                        <span className="text-[10px] font-bold text-slate-500">
+                          {USER_ROLES_CONFIG[selectedSignupUserType].requiredFields.length} Required
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {USER_ROLES_CONFIG[selectedSignupUserType].requiredFields.map((field, idx) => (
+                          <div key={idx} className="flex items-start gap-2 p-2 bg-white rounded-lg border border-slate-200/80 shadow-2xs text-left">
+                            <span className="text-sm shrink-0 mt-0.5">{field.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-slate-900 leading-tight">
+                                {field.name}
+                              </p>
+                              <p className="text-[10px] text-slate-500 leading-tight mt-0.5 truncate">
+                                {field.desc}
+                              </p>
+                            </div>
+                            <span className="text-[8.5px] font-black text-orange-700 bg-orange-50 border border-orange-200/60 px-1.5 py-0.5 rounded shrink-0">
+                              Required
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Single Continue Sign Up Button */}
                     <button
                       type="button"
-                      id="btn-reg-role-parent"
+                      id="btn-proceed-signup"
                       onClick={() => {
                         const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                        onStartSignUp('Parent', { phone: formatted, email: email.includes('@') ? email : undefined });
+                        onStartSignUp(selectedSignupUserType, { phone: formatted, email: email.includes('@') ? email : undefined });
                       }}
-                      className="p-4 bg-gradient-to-br from-rose-50 via-orange-50/80 to-amber-50/60 hover:from-rose-100 hover:to-orange-100 border-2 border-rose-200/90 rounded-2xl text-left transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-md active:scale-98 group flex flex-col justify-between"
+                      className="w-full py-3.5 px-4 bg-gradient-to-r from-orange-500 via-rose-500 to-amber-500 hover:from-orange-600 hover:to-rose-600 text-white font-black text-xs sm:text-sm rounded-xl shadow-md hover:shadow-lg transition cursor-pointer active:scale-98 flex items-center justify-center gap-2"
                     >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl group-hover:scale-110 transition">👪</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-rose-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                            🎁 1-Year Free
-                          </span>
-                        </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-rose-950 mt-2">Parent &amp; Kid Profile</h4>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Find neighborhood playmates, join Moms/Dads circles, book local sitters &amp; schedule safe playdates.
-                        </p>
-                      </div>
-                      <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-rose-700">
-                        <span>Register Parent Profile</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-                      </div>
+                      <UserPlus className="w-4 h-4" />
+                      <span>Continue Sign Up as {USER_ROLES_CONFIG[selectedSignupUserType].label}</span>
+                      <ArrowRight className="w-4 h-4" />
                     </button>
-
-                    {/* 2. Daycare & Creche */}
-                    <button
-                      type="button"
-                      id="btn-reg-role-daycare"
-                      onClick={() => {
-                        const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                        onStartSignUp('Daycare Center', { phone: formatted, email: email.includes('@') ? email : undefined });
-                      }}
-                      className="p-4 bg-gradient-to-br from-teal-50 via-emerald-50/80 to-cyan-50/60 hover:from-teal-100 hover:to-emerald-100 border-2 border-teal-200/90 rounded-2xl text-left transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-md active:scale-98 group flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl group-hover:scale-110 transition">🏫</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-teal-700 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                            🎁 6 Mos Free
-                          </span>
-                        </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-teal-950 mt-2">Daycare Center &amp; Creche</h4>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Montessori early learning centers, infant creches, after-school care &amp; certified home playhomes.
-                        </p>
-                      </div>
-                      <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-teal-700">
-                        <span>Register Daycare Center</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-                      </div>
-                    </button>
-
-                    {/* 3. Events, Activity & Classes */}
-                    <button
-                      type="button"
-                      id="btn-reg-role-events"
-                      onClick={() => {
-                        const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                        onStartSignUp('Event Organizer', { phone: formatted, email: email.includes('@') ? email : undefined });
-                      }}
-                      className="p-4 bg-gradient-to-br from-amber-50 via-orange-50/80 to-yellow-50/60 hover:from-amber-100 hover:to-orange-100 border-2 border-amber-200/90 rounded-2xl text-left transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-md active:scale-98 group flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl group-hover:scale-110 transition">🎪</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-amber-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                            🎁 6 Mos Free
-                          </span>
-                        </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-amber-950 mt-2">Events &amp; Activity Classes</h4>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Kids workshops, weekend activity camps, sports clinics, pottery, robotics &amp; arts classes.
-                        </p>
-                      </div>
-                      <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-amber-700">
-                        <span>Register Event Host</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-                      </div>
-                    </button>
-
-                    {/* 4. Specialist Pro */}
-                    <button
-                      type="button"
-                      id="btn-reg-role-specialist"
-                      onClick={() => {
-                        const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                        onStartSignUp('Portfolio Professional', { phone: formatted, email: email.includes('@') ? email : undefined });
-                      }}
-                      className="p-4 bg-gradient-to-br from-purple-50 via-indigo-50/80 to-violet-50/60 hover:from-purple-100 hover:to-indigo-100 border-2 border-purple-200/90 rounded-2xl text-left transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-md active:scale-98 group flex flex-col justify-between"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl group-hover:scale-110 transition">🩺</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-purple-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                            🎁 6 Mos Free
-                          </span>
-                        </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-purple-950 mt-2">Kids Specialist &amp; Doctor</h4>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Child doctors, developmental therapists, nutritionists, speech coaches &amp; sports mentors.
-                        </p>
-                      </div>
-                      <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-purple-700">
-                        <span>Register Specialist Profile</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-                      </div>
-                    </button>
-
-                    {/* 5. Creator Ambassador (Full Width) */}
-                    <button
-                      type="button"
-                      id="btn-reg-role-creator"
-                      onClick={() => {
-                        const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
-                        onStartSignUp('Influencer', { phone: formatted, email: email.includes('@') ? email : undefined });
-                      }}
-                      className="p-4 bg-gradient-to-br from-pink-50 via-rose-50/80 to-fuchsia-50/60 hover:from-pink-100 hover:to-rose-100 border-2 border-pink-200/90 rounded-2xl text-left transition-all duration-200 cursor-pointer shadow-2xs hover:shadow-md active:scale-98 group flex flex-col justify-between sm:col-span-2"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-2xl group-hover:scale-110 transition">⭐</span>
-                          <span className="text-[9px] font-black uppercase tracking-wider bg-pink-600 text-white px-2 py-0.5 rounded-full shadow-2xs">
-                            🎟️ 1,000 Free Tickets VIP Pass
-                          </span>
-                        </div>
-                        <h4 className="font-black text-sm text-slate-900 group-hover:text-pink-950 mt-2">Community Creator &amp; Influencer Ambassador</h4>
-                        <p className="text-[11px] text-slate-600 leading-tight mt-1">
-                          Parenting creators, family vloggers &amp; ambassadors with priority radar placement, zero platform commissions &amp; VIP spotlight.
-                        </p>
-                      </div>
-                      <div className="pt-3 flex items-center justify-between text-xs font-extrabold text-pink-700">
-                        <span>Register Creator / Ambassador</span>
-                        <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-                      </div>
-                    </button>
-
                   </div>
 
                   {/* Switch back to Login if they actually have an account */}

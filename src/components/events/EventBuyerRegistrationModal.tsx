@@ -1,22 +1,36 @@
-import React, { useState } from 'react';
-import { X, Ticket, Smartphone, User, CheckCircle2, ShieldCheck, ArrowRight, Lock, Mail, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { 
+  X, Ticket, Smartphone, User, CheckCircle2, ShieldCheck, 
+  ArrowRight, Lock, Mail, RefreshCw, Calendar, Clock, 
+  Sparkles, Radio, Check, Info
+} from 'lucide-react';
 import { ChildProfile, VerificationStatus, LocationSharing } from '../../types.ts';
 
+export type RegistrationStatus = 'Upcoming' | 'Checking In' | 'Completed';
+
 interface EventBuyerRegistrationModalProps {
-  isOpen: boolean;
+  isOpen?: boolean;
   onClose: () => void;
   onSuccess: (profile: ChildProfile) => void;
   onSwitchToLogin?: () => void;
   intendedActionLabel?: string; // e.g. "Book Tickets for Cubbon Park Art & Nature Sketching"
+  actionLabel?: string; // Alias
+  initialStatus?: RegistrationStatus;
+  eventTitle?: string;
 }
 
 export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalProps> = ({
-  isOpen,
+  isOpen = true,
   onClose,
   onSuccess,
   onSwitchToLogin,
-  intendedActionLabel = 'Book event tickets and access instant check-in passes'
+  intendedActionLabel,
+  actionLabel,
+  initialStatus,
+  eventTitle
 }) => {
+  const displayActionLabel = actionLabel || intendedActionLabel || 'Book event tickets and access instant check-in passes';
+
   const [fullName, setFullName] = useState('');
   
   // Mobile OTP state
@@ -37,8 +51,37 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
 
   const [generalError, setGeneralError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCompletedSuccess, setIsCompletedSuccess] = useState(false);
 
-  if (!isOpen) return null;
+  // Real-time tracking status: 'Upcoming' | 'Checking In' | 'Completed'
+  const [manualStatusOverride, setManualStatusOverride] = useState<RegistrationStatus | null>(initialStatus || null);
+
+  // Derive real-time registration status dynamically based on current user interaction
+  const derivedRealtimeStatus: RegistrationStatus = (() => {
+    if (manualStatusOverride) return manualStatusOverride;
+    if (isCompletedSuccess || (phoneVerified && emailVerified && fullName.trim().length > 0)) {
+      return 'Completed';
+    }
+    if (
+      isSendingPhoneOtp || 
+      phoneOtpSent || 
+      phoneVerified || 
+      isSendingEmailOtp || 
+      emailOtpSent || 
+      emailVerified || 
+      phoneOtpCode.length > 0 || 
+      emailOtpCode.length > 0 ||
+      mobileNumber.trim().length >= 10 ||
+      emailAddress.includes('@')
+    ) {
+      return 'Checking In';
+    }
+    return 'Upcoming';
+  })();
+
+  const currentStatus = derivedRealtimeStatus;
+
+  if (isOpen === false) return null;
 
   // Send Mobile OTP
   const handleSendPhoneOtp = () => {
@@ -49,6 +92,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     }
     setPhoneOtpError('');
     setIsSendingPhoneOtp(true);
+    setManualStatusOverride(null);
     setTimeout(() => {
       setIsSendingPhoneOtp(false);
       setPhoneOtpSent(true);
@@ -73,17 +117,17 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     }
     setEmailOtpError('');
     setIsSendingEmailOtp(true);
+    setManualStatusOverride(null);
     try {
       const resp = await fetch('/api/auth/send-email-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: emailAddress.trim() })
       });
-      const data = await resp.json().catch(() => ({ success: true }));
+      await resp.json().catch(() => ({ success: true }));
       setIsSendingEmailOtp(false);
       setEmailOtpSent(true);
     } catch (e) {
-      // Offline / fallback support
       setIsSendingEmailOtp(false);
       setEmailOtpSent(true);
     }
@@ -116,7 +160,8 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
 
   // Quick 1-Click test verify for both
   const handleQuickVerifyAll = () => {
-    if (!mobileNumber.trim()) setMobileNumber('9876543210');
+    if (!fullName.trim()) setFullName('Vikram Mehta');
+    if (!mobileNumber.trim()) setMobileNumber('9845012345');
     if (!emailAddress.trim()) setEmailAddress('guest.attendee@vernunt.com');
     setPhoneVerified(true);
     setPhoneOtpSent(true);
@@ -127,6 +172,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     setPhoneOtpError('');
     setEmailOtpError('');
     setGeneralError('');
+    setManualStatusOverride(null);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -145,7 +191,6 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     }
 
     if (!phoneVerified) {
-      // Auto-verify if user entered phone to avoid blocking
       setPhoneVerified(true);
     }
 
@@ -159,12 +204,14 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     }
 
     setIsSubmitting(true);
+    setIsCompletedSuccess(true);
+    setManualStatusOverride('Completed');
 
     const buyerId = `buyer-${Date.now()}`;
     const buyerProfile: ChildProfile = {
       id: buyerId,
       parentName: fullName.trim(),
-      childName: fullName.trim(), // Attendee name
+      childName: fullName.trim(),
       childAge: 0,
       childGender: 'Other',
       gradeLevel: 'Event Attendee',
@@ -190,12 +237,78 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
     setTimeout(() => {
       setIsSubmitting(false);
       onSuccess(buyerProfile);
-    }, 400);
+    }, 600);
+  };
+
+  // Render a single Color-Coded Status Badge
+  const renderStatusBadge = (status: RegistrationStatus, interactive = false) => {
+    const isActive = currentStatus === status;
+
+    if (status === 'Upcoming') {
+      return (
+        <button
+          key="status-upcoming"
+          type="button"
+          onClick={() => interactive && setManualStatusOverride('Upcoming')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all ${
+            isActive
+              ? 'bg-amber-100 text-amber-900 border-2 border-amber-400 shadow-sm ring-2 ring-amber-300/40'
+              : 'bg-amber-50/80 text-amber-700/70 border border-amber-200/60 hover:bg-amber-100/60'
+          }`}
+          title="Upcoming Registration: Booking details pending verification"
+        >
+          <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-500 animate-pulse' : 'bg-amber-400'}`}></span>
+          <Calendar className="w-3 h-3 text-amber-700" />
+          <span>Upcoming</span>
+        </button>
+      );
+    }
+
+    if (status === 'Checking In') {
+      return (
+        <button
+          key="status-checking-in"
+          type="button"
+          onClick={() => interactive && setManualStatusOverride('Checking In')}
+          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all ${
+            isActive
+              ? 'bg-purple-100 text-purple-900 border-2 border-purple-400 shadow-sm ring-2 ring-purple-300/40 animate-pulse'
+              : 'bg-purple-50/80 text-purple-700/70 border border-purple-200/60 hover:bg-purple-100/60'
+          }`}
+          title="Checking In: Real-time OTP authentication in progress"
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-600"></span>
+          </span>
+          <Radio className="w-3 h-3 text-purple-700" />
+          <span>Checking In</span>
+        </button>
+      );
+    }
+
+    // Completed
+    return (
+      <button
+        key="status-completed"
+        type="button"
+        onClick={() => interactive && setManualStatusOverride('Completed')}
+        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black transition-all ${
+          isActive
+            ? 'bg-emerald-100 text-emerald-900 border-2 border-emerald-400 shadow-sm ring-2 ring-emerald-300/40'
+            : 'bg-emerald-50/80 text-emerald-700/70 border border-emerald-200/60 hover:bg-emerald-100/60'
+        }`}
+        title="Completed: Verified passes ready for instant check-in"
+      >
+        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+        <span>Completed</span>
+      </button>
+    );
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
-      <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-150 relative my-auto">
+      <div className="bg-white rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl border border-slate-150 relative my-auto">
         
         {/* Header with Event theme */}
         <div className="bg-gradient-to-r from-rose-600 via-pink-600 to-amber-500 p-5 sm:p-6 text-white relative">
@@ -208,9 +321,21 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
             <X className="w-4 h-4" />
           </button>
           
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             <span className="px-2.5 py-0.5 bg-white/20 text-white font-bold text-[10px] tracking-wider uppercase rounded-full flex items-center gap-1">
               <Ticket className="w-3 h-3" /> Event Pass & Ticket Registration
+            </span>
+
+            {/* Top Active Color-Coded Status Badge Indicator */}
+            <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 border ${
+              currentStatus === 'Completed'
+                ? 'bg-emerald-500/90 text-white border-white/40'
+                : currentStatus === 'Checking In'
+                ? 'bg-purple-600/90 text-white border-white/40 animate-pulse'
+                : 'bg-amber-400/90 text-slate-900 border-white/40'
+            }`}>
+              <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
+              Live: {currentStatus}
             </span>
           </div>
           
@@ -218,16 +343,58 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
             Register for Event & Classes
           </h2>
           
-          <p className="text-xs text-rose-50/90 mt-1">
-            {intendedActionLabel}
+          <p className="text-xs text-rose-50/90 mt-1 line-clamp-2">
+            {eventTitle ? `For: ${eventTitle} • ` : ''}{displayActionLabel}
           </p>
+        </div>
+
+        {/* Real-time Registration Status Tracker Bar */}
+        <div className="bg-slate-50 border-b border-slate-200 p-3.5 sm:px-6">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+              Registration Status Tracker
+            </span>
+            <span className="text-[10px] text-slate-400 font-semibold">Real-Time Sync</span>
+          </div>
+
+          {/* Stepper with the 3 Color-Coded Status Badges */}
+          <div className="grid grid-cols-3 gap-2">
+            {renderStatusBadge('Upcoming', true)}
+            {renderStatusBadge('Checking In', true)}
+            {renderStatusBadge('Completed', true)}
+          </div>
+
+          {/* Dynamic real-time stage description message */}
+          <div className={`mt-2.5 px-3 py-1.5 rounded-xl text-[11px] flex items-center gap-2 border font-medium transition-all ${
+            currentStatus === 'Completed'
+              ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+              : currentStatus === 'Checking In'
+              ? 'bg-purple-50 text-purple-900 border-purple-200'
+              : 'bg-amber-50 text-amber-900 border-amber-200'
+          }`}>
+            <Info className={`w-3.5 h-3.5 shrink-0 ${
+              currentStatus === 'Completed' ? 'text-emerald-600' : currentStatus === 'Checking In' ? 'text-purple-600' : 'text-amber-600'
+            }`} />
+            <div className="leading-snug">
+              {currentStatus === 'Upcoming' && (
+                <span><strong>Upcoming Stage:</strong> Fill in attendee details below to initiate digital pass reservation.</span>
+              )}
+              {currentStatus === 'Checking In' && (
+                <span><strong>Checking In Stage:</strong> Real-time OTP authentication active. Enter mobile/email codes to lock in passes.</span>
+              )}
+              {currentStatus === 'Completed' && (
+                <span><strong>Completed Stage:</strong> Contact verified! Instant e-pass and QR code will be generated upon submission.</span>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Body Form */}
         <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4">
           
           {/* Trust Banner */}
-          <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2.5">
+          <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2.5">
             <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
             <div className="text-[11px] text-amber-900 leading-snug">
               <span className="font-bold">Fast Mobile & Email OTP verification.</span> Digital QR passes, booking receipts, and virtual room credentials are automatically sent to your verified mobile and email.
@@ -249,7 +416,10 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
               type="text"
               required
               value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              onChange={(e) => {
+                setFullName(e.target.value);
+                setManualStatusOverride(null);
+              }}
               placeholder="e.g. Vikram Mehta"
               className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-200 focus:bg-white outline-none transition font-medium text-slate-900"
             />
@@ -285,6 +455,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
                 onChange={(e) => {
                   setMobileNumber(e.target.value.replace(/\D/g, '').slice(0, 10));
                   if (phoneVerified) setPhoneVerified(false);
+                  setManualStatusOverride(null);
                 }}
                 placeholder="10-digit mobile"
                 className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-200 outline-none font-mono"
@@ -358,6 +529,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
                 onChange={(e) => {
                   setEmailAddress(e.target.value);
                   if (emailVerified) setEmailVerified(false);
+                  setManualStatusOverride(null);
                 }}
                 placeholder="attendee@example.com"
                 className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-200 outline-none"
@@ -436,10 +608,17 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
           <button
             type="submit"
             disabled={isSubmitting || !fullName.trim() || mobileNumber.length < 10 || !emailAddress.includes('@')}
-            className="w-full py-3 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer mt-2"
+            className={`w-full py-3 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer mt-2 ${
+              currentStatus === 'Completed'
+                ? 'bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700'
+                : 'bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 disabled:opacity-50'
+            }`}
           >
             {isSubmitting ? (
-              <span>Completing Registration...</span>
+              <span className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Issuing Pass & Completing Registration...</span>
+              </span>
             ) : (
               <>
                 <span>Complete Registration & Continue</span>
@@ -468,3 +647,4 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
 };
 
 export default EventBuyerRegistrationModal;
+

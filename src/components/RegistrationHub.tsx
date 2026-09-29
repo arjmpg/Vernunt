@@ -45,6 +45,7 @@ import {
   CHILD_INTERESTS_OPTIONS, 
   CHILD_PRIVACY_OPTIONS 
 } from '../data/indianDemographics.ts';
+import { USER_ROLES_CONFIG } from '../data/userRoles.ts';
 
 interface RegistrationHubProps {
   onCompleteSignup: (profile: ChildProfile, options?: { openCreateWizard?: boolean }) => void;
@@ -124,8 +125,8 @@ export default function RegistrationHub({
   const [showEventPostRegistrationModal, setShowEventPostRegistrationModal] = useState<boolean>(false);
   const [completedEventOrganizerProfile, setCompletedEventOrganizerProfile] = useState<ChildProfile | null>(null);
   
-  // Preferred platform access role pre-populated dynamically
-  const [preferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>(
+  // Preferred platform access role pre-populated dynamically, selectable via dropdown
+  const [preferredRole, setPreferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>(
     (initialRole as any) || 'Parent'
   );
 
@@ -2265,6 +2266,43 @@ export default function RegistrationHub({
           </div>
         )}
         
+        {/* Dynamic User Type Selector Dropdown */}
+        <div id="reg-user-type-selector-box" className="p-3.5 bg-gradient-to-r from-orange-50/90 via-amber-50/60 to-rose-50/80 border-2 border-orange-200/90 rounded-2xl space-y-2 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <label htmlFor="reg-user-type-select" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span>👤 User Type / Registration Category:</span>
+            </label>
+            <span className="text-[10px] font-black text-orange-800 bg-orange-100/90 px-2 py-0.5 rounded-full border border-orange-200/80">
+              {USER_ROLES_CONFIG[preferredRole]?.badge || '100% Free'}
+            </span>
+          </div>
+          <div className="relative">
+            <select
+              id="reg-user-type-select"
+              value={preferredRole}
+              onChange={(e) => {
+                setPreferredRole(e.target.value as any);
+                setStep(1);
+                setErrors({});
+                setFormSubmitError('');
+              }}
+              className="w-full appearance-none px-3.5 py-2.5 bg-white border border-slate-300 focus:border-orange-500 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none shadow-2xs transition cursor-pointer pr-9"
+            >
+              <option value="Parent">👪 Parent &amp; Kid Profile (Family Playmates, Sitters, Daycare)</option>
+              <option value="Daycare Center">🏫 Daycare Center / Creche (Pre-schools &amp; Care Facilities)</option>
+              <option value="Event Organizer">🎪 Event Organizer / Activity Host (Workshops &amp; Classes)</option>
+              <option value="Portfolio Professional">🩺 Kids Specialist &amp; Pediatrician (Doctors &amp; Therapists)</option>
+              <option value="Influencer">⭐ Community Creator &amp; Ambassador (VIP Spotlight)</option>
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500">
+              <ChevronDown className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="text-[11px] text-slate-600">
+            {USER_ROLES_CONFIG[preferredRole]?.description}
+          </p>
+        </div>
+
         {/* ============================================================== */}
         {/* FLOW 1: LOCAL FAMILIES, PARENTS & INFLUENCERS FLOW             */}
         {/* ============================================================== */}

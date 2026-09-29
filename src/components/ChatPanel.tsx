@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ChildProfile, Message } from '../types.ts';
 import { 
   Send, ArrowLeft, Lock, CheckCircle2, ShieldCheck, AlertTriangle, 
-  Sparkles, Wifi, WifiOff, RefreshCw, Clock, Database, Check, CloudUpload
+  Sparkles, Wifi, WifiOff, RefreshCw, Clock, Database, Check, CloudUpload, MessageSquare
 } from 'lucide-react';
 import { evaluateChildSafetyText } from '../utils/childSafetyFilter.ts';
 import { 
@@ -46,12 +46,12 @@ export default function ChatPanel({
   onTriggerAadhaarVerification
 }: ChatPanelProps) {
   
-  // Filter only connected ones to pre-select, or use requested activePlaymate
+  // Show ONLY profiles which parents are connected to chat with
   const connectedPlaymates = playmates.filter(p => connectedIds.includes(p.id));
   
-  const [selectedCompanion, setSelectedCompanion] = useState<ChildProfile>(() => {
-    if (activePlaymate) return activePlaymate;
-    return connectedPlaymates[0] || playmates[0];
+  const [selectedCompanion, setSelectedCompanion] = useState<ChildProfile | null>(() => {
+    if (activePlaymate && connectedIds.includes(activePlaymate.id)) return activePlaymate;
+    return connectedPlaymates.length > 0 ? connectedPlaymates[0] : null;
   });
   
   // Local Database and Sync status
@@ -92,12 +92,16 @@ export default function ChatPanel({
     };
   }, []);
 
-  // Sync with active companion choice from radar/parent prop changes
+  // Sync with active companion choice from radar/parent prop changes - only allow connected profiles
   useEffect(() => {
-    if (activePlaymate) {
+    if (activePlaymate && connectedIds.includes(activePlaymate.id)) {
       setSelectedCompanion(activePlaymate);
+    } else if (selectedCompanion && !connectedIds.includes(selectedCompanion.id)) {
+      setSelectedCompanion(connectedPlaymates[0] || null);
+    } else if (!selectedCompanion && connectedPlaymates.length > 0) {
+      setSelectedCompanion(connectedPlaymates[0]);
     }
-  }, [activePlaymate]);
+  }, [activePlaymate, connectedIds]);
 
   // Handle pre-filled message template (e.g. from Quick Chat button)
   useEffect(() => {
@@ -114,7 +118,7 @@ export default function ChatPanel({
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
+    if (!selectedCompanion || !inputText.trim()) return;
 
     // Run Child Safety & Inappropriate Content Evaluation
     const safetyCheck = evaluateChildSafetyText(inputText.trim(), userProfile?.userRole || 'Parent');
@@ -177,7 +181,7 @@ export default function ChatPanel({
         id: `reply-msg-${Date.now()}`,
         chatId: companionId,
         senderId: companionId,
-        content: replyMsgGenerator(currentInput, selectedCompanion.childName, randomReply),
+        content: replyMsgGenerator(currentInput, selectedCompanion.childName, selectedCompanion.ageUnit, selectedCompanion.childAge, selectedCompanion.gradeLevel, randomReply),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         syncStatus: 'synced',
         createdAt: Date.now()
@@ -188,25 +192,25 @@ export default function ChatPanel({
     }, 1500);
   };
 
-  const replyMsgGenerator = (query: string, childName: string, fallback: string) => {
+  const replyMsgGenerator = (query: string, childName: string, ageUnit: string, childAge: number, gradeLevel: string, fallback: string) => {
     const qLower = query.toLowerCase();
     if (qLower.includes('how old') || qLower.includes('age')) {
-      const ageStr = selectedCompanion.ageUnit === 'months' 
-        ? `${selectedCompanion.childAge} months` 
-        : `${selectedCompanion.childAge} years`;
+      const ageStr = ageUnit === 'months' 
+        ? `${childAge} months` 
+        : `${childAge} years`;
       return `Oh, ${childName} is currently ${ageStr} old. Time flies!`;
     }
     if (qLower.includes('hello') || qLower.includes('hi') || qLower.includes('hey')) {
       return `Hey there! Wonderful to meet you and your sweet child. ${childName} says hello! 😊`;
     }
     if (qLower.includes('grade') || qLower.includes('school')) {
-      return `${childName} is in ${selectedCompanion.gradeLevel}! What class or grade is your child in?`;
+      return `${childName} is in ${gradeLevel}! What class or grade is your child in?`;
     }
     return fallback;
   };
 
-  const currentMessages = conversations[selectedCompanion.id] || [];
-  const isSelectedCompanionConnected = connectedIds.includes(selectedCompanion.id);
+  const currentMessages = selectedCompanion ? (conversations[selectedCompanion.id] || []) : [];
+  const isSelectedCompanionConnected = selectedCompanion ? connectedIds.includes(selectedCompanion.id) : false;
 
   // Filter playmates for requests received
   const receivedRequestsCompanions = playmates.filter(p => interestsReceived.includes(p.id) && !connectedIds.includes(p.id));
@@ -217,16 +221,26 @@ export default function ChatPanel({
       <div id="threads-sidebar" className="border-r border-slate-100 p-4 flex flex-col justify-between h-full bg-white">
         <div className="space-y-4 flex-1 overflow-y-auto">
           <div id="threads-header" className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 font-serif text-base">Conversations</h3>
-            <span className="text-[10px] uppercase font-bold text-slate-400">FAMILY CHATS</span>
+            <h3 className="font-bold text-slate-800 font-serif text-base">Connected Chats</h3>
+            <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              {connectedPlaymates.length} CONNECTED
+            </span>
           </div>
 
           <div id="threads-list" className="space-y-1">
             {connectedPlaymates.length === 0 ? (
-              <p className="text-xs text-slate-400 italic text-center py-4">No active secure connections yet.</p>
+              <div className="text-center py-8 px-2 space-y-2">
+                <div className="w-10 h-10 mx-auto rounded-full bg-orange-50 text-orange-500 flex items-center justify-center">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700">No Connected Parents Yet</p>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Only profiles which parents are connected to chat with are displayed here.
+                </p>
+              </div>
             ) : (
               connectedPlaymates.map((p) => {
-                const isSelected = selectedCompanion.id === p.id;
+                const isSelected = selectedCompanion?.id === p.id;
                 const lastMsgs = conversations[p.id] || [];
                 const lastMsgText = lastMsgs.length > 0 ? lastMsgs[lastMsgs.length - 1].content : "Connected safely. Start chatting!";
                 const hasPending = lastMsgs.some(m => (m as LocalChatMessage).syncStatus === 'pending');
@@ -257,44 +271,13 @@ export default function ChatPanel({
               })
             )}
           </div>
-
-          {/* Secure Locked Sandbox Profiles */}
-          <div className="pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">🔒 SECURE SHIELD LOCKS</span>
-              <span className="text-[9px] text-orange-500 font-bold bg-orange-50 px-1.5 py-0.5 rounded-full border border-orange-150">Active</span>
-            </div>
-            <div className="space-y-1">
-              {playmates.filter(p => !connectedIds.includes(p.id)).map((p) => {
-                const isSelected = selectedCompanion.id === p.id;
-                return (
-                  <button
-                    id={`btn-select-locked-thread-${p.id}`}
-                    key={p.id}
-                    onClick={() => setSelectedCompanion(p)}
-                    type="button"
-                    className={`w-full text-left p-2.5 rounded-xl transition flex items-center gap-3 opacity-60 hover:opacity-100 ${isSelected ? 'bg-slate-100 border-l-4 border-slate-400' : 'hover:bg-slate-50'}`}
-                  >
-                    <img src={p.photoUrl} alt={p.childName} className="w-8 h-8 rounded-full object-cover border border-slate-200 filter grayscale" referrerPolicy="no-referrer" />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-xs block truncate text-slate-700">{p.childName}'s Parent</span>
-                        <Lock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-                      </div>
-                      <span className="text-[9px] text-slate-400 leading-none">Connection Required</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         {/* Pending Requests Inbox in Sidebar */}
         {receivedRequestsCompanions.length > 0 && (
           <div className="mt-4 p-3.5 bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-100 space-y-2">
             <h4 className="text-[10px] font-black text-amber-900 tracking-wider uppercase flex items-center gap-1">
-              📬 Request Inbox ({receivedRequestsCompanions.length})
+              📬 Connection Requests ({receivedRequestsCompanions.length})
             </h4>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {receivedRequestsCompanions.map((p) => (
@@ -309,9 +292,9 @@ export default function ChatPanel({
                   <button
                     id={`sidebar-btn-connect-${p.id}`}
                     onClick={() => onAcceptConnection?.(p.id)}
-                    className="w-full py-1 text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg leading-relaxed transition"
+                    className="w-full py-1 text-[10px] bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg leading-relaxed transition cursor-pointer"
                   >
-                    Approve Security Access
+                    Accept & Connect to Chat
                   </button>
                 </div>
               ))}
@@ -338,55 +321,36 @@ export default function ChatPanel({
       {/* Main chat log output */}
       <div id="chat-log-panel" className="md:col-span-2 flex flex-col h-full bg-slate-50 relative min-h-[450px]">
         
-        {/* Connection Lock Guard Screen */}
-        {!isSelectedCompanionConnected ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative">
+        {/* If no companion selected or companion is not connected, show clean empty state */}
+        {!selectedCompanion || !isSelectedCompanionConnected ? (
+          <div id="chat-empty-panel-view" className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-slate-50 relative min-h-[450px]">
             <div className="w-16 h-16 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center mb-4 border border-orange-200">
-              <Lock className="w-8 h-8" />
+              <CheckCircle2 className="w-8 h-8 text-orange-500" />
             </div>
             
-            <span className="text-[10px] font-bold bg-orange-100 text-orange-800 px-3 py-1 rounded-full border border-orange-200 mb-2 uppercase tracking-widest flex items-center gap-1.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> SECURE SHIELD ACTIVE
+            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-200 mb-2 uppercase tracking-widest flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5" /> SECURE MESSENGER
             </span>
             
-            <h3 className="font-serif text-xl font-bold text-slate-900">Security Gate Guarded</h3>
+            <h3 className="font-serif text-xl font-bold text-slate-900">
+              {connectedPlaymates.length === 0 ? "No Connected Parents Yet" : "Select a Connected Parent"}
+            </h3>
             <p className="text-xs text-slate-500 max-w-sm mt-2 leading-relaxed">
-              Coordinate and message transmission with <strong>{selectedCompanion.parentName}</strong> ({selectedCompanion.childName}'s garden-mate) is locked. 
-              To safeguard our child network from unsolicited parent actions, we enforce a secure authorization connection before opening transcripts.
+              {connectedPlaymates.length === 0 
+                ? "To ensure child privacy and security, only profiles you are connected with appear here to chat. Explore verified families in your neighborhood on the Play Radar to connect!"
+                : "Choose a connected family from your chat list on the left to start sending messages."
+              }
             </p>
 
-            {interestsReceived.includes(selectedCompanion.id) ? (
-              <div className="mt-6 bg-white p-5 rounded-2xl border border-amber-200 max-w-md shadow-sm">
-                <p className="text-xs font-bold text-amber-800 flex items-center justify-center gap-1.5 mb-2">
-                  <span>📬 Connection Invitation Available</span>
-                </p>
-                <p className="text-xs text-slate-600 mb-4 font-medium">
-                  {selectedCompanion.parentName} has sent you a connection invitation!
-                </p>
-                <button
-                  type="button"
-                  onClick={() => onAcceptConnection?.(selectedCompanion.id)}
-                  className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-md hover:scale-102 active:scale-95 transition cursor-pointer"
-                >
-                  Approve secure alignment & chat
-                </button>
-              </div>
-            ) : interestsSent.includes(selectedCompanion.id) ? (
-              <div className="mt-6 bg-indigo-50 border border-indigo-100 p-5 rounded-2xl text-center max-w-sm">
-                <span className="inline-block w-2.5 h-2.5 bg-indigo-500 rounded-full animate-ping mb-2"></span>
-                <p className="text-xs font-bold text-indigo-900">Invitation query matches: Pending guardian reply</p>
-                <p className="text-[11px] text-slate-500 mt-1 leading-normal">Your parent security credentials were securely aligned. We will immediately raise notifications once accepted by {selectedCompanion.parentName}.</p>
-              </div>
-            ) : (
-              <div className="mt-6">
-                <button
-                  type="button"
-                  onClick={() => onSendConnection?.(selectedCompanion.id)}
-                  className="px-6 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-orange-600 active:scale-95 transition cursor-pointer"
-                >
-                  Connect with {selectedCompanion.parentName.split(' ')[0]} to Chat
-                </button>
-              </div>
+            {connectedPlaymates.length === 0 && onBackToRadar && (
+              <button
+                id="btn-chat-go-radar"
+                type="button"
+                onClick={onBackToRadar}
+                className="mt-6 px-6 py-2.5 bg-orange-500 text-white rounded-xl text-xs font-bold shadow-md hover:bg-orange-600 active:scale-95 transition cursor-pointer"
+              >
+                Find Playmates on Radar
+              </button>
             )}
           </div>
         ) : (
