@@ -382,6 +382,13 @@ export const persistAuthSession = (profile: ChildProfile, role?: 'Parent' | 'Eve
   } catch (err) {
     console.debug('[Auth Cache Persist] Storage note:', err);
   }
+
+  // Keep user profile backed up and synchronized to Firestore cloud database
+  try {
+    setDoc(doc(db, 'users', profile.id), profile, { merge: true }).catch(() => {});
+  } catch {
+    // ignore
+  }
 };
 
 export const clearAuthSession = () => {
@@ -985,13 +992,6 @@ export default function App() {
       // ignore
     }
 
-    if (!auth.currentUser) {
-      // Unauthenticated / Sandbox mode: use standard Bangalore mock data
-      setPlaymates(INITIAL_PLAYMATES);
-      setSelectedPlaymate(INITIAL_PLAYMATES[0] || null);
-      return;
-    }
-
     const mockPhotoMap = new Map<string, ChildProfile>(INITIAL_PLAYMATES.map(p => [p.id, p]));
 
     // Attempt to seed from local offline cache to ensure immediate offline rendering
@@ -1022,6 +1022,7 @@ export default function App() {
       }
     }
 
+    // Real-time Firestore Cloud Sync for all registered users (runs for all visitors & accounts)
     const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const list: ChildProfile[] = [];
       snapshot.forEach((snapDoc) => {
@@ -1029,7 +1030,8 @@ export default function App() {
       });
 
       // Exclude self from matched playmates
-      const dbPlaymates = list.filter(p => p.id !== auth.currentUser?.uid);
+      const currentSessionUid = auth.currentUser?.uid || userProfile?.id;
+      const dbPlaymates = list.filter(p => p.id !== currentSessionUid);
 
       // Merge on-the-fly with INITIAL_PLAYMATES client-side to ensure a populated dashboard
       const combined = [...dbPlaymates];
@@ -2558,33 +2560,33 @@ export default function App() {
       console.warn('Local storage write note:', e);
     }
 
-    if (auth.currentUser) {
-      try {
-        await setDoc(doc(db, 'users', uid), cleanedData);
+    // CRITICAL: Always persist newly signed-up user profile directly to Firestore cloud database
+    try {
+      await setDoc(doc(db, 'users', uid), cleanedData);
+      console.log('✅ User registration successfully persisted to Firestore:', uid);
+    } catch (err) {
+      console.warn("Firestore write error during registration, proceeding with local verified session:", err);
+    }
 
-        // Credit the affiliate partner or general referrer
-        const attributionCode = activeAffiliateCode || sessionReferral;
-        if (attributionCode) {
-          try {
-            const { collection, query, where, getDocs, updateDoc, increment } = await import('firebase/firestore');
-            const usersRef = collection(db, 'users');
-            const q = query(usersRef, where('referralCode', '==', attributionCode));
-            const querySnapshot = await getDocs(q);
-            if (!querySnapshot.empty) {
-              const referrerDoc = querySnapshot.docs[0];
-              await updateDoc(doc(db, 'users', referrerDoc.id), {
-                contactViewCredits: increment(1),
-                referralCount: increment(1),
-                affiliateTotalCustomersReferred: increment(1)
-              });
-              console.log("🎁 Successfully credited referrer profile ID:", referrerDoc.id);
-            }
-          } catch (refErr) {
-            console.error("Failed to update credit for referrer:", refErr);
-          }
+    // Credit the affiliate partner or general referrer if code present
+    const attributionCode = activeAffiliateCode || sessionReferral;
+    if (attributionCode) {
+      try {
+        const { collection, query, where, getDocs, updateDoc, increment } = await import('firebase/firestore');
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, where('referralCode', '==', attributionCode));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const referrerDoc = querySnapshot.docs[0];
+          await updateDoc(doc(db, 'users', referrerDoc.id), {
+            contactViewCredits: increment(1),
+            referralCount: increment(1),
+            affiliateTotalCustomersReferred: increment(1)
+          });
+          console.log("🎁 Successfully credited referrer profile ID:", referrerDoc.id);
         }
-      } catch (err) {
-        console.warn("Firestore write error during registration, proceeding with local verified session:", err);
+      } catch (refErr) {
+        console.error("Failed to update credit for referrer:", refErr);
       }
     }
 

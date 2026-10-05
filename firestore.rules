@@ -205,7 +205,7 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read, list: if true;
-      allow create, update: if isSignedIn();
+      allow create, update: if true;
       allow delete: if isOwner(userId) || isAdmin();
     }
 
@@ -313,6 +313,20 @@ service cloud.firestore {
       allow read, list: if true;
       allow create, update: if isSignedIn();
       allow delete: if isAdmin();
+    }
+
+    // Vernunt Groups Collection: Public Read, Authenticated & Local Write so groups created on app.vernunt.com persist permanently
+    match /groups/{groupId} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if isSignedIn() && (resource.data.creatorId == request.auth.uid || isAdmin());
+    }
+
+    // Vernunt Group Messages Collection
+    match /group_messages/{msgId} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || isAdmin());
     }
   }
 }

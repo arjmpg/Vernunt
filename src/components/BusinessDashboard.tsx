@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { CommunityEvent, SpecialistProfile, Booking, ChildProfile } from '../types.ts';
-import { Award, ShieldCheck, TrendingUp, DollarSign, Percent, Settings, Edit3, Save, Users, CreditCard, Layers, ArrowRight, Sparkles, Check, FileText, Trash2, ShieldAlert, CheckCircle, XCircle } from 'lucide-react';
+import { Award, ShieldCheck, TrendingUp, DollarSign, Percent, Settings, Edit3, Save, Users, CreditCard, Layers, ArrowRight, Sparkles, Check, FileText, Trash2, ShieldAlert, CheckCircle, XCircle, QrCode, UserCheck, Clock } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { doc, updateDoc, deleteDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
+import EventOrganizerDynamicCheckInModal from './events/EventOrganizerDynamicCheckInModal.tsx';
+import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.tsx';
 
 interface BusinessDashboardProps {
   userProfile: ChildProfile | null;
@@ -49,6 +51,10 @@ export default function BusinessDashboard({
 
   // Bulk set override value
   const [bulkCommissionValue, setBulkCommissionValue] = useState<number>(globalCommissionRate);
+
+  // Dynamic Check-In QR & Gate Desk state for Event Organizers
+  const [dynamicCheckInModalEvent, setDynamicCheckInModalEvent] = useState<CommunityEvent | null>(null);
+  const [organizerCameraStationEvent, setOrganizerCameraStationEvent] = useState<CommunityEvent | null>(null);
 
   // Success animations states
   const [successToast, setSuccessToast] = useState('');
@@ -428,6 +434,70 @@ export default function BusinessDashboard({
 
       {userRole === 'Event Organizer' && (
         <div className="space-y-6">
+          {/* GATE CHECK-IN & DYNAMIC QR SYSTEM HERO CARD */}
+          <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 text-white rounded-3xl p-5 sm:p-6 shadow-xl border border-rose-900/40 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 relative overflow-hidden">
+            <div className="space-y-2 max-w-xl z-10">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-rose-500/20 text-rose-300 border border-rose-400/30 text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-rose-400" />
+                  QR Gate Check-In System
+                </span>
+                <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  Single-Use Dynamic QR
+                </span>
+              </div>
+              <h3 className="text-lg sm:text-xl font-black font-serif text-white leading-tight">
+                Event Gate Access & Dynamic QR Check-In
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                Generate temporary, single-use dynamic QR codes that cycle periodically for attendees to scan at the gate. Eliminates paper passes, validates attendee attendance instantly, and prevents ticket screenshot forwarding.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2.5 flex-wrap z-10 shrink-0">
+              <button
+                type="button"
+                id="btn-generate-checkin-qr-main"
+                onClick={() => {
+                  const targetEvt = visibleEvents[0] || eventsList[0];
+                  if (targetEvt) {
+                    setDynamicCheckInModalEvent(targetEvt);
+                  } else {
+                    triggerToast('Please create or host an event first to generate a Gate Check-In QR.');
+                  }
+                }}
+                className="py-3 px-5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white rounded-2xl text-xs font-black shadow-lg shadow-rose-600/30 transition transform hover:scale-[1.02] active:scale-[0.98] cursor-pointer flex items-center gap-2"
+              >
+                <QrCode className="w-4 h-4 text-white" />
+                <span>Generate Check-in QR</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-open-organizer-camera-station"
+                onClick={() => {
+                  const targetEvt = visibleEvents[0] || eventsList[0];
+                  if (targetEvt) {
+                    setOrganizerCameraStationEvent(targetEvt);
+                  } else {
+                    triggerToast('No active events to launch Gate Desk.');
+                  }
+                }}
+                className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-2xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                title="Launch camera QR scanner and attendee roster desk"
+              >
+                <UserCheck className="w-4 h-4 text-orange-400" />
+                <span>Open Gate Desk</span>
+              </button>
+            </div>
+
+            {/* Background design accent */}
+            <div className="absolute right-0 bottom-0 text-white/[0.03] text-9xl font-black pointer-events-none select-none -mr-4 -mb-8">
+              🎟️
+            </div>
+          </div>
+
           {/* STATS */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center justify-between">
@@ -541,17 +611,28 @@ export default function BusinessDashboard({
                                 </button>
                               </div>
                             ) : (
-                              <button
-                                onClick={() => {
-                                  setEditingEventId(evt.id);
-                                  setEditEventTitle(evt.title);
-                                  setEditEventLoc(evt.location);
-                                  setEditEventPrice(evt.ticketPrice || 0);
-                                }}
-                                className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded border border-slate-200 text-[10px] font-extrabold uppercase transition"
-                              >
-                                Edit details
-                              </button>
+                              <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setDynamicCheckInModalEvent(evt)}
+                                  className="px-2.5 py-1 text-rose-700 bg-rose-50 hover:bg-rose-100 rounded border border-rose-200 text-[10px] font-black uppercase transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="Generate dynamic, single-use QR for attendees to scan at gate"
+                                >
+                                  <QrCode className="w-3 h-3 text-rose-600" />
+                                  <span>Generate Check-in QR</span>
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setEditingEventId(evt.id);
+                                    setEditEventTitle(evt.title);
+                                    setEditEventLoc(evt.location);
+                                    setEditEventPrice(evt.ticketPrice || 0);
+                                  }}
+                                  className="px-2.5 py-1 text-slate-600 hover:bg-slate-100 rounded border border-slate-200 text-[10px] font-extrabold uppercase transition"
+                                >
+                                  Edit details
+                                </button>
+                              </div>
                             )}
                           </td>
                         </tr>
@@ -1315,6 +1396,37 @@ export default function BusinessDashboard({
 
         </div>
         )
+      )}
+
+      {/* Dynamic Single-Use Gate Check-In QR Modal */}
+      {dynamicCheckInModalEvent && (
+        <EventOrganizerDynamicCheckInModal
+          isOpen={Boolean(dynamicCheckInModalEvent)}
+          onClose={() => setDynamicCheckInModalEvent(null)}
+          event={dynamicCheckInModalEvent}
+          allEvents={visibleEvents.length > 0 ? visibleEvents : eventsList}
+          onSelectEvent={(evt) => setDynamicCheckInModalEvent(evt)}
+          userProfile={userProfile}
+          onOpenScanner={() => {
+            setOrganizerCameraStationEvent(dynamicCheckInModalEvent);
+            setDynamicCheckInModalEvent(null);
+          }}
+          onUpdateEvent={(updated) => {
+            setEventsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+          }}
+        />
+      )}
+
+      {/* Organizer Camera Check-In Desk */}
+      {organizerCameraStationEvent && (
+        <EventOrganizerCheckInStation
+          event={organizerCameraStationEvent}
+          userProfile={userProfile}
+          onClose={() => setOrganizerCameraStationEvent(null)}
+          onUpdateEvent={(updated) => {
+            setEventsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+          }}
+        />
       )}
 
     </div>

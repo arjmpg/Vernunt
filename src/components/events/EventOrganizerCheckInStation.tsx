@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import jsQR from 'jsqr';
+import EventOrganizerDynamicCheckInModal from './EventOrganizerDynamicCheckInModal.tsx';
 
 interface EventOrganizerCheckInStationProps {
   event: CommunityEvent;
@@ -41,6 +42,7 @@ export default function EventOrganizerCheckInStation({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [audioFeedbackEnabled, setAudioFeedbackEnabled] = useState(true);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [showDynamicQrModal, setShowDynamicQrModal] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -637,6 +639,18 @@ export default function EventOrganizerCheckInStation({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Generate Dynamic Check-in QR for Attendees */}
+            <button
+              id="btn-station-generate-checkin-qr"
+              type="button"
+              onClick={() => setShowDynamicQrModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-md bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white cursor-pointer"
+              title="Generate temporary, single-use dynamic QR code for attendees to scan at gate"
+            >
+              <QrCode className="w-3.5 h-3.5 text-white" />
+              <span>Generate Check-in QR</span>
+            </button>
+
             {/* Camera-based QR Scanner Button in Header */}
             <button
               id="btn-station-header-camera-scanner"
@@ -1147,6 +1161,23 @@ export default function EventOrganizerCheckInStation({
         </div>
 
       </div>
+
+      {/* Dynamic Single-Use Gate Check-In QR Modal */}
+      {showDynamicQrModal && (
+        <EventOrganizerDynamicCheckInModal
+          isOpen={showDynamicQrModal}
+          onClose={() => setShowDynamicQrModal(false)}
+          event={event}
+          userProfile={userProfile}
+          onOpenScanner={() => {
+            setShowDynamicQrModal(false);
+            if (!cameraActive) {
+              startCamera();
+            }
+          }}
+          onUpdateEvent={onUpdateEvent}
+        />
+      )}
     </div>
   );
 }

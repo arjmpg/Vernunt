@@ -214,6 +214,56 @@
         "privacyLevel": { "type": "string", "enum": ["hidden", "visible", "connected"] }
       },
       "required": ["userId"]
+    },
+    "VernuntGroup": {
+      "title": "VernuntGroup",
+      "description": "Vernunt parent community circles, interest groups, and moms/dads safe spaces",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "coverUrl": { "type": "string" },
+        "avatarEmoji": { "type": "string" },
+        "privacyTier": { "type": "string", "enum": ["Public", "Private", "Secret"] },
+        "genderRestriction": { "type": "string", "enum": ["All Parents", "Female Only", "Male Only"] },
+        "creatorId": { "type": "string" },
+        "creatorName": { "type": "string" },
+        "creatorRole": { "type": "string" },
+        "creatorGender": { "type": "string", "enum": ["Mother", "Father", "Other"] },
+        "createdAt": { "type": "string" },
+        "rules": { "type": "array" },
+        "pinnedAnnouncements": { "type": "array" },
+        "editors": { "type": "array" },
+        "memberIds": { "type": "array" },
+        "membersCount": { "type": "integer" },
+        "pendingJoinRequests": { "type": "array" },
+        "category": { "type": "string" },
+        "tags": { "type": "array" },
+        "inviteSlug": { "type": "string" }
+      },
+      "required": ["id", "name", "creatorId"]
+    },
+    "VernuntGroupMessage": {
+      "title": "VernuntGroupMessage",
+      "description": "Messages sent inside Vernunt parent community groups",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "groupId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhoto": { "type": "string" },
+        "senderGender": { "type": "string" },
+        "isAnonymous": { "type": "boolean" },
+        "content": { "type": "string" },
+        "attachments": { "type": "array" },
+        "likesCount": { "type": "integer" },
+        "likedBy": { "type": "array" },
+        "repliesCount": { "type": "integer" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "groupId", "senderId", "content"]
     }
   },
   "firestore": {
@@ -280,6 +330,14 @@
     "/custom_profile_fields/{id}": {
       "schema": "CustomProfileField",
       "description": "Stores custom registration profile fields injected dynamically"
+    },
+    "/groups/{groupId}": {
+      "schema": "VernuntGroup",
+      "description": "Stores Vernunt community parent circles and interest groups"
+    },
+    "/group_messages/{msgId}": {
+      "schema": "VernuntGroupMessage",
+      "description": "Stores real-time messages within Vernunt parent groups"
     }
   }
 }

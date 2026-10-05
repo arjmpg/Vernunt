@@ -16,6 +16,7 @@ import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import CommunityEventCheckIn from './CommunityEventCheckIn.tsx';
 import EventTicketPassModal from './events/EventTicketPassModal.tsx';
 import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.tsx';
+import EventOrganizerDynamicCheckInModal from './events/EventOrganizerDynamicCheckInModal.tsx';
 import EventBookingModal from './events/EventBookingModal.tsx';
 import CreateEventWizardModal from './events/CreateEventWizardModal.tsx';
 import EventBuyerRegistrationModal from './events/EventBuyerRegistrationModal.tsx';
@@ -93,6 +94,7 @@ export default function EventsTab({
   const [activeTicketModalBooking, setActiveTicketModalBooking] = useState<Booking | null>(null);
   const [activeTicketEvent, setActiveTicketEvent] = useState<CommunityEvent | null>(null);
   const [checkInStationEvent, setCheckInStationEvent] = useState<CommunityEvent | null>(null);
+  const [dynamicCheckInEvent, setDynamicCheckInEvent] = useState<CommunityEvent | null>(null);
   const [bookingModalEvent, setBookingModalEvent] = useState<CommunityEvent | null>(null);
   const [showCreateWizard, setShowCreateWizard] = useState<boolean>(initialOpenCreateWizard);
   const [myTickets, setMyTickets] = useState<Booking[]>([]);
@@ -1117,6 +1119,25 @@ ${deepLink}`;
 
         {/* Top Header Actions: Publish Vernunt Event, My Passes, and Search Input */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+          {/* Event Organizer Gate Check-in QR button */}
+          {(userProfile?.userRole === 'Event Organizer' || userProfile?.userRole === 'Admin') && (
+            <button
+              id="btn-events-tab-generate-checkin-qr"
+              type="button"
+              onClick={() => {
+                const myEvent = eventsList.find(e => e.hostName && userProfile?.parentName && e.hostName.toLowerCase().includes(userProfile.parentName.toLowerCase())) || eventsList[0];
+                if (myEvent) {
+                  setDynamicCheckInEvent(myEvent);
+                }
+              }}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+              title="Generate temporary, single-use dynamic QR code for attendees to scan at gate"
+            >
+              <QrCode className="w-3.5 h-3.5 text-white" />
+              <span>Generate Check-in QR</span>
+            </button>
+          )}
+
           {/* Host/Publish button */}
           <button
             id="btn-trigger-propose-event"
@@ -2163,6 +2184,25 @@ ${deepLink}`;
           event={checkInStationEvent}
           userProfile={userProfile}
           onClose={() => setCheckInStationEvent(null)}
+        />
+      )}
+
+      {/* Dynamic Single-Use Gate Check-In QR Modal */}
+      {dynamicCheckInEvent && (
+        <EventOrganizerDynamicCheckInModal
+          isOpen={Boolean(dynamicCheckInEvent)}
+          onClose={() => setDynamicCheckInEvent(null)}
+          event={dynamicCheckInEvent}
+          allEvents={eventsList}
+          onSelectEvent={(evt) => setDynamicCheckInEvent(evt)}
+          userProfile={userProfile}
+          onOpenScanner={() => {
+            setCheckInStationEvent(dynamicCheckInEvent);
+            setDynamicCheckInEvent(null);
+          }}
+          onUpdateEvent={(updated) => {
+            setEventsList(prev => prev.map(e => e.id === updated.id ? updated : e));
+          }}
         />
       )}
 

@@ -12,6 +12,8 @@ import {
 } from '../../types.ts';
 import QRCode from 'qrcode';
 import confetti from 'canvas-confetti';
+import { db } from '../../utils/firebase.ts';
+import { collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { 
   Users, 
   Plus, 
@@ -348,6 +350,86 @@ export function VernuntGroupsHub({
   const currentUserName = isLoggedIn ? (activeProfile?.parentName || 'Vernunt Parent') : 'Guest Explorer';
   const currentUserGender = activeProfile?.parentGender || 'Mother'; // default to Mother if unspecified
 
+  // Real-time Cloud Sync with Firestore for Vernunt Groups
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'groups'), (snapshot) => {
+      if (!snapshot.empty) {
+        const firestoreGroups: VernuntGroup[] = [];
+        snapshot.forEach((snapDoc) => {
+          firestoreGroups.push(snapDoc.data() as VernuntGroup);
+        });
+
+        setGroups((prevLocal) => {
+          const map = new Map<string, VernuntGroup>();
+          // Base: Initial Seed Groups
+          INITIAL_GROUPS.forEach(g => map.set(g.id, g));
+          // Overlay local groups
+          prevLocal.forEach(g => map.set(g.id, g));
+          // Authoritative Cloud Firestore groups (guarantees user created groups are never lost)
+          firestoreGroups.forEach(g => map.set(g.id, g));
+          const merged = Array.from(map.values());
+          try {
+            localStorage.setItem('vernunt_groups_db', JSON.stringify(merged));
+          } catch (e) {
+            console.debug('Storage note:', e);
+          }
+          return merged;
+        });
+      } else {
+        // If Firestore collection is empty, seed initial groups to cloud so they persist
+        (async () => {
+          try {
+            for (const initGrp of INITIAL_GROUPS) {
+              await setDoc(doc(db, 'groups', initGrp.id), initGrp);
+            }
+          } catch (err) {
+            console.debug('Initial group seeding note:', err);
+          }
+        })();
+      }
+    }, (error) => {
+      console.warn('[Vernunt Groups] Cloud sync note:', error);
+    });
+
+    return () => unsub();
+  }, []);
+
+  // Real-time Cloud Sync with Firestore for Group Messages
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'group_messages'), (snapshot) => {
+      if (!snapshot.empty) {
+        const firestoreMsgs: VernuntGroupMessage[] = [];
+        snapshot.forEach((snapDoc) => {
+          firestoreMsgs.push(snapDoc.data() as VernuntGroupMessage);
+        });
+
+        setMessages((prev) => {
+          const updated: Record<string, VernuntGroupMessage[]> = { ...prev };
+          firestoreMsgs.forEach(m => {
+            if (!updated[m.groupId]) {
+              updated[m.groupId] = [];
+            }
+            if (!updated[m.groupId].some(ex => ex.id === m.id)) {
+              updated[m.groupId].push(m);
+            } else {
+              updated[m.groupId] = updated[m.groupId].map(ex => ex.id === m.id ? m : ex);
+            }
+          });
+          try {
+            localStorage.setItem('vernunt_group_messages', JSON.stringify(updated));
+          } catch (e) {
+            console.debug('Message storage note:', e);
+          }
+          return updated;
+        });
+      }
+    }, (error) => {
+      console.warn('[Vernunt Messages] Cloud sync note:', error);
+    });
+
+    return () => unsub();
+  }, []);
+
   // Save to local storage
   useEffect(() => {
     try {
@@ -518,13 +600,16 @@ export function VernuntGroupsHub({
       }
 
       // Add user to the target group
+      const updatedMemberIds = [...new Set([...groupToJoin.memberIds, newMemberId])];
+      const updatedCount = groupToJoin.membersCount + 1;
+
       setGroups(prev => prev.map(g => {
         if (g.id === groupToJoin.id) {
           if (groupToJoin.privacyTier === 'Public') {
             return {
               ...g,
-              memberIds: [...new Set([...g.memberIds, newMemberId])],
-              membersCount: g.membersCount + 1
+              memberIds: updatedMemberIds,
+              membersCount: updatedCount
             };
           } else {
             const newReq: GroupJoinRequest = {
@@ -542,6 +627,36 @@ export function VernuntGroupsHub({
         }
         return g;
       }));
+
+      // PERSIST USER PROFILE TO FIRESTORE
+      try {
+        setDoc(doc(db, 'users', newMemberId), newMemberProfile).catch(e => console.warn('User profile write note:', e));
+      } catch (uErr) {
+        console.warn('Profile sync note:', uErr);
+      }
+
+      // PERSIST GROUP UPDATE TO FIRESTORE
+      try {
+        if (groupToJoin.privacyTier === 'Public') {
+          setDoc(doc(db, 'groups', groupToJoin.id), {
+            memberIds: updatedMemberIds,
+            membersCount: updatedCount
+          }, { merge: true }).catch(e => console.warn('Group update note:', e));
+        } else {
+          const newReq: GroupJoinRequest = {
+            userId: newMemberId,
+            userName: finalName,
+            userPhoto: newMemberProfile.photoUrl,
+            requestedAt: 'Just now',
+            note: 'Mobile OTP verified parent.'
+          };
+          setDoc(doc(db, 'groups', groupToJoin.id), {
+            pendingJoinRequests: [...groupToJoin.pendingJoinRequests, newReq]
+          }, { merge: true }).catch(e => console.warn('Group update note:', e));
+        }
+      } catch (gErr) {
+        console.warn('Group sync note:', gErr);
+      }
 
       setIsVerifyingOtp(false);
       setShowOtpJoinModal(false);
@@ -579,38 +694,60 @@ export function VernuntGroupsHub({
 
     if (group.privacyTier === 'Public') {
       // Instant Join
+      const updatedMemberIds = [...new Set([...group.memberIds, currentUserId])];
+      const updatedCount = group.membersCount + 1;
       setGroups(prev => prev.map(g => {
         if (g.id === group.id) {
           return {
             ...g,
-            memberIds: [...new Set([...g.memberIds, currentUserId])],
-            membersCount: g.membersCount + 1
+            memberIds: updatedMemberIds,
+            membersCount: updatedCount
           };
         }
         return g;
       }));
       setJoinSuccessToast(`🎉 You have joined ${group.name}!`);
       setTimeout(() => setJoinSuccessToast(null), 4000);
+
+      // Persist to Firestore
+      try {
+        setDoc(doc(db, 'groups', group.id), {
+          memberIds: updatedMemberIds,
+          membersCount: updatedCount
+        }, { merge: true }).catch(e => console.warn('Group join note:', e));
+      } catch (err) {
+        console.warn('Group update note:', err);
+      }
     } else if (group.privacyTier === 'Private') {
       // Submit Join Request
+      const newReq: GroupJoinRequest = {
+        userId: currentUserId,
+        userName: currentUserName,
+        userPhoto: activeProfile?.photoUrl,
+        requestedAt: 'Just now',
+        note: 'Excited to join this community!'
+      };
+      const updatedRequests = [...group.pendingJoinRequests, newReq];
       setGroups(prev => prev.map(g => {
         if (g.id === group.id) {
-          const newReq: GroupJoinRequest = {
-            userId: currentUserId,
-            userName: currentUserName,
-            userPhoto: activeProfile?.photoUrl,
-            requestedAt: 'Just now',
-            note: 'Excited to join this community!'
-          };
           return {
             ...g,
-            pendingJoinRequests: [...g.pendingJoinRequests, newReq]
+            pendingJoinRequests: updatedRequests
           };
         }
         return g;
       }));
       setJoinSuccessToast(`Join request submitted for ${group.name}.`);
       setTimeout(() => setJoinSuccessToast(null), 4000);
+
+      // Persist to Firestore
+      try {
+        setDoc(doc(db, 'groups', group.id), {
+          pendingJoinRequests: updatedRequests
+        }, { merge: true }).catch(e => console.warn('Join request note:', e));
+      } catch (err) {
+        console.warn('Join request sync note:', err);
+      }
     }
   };
 
@@ -618,11 +755,26 @@ export function VernuntGroupsHub({
   const handleApproveMember = (groupId: string, req: GroupJoinRequest) => {
     setGroups(prev => prev.map(g => {
       if (g.id === groupId) {
+        const updatedMembers = [...new Set([...g.memberIds, req.userId])];
+        const updatedCount = g.membersCount + 1;
+        const updatedRequests = g.pendingJoinRequests.filter(r => r.userId !== req.userId);
+        
+        // Persist to Firestore
+        try {
+          setDoc(doc(db, 'groups', groupId), {
+            memberIds: updatedMembers,
+            membersCount: updatedCount,
+            pendingJoinRequests: updatedRequests
+          }, { merge: true }).catch(e => console.warn('Approve sync note:', e));
+        } catch (err) {
+          console.warn('Approve member sync note:', err);
+        }
+
         return {
           ...g,
-          memberIds: [...new Set([...g.memberIds, req.userId])],
-          membersCount: g.membersCount + 1,
-          pendingJoinRequests: g.pendingJoinRequests.filter(r => r.userId !== req.userId)
+          memberIds: updatedMembers,
+          membersCount: updatedCount,
+          pendingJoinRequests: updatedRequests
         };
       }
       return g;
@@ -632,9 +784,20 @@ export function VernuntGroupsHub({
   const handleRejectMember = (groupId: string, userId: string) => {
     setGroups(prev => prev.map(g => {
       if (g.id === groupId) {
+        const updatedRequests = g.pendingJoinRequests.filter(r => r.userId !== userId);
+        
+        // Persist to Firestore
+        try {
+          setDoc(doc(db, 'groups', groupId), {
+            pendingJoinRequests: updatedRequests
+          }, { merge: true }).catch(e => console.warn('Reject sync note:', e));
+        } catch (err) {
+          console.warn('Reject member sync note:', err);
+        }
+
         return {
           ...g,
-          pendingJoinRequests: g.pendingJoinRequests.filter(r => r.userId !== userId)
+          pendingJoinRequests: updatedRequests
         };
       }
       return g;
@@ -675,9 +838,23 @@ export function VernuntGroupsHub({
       inviteSlug: slug
     };
 
+    // Update local state immediately for instant responsive feedback
     setGroups(prev => [newGrp, ...prev]);
     setSelectedGroupId(newGrp.id);
     setShowCreateModal(false);
+
+    // CRITICAL FIX: Persist permanently to Firestore cloud database so GitHub pushes & reloads never delete it!
+    try {
+      setDoc(doc(db, 'groups', newGrp.id), newGrp)
+        .then(() => {
+          console.log('✅ Vernunt Group successfully persisted to Firestore cloud database:', newGrp.id);
+        })
+        .catch(err => {
+          console.error('Firestore group write error:', err);
+        });
+    } catch (dbErr) {
+      console.error('Failed to dispatch group to Firestore:', dbErr);
+    }
 
     // Reset Form
     setNewGroupName('');
@@ -691,7 +868,7 @@ export function VernuntGroupsHub({
     if (!messageText.trim() || !selectedGroupId) return;
 
     const newMsg: VernuntGroupMessage = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       groupId: selectedGroupId,
       senderId: currentUserId,
       senderName: isAnonymousPost ? 'Anonymous Mom' : currentUserName,
@@ -709,6 +886,14 @@ export function VernuntGroupsHub({
       [selectedGroupId]: [...(prev[selectedGroupId] || []), newMsg]
     }));
 
+    // CRITICAL FIX: Persist group message to Firestore cloud database
+    try {
+      setDoc(doc(db, 'group_messages', newMsg.id), newMsg)
+        .catch(err => console.warn('Message sync note:', err));
+    } catch (msgErr) {
+      console.warn('Message send sync note:', msgErr);
+    }
+
     setMessageText('');
   };
 
@@ -722,6 +907,26 @@ export function VernuntGroupsHub({
       addedAt: 'Just now',
       addedBy: currentUserName
     };
+
+    const updatedEditors = [...selectedGroup.editors, newEditor];
+    setGroups(prev => prev.map(g => {
+      if (g.id === selectedGroup.id) {
+        return {
+          ...g,
+          editors: updatedEditors
+        };
+      }
+      return g;
+    }));
+
+    // Persist editor to Firestore
+    try {
+      setDoc(doc(db, 'groups', selectedGroup.id), {
+        editors: updatedEditors
+      }, { merge: true }).catch(err => console.warn('Editor sync note:', err));
+    } catch (edErr) {
+      console.warn('Editor sync note:', edErr);
+    }
 
     setGroups(prev => prev.map(g => {
       if (g.id === selectedGroup.id) {
