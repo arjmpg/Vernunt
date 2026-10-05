@@ -251,6 +251,13 @@ export interface StoreOrder {
   statusHistory: OrderStatusHistory[];
   trackingNumber?: string;
   courierPartner?: string; // e.g., 'BlueDart Express', 'Delhivery Priority', 'Shadowfax 24h'
+  shiprocketShipmentId?: number | string;
+  shiprocketAwb?: string;
+  shiprocketCourierCompanyId?: number;
+  shiprocketStatus?: string;
+  shiprocketPickupToken?: string;
+  shiprocketLabelUrl?: string;
+  shiprocketManifestUrl?: string;
   placedAt: string;
   deliveredAt?: string;
   notes?: string;

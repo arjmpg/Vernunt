@@ -1,4 +1,4 @@
-export type UserPlatformRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer';
+export type UserPlatformRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Vendor';
 
 export interface RegistrationFieldItem {
   name: string;
@@ -96,6 +96,24 @@ export const USER_ROLES_CONFIG: Record<UserPlatformRole, UserRoleMeta> = {
       { name: 'Primary Family & Parenting Topics', desc: 'Play ideas, kid activities, education, nutrition', icon: '🎬', isMandatory: true },
       { name: 'Creator Mobile & Email Verification', desc: 'OTP-verified creator channels', icon: '📲', isMandatory: true },
       { name: 'Profile Avatar Photo & Bio', desc: 'Featured badge on community spotlight deck', icon: '🖼️', isMandatory: true }
+    ]
+  },
+  'Vendor': {
+    role: 'Vendor',
+    label: 'Kids Brand & Product Vendor / Seller',
+    shortLabel: 'Store Vendor',
+    badge: 'Zero Commission 60-Day Trial',
+    icon: '🛍️',
+    description: 'Sell toys, Montessori kits, books, kids wear, organic snacks, and nursery gear directly to parents with Shiprocket shipping integration.',
+    requiredFields: [
+      { name: 'Brand & Store Trade Name', desc: 'Official seller store name, brand slug & business email', icon: '🏪', isMandatory: true },
+      { name: 'Business Entity & Legal Type', desc: 'Sole Proprietorship, Partnership, LLP, or Pvt Ltd company', icon: '🏢', isMandatory: true },
+      { name: 'GSTIN & Business PAN Compliance', desc: '15-digit GSTIN number and verified business PAN card', icon: '📑', isMandatory: true },
+      { name: 'Warehouse & Shiprocket Pickup Hub', desc: 'Dispatch address, landmark, city, state & 6-digit pincode', icon: '📦', isMandatory: true },
+      { name: 'Shiprocket Shipping & Courier Sync', desc: 'Delhivery, BlueDart, Shadowfax automated AWB & doorstep pickup', icon: '🚀', isMandatory: true },
+      { name: 'Bank Details & UPI for Sales Payouts', desc: 'Account holder, bank name, account number, IFSC & UPI ID', icon: '💳', isMandatory: true },
+      { name: 'BIS Toys Certification / FSSAI License', desc: 'Non-toxic toy safety or kid food safety license number', icon: '🛡️', isMandatory: true },
+      { name: 'Authorized Signatory Aadhaar & Cheque', desc: 'Identity verification & cancelled cheque / GST certificate', icon: '📄', isMandatory: true }
     ]
   }
 };

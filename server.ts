@@ -4,6 +4,7 @@ import fs from "fs";
 import os from "os";
 import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
+import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
 // Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
@@ -67,6 +68,9 @@ async function startServer() {
 
   // Zero-Cost Commerce Engine: Cursor Pagination, Search Index, Taxonomy, Distributed Locks
   registerCommerceEngineRoutes(app);
+
+  // Shiprocket Shipping & Logistics Fulfillment Routes
+  registerShiprocketRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {
@@ -3975,16 +3979,21 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   // =========================================================================
   // VITE DEV SERVER OR STATIC PRODUCTION BUILD HOSTING
   // =========================================================================
-  if (process.env.NODE_ENV !== "production") {
+  const distPath = path.join(process.cwd(), "dist");
+  const isProduction = process.env.NODE_ENV === "production" || (process.env.NODE_ENV !== "development" && fs.existsSync(path.join(distPath, "index.html")));
+
+  if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: { 
+        middlewareMode: true,
+        hmr: false
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
     console.log("[Vernunt Full-Stack Server] Loaded Vite Development Middleware");
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(
       express.static(distPath, {
         setHeaders: (res, filePath) => {
@@ -4011,31 +4020,18 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  const defaultPort = 3000;
-  const envPort = process.env.PORT ? parseInt(process.env.PORT, 10) : defaultPort;
-  const primaryPort = isNaN(envPort) ? defaultPort : envPort;
+  // In dev / AI studio preview environment, port 3000 is always required.
+  // In production deployments (e.g. standalone Cloud Run), honor process.env.PORT.
+  const port = isProduction && process.env.PORT
+    ? parseInt(process.env.PORT, 10) || 3000
+    : 3000;
 
-  const server = app.listen(primaryPort, "0.0.0.0", () => {
-    console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${primaryPort}`);
+  const server = app.listen(port, "0.0.0.0", () => {
+    console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${port}`);
   });
   server.on("error", (err: any) => {
-    console.error(`[Vernunt Full-Stack Server] Primary port ${primaryPort} error:`, err.message);
+    console.error(`[Vernunt Full-Stack Server] Port ${port} error:`, err.message);
   });
-
-  // If primary port is not 3000, also bind to port 3000 to maintain internal reverse-proxy compatibility
-  if (primaryPort !== defaultPort) {
-    try {
-      const backupServer = app.listen(defaultPort, "0.0.0.0", () => {
-        console.log(`[Vernunt Full-Stack Server] Dual-port proxy listener active on http://0.0.0.0:${defaultPort}`);
-      });
-      backupServer.on("error", (err: any) => {
-        // EADDRINUSE is expected when an internal proxy already occupies port 3000
-        console.log(`[Vernunt Full-Stack Server] Port ${defaultPort} handled: ${err.message}`);
-      });
-    } catch (e: any) {
-      console.log(`[Vernunt Full-Stack Server] Dual-port initialization note: ${e.message}`);
-    }
-  }
 }
 
 startServer();

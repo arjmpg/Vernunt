@@ -14,6 +14,7 @@ import {
   getStoredStoreSettings 
 } from '../../data/storeVendors.ts';
 import { getStoredProducts, saveStoredProducts, getStoredOrders, saveStoredOrders } from '../../data/storeProducts.ts';
+import { ShiprocketShippingDesk } from './ShiprocketShippingDesk.tsx';
 
 interface VendorDashboardProps {
   onBackToStore?: () => void;
@@ -44,7 +45,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   const [storeSettings] = useState<StoreSettings>(getStoredStoreSettings);
 
   // Active Sub-Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'withdrawals' | 'coupons' | 'inquiries' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders' | 'shipping' | 'withdrawals' | 'coupons' | 'inquiries' | 'settings'>('overview');
 
   // Modals
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
@@ -474,6 +475,15 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
             <ShoppingCart className="w-3.5 h-3.5 text-sky-400" /> Orders ({vendorOrders.length})
           </button>
           <button
+            id="tab-btn-vendor-shipping"
+            onClick={() => setActiveTab('shipping')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shrink-0 ${
+              activeTab === 'shipping' ? 'bg-[#1d2327] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5 text-indigo-400" /> Shiprocket Logistics
+          </button>
+          <button
             onClick={() => setActiveTab('withdrawals')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 shrink-0 ${
               activeTab === 'withdrawals' ? 'bg-[#1d2327] text-white shadow-xs' : 'text-slate-600 hover:bg-slate-100'
@@ -863,8 +873,15 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                         </td>
                         <td className="py-3.5 px-4 text-right space-x-2">
                           <button
+                            onClick={() => setActiveTab('shipping')}
+                            className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 inline-flex shadow-xs cursor-pointer"
+                            title="Dispatch with Shiprocket Courier & Generate AWB"
+                          >
+                            <Truck className="w-3.5 h-3.5 text-indigo-200" /> Shiprocket
+                          </button>
+                          <button
                             onClick={() => setSelectedPackingSlipOrder(ord)}
-                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold flex items-center gap-1 inline-flex"
+                            className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-bold flex items-center gap-1 inline-flex cursor-pointer"
                           >
                             <Printer className="w-3.5 h-3.5 text-slate-600" /> Packing Slip
                           </button>
@@ -876,6 +893,31 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
               </div>
             </div>
           </div>
+        )}
+
+        {/* ========================================================================= */}
+        {/* VIEW: SHIPROCKET SHIPPING & LOGISTICS                                      */}
+        {/* ========================================================================= */}
+        {activeTab === 'shipping' && (
+          <ShiprocketShippingDesk
+            currentVendor={currentVendor}
+            orders={vendorOrders}
+            onOrderUpdated={(orderId, status, trackingNumber) => {
+              const updated = orders.map(ord => {
+                if (ord.id === orderId || ord.orderNumber === orderId) {
+                  return {
+                    ...ord,
+                    orderStatus: status as any,
+                    trackingNumber: trackingNumber || ord.trackingNumber,
+                    courierPartner: 'Shiprocket Logistics'
+                  };
+                }
+                return ord;
+              });
+              setOrders(updated);
+              saveStoredOrders(updated);
+            }}
+          />
         )}
 
         {/* ========================================================================= */}

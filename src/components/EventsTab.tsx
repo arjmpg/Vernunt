@@ -157,13 +157,16 @@ export default function EventsTab({
     setBookingModalEvent(evt);
   };
 
-  const handleBuyerRegistrationSuccess = (buyerProfile: ChildProfile) => {
+  const handleBuyerRegistrationSuccess = (buyerProfile: ChildProfile, quickBooking?: Booking) => {
     setShowBuyerRegistrationModal(false);
     if (onUpdateUserProfile) {
       onUpdateUserProfile(buyerProfile);
     }
     onUpdateRole('eventbuyers');
-    if (pendingBookingEvent) {
+    if (quickBooking) {
+      handleSaveNewTicket(quickBooking);
+      setPendingBookingEvent(null);
+    } else if (pendingBookingEvent) {
       setBookingModalEvent(pendingBookingEvent);
       setPendingBookingEvent(null);
     }
@@ -2462,11 +2465,14 @@ ${deepLink}`;
         <EventBuyerRegistrationModal
           actionLabel={buyerRegActionLabel}
           eventTitle={pendingBookingEvent?.title}
+          event={pendingBookingEvent}
+          userProfile={userProfile}
+          ticketPrice={pendingBookingEvent?.ticketPrice || (pendingBookingEvent?.tiers && pendingBookingEvent.tiers[0]?.price) || 199}
           onClose={() => {
             setShowBuyerRegistrationModal(false);
             setPendingBookingEvent(null);
           }}
-          onSuccess={(buyer) => handleBuyerRegistrationSuccess(buyer)}
+          onSuccess={(buyer, quickBooking) => handleBuyerRegistrationSuccess(buyer, quickBooking)}
           onSwitchToLogin={() => {
             setShowBuyerRegistrationModal(false);
             if (onOpenLogin) onOpenLogin();

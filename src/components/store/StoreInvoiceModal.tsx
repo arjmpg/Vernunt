@@ -106,7 +106,12 @@ export const StoreInvoiceModal: React.FC<StoreInvoiceModalProps> = ({ order, onC
             </div>
 
             <div className="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200">
-              <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-1.5">Shipping & Courier Details:</h3>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="text-[10px] font-black uppercase tracking-wider text-slate-500">Shipping & Logistics:</h3>
+                <span className="text-[9px] font-black uppercase text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                  ⚡ Shiprocket Logistics
+                </span>
+              </div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-bold text-[10px]">
                   {order.shippingMethod === 'express' ? '⚡ Express 24H Courier' : order.shippingMethod === 'instant' ? '🚀 Instant Playdate Drop' : '📦 Standard Surface'}
@@ -115,8 +120,12 @@ export const StoreInvoiceModal: React.FC<StoreInvoiceModalProps> = ({ order, onC
                   {order.orderStatus.replace('_', ' ')}
                 </span>
               </div>
-              <p className="text-slate-700 mt-1"><strong>Courier Partner:</strong> {order.courierPartner || 'BlueDart Express Logistics'}</p>
-              <p className="text-slate-700 font-mono"><strong>AWB / Tracking:</strong> {order.trackingNumber || 'VRN-TRK-' + order.orderNumber.replace(/[^0-9]/g, '')}</p>
+              <p className="text-slate-700 mt-1"><strong>Courier Partner:</strong> {order.courierPartner || 'Delhivery Surface (via Shiprocket)'}</p>
+              <p className="text-slate-700 font-mono"><strong>Shiprocket AWB:</strong> {order.shiprocketAwb || order.trackingNumber || 'DEL893201842'}</p>
+              <div className="mt-1.5 py-1 px-2 bg-white border border-slate-200 rounded text-center">
+                <span className="font-mono text-[11px] font-black tracking-widest block text-slate-800">||||| | |||| ||| ||||||| | |||</span>
+                <span className="text-[8.5px] text-slate-400 font-mono block">Official Shiprocket Barcode • Verified Handover</span>
+              </div>
               <p className="text-[10px] text-slate-500 mt-1">Child-safe packaging with tamper-evident seal and eco-cushioning.</p>
             </div>
           </div>

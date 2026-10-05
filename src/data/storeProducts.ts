@@ -1,4 +1,4 @@
-import { StoreProduct, StoreCategory, StoreCoupon, StoreOrder, StoreAttribute } from '../types/store.ts';
+import type { StoreProduct, StoreCategory, StoreCoupon, StoreOrder, StoreAttribute } from '../types/store.ts';
 
 export const STORE_CATEGORIES: StoreCategory[] = [
   {

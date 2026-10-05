@@ -1,7 +1,7 @@
-import { Request, Response, Express } from 'express';
+import type { Request, Response, Express } from 'express';
 import crypto from 'crypto';
 import { INITIAL_STORE_PRODUCTS, STORE_CATEGORIES } from '../src/data/storeProducts.ts';
-import { StoreProduct, ProductVariation, ProductAttribute } from '../src/types/store.ts';
+import type { StoreProduct, ProductVariation, ProductAttribute } from '../src/types/store.ts';
 
 // ============================================================================
 // ZERO-COST HIGH-PERFORMANCE COMMERCE ENGINE

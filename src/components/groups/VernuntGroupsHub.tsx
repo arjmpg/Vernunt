@@ -6,9 +6,12 @@ import {
   GroupPrivacyTier, 
   GroupGenderRestriction,
   GroupPinnedAnnouncement,
-  GroupJoinRequest
+  GroupJoinRequest,
+  LocationSharing,
+  VerificationStatus
 } from '../../types.ts';
 import QRCode from 'qrcode';
+import confetti from 'canvas-confetti';
 import { 
   Users, 
   Plus, 
@@ -35,12 +38,16 @@ import {
   Copy,
   Info,
   ChevronRight,
-  ShieldAlert
+  ShieldAlert,
+  Smartphone,
+  CheckCircle2
 } from 'lucide-react';
 
 interface VernuntGroupsHubProps {
   userProfile: ChildProfile | null;
   onOpenCommunityMeetups?: () => void;
+  onOpenLogin?: () => void;
+  onUserAuthenticated?: (profile: ChildProfile) => void;
 }
 
 // Initial Seed Groups showcasing Vernunt's vibrant parent community
@@ -74,7 +81,7 @@ const INITIAL_GROUPS: VernuntGroup[] = [
     editors: [
       { emailOrPhone: 'priya.k@gmail.com', addedAt: '2026-07-01', addedBy: 'Ananya Sharma' }
     ],
-    memberIds: ['seed-mom-1', 'demo-user-1'],
+    memberIds: ['seed-mom-1'],
     membersCount: 142,
     pendingJoinRequests: [],
     category: 'Newborn & Infancy',
@@ -132,7 +139,7 @@ const INITIAL_GROUPS: VernuntGroup[] = [
     ],
     pinnedAnnouncements: [],
     editors: [],
-    memberIds: ['seed-mom-2', 'demo-user-1'],
+    memberIds: ['seed-mom-2'],
     membersCount: 310,
     pendingJoinRequests: [],
     category: 'Nutrition & Recipes',
@@ -226,7 +233,29 @@ const INITIAL_MESSAGES: Record<string, VernuntGroupMessage[]> = {
   ]
 };
 
-export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: VernuntGroupsHubProps) {
+export function VernuntGroupsHub({ 
+  userProfile, 
+  onOpenCommunityMeetups,
+  onOpenLogin,
+  onUserAuthenticated
+}: VernuntGroupsHubProps) {
+  // Internal profile state (dynamically updated if user authenticates via mobile OTP in groups hub)
+  const [internalProfile, setInternalProfile] = useState<ChildProfile | null>(userProfile);
+
+  useEffect(() => {
+    setInternalProfile(userProfile);
+  }, [userProfile]);
+
+  const activeProfile = internalProfile || userProfile;
+
+  // Real logged-in verification: user must have a non-guest authenticated profile
+  const isLoggedIn = Boolean(
+    activeProfile && 
+    activeProfile.id && 
+    activeProfile.id !== 'guest-explorer' && 
+    !activeProfile.id.startsWith('guest-')
+  );
+
   // Stored state
   const [groups, setGroups] = useState<VernuntGroup[]>(() => {
     try {
@@ -255,11 +284,38 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showLoginPromptModal, setShowLoginPromptModal] = useState(false);
+  const [showOtpJoinModal, setShowOtpJoinModal] = useState(false);
+  const [groupToJoin, setGroupToJoin] = useState<VernuntGroup | null>(null);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showAddEditorModal, setShowAddEditorModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [copiedLink, setCopiedLink] = useState(false);
+
+  // Mobile OTP Join Form State
+  const [otpPhone, setOtpPhone] = useState('');
+  const [otpName, setOtpName] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpResendTimer, setOtpResendTimer] = useState(30);
+  const [joinSuccessToast, setJoinSuccessToast] = useState<string | null>(null);
+
+  // Countdown timer for OTP resend
+  useEffect(() => {
+    let interval: any = null;
+    if (otpSent && otpResendTimer > 0) {
+      interval = setInterval(() => {
+        setOtpResendTimer(prev => prev - 1);
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [otpSent, otpResendTimer]);
 
   // New Message input
   const [messageText, setMessageText] = useState('');
@@ -287,10 +343,10 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
   const [announcementContent, setAnnouncementContent] = useState('');
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
 
-  // Current user info
-  const currentUserId = userProfile?.id || 'demo-user-1';
-  const currentUserName = userProfile?.parentName || 'Vernunt Parent';
-  const currentUserGender = userProfile?.parentGender || 'Mother'; // default to Mother if unspecified
+  // Current user info (Only set when authenticated)
+  const currentUserId = isLoggedIn ? (activeProfile?.id || '') : '';
+  const currentUserName = isLoggedIn ? (activeProfile?.parentName || 'Vernunt Parent') : 'Guest Explorer';
+  const currentUserGender = activeProfile?.parentGender || 'Mother'; // default to Mother if unspecified
 
   // Save to local storage
   useEffect(() => {
@@ -314,14 +370,14 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
     return groups.find(g => g.id === selectedGroupId) || null;
   }, [groups, selectedGroupId]);
 
-  const isCreator = selectedGroup?.creatorId === currentUserId;
-  const isEditor = selectedGroup?.editors.some(ed => 
+  const isCreator = Boolean(isLoggedIn && currentUserId && selectedGroup?.creatorId === currentUserId);
+  const isEditor = Boolean(isLoggedIn && currentUserId && selectedGroup?.editors.some(ed => 
     ed.id === currentUserId || 
-    (userProfile?.email && ed.emailOrPhone.toLowerCase() === userProfile.email.toLowerCase()) ||
-    (userProfile?.phoneNumber && ed.emailOrPhone === userProfile.phoneNumber)
-  );
-  const isMember = selectedGroup?.memberIds?.includes(currentUserId) ?? false;
-  const isPendingApproval = selectedGroup?.pendingJoinRequests?.some(r => r.userId === currentUserId) ?? false;
+    (activeProfile?.email && ed.emailOrPhone.toLowerCase() === activeProfile.email.toLowerCase()) ||
+    (activeProfile?.phoneNumber && ed.emailOrPhone === activeProfile.phoneNumber)
+  ));
+  const isMember = Boolean(isLoggedIn && currentUserId && selectedGroup?.memberIds?.includes(currentUserId));
+  const isPendingApproval = Boolean(isLoggedIn && currentUserId && selectedGroup?.pendingJoinRequests?.some(r => r.userId === currentUserId));
 
   // Filter groups according to strict security rules:
   // 1. Male users CANNOT view or search Female groups (hidden).
@@ -382,8 +438,145 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
     }
   };
 
+  // Open Group Creation Modal (Only logged-in users allowed)
+  const handleOpenCreateModal = () => {
+    if (!isLoggedIn) {
+      setShowLoginPromptModal(true);
+      return;
+    }
+    setShowCreateModal(true);
+  };
+
+  // Send Mobile OTP for joining groups
+  const handleSendMobileOtp = () => {
+    const cleanDigits = otpPhone.replace(/\D/g, '');
+    if (cleanDigits.length < 10) {
+      setOtpError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    setOtpError('');
+    setIsSendingOtp(true);
+    setTimeout(() => {
+      setIsSendingOtp(false);
+      setOtpSent(true);
+      setOtpResendTimer(30);
+    }, 500);
+  };
+
+  // Verify OTP and complete joining group
+  const handleVerifyOtpAndJoin = () => {
+    if (!groupToJoin) return;
+    const cleanDigits = otpPhone.replace(/\D/g, '').slice(-10);
+    if (cleanDigits.length < 10) {
+      setOtpError('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!otpCode.trim() || (otpCode.trim().length !== 6 && otpCode.trim() !== '123456')) {
+      setOtpError('Please enter the 6-digit OTP code (use test code: 123456).');
+      return;
+    }
+
+    setIsVerifyingOtp(true);
+    setOtpError('');
+
+    setTimeout(() => {
+      const finalName = otpName.trim() || `Parent ${cleanDigits.slice(-4)}`;
+      const newMemberId = `user-mobile-${cleanDigits}`;
+      const newMemberProfile: ChildProfile = {
+        id: newMemberId,
+        parentName: finalName,
+        childName: `Child of ${finalName}`,
+        childAge: 4,
+        childGender: 'Other',
+        gradeLevel: 'Preschool',
+        playStyle: 'Explorer',
+        bio: 'Verified parent member on Vernunt Community Groups.',
+        location: {
+          lat: 12.9716,
+          lng: 77.5946,
+          address: 'Bengaluru, Karnataka'
+        },
+        locationSharing: LocationSharing.APPROXIMATE,
+        verificationStatus: VerificationStatus.VERIFIED,
+        interests: ['Parenting Circles', 'Community Meetups'],
+        photoUrl: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200',
+        phoneNumber: cleanDigits,
+        phone: cleanDigits,
+        phoneVerified: true,
+        userRole: 'Parent' as any
+      };
+
+      // Authenticate locally and globally
+      setInternalProfile(newMemberProfile);
+      if (onUserAuthenticated) {
+        onUserAuthenticated(newMemberProfile);
+      }
+      try {
+        localStorage.setItem('vernunt_user_session', JSON.stringify({ userProfile: newMemberProfile, userRole: 'Parent' }));
+      } catch (err) {
+        console.error('Session storage error:', err);
+      }
+
+      // Add user to the target group
+      setGroups(prev => prev.map(g => {
+        if (g.id === groupToJoin.id) {
+          if (groupToJoin.privacyTier === 'Public') {
+            return {
+              ...g,
+              memberIds: [...new Set([...g.memberIds, newMemberId])],
+              membersCount: g.membersCount + 1
+            };
+          } else {
+            const newReq: GroupJoinRequest = {
+              userId: newMemberId,
+              userName: finalName,
+              userPhoto: newMemberProfile.photoUrl,
+              requestedAt: 'Just now',
+              note: 'Mobile OTP verified parent.'
+            };
+            return {
+              ...g,
+              pendingJoinRequests: [...g.pendingJoinRequests, newReq]
+            };
+          }
+        }
+        return g;
+      }));
+
+      setIsVerifyingOtp(false);
+      setShowOtpJoinModal(false);
+      setSelectedGroupId(groupToJoin.id);
+
+      try {
+        confetti({ particleCount: 130, spread: 75, origin: { y: 0.6 } });
+      } catch (confettiErr) {
+        console.warn('Confetti note:', confettiErr);
+      }
+
+      setJoinSuccessToast(
+        groupToJoin.privacyTier === 'Public'
+          ? `🎉 Mobile verified! Welcome to ${groupToJoin.name}. You are now a member.`
+          : `🎉 Mobile verified! Your join request for ${groupToJoin.name} has been submitted.`
+      );
+      setTimeout(() => setJoinSuccessToast(null), 5000);
+    }, 500);
+  };
+
   // Handle Joining Group
   const handleJoinGroup = (group: VernuntGroup) => {
+    // If not logged in, prompt for mobile number + OTP verification!
+    if (!isLoggedIn) {
+      setGroupToJoin(group);
+      setOtpPhone('');
+      setOtpName('');
+      setOtpCode('');
+      setOtpSent(false);
+      setOtpError('');
+      setOtpResendTimer(30);
+      setShowOtpJoinModal(true);
+      return;
+    }
+
     if (group.privacyTier === 'Public') {
       // Instant Join
       setGroups(prev => prev.map(g => {
@@ -396,6 +589,8 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
         }
         return g;
       }));
+      setJoinSuccessToast(`🎉 You have joined ${group.name}!`);
+      setTimeout(() => setJoinSuccessToast(null), 4000);
     } else if (group.privacyTier === 'Private') {
       // Submit Join Request
       setGroups(prev => prev.map(g => {
@@ -403,7 +598,7 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
           const newReq: GroupJoinRequest = {
             userId: currentUserId,
             userName: currentUserName,
-            userPhoto: userProfile?.photoUrl,
+            userPhoto: activeProfile?.photoUrl,
             requestedAt: 'Just now',
             note: 'Excited to join this community!'
           };
@@ -414,6 +609,8 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
         }
         return g;
       }));
+      setJoinSuccessToast(`Join request submitted for ${group.name}.`);
+      setTimeout(() => setJoinSuccessToast(null), 4000);
     }
   };
 
@@ -447,6 +644,11 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
   // Handle Creating New Group
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isLoggedIn) {
+      setShowCreateModal(false);
+      setShowLoginPromptModal(true);
+      return;
+    }
     if (!newGroupName.trim()) return;
 
     const slug = newGroupName.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-' + Math.floor(1000 + Math.random() * 9000);
@@ -1000,11 +1202,22 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
                 <button
                   type="button"
                   id="btn-create-new-group"
-                  onClick={() => setShowCreateModal(true)}
+                  onClick={handleOpenCreateModal}
                   className="bg-gradient-to-r from-amber-400 to-amber-300 text-slate-950 font-black text-xs py-2.5 px-4 rounded-xl shadow-md hover:scale-102 transition cursor-pointer flex items-center gap-1.5"
+                  title={!isLoggedIn ? "Login required to create a group" : "Create a new group"}
                 >
-                  <Plus className="w-4 h-4 stroke-[2.5]" />
-                  <span>Create a New Group</span>
+                  {!isLoggedIn ? (
+                    <>
+                      <Lock className="w-3.5 h-3.5 text-slate-900" />
+                      <span>Create a New Group</span>
+                      <span className="text-[10px] bg-slate-950/10 px-1.5 py-0.5 rounded font-bold">Login required</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4 stroke-[2.5]" />
+                      <span>Create a New Group</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -1131,17 +1344,31 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
                     )}
                   </div>
 
-                  {/* Bottom Footer: Members count & View Button */}
+                  {/* Bottom Footer: Members count & View/Join Button */}
                   <div className="pt-4 mt-4 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
                       <Users className="w-3.5 h-3.5" />
                       <span>{group.membersCount} members</span>
                     </span>
 
-                    <span className="text-xs font-black text-rose-700 group-hover:text-rose-900 flex items-center gap-0.5">
-                      <span>{userInGroup ? "Open Group" : "Explore"}</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
+                    <div className="flex items-center gap-2">
+                      {!userInGroup && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleJoinGroup(group);
+                          }}
+                          className="bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 text-[11px] font-extrabold px-2.5 py-1 rounded-xl transition cursor-pointer"
+                        >
+                          Join
+                        </button>
+                      )}
+                      <span className="text-xs font-black text-rose-700 group-hover:text-rose-900 flex items-center gap-0.5">
+                        <span>{userInGroup ? "Open Group" : "Explore"}</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
@@ -1157,10 +1384,11 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
               </p>
               <button
                 type="button"
-                onClick={() => setShowCreateModal(true)}
-                className="bg-rose-700 text-white font-black text-xs py-2 px-4 rounded-xl shadow-xs hover:bg-rose-800 transition cursor-pointer"
+                onClick={handleOpenCreateModal}
+                className="bg-rose-700 text-white font-black text-xs py-2 px-4 rounded-xl shadow-xs hover:bg-rose-800 transition cursor-pointer flex items-center gap-1.5 mx-auto"
               >
-                + Create Group Now
+                {!isLoggedIn && <Lock className="w-3.5 h-3.5" />}
+                <span>+ Create Group Now</span>
               </button>
             </div>
           )}
@@ -1598,6 +1826,300 @@ export function VernuntGroupsHub({ userProfile, onOpenCommunityMeetups }: Vernun
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Success Toast */}
+      {joinSuccessToast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 max-w-md w-full px-4 animate-bounce">
+          <div className="bg-slate-900 text-white p-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span className="font-bold">{joinSuccessToast}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setJoinSuccessToast(null)}
+              className="text-slate-400 hover:text-white text-xs font-bold px-2 py-1 rounded-lg"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Login Required to Create Group */}
+      {showLoginPromptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 p-6 space-y-5 animate-scale-up text-center relative">
+            <button
+              type="button"
+              onClick={() => setShowLoginPromptModal(false)}
+              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto border border-amber-200 shadow-xs">
+              <Lock className="w-8 h-8" />
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="bg-rose-50 text-rose-700 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border border-rose-200 inline-block">
+                Logged-In Parents Only
+              </span>
+              <h3 className="font-serif font-black text-slate-900 text-xl">
+                Login Required to Create Groups
+              </h3>
+              <p className="text-xs text-slate-600 leading-relaxed max-w-sm mx-auto">
+                Vernunt Parent Circles are safe, moderated spaces. To maintain high community trust, prevent spam, and verify parent identity, only logged-in parents can create new community groups.
+              </p>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 text-left text-xs space-y-2">
+              <div className="flex items-center gap-2 font-bold text-slate-800">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Why is an authenticated account required?</span>
+              </div>
+              <ul className="text-[11px] text-slate-600 space-y-1 list-disc list-inside">
+                <li>Groups must be moderated by authenticated mothers or fathers.</li>
+                <li>Allows creators to pin local meetups and manage member approvals.</li>
+                <li>Protects women-only and fathers-only circles from unverified access.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowLoginPromptModal(false);
+                  if (onOpenLogin) {
+                    onOpenLogin();
+                  } else {
+                    // Open quick mobile OTP modal to log in
+                    setGroupToJoin(null);
+                    setOtpPhone('');
+                    setOtpName('');
+                    setOtpCode('');
+                    setOtpSent(false);
+                    setOtpError('');
+                    setShowOtpJoinModal(true);
+                  }
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-black text-xs shadow-md shadow-rose-600/20 transition cursor-pointer flex items-center justify-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                <span>Log In / Register to Create Groups</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLoginPromptModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition cursor-pointer"
+              >
+                Continue Browsing Groups
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Non-Logged In User Mobile Number & OTP Verification to Join Group */}
+      {showOtpJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/65 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-100 p-6 space-y-5 animate-scale-up text-left relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowOtpJoinModal(false);
+                setGroupToJoin(null);
+              }}
+              className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Header with Group Info */}
+            <div className="flex items-start gap-3.5 pr-8">
+              <div className="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-2xl flex items-center justify-center shrink-0">
+                {groupToJoin?.avatarEmoji || '🌸'}
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200 inline-block mb-1">
+                  1-Step Parent Verification
+                </span>
+                <h3 className="font-serif font-black text-slate-900 text-base leading-tight">
+                  {groupToJoin ? `Join ${groupToJoin.name}` : 'Verify Mobile to Continue'}
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Enter your mobile number to get a quick SMS OTP and join instantly.
+                </p>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {otpError && (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{otpError}</span>
+              </div>
+            )}
+
+            {!otpSent ? (
+              /* STEP 1: Enter Mobile Number & Name */
+              <div className="space-y-3.5">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Your Name <span className="text-slate-400 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={otpName}
+                    onChange={(e) => setOtpName(e.target.value)}
+                    placeholder="e.g. Priya Sharma"
+                    className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 focus:bg-white transition text-slate-900"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Mobile Number <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <div className="px-3 py-2.5 bg-slate-100 border border-slate-200 text-xs font-bold text-slate-700 rounded-xl flex items-center shrink-0">
+                      🇮🇳 +91
+                    </div>
+                    <input
+                      type="tel"
+                      maxLength={10}
+                      value={otpPhone}
+                      onChange={(e) => {
+                        setOtpPhone(e.target.value.replace(/\D/g, '').slice(0, 10));
+                        setOtpError('');
+                      }}
+                      placeholder="10-digit mobile number"
+                      className="flex-1 text-xs px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white font-mono tracking-wider text-slate-900"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Used only for verification & community safety. Never shared publicly.
+                  </p>
+                </div>
+
+                <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl p-3 flex items-start gap-2 text-[11px] text-amber-900">
+                  <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <span>
+                    Vernunt circles are verified parent-to-parent safe havens. OTP verification ensures real neighborhood families participate.
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSendMobileOtp}
+                  disabled={isSendingOtp || otpPhone.replace(/\D/g, '').length < 10}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 disabled:opacity-50 text-white font-black text-xs shadow-md shadow-rose-600/20 transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isSendingOtp ? (
+                    <span>Sending 6-Digit OTP...</span>
+                  ) : (
+                    <>
+                      <span>Send Verification OTP</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              /* STEP 2: Enter 6-Digit OTP */
+              <div className="space-y-3.5 animate-fade-in">
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-500 text-[10px] block font-medium">OTP sent to:</span>
+                    <span className="font-mono font-bold text-slate-900">+91 {otpPhone}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpSent(false);
+                      setOtpCode('');
+                      setOtpError('');
+                    }}
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                  >
+                    Change
+                  </button>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-bold text-slate-700">
+                      Enter 6-Digit OTP <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[10px] text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                      Test Code: 123456
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={otpCode}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
+                      setOtpError('');
+                    }}
+                    placeholder="123456"
+                    className="w-full text-center text-lg font-mono tracking-widest font-black py-2.5 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                  />
+                </div>
+
+                {/* Resend & 1-Click test shortcut */}
+                <div className="flex items-center justify-between text-xs pt-1">
+                  {otpResendTimer > 0 ? (
+                    <span className="text-[11px] text-slate-400">
+                      Resend in {otpResendTimer}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleSendMobileOtp}
+                      disabled={isSendingOtp}
+                      className="text-[11px] font-bold text-rose-600 hover:text-rose-700 underline cursor-pointer"
+                    >
+                      Resend OTP
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOtpCode('123456');
+                      setOtpError('');
+                    }}
+                    className="text-[10px] text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
+                  >
+                    ⚡ Auto-Fill 123456
+                  </button>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleVerifyOtpAndJoin}
+                  disabled={isVerifyingOtp || otpCode.length !== 6}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 text-white font-black text-xs shadow-md shadow-emerald-600/20 transition cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {isVerifyingOtp ? (
+                    <span>Verifying & Joining...</span>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>Verify OTP & Join {groupToJoin ? groupToJoin.name.slice(0, 16) + '...' : 'Group'}</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -3952,8 +3952,17 @@ export default function App() {
             {/* Tab: Peanut-Style Vernunt Groups & Circles */}
             {activeTab === 'groups' && (
               <VernuntGroupsHub 
-                userProfile={effectiveProfile} 
+                userProfile={userProfile} 
                 onOpenCommunityMeetups={() => setActiveTab('community')} 
+                onOpenLogin={() => setAppMode('register')}
+                onUserAuthenticated={(newProfile) => {
+                  setUserProfile(newProfile);
+                  try {
+                    localStorage.setItem('vernunt_user_session', JSON.stringify({ userProfile: newProfile, userRole: 'Parent' }));
+                  } catch (e) {
+                    console.error(e);
+                  }
+                }}
               />
             )}
 
@@ -5375,15 +5384,19 @@ export default function App() {
         <EventBuyerRegistrationModal
           isOpen={showEventBuyerRegModal}
           onClose={() => setShowEventBuyerRegModal(false)}
-          onSuccess={(profile) => {
+          onSuccess={(profile, quickBooking) => {
             setUserProfile(profile);
             setUserRole('Parent');
             setShowEventBuyerRegModal(false);
             setAppMode('dashboard');
             setActiveTab('events');
+            if (quickBooking) {
+              setBookingsList(prev => [quickBooking, ...prev]);
+            }
             confetti({ particleCount: 120, spread: 70 });
           }}
           actionTitle="Event Ticket Buyer Instant Pass"
+          userProfile={userProfile}
         />
       )}
 
