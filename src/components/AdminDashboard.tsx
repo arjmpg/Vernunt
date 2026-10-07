@@ -8,7 +8,7 @@ import {
   ChevronUp, Lock, Unlock, AlertTriangle, Activity, Terminal, Cpu,
   Database, UserX, Radio, Sliders, CheckCircle2, FileText, HardDrive,
   Calendar, Sparkles as SparklesIcon, Flame, Star, Compass, LayoutDashboard,
-  ShoppingCart, HelpCircle, MoreHorizontal, ExternalLink, Settings,
+  ShoppingCart, ShoppingBag, HelpCircle, MoreHorizontal, ExternalLink, Settings,
   CreditCard, Key, Server, CheckSquare, Square, Filter, ChevronLeft,
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
   Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins
@@ -52,6 +52,7 @@ import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.t
 import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
 import AdminVisualCmsDesk from './admin/AdminVisualCmsDesk.tsx';
+import AdminMerchantHubDesk from './admin/AdminMerchantHubDesk.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -83,8 +84,8 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo | visual-cms
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo' | 'visual-cms'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo | visual-cms | merchant-hub
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo' | 'visual-cms' | 'merchant-hub'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -1806,6 +1807,28 @@ export default function AdminDashboard({
               )}
             </button>
 
+            {/* MENU ITEM: Vernunt Merchant Hub (Admin Exclusive) */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('merchant-hub'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'merchant-hub'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-orange-400 shadow-md'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Vernunt Merchant Hub & Product Feed Syndication"
+            >
+              <ShoppingBag className="w-4 h-4 shrink-0 text-orange-300" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Merchant Hub</span>
+                  <span className="bg-orange-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                    Feed
+                  </span>
+                </div>
+              )}
+            </button>
+
             {/* MENU ITEM: Settings & Tabs */}
             <button
               type="button"
@@ -1928,6 +1951,15 @@ export default function AdminDashboard({
               }`}
             >
               SEO &amp; Index
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('merchant-hub')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'merchant-hub' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Merchant Hub
             </button>
           </div>
           
@@ -5530,6 +5562,15 @@ export default function AdminDashboard({
           {activeMenu === 'visual-cms' && (
             <div className="space-y-4 animate-fadeIn">
               <AdminVisualCmsDesk />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* VIEW N: VERNUNT MERCHANT HUB & DISCOVERY STUDIO           */}
+          {/* ========================================================= */}
+          {activeMenu === 'merchant-hub' && (
+            <div className="space-y-4 animate-fadeIn">
+              <AdminMerchantHubDesk />
             </div>
           )}
 

@@ -118,18 +118,18 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                Google Merchant &amp; Search Console Hub
+                Vernunt Merchant Hub &amp; Discovery Gateway
               </span>
               <span className="text-slate-400 text-xs hidden sm:inline">&bull; app.vernunt.com</span>
               <span className="px-2 py-0.2 rounded-full text-[10px] font-extrabold bg-orange-500/20 text-orange-300 border border-orange-500/30">
-                RSS 2.0 Google Base Feed Active
+                RSS 2.0 Product Feed Active
               </span>
             </div>
             <h3 className="text-lg sm:text-xl font-black font-serif tracking-tight text-white flex items-center gap-2">
-              <span>Google Merchant Center &amp; Search Console Indexing</span>
+              <span>Vernunt Merchant Hub &amp; Discovery Engine</span>
             </h3>
             <p className="text-xs text-slate-300 max-w-2xl leading-relaxed">
-              Link the Vernunt Store catalog to Google Merchant Center for free Google Shopping listings, and index all verified public pages in Google Search Console while strictly safeguarding private child data.
+              Link the Vernunt Store catalog to Vernunt Merchant Hub for product catalog syndication and search discovery while strictly safeguarding private child data.
             </p>
           </div>
 
@@ -154,7 +154,7 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
             }`}
           >
             <ShoppingBag className="w-4 h-4 text-orange-600" />
-            <span>Google Merchant Center (Store Feed)</span>
+            <span>Vernunt Merchant Hub (Store Feed)</span>
             <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-orange-100 text-orange-700">
               {productAudits.length} Products Synced
             </span>
@@ -170,7 +170,7 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
             }`}
           >
             <Search className="w-4 h-4 text-indigo-600" />
-            <span>Google Search Console (Public Indexing)</span>
+            <span>Vernunt Search Discovery (Public Indexing)</span>
             <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700">
               {publicAreas.length} Public Sections
             </span>
@@ -216,10 +216,10 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
                       </span>
                     </div>
                     <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                      Vernunt Store &bull; Google Shopping Product Data Feed
+                      Vernunt Store &bull; Product Catalog Data Feed
                     </h4>
                     <p className="text-xs text-slate-600 max-w-xl leading-relaxed">
-                      Conforms to Google Merchant Center RSS 2.0 with XML namespace <code>xmlns:g="http://base.google.com/ns/1.0"</code>. Contains all {products.length} products with real-time stock, pricing, and category mapping.
+                      Conforms to Merchant Feed RSS 2.0 with XML namespace <code>xmlns:g="http://base.google.com/ns/1.0"</code>. Contains all {products.length} products with real-time stock, pricing, and category mapping.
                     </p>
                   </div>
 
@@ -405,13 +405,13 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
                       Product Feed Compliance Audit ({productAudits.length} Products)
                     </h4>
                     <p className="text-[11px] text-slate-500">
-                      Every product has been validated against Google Merchant Center required attributes: Title, SKU, Price INR, Image Link, In-Stock Availability, and Google Product Category.
+                      Every product has been validated against Merchant Feed required attributes: Title, SKU, Price INR, Image Link, In-Stock Availability, and Product Category.
                     </p>
                   </div>
 
                   <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1 shrink-0 self-start sm:self-auto">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>100% Google Shopping Compliant</span>
+                    <span>100% Merchant Feed Compliant</span>
                   </span>
                 </div>
 

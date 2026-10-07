@@ -4265,17 +4265,6 @@ export default function App() {
             <div className="flex items-center gap-2.5 flex-wrap">
               <VernuntLogo size="sm" />
               <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
-              <button
-                type="button"
-                id="btn-footer-open-google-seo"
-                onClick={() => setShowGoogleSeoModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition cursor-pointer shadow-2xs"
-                title="Google Merchant Center & Search Console Indexing Hub"
-              >
-                <Globe className="w-3 h-3 text-indigo-600" />
-                <span>Google Merchant &amp; Search Console</span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              </button>
             </div>
 
             {/* Back to Top button */}
@@ -4584,9 +4573,30 @@ export default function App() {
                   <a
                     href="mailto:support@vernunt.com"
                     className="hover:text-rose-700 transition flex items-center gap-2 text-slate-600"
+                    title="Customer Care Support"
                   >
-                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">✉️</span>
-                    <span>support@vernunt.com</span>
+                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">✉️</span>
+                    <span>Support: support@vernunt.com</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="mailto:grievance@vernunt.com"
+                    className="hover:text-indigo-700 transition flex items-center gap-2 text-slate-600"
+                    title="Grievance Redressal Officer"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">⚖️</span>
+                    <span>Grievance: grievance@vernunt.com</span>
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="mailto:estate@vernunt.com"
+                    className="hover:text-emerald-700 transition flex items-center gap-2 text-slate-600"
+                    title="Real Estate Support"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🏢</span>
+                    <span>Real Estate: estate@vernunt.com</span>
                   </a>
                 </li>
               </ul>

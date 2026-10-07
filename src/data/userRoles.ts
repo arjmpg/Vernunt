@@ -104,13 +104,13 @@ export const USER_ROLES_CONFIG: Record<UserPlatformRole, UserRoleMeta> = {
     shortLabel: 'Store Vendor',
     badge: 'Zero Commission 60-Day Trial',
     icon: '🛍️',
-    description: 'Sell toys, Montessori kits, books, kids wear, organic snacks, and nursery gear directly to parents with Shiprocket shipping integration.',
+    description: 'Sell toys, Montessori kits, books, kids wear, organic snacks, and nursery gear directly to parents with automated shipping integration.',
     requiredFields: [
       { name: 'Brand & Store Trade Name', desc: 'Official seller store name, brand slug & business email', icon: '🏪', isMandatory: true },
       { name: 'Business Entity & Legal Type', desc: 'Sole Proprietorship, Partnership, LLP, or Pvt Ltd company', icon: '🏢', isMandatory: true },
       { name: 'GSTIN & Business PAN Compliance', desc: '15-digit GSTIN number and verified business PAN card', icon: '📑', isMandatory: true },
-      { name: 'Warehouse & Shiprocket Pickup Hub', desc: 'Dispatch address, landmark, city, state & 6-digit pincode', icon: '📦', isMandatory: true },
-      { name: 'Shiprocket Shipping & Courier Sync', desc: 'Delhivery, BlueDart, Shadowfax automated AWB & doorstep pickup', icon: '🚀', isMandatory: true },
+      { name: 'Warehouse & Shipping Pickup Hub', desc: 'Dispatch address, landmark, city, state & 6-digit pincode', icon: '📦', isMandatory: true },
+      { name: 'Automated Shipping & Courier Sync', desc: 'Delhivery, BlueDart, Shadowfax automated AWB & doorstep pickup', icon: '🚀', isMandatory: true },
       { name: 'Bank Details & UPI for Sales Payouts', desc: 'Account holder, bank name, account number, IFSC & UPI ID', icon: '💳', isMandatory: true },
       { name: 'BIS Toys Certification / FSSAI License', desc: 'Non-toxic toy safety or kid food safety license number', icon: '🛡️', isMandatory: true },
       { name: 'Authorized Signatory Aadhaar & Cheque', desc: 'Identity verification & cancelled cheque / GST certificate', icon: '📄', isMandatory: true }

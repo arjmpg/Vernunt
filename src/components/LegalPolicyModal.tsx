@@ -442,7 +442,7 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Dispatch Timelines &amp; Courier Aggregators</h4>
                   <p className="mt-1">
-                    Standard in-stock merchandise is packed and handed over to independent courier partners (Shiprocket, BlueDart, Delhivery, DTDC, India Post) within <strong>24 to 48 business hours</strong> of payment verification. Personalized hardcover achievement storybooks undergo printing and binding and dispatch within <strong>3 to 4 business days</strong>.
+                    Standard in-stock merchandise is packed and handed over to independent courier partners (National Logistics Network, BlueDart, Delhivery, DTDC, India Post) within <strong>24 to 48 business hours</strong> of payment verification. Personalized hardcover achievement storybooks undergo printing and binding and dispatch within <strong>3 to 4 business days</strong>.
                   </p>
                 </div>
 
@@ -583,7 +583,9 @@ export default function LegalPolicyModal({
                 <div className="space-y-1.5 text-xs text-slate-700">
                   <p><strong>Name / Designation:</strong> Nodal Grievance Redressal Officer, Vernunt Technologies Pvt Ltd</p>
                   <p><strong>Corporate Address:</strong> Indiranagar 100ft Road, Bengaluru, Karnataka 560038, India</p>
-                  <p><strong>Official Legal &amp; Grievance Email:</strong> <a href="mailto:grievance@vernunt.com" className="text-indigo-600 font-bold underline">grievance@vernunt.com</a> &bull; <a href="mailto:legal@vernunt.com" className="text-indigo-600 font-bold underline">legal@vernunt.com</a></p>
+                  <p><strong>Customer Care Support:</strong> <a href="mailto:support@vernunt.com" className="text-rose-600 font-bold underline">support@vernunt.com</a></p>
+                  <p><strong>Grievance Redressal Contact:</strong> <a href="mailto:grievance@vernunt.com" className="text-indigo-600 font-bold underline">grievance@vernunt.com</a> &bull; <a href="mailto:legal@vernunt.com" className="text-indigo-600 font-bold underline">legal@vernunt.com</a></p>
+                  <p><strong>Real Estate Support Email:</strong> <a href="mailto:estate@vernunt.com" className="text-emerald-700 font-bold underline">estate@vernunt.com</a></p>
                   <p><strong>Child Safety Escalations:</strong> <a href="mailto:safety@vernunt.com" className="text-rose-600 font-bold underline">safety@vernunt.com</a></p>
                 </div>
               </div>
@@ -674,9 +676,9 @@ export default function LegalPolicyModal({
                 </div>
 
                 <div>
-                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Google Merchant Center Feed Accuracy</h4>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Vernunt Merchant Hub &amp; Catalog Feed Accuracy</h4>
                   <p className="mt-1">
-                    Product prices, stock availability, and specifications published on Vernunt Store and mirrored to Google Merchant Center feeds are maintained with high automated fidelity. In the event of pricing discrepancies or stockouts, merchants reserve the right to cancel orders with full refund of the amount paid.
+                    Product prices, stock availability, and specifications published on Vernunt Store and synchronized across Vernunt Merchant Hub feeds are maintained with high automated fidelity. In the event of pricing discrepancies or stockouts, merchants reserve the right to cancel orders with full refund of the amount paid.
                   </p>
                 </div>
               </div>

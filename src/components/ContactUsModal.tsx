@@ -183,44 +183,61 @@ export const ContactUsModal: React.FC<ContactUsModalProps> = ({
           {/* OFFICIAL CONTACT CHANNELS GRID */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            {/* 1. Official Support Email */}
+            {/* 1. Official Support & Escalation Desks */}
             <div className="bg-rose-50/70 border border-rose-200/80 rounded-2xl p-4.5 space-y-3 flex flex-col justify-between hover:shadow-md transition">
-              <div className="space-y-2">
-                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
-                  <Mail className="w-4 h-4" />
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <span className="text-[10px] font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded-full">Official Desks</span>
                 </div>
                 <div>
-                  <h4 className="font-serif font-black text-slate-900 text-sm">Support Email</h4>
-                  <p className="text-xs text-slate-600">Official customer & parent assistance desk</p>
+                  <h4 className="font-serif font-black text-slate-900 text-sm">Official Email Channels</h4>
+                  <p className="text-xs text-slate-600">Parent care, grievance &amp; property desks</p>
                 </div>
-                <div className="bg-white p-2.5 rounded-xl border border-rose-200 flex items-center justify-between gap-2">
-                  <code className="text-xs font-mono font-bold text-rose-900">
-                    support@vernunt.com
-                  </code>
-                  <button
-                    id="btn-copy-support-email"
-                    type="button"
-                    onClick={handleCopyEmail}
-                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 transition cursor-pointer"
-                    title="Copy Email Address"
-                  >
-                    {copiedEmail ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    ) : (
-                      <Copy className="w-4 h-4" />
-                    )}
-                  </button>
+                <div className="space-y-1.5">
+                  <div className="bg-white p-2 rounded-xl border border-rose-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Customer Care:</span>
+                      <code className="font-mono font-bold text-rose-900 text-[11px]">support@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:support@vernunt.com?subject=Vernunt%20Customer%20Care%20Query"
+                      className="p-1 rounded bg-rose-50 hover:bg-rose-100 text-rose-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-indigo-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Grievance Contact:</span>
+                      <code className="font-mono font-bold text-indigo-900 text-[11px]">grievance@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:grievance@vernunt.com?subject=Vernunt%20Grievance%20Notice"
+                      className="p-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-emerald-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Real Estate Support:</span>
+                      <code className="font-mono font-bold text-emerald-900 text-[11px]">estate@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:estate@vernunt.com?subject=Vernunt%20Daycare%20Real%20Estate%20Enquiry"
+                      className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
                 </div>
               </div>
-              <div className="pt-2 border-t border-rose-100 flex items-center justify-between">
-                <a
-                  href="mailto:support@vernunt.com?subject=Vernunt%20Support%20Enquiry"
-                  className="inline-flex items-center gap-1 text-xs font-bold text-rose-700 hover:text-rose-900 hover:underline"
-                >
-                  <span>Send Email</span>
-                  <ExternalLink className="w-3 h-3" />
-                </a>
-                <span className="text-[10px] text-slate-500 font-medium">&lt; 2 hr reply</span>
+              <div className="pt-2 border-t border-rose-100 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                <span>Verified response desk</span>
+                <span>&lt; 2 hr reply</span>
               </div>
             </div>
 
