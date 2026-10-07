@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { CommunityEvent, EventAttendee } from '../../types.ts';
 import { 
   QrCode, Camera, CheckCircle2, AlertTriangle, XCircle, Search, 
   UserCheck, Users, Download, RefreshCw, X, ShieldCheck, 
   Clock, MapPin, Sparkles, Filter, Check, ArrowRight,
   Flashlight, FlashlightOff, Upload, SwitchCamera, Volume2, VolumeX,
-  Scan, CheckCheck
+  Scan, CheckCheck, Keyboard, Mail, Ticket
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import jsQR from 'jsqr';
@@ -49,6 +49,42 @@ export default function EventOrganizerCheckInStation({
   const animationFrameRef = useRef<number | null>(null);
   const scanCooldownRef = useRef<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const scanResultTimerRef = useRef<any>(null);
+
+  // Clear timer on unmount
+  useEffect(() => {
+    return () => {
+      if (scanResultTimerRef.current) {
+        clearTimeout(scanResultTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Display instant visual feedback and auto-clear after 4.5 seconds
+  const displayScanFeedback = (result: {
+    status: 'success' | 'already_checked' | 'invalid' | null;
+    message: string;
+    attendee?: EventAttendee;
+  }) => {
+    if (scanResultTimerRef.current) {
+      clearTimeout(scanResultTimerRef.current);
+    }
+    setScanResult(result);
+
+    if (result.status) {
+      scanResultTimerRef.current = setTimeout(() => {
+        setScanResult({ status: null, message: '' });
+      }, 4500);
+    }
+  };
+
+  const clearScanFeedback = () => {
+    if (scanResultTimerRef.current) {
+      clearTimeout(scanResultTimerRef.current);
+      scanResultTimerRef.current = null;
+    }
+    setScanResult({ status: null, message: '' });
+  };
 
   // Web Audio API Synthesizer Feedback for Instant Gate Validation
   const playAudioFeedback = (type: 'success' | 'error' | 'already') => {
@@ -313,45 +349,78 @@ export default function EventOrganizerCheckInStation({
     }, 700);
   };
 
+  // Live predictive search matches when organizer types in fallback field
+  const manualInputMatches = useMemo(() => {
+    const q = manualCodeInput.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return attendees
+      .filter(a => {
+        const tNum = a.ticketNumber ? a.ticketNumber.toLowerCase() : '';
+        const email = a.buyerEmail ? a.buyerEmail.toLowerCase() : '';
+        const name = a.buyerName ? a.buyerName.toLowerCase() : '';
+        const child = a.childName ? a.childName.toLowerCase() : '';
+        const phone = a.buyerPhone ? a.buyerPhone : '';
+        return tNum.includes(q) || email.includes(q) || name.includes(q) || child.includes(q) || phone.includes(q);
+      })
+      .slice(0, 4);
+  }, [attendees, manualCodeInput]);
+
   // Check-In Logic
   const handleCheckInByCode = (rawCode: string) => {
     const parsed = parseTicketFromQr(rawCode);
-    const trimmed = parsed.trim().toUpperCase();
-    if (!trimmed) return;
+    const cleanSearch = (parsed || rawCode).trim();
+    if (!cleanSearch) return;
 
-    setLastScannedCode(trimmed);
+    const searchLower = cleanSearch.toLowerCase();
+    const searchUpper = cleanSearch.toUpperCase();
+    const searchDigits = cleanSearch.replace(/\D/g, '');
+
+    setLastScannedCode(searchUpper);
 
     // Check if event itself is past or ticket explicitly marked expired
     const todayStr = new Date().toISOString().split('T')[0];
     const isEventExpired = (event.endDate && event.endDate < todayStr) || (event.date && event.date < todayStr);
-    const isCodeExpired = trimmed.includes('EXPIRED');
+    const isCodeExpired = searchUpper.includes('EXPIRED');
 
     if (isEventExpired || isCodeExpired) {
       triggerInvalidFeedback();
       playAudioFeedback('error');
-      setScanResult({
+      displayScanFeedback({
         status: 'invalid',
         message: `⛔ TICKET EXPIRED: This pass for "${event.title}" has expired (${event.date || 'past event'}). Not valid for gate admission.`
       });
       return;
     }
 
-    // Search attendee by ticketNumber, bookingId, or childName/buyerName
-    const matchedIndex = attendees.findIndex(
-      a => a.ticketNumber.toUpperCase() === trimmed ||
-           a.id.toUpperCase() === trimmed ||
-           a.buyerPhone.includes(trimmed) ||
-           a.buyerEmail.toLowerCase() === trimmed.toLowerCase() ||
-           trimmed.includes(a.ticketNumber.toUpperCase()) ||
-           a.ticketNumber.toUpperCase().includes(trimmed)
-    );
+    // Search attendee by ticketNumber, bookingId, email, phone, or childName/buyerName
+    const matchedIndex = attendees.findIndex(a => {
+      const tNum = a.ticketNumber ? a.ticketNumber.toUpperCase() : '';
+      const email = a.buyerEmail ? a.buyerEmail.toLowerCase() : '';
+      const buyer = a.buyerName ? a.buyerName.toLowerCase() : '';
+      const child = a.childName ? a.childName.toLowerCase() : '';
+      const phoneDigits = a.buyerPhone ? a.buyerPhone.replace(/\D/g, '') : '';
+      const attId = a.id ? a.id.toUpperCase() : '';
+
+      return (
+        tNum === searchUpper ||
+        tNum.includes(searchUpper) ||
+        searchUpper.includes(tNum) ||
+        attId === searchUpper ||
+        email === searchLower ||
+        email.includes(searchLower) ||
+        (searchDigits.length >= 6 && phoneDigits.includes(searchDigits)) ||
+        buyer === searchLower ||
+        buyer.includes(searchLower) ||
+        (child && (child === searchLower || child.includes(searchLower)))
+      );
+    });
 
     if (matchedIndex === -1) {
       triggerInvalidFeedback();
       playAudioFeedback('error');
-      setScanResult({
+      displayScanFeedback({
         status: 'invalid',
-        message: `❌ INVALID PASS: Ticket "${trimmed}" was not found in this event's roster. Please check the QR pass.`
+        message: `❌ INVALID PASS: Ticket "${cleanSearch}" was not found in this event's roster. Please check the QR pass or email.`
       });
       return;
     }
@@ -361,7 +430,7 @@ export default function EventOrganizerCheckInStation({
     if (attendee.checkedIn) {
       triggerInvalidFeedback();
       playAudioFeedback('already');
-      setScanResult({
+      displayScanFeedback({
         status: 'already_checked',
         message: `⚠️ ALREADY CHECKED IN: ${attendee.childName || attendee.buyerName} was already admitted at ${attendee.checkedInAt || 'earlier today'}.`,
         attendee: attendee
@@ -382,17 +451,21 @@ export default function EventOrganizerCheckInStation({
     saveAttendees(updatedList);
     playAudioFeedback('success');
 
-    setScanResult({
+    displayScanFeedback({
       status: 'success',
       message: `✅ ADMITTED: Welcome ${attendee.childName ? `${attendee.childName} (Parent: ${attendee.buyerName})` : attendee.buyerName}!`,
       attendee: updatedList[matchedIndex]
     });
 
-    confetti({
-      particleCount: 60,
-      spread: 70,
-      origin: { y: 0.6 }
-    });
+    try {
+      confetti({
+        particleCount: 75,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    } catch {
+      // ignore
+    }
 
     setManualCodeInput('');
   };
@@ -803,8 +876,12 @@ export default function EventOrganizerCheckInStation({
 
               {/* Video Camera Preview */}
               {cameraActive ? (
-                <div className={`relative aspect-video bg-black rounded-xl overflow-hidden border transition-colors ${
-                  isShakeError ? 'border-rose-500 ring-4 ring-rose-500/40' : 'border-slate-300'
+                <div className={`relative aspect-video bg-black rounded-2xl overflow-hidden border transition-all duration-300 shadow-inner ${
+                  isShakeError 
+                    ? 'border-rose-500 ring-4 ring-rose-500/50 animate-shake' 
+                    : scanResult.status === 'success'
+                    ? 'border-emerald-500 ring-4 ring-emerald-500/40'
+                    : 'border-slate-300'
                 }`}>
                   <video
                     ref={videoRef}
@@ -818,22 +895,146 @@ export default function EventOrganizerCheckInStation({
                     <div className="absolute inset-0 pointer-events-none bg-radial from-amber-100/30 via-amber-200/10 to-transparent ring-4 ring-amber-300/40 animate-pulse"></div>
                   )}
 
-                  {/* Laser scan line animation */}
-                  <div className="absolute inset-x-8 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_12px_rgba(249,115,22,1)] animate-bounce pointer-events-none" style={{ top: '48%' }}></div>
+                  {/* Laser scan line animation (active while waiting for QR scan) */}
+                  {!scanResult.status && (
+                    <>
+                      <div className="absolute inset-x-8 h-0.5 bg-gradient-to-r from-transparent via-orange-400 to-transparent shadow-[0_0_12px_rgba(249,115,22,1)] animate-bounce pointer-events-none" style={{ top: '48%' }}></div>
 
-                  {/* Scanning Reticle */}
-                  <div className={`absolute inset-0 border-2 rounded-xl m-6 pointer-events-none flex items-center justify-center transition-colors ${
-                    isShakeError ? 'border-rose-500 bg-rose-950/30' : 'border-orange-500/80 animate-pulse'
-                  }`}>
-                    <span className={`text-[11px] px-2.5 py-1 rounded-md font-bold shadow-md ${
-                      isShakeError ? 'bg-rose-600 text-white' : 'bg-black/70 text-white'
-                    }`}>
-                      {isShakeError ? '⚠️ Invalid / Expired QR Code' : 'Align Attendee QR Code Here'}
-                    </span>
-                  </div>
+                      {/* Scanning Reticle */}
+                      <div className={`absolute inset-0 border-2 rounded-xl m-6 pointer-events-none flex items-center justify-center transition-colors ${
+                        isShakeError ? 'border-rose-500 bg-rose-950/30' : 'border-orange-500/80 animate-pulse'
+                      }`}>
+                        <span className={`text-[11px] px-2.5 py-1 rounded-md font-bold shadow-md ${
+                          isShakeError ? 'bg-rose-600 text-white' : 'bg-black/70 text-white'
+                        }`}>
+                          {isShakeError ? '⚠️ Invalid / Expired QR Code' : 'Align Attendee QR Code Here'}
+                        </span>
+                      </div>
+                    </>
+                  )}
+
+                  {/* IMMEDIATE VISUAL FEEDBACK ANIMATION OVERLAY (Green Checkmark vs Red Cross) */}
+                  {scanResult.status && (
+                    <div 
+                      className={`absolute inset-0 z-30 flex flex-col items-center justify-center p-4 text-center backdrop-blur-md transition-all animate-fadeIn ${
+                        scanResult.status === 'success'
+                          ? 'bg-emerald-950/85 text-emerald-50 border-4 border-emerald-500'
+                          : scanResult.status === 'already_checked'
+                          ? 'bg-amber-950/85 text-amber-50 border-4 border-amber-500'
+                          : 'bg-rose-950/85 text-rose-50 border-4 border-rose-500 animate-shake'
+                      }`}
+                    >
+                      {/* Animated Status Icon with Ripple */}
+                      <div className="relative mb-2.5 flex items-center justify-center">
+                        {scanResult.status === 'success' ? (
+                          <>
+                            <span className="absolute w-24 h-24 rounded-full bg-emerald-400/25 animate-feedback-ripple pointer-events-none" />
+                            <span className="absolute w-18 h-18 rounded-full bg-emerald-500/35 animate-pulse-ring pointer-events-none" />
+                            <div className="w-16 h-16 rounded-full bg-emerald-500 text-white flex items-center justify-center shadow-2xl shadow-emerald-500/50 animate-pop-in">
+                              <svg className="w-10 h-10 text-white" viewBox="0 0 52 52" fill="none">
+                                <path
+                                  d="M14 27l8 8 16-16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="animate-checkmark-draw"
+                                />
+                              </svg>
+                            </div>
+                          </>
+                        ) : scanResult.status === 'already_checked' ? (
+                          <>
+                            <span className="absolute w-24 h-24 rounded-full bg-amber-400/25 animate-feedback-ripple pointer-events-none" />
+                            <div className="w-16 h-16 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-2xl shadow-amber-500/50 animate-pop-in">
+                              <AlertTriangle className="w-9 h-9 text-white" />
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <span className="absolute w-24 h-24 rounded-full bg-rose-500/25 animate-feedback-ripple pointer-events-none" />
+                            <div className="w-16 h-16 rounded-full bg-rose-600 text-white flex items-center justify-center shadow-2xl shadow-rose-600/50 animate-pop-in">
+                              <svg className="w-10 h-10 text-white" viewBox="0 0 52 52" fill="none">
+                                <path
+                                  d="M16 16l20 20M36 16l-20 20"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="5"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="animate-cross-draw"
+                                />
+                              </svg>
+                            </div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Primary Status Banner */}
+                      <div className="space-y-1 max-w-sm px-2">
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full inline-block shadow-xs ${
+                          scanResult.status === 'success'
+                            ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/50'
+                            : scanResult.status === 'already_checked'
+                            ? 'bg-amber-500/30 text-amber-200 border border-amber-400/50'
+                            : 'bg-rose-500/30 text-rose-200 border border-rose-400/50'
+                        }`}>
+                          {scanResult.status === 'success' ? '✓ Verified & Admitted' : scanResult.status === 'already_checked' ? '⚠ Already Checked In' : '✕ Entry Rejected'}
+                        </span>
+
+                        <p className="text-sm font-black text-white leading-tight">
+                          {scanResult.status === 'success' && scanResult.attendee ? (
+                            <span>Welcome {scanResult.attendee.childName || scanResult.attendee.buyerName}!</span>
+                          ) : (
+                            scanResult.message
+                          )}
+                        </p>
+
+                        {scanResult.attendee && (
+                          <div className="text-[10px] text-slate-200 bg-black/50 px-2.5 py-1 rounded-lg border border-white/10 mt-1 flex flex-wrap items-center justify-center gap-1.5">
+                            <span>Tier: <strong className="text-emerald-300">{scanResult.attendee.ticketTierName}</strong></span>
+                            <span>•</span>
+                            <span className="font-mono text-white">{scanResult.attendee.ticketNumber}</span>
+                            {scanResult.attendee.buyerEmail && (
+                              <>
+                                <span>•</span>
+                                <span className="text-slate-300 truncate max-w-[140px]">{scanResult.attendee.buyerEmail}</span>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Immediate Actions */}
+                      <div className="flex items-center gap-2 mt-2.5">
+                        <button
+                          type="button"
+                          onClick={clearScanFeedback}
+                          className="px-3 py-1 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 transition shadow-md cursor-pointer flex items-center gap-1"
+                        >
+                          <span>Scan Next</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                        {scanResult.status === 'invalid' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              clearScanFeedback();
+                              const inputEl = document.getElementById('station-manual-fallback-input');
+                              if (inputEl) inputEl.focus();
+                            }}
+                            className="px-3 py-1 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white transition shadow-sm cursor-pointer"
+                          >
+                            Use Manual Fallback
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Top bar controls in camera preview */}
-                  <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                  <div className="absolute top-2 right-2 flex items-center gap-1.5 z-10">
                     <button
                       type="button"
                       onClick={toggleFacingMode}
@@ -907,63 +1108,101 @@ export default function EventOrganizerCheckInStation({
                 </div>
               )}
 
-              {/* Manual Ticket ID / Phone Input */}
-              <form 
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleCheckInByCode(manualCodeInput);
-                }} 
-                className="space-y-2"
-              >
-                <label className="block text-[11px] font-bold text-slate-700 uppercase">
-                  Fast Manual Search & Validation
-                </label>
-                <div className="flex gap-1.5">
-                  <input
-                    type="text"
-                    value={manualCodeInput}
-                    onChange={(e) => setManualCodeInput(e.target.value)}
-                    placeholder="Enter Ticket ID, Child Name, or Phone..."
-                    className={`flex-1 text-xs px-3 py-2 rounded-xl border font-mono transition-all focus:outline-none ${
-                      isShakeError 
-                        ? 'border-rose-500 ring-2 ring-rose-400 bg-rose-50/60 text-rose-900' 
-                        : 'border-slate-300 focus:ring-2 focus:ring-orange-500'
-                    }`}
-                  />
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl hover:bg-slate-800 transition-colors"
-                  >
-                    Check In
-                  </button>
-                </div>
-              </form>
+              {/* Instant Visual Scan Feedback Animation Banner (Displayed when camera is not active or as persistent feedback) */}
+              {scanResult.status && !cameraActive && (
+                <div 
+                  className={`p-4 rounded-2xl border transition-all animate-fadeIn relative overflow-hidden shadow-lg ${
+                    scanResult.status === 'success'
+                      ? 'bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white border-emerald-500 ring-2 ring-emerald-500/30'
+                      : scanResult.status === 'already_checked'
+                      ? 'bg-gradient-to-r from-amber-950 via-slate-900 to-amber-950 text-white border-amber-500 ring-2 ring-amber-500/30'
+                      : 'bg-gradient-to-r from-rose-950 via-slate-900 to-rose-950 text-white border-rose-500 ring-2 ring-rose-500/30 animate-shake'
+                  }`}
+                >
+                  <div className="flex items-start gap-3.5">
+                    {/* Animated Icon */}
+                    <div className="relative flex-shrink-0 flex items-center justify-center pt-0.5">
+                      {scanResult.status === 'success' ? (
+                        <div className="relative">
+                          <span className="absolute -inset-1 rounded-full bg-emerald-400/20 animate-feedback-ripple pointer-events-none" />
+                          <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/40 animate-pop-in">
+                            <svg className="w-7 h-7 text-white" viewBox="0 0 52 52" fill="none">
+                              <path
+                                d="M14 27l8 8 16-16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="animate-checkmark-draw"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      ) : scanResult.status === 'already_checked' ? (
+                        <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white flex items-center justify-center shadow-lg shadow-amber-500/40 animate-pop-in">
+                          <AlertTriangle className="w-7 h-7 text-white" />
+                        </div>
+                      ) : (
+                        <div className="relative">
+                          <span className="absolute -inset-1 rounded-full bg-rose-500/20 animate-feedback-ripple pointer-events-none" />
+                          <div className="w-12 h-12 rounded-2xl bg-rose-600 text-white flex items-center justify-center shadow-lg shadow-rose-600/40 animate-pop-in">
+                            <svg className="w-7 h-7 text-white" viewBox="0 0 52 52" fill="none">
+                              <path
+                                d="M16 16l20 20M36 16l-20 20"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="animate-cross-draw"
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-              {/* Instant Quick Validation Result Banner */}
-              {scanResult.status && (
-                <div className={`p-4 rounded-xl text-xs border animate-fadeIn ${
-                  scanResult.status === 'success'
-                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
-                    : scanResult.status === 'already_checked'
-                    ? 'bg-amber-50 text-amber-900 border-amber-300'
-                    : 'bg-rose-50 text-rose-900 border-rose-300'
-                }`}>
-                  <div className="flex items-start gap-2.5">
-                    {scanResult.status === 'success' ? (
-                      <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    ) : scanResult.status === 'already_checked' ? (
-                      <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    ) : (
-                      <XCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
-                    )}
-                    <div className="space-y-1">
-                      <p className="font-bold">{scanResult.message}</p>
+                    {/* Details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                          scanResult.status === 'success'
+                            ? 'bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'
+                            : scanResult.status === 'already_checked'
+                            ? 'bg-amber-500/30 text-amber-300 border border-amber-500/40'
+                            : 'bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                        }`}>
+                          {scanResult.status === 'success' ? '✓ Pass Admitted' : scanResult.status === 'already_checked' ? '⚠ Already Admitted' : '✕ Invalid / Expired Pass'}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={clearScanFeedback}
+                          className="text-slate-400 hover:text-white transition p-1 cursor-pointer"
+                          title="Dismiss feedback"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-white leading-tight">
+                        {scanResult.message}
+                      </h4>
+
                       {scanResult.attendee && (
-                        <div className="text-[11px] text-slate-700 bg-white/80 p-2 rounded-lg border border-slate-200/60 mt-1.5 space-y-0.5">
+                        <div className="text-[11px] text-slate-300 bg-white/10 p-2.5 rounded-xl border border-white/10 space-y-0.5 mt-2">
+                          <div className="flex items-center justify-between">
+                            <span><strong>Attendee:</strong> {scanResult.attendee.childName || scanResult.attendee.buyerName}</span>
+                            <span className="font-mono text-emerald-400 font-bold">{scanResult.attendee.ticketNumber}</span>
+                          </div>
+                          {scanResult.attendee.buyerEmail && (
+                            <div className="text-slate-300 text-[10px]">
+                              <strong>Email:</strong> {scanResult.attendee.buyerEmail}
+                            </div>
+                          )}
                           <div><strong>Pass Tier:</strong> {scanResult.attendee.ticketTierName}</div>
-                          <div><strong>Ticket ID:</strong> <span className="font-mono">{scanResult.attendee.ticketNumber}</span></div>
                           {scanResult.attendee.specialRequirements && (
-                            <div className="text-amber-800 font-semibold">
+                            <div className="text-amber-300 font-semibold text-[10px]">
                               ⚠️ Notes: {scanResult.attendee.specialRequirements}
                             </div>
                           )}
@@ -973,6 +1212,151 @@ export default function EventOrganizerCheckInStation({
                   </div>
                 </div>
               )}
+
+              {/* MANUAL CHECK-IN FALLBACK SECTION (Ticket ID or Attendee Email) */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center">
+                      <Keyboard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-slate-900 uppercase tracking-wide">
+                        Manual Check-In Fallback
+                      </h4>
+                      <p className="text-[10px] text-slate-500">
+                        Use if QR scanning fails or camera is unavailable
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full border border-slate-200 flex items-center gap-1">
+                    <Ticket className="w-3 h-3 text-orange-500" />
+                    <span>Ticket ID or Email</span>
+                  </span>
+                </div>
+
+                <form 
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleCheckInByCode(manualCodeInput);
+                  }} 
+                  className="space-y-2"
+                >
+                  <label htmlFor="station-manual-fallback-input" className="block text-[11px] font-bold text-slate-700">
+                    Enter Ticket ID or Attendee Email:
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search className="w-3.5 h-3.5" />
+                    </div>
+                    <input
+                      id="station-manual-fallback-input"
+                      type="text"
+                      value={manualCodeInput}
+                      onChange={(e) => setManualCodeInput(e.target.value)}
+                      placeholder="e.g. VERN-EVT-102 or parent@example.com..."
+                      className={`w-full text-xs pl-9 pr-9 py-2.5 rounded-xl border font-mono transition-all focus:outline-none ${
+                        isShakeError 
+                          ? 'border-rose-500 ring-2 ring-rose-400 bg-rose-50/60 text-rose-900' 
+                          : 'border-slate-300 focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-slate-50 focus:bg-white text-slate-800'
+                      }`}
+                    />
+                    {manualCodeInput && (
+                      <button
+                        type="button"
+                        onClick={() => setManualCodeInput('')}
+                        className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                        title="Clear input"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="submit"
+                      disabled={!manualCodeInput.trim()}
+                      className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer ${
+                        manualCodeInput.trim()
+                          ? 'bg-slate-900 hover:bg-slate-800 text-white'
+                          : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
+                      }`}
+                    >
+                      <UserCheck className="w-3.5 h-3.5" />
+                      <span>Validate & Admit Attendee</span>
+                    </button>
+
+                    {manualCodeInput.trim() && (
+                      <button
+                        type="button"
+                        onClick={() => setManualCodeInput('')}
+                        className="py-2 px-3 text-xs font-medium text-slate-500 hover:text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl transition cursor-pointer"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </form>
+
+                {/* Live Predictive Autocomplete Suggestions */}
+                {manualInputMatches.length > 0 && (
+                  <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                      Matching Attendees ({manualInputMatches.length}):
+                    </span>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {manualInputMatches.map((attendee) => (
+                        <div
+                          key={attendee.id}
+                          className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 transition ${
+                            attendee.checkedIn
+                              ? 'bg-emerald-50/60 border-emerald-200'
+                              : 'bg-slate-50 border-slate-200 hover:border-orange-300 hover:bg-orange-50/40'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1 space-y-0.5">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-bold text-slate-900">
+                                {attendee.childName ? `${attendee.childName} (${attendee.buyerName})` : attendee.buyerName}
+                              </span>
+                              <span className="text-[9px] font-mono bg-white px-1.5 py-0.2 rounded border border-slate-200 text-slate-600 font-semibold">
+                                {attendee.ticketNumber}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500 truncate">
+                              <Mail className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                              <span className="truncate">{attendee.buyerEmail}</span>
+                              <span>•</span>
+                              <span className="text-slate-600">{attendee.ticketTierName}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {attendee.checkedIn ? (
+                              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <Check className="w-3 h-3 text-emerald-700" />
+                                <span>Admitted</span>
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  handleCheckInByCode(attendee.ticketNumber);
+                                }}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-[11px] transition shadow-xs flex items-center gap-1 cursor-pointer"
+                              >
+                                <UserCheck className="w-3 h-3" />
+                                <span>Admit</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Quick Demo QR Test Buttons */}

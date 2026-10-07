@@ -18,6 +18,7 @@ interface CreateEventWizardModalProps {
   onAddEvent: (newEvent: CommunityEvent) => void;
   onDirectBook?: (newEvent: CommunityEvent) => void;
   customCategories?: any[];
+  initialSubCategory?: 'event' | 'classes' | 'activity';
 }
 
 export default function CreateEventWizardModal({
@@ -25,13 +26,14 @@ export default function CreateEventWizardModal({
   onClose,
   onAddEvent,
   onDirectBook,
-  customCategories = []
+  customCategories = [],
+  initialSubCategory
 }: CreateEventWizardModalProps) {
   // Published Event QR Stage
   const [publishedEvent, setPublishedEvent] = useState<CommunityEvent | null>(null);
 
   // Top-Level Classification: Event vs Classes vs Activity
-  const [itemCategoryType, setItemCategoryType] = useState<'event' | 'classes' | 'activity'>('event');
+  const [itemCategoryType, setItemCategoryType] = useState<'event' | 'classes' | 'activity'>(initialSubCategory || 'event');
 
   // Delivery Mode: Physical In-Person vs Virtual Online
   const [deliveryMode, setDeliveryMode] = useState<'physical' | 'virtual'>('physical');
@@ -131,19 +133,22 @@ export default function CreateEventWizardModal({
     setItemCategoryType(type);
     if (type === 'classes') {
       setCategory('Class');
-      if (!title || title.includes('Workshop') || title.includes('Event')) {
-        setTitle('Kids Interactive Learning Masterclass');
+      if (!title || title.includes('Workshop') || title.includes('Event') || title.includes('Activity') || title.includes('Carnival')) {
+        setTitle('Permanent Music / Tuition Class');
       }
+      setTagsStr('Tuition, Music, Permanent Class, Kids, Learning');
     } else if (type === 'activity') {
       setCategory('Activity');
-      if (!title || title.includes('Class') || title.includes('Event')) {
-        setTitle('Weekend Creative Activity Circle');
+      if (!title || title.includes('Class') || title.includes('Event') || title.includes('Activity') || title.includes('Carnival')) {
+        setTitle('Junior Swimming / Chess / Sports Summer Camp');
       }
+      setTagsStr('Swimming, Chess, Sports, Summer Camp, Activity');
     } else {
       setCategory('Event');
-      if (!title || title.includes('Class') || title.includes('Activity')) {
-        setTitle('Community Carnival & Children Gathering');
+      if (!title || title.includes('Class') || title.includes('Activity') || title.includes('Camp')) {
+        setTitle('Weekend Family Carnival (1–7 Days)');
       }
+      setTagsStr('Carnival, Festival, 1-7 Days, Weekend Event, Kids');
     }
   };
 
@@ -356,6 +361,27 @@ export default function CreateEventWizardModal({
         });
       }
 
+      // 5. Automatic Real-Time Google Search Console & IndexNow Indexing
+      try {
+        const { triggerAutoIndex } = await import('../../services/seoAutoIndexer.ts');
+        triggerAutoIndex({
+          type: 'event',
+          item: {
+            id: newEvent.id,
+            title: newEvent.title,
+            name: newEvent.title,
+            slug: (newEvent as any).slug || newEvent.id,
+            subcat: (newEvent as any).subCategory || 'event',
+            description: newEvent.description,
+            imageUrl: newEvent.imageUrl,
+            price: newEvent.price,
+            url: `https://app.vernunt.com/events/${(newEvent as any).subCategory || 'event'}/${(newEvent as any).slug || newEvent.id}`
+          }
+        }).catch(() => {});
+      } catch (autoErr) {
+        // Safe fallback
+      }
+
       setIsSubmitting(false);
       // Present Host QR Pass Station so host can immediately share with others
       setPublishedEvent(newEvent);
@@ -431,14 +457,16 @@ export default function CreateEventWizardModal({
           </div>
         )}
 
-        {/* Primary Classification Selector: Event vs Classes vs Activity */}
-        <div className="bg-slate-50 border-b border-slate-200 p-3.5">
+        {/* Primary Classification Selector: Event (1-7 Days) vs Activity (Swimming, Chess, Sports) vs Classes (Permanent Music, Tuition) */}
+        <div className="bg-slate-50 border-b border-slate-200 p-4 space-y-2.5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div>
-              <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 block">
-                1. Select Listing Type *
+              <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 block">
+                1. Select Gathering Sub-Category *
               </span>
-              <p className="text-[11px] text-slate-500">Choose category to reveal specialized fields</p>
+              <p className="text-[11px] text-slate-500">
+                Choose format to configure schedule, duration and pass tiers
+              </p>
             </div>
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-2xl w-full sm:w-auto">
               <button
@@ -449,21 +477,10 @@ export default function CreateEventWizardModal({
                     ? 'bg-orange-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
+                title="Short term events like 1 to 7 days (festivals, popups, carnivals)"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>🎪 Event</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleItemTypeChange('classes')}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
-                  itemCategoryType === 'classes'
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>📚 Classes</span>
+                <span>🎪 Event (1–7d)</span>
               </button>
               <button
                 type="button"
@@ -473,10 +490,55 @@ export default function CreateEventWizardModal({
                     ? 'bg-emerald-600 text-white shadow-sm'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
+                title="Activities as swimming, chess, sports, summer camps etc."
               >
                 <Palette className="w-3.5 h-3.5" />
-                <span>🎨 Activity</span>
+                <span>🏊 Activity</span>
               </button>
+              <button
+                type="button"
+                onClick={() => handleItemTypeChange('classes')}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  itemCategoryType === 'classes'
+                    ? 'bg-purple-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Classes as permanent classes like music, tuition etc."
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>🎓 Class (Perm.)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-Category Explanation Note */}
+          <div className={`p-2.5 rounded-xl border text-[11px] flex items-center justify-between gap-2 ${
+            itemCategoryType === 'classes'
+              ? 'bg-purple-50 border-purple-200 text-purple-900'
+              : itemCategoryType === 'activity'
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+              : 'bg-orange-50 border-orange-200 text-orange-900'
+          }`}>
+            <div className="flex items-center gap-2">
+              <span className="text-base shrink-0">
+                {itemCategoryType === 'classes' ? '🎓' : itemCategoryType === 'activity' ? '🏊' : '🎪'}
+              </span>
+              <div>
+                <strong className="block font-black">
+                  {itemCategoryType === 'classes' 
+                    ? 'Permanent Classes (Music, Tuition, Academies, etc.)' 
+                    : itemCategoryType === 'activity'
+                    ? 'Recreational Activities & Camps (Swimming, Chess, Sports, Summer Camps)'
+                    : 'Short-Term Events (1 to 7 Days Duration)'}
+                </strong>
+                <span className="text-[10px] opacity-85">
+                  {itemCategoryType === 'classes'
+                    ? 'Ongoing regular weekly sessions: music lessons, school tuition batches, robotics academy, pottery studio & dance.'
+                    : itemCategoryType === 'activity'
+                    ? 'Active physical & mental sports: swimming coaching, chess tournaments, football drills, summer camps & outdoor adventure.'
+                    : 'Short-term experiences lasting 1 to 7 days: weekend family popups, carnivals, puppet shows, festivals & exhibitions.'}
+                </span>
+              </div>
             </div>
           </div>
         </div>

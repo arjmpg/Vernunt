@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Vernunt Store Official Product Feed</title>
+    <link>https://app.vernunt.com/store</link>
+    <description>Verified child play gear, organic toddler nutrition, and child safety equipment on Vernunt.</description>
+    <lastBuildDate>Wed, 07 Oct 2026 02:27:19 GMT</lastBuildDate>
+    <atom:link href="https://app.vernunt.com/google-merchant-feed.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <g:id>VRN-FOOD-001</g:id>
+      <g:title>Organic Sprouted Ragi & Almond Baby Porridge Mix</g:title>
+      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
+      <g:link>https://app.vernunt.com/store/organic-sprouted-ragi-almond-baby-porridge</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>349.00 INR</g:price>
+      <g:google_product_category>Food, Beverages & Tobacco > Food Items > Baby & Toddler Food</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-001</g:id>
+      <g:title>100% Organic Bamboo Cotton Infant Romper & Jumpsuit Set</g:title>
+      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
+      <g:link>https://app.vernunt.com/store/organic-cotton-infant-romper-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>699.00 INR</g:price>
+      <g:google_product_category>Apparel & Accessories > Clothing > Baby & Toddler Clothing</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-STEM-001</g:id>
+      <g:title>Montessori Wooden Sensory Busy Board & Motor Agility Board</g:title>
+      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
+      <g:link>https://app.vernunt.com/store/montessori-wooden-sensory-activity-board</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1299.00 INR</g:price>
+      <g:google_product_category>Toys & Games > Toys > Educational Toys</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-JEWEL-001</g:id>
+      <g:title>Hallmarked 925 Pure Silver Baby Nazariya Evil Eye Bangles</g:title>
+      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
+      <g:link>https://app.vernunt.com/store/hallmarked-925-silver-baby-nazariya-bangles</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>899.00 INR</g:price>
+      <g:google_product_category>Apparel & Accessories > Jewelry</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-001</g:id>
+      <g:title>Ultra-Soft Chemical-Free Bamboo Diapers with Wetness Indicator</g:title>
+      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
+      <g:link>https://app.vernunt.com/store/chemical-free-bamboo-baby-diapers-tape-style</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>749.00 INR</g:price>
+      <g:google_product_category>Baby & Toddler > Diapering</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+  </channel>
+</rss>

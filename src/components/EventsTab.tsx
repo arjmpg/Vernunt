@@ -6,8 +6,9 @@ import {
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
   Ticket, QrCode, UserCheck, Wallet, Clock, ArrowRight, ShieldCheck,
   Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing, Users,
-  ChevronDown, SlidersHorizontal, RotateCcw, Filter
+  ChevronDown, SlidersHorizontal, RotateCcw, Filter, Layers, BookOpen, Trophy
 } from 'lucide-react';
+import { GatheringSubCategory, GATHERING_SUBCATEGORIES, getGatheringSubCategory } from '../utils/gatheringCategories.ts';
 import confetti from 'canvas-confetti';
 import { getHaversineDistance, getProximityBadge } from '../utils/distance.ts';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
@@ -30,6 +31,7 @@ import { sendEventBookingNotifications } from '../utils/notifications.ts';
 import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 import { MOCK_EVENTS } from '../data/mockData.ts';
+import { PageCustomBlocksSection } from './admin/visual/PageCustomBlocksSection.tsx';
 
 // Calculate status: 'Upcoming' | 'Full' | 'Past'
 export const getEventStatus = (evt: CommunityEvent): 'Upcoming' | 'Full' | 'Past' => {
@@ -76,6 +78,7 @@ export default function EventsTab({
   onOpenPushModal
 }: EventsTabProps) {
   // Core Filter and Sort States declared upfront to eliminate TDZ
+  const [activeSubCategory, setActiveSubCategory] = useState<GatheringSubCategory>('all');
   const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('nearby_only');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -97,6 +100,7 @@ export default function EventsTab({
   const [dynamicCheckInEvent, setDynamicCheckInEvent] = useState<CommunityEvent | null>(null);
   const [bookingModalEvent, setBookingModalEvent] = useState<CommunityEvent | null>(null);
   const [showCreateWizard, setShowCreateWizard] = useState<boolean>(initialOpenCreateWizard);
+  const [wizardInitialSubCat, setWizardInitialSubCat] = useState<'event' | 'classes' | 'activity'>('event');
   const [myTickets, setMyTickets] = useState<Booking[]>([]);
   const [showMyTicketsDrawer, setShowMyTicketsDrawer] = useState<boolean>(false);
   const [organizerRoleAlertEvent, setOrganizerRoleAlertEvent] = useState<CommunityEvent | null>(null);
@@ -105,6 +109,7 @@ export default function EventsTab({
   const isAnyFilterActive = categoryFilter !== 'All' || sortMode !== 'nearby_only' || onlyNearbyFilter || searchQuery.trim() !== '';
 
   const handleResetAllFilters = () => {
+    setActiveSubCategory('all');
     setCategoryFilter('All');
     setSortMode('nearby_only');
     setOnlyNearbyFilter(false);
@@ -117,6 +122,71 @@ export default function EventsTab({
       setShowCreateWizard(true);
     }
   }, [initialOpenCreateWizard]);
+
+  // Dynamic Schema.org Event, SportsEvent, and Course Structured Data for Googlebot & Google Search Console
+  useEffect(() => {
+    try {
+      const topEvents = (eventsList || []).slice(0, 12);
+      const jsonLd = {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        "itemListElement": topEvents.map((evt, idx) => {
+          const subCat = getGatheringSubCategory(evt);
+          const schemaType = subCat === 'classes' ? 'Course' : subCat === 'activity' ? 'SportsEvent' : 'Event';
+          return {
+            "@type": "ListItem",
+            "position": idx + 1,
+            "item": {
+              "@type": schemaType,
+              "name": evt.title,
+              "description": evt.description,
+              "startDate": evt.date,
+              "endDate": evt.endDate || evt.date,
+              "eventStatus": "https://schema.org/EventScheduled",
+              "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+              "location": {
+                "@type": "Place",
+                "name": evt.location,
+                "address": {
+                  "@type": "PostalAddress",
+                  "addressLocality": "Bengaluru",
+                  "addressRegion": "Karnataka",
+                  "addressCountry": "IN"
+                }
+              },
+              "image": evt.imageUrl ? [evt.imageUrl] : undefined,
+              "offers": {
+                "@type": "Offer",
+                "price": evt.price || 0,
+                "priceCurrency": "INR",
+                "availability": evt.currentAttendees < evt.maxAttendees ? "https://schema.org/InStock" : "https://schema.org/SoldOut"
+              },
+              "organizer": {
+                "@type": "Person",
+                "name": evt.hostName
+              }
+            }
+          };
+        })
+      };
+
+      let scriptTag = document.getElementById('vernunt-events-jsonld') as HTMLScriptElement | null;
+      if (!scriptTag) {
+        scriptTag = document.createElement('script');
+        scriptTag.id = 'vernunt-events-jsonld';
+        scriptTag.type = 'application/ld+json';
+        document.head.appendChild(scriptTag);
+      }
+      scriptTag.text = JSON.stringify(jsonLd);
+    } catch (e) {
+      console.warn('Failed to inject events JSON-LD', e);
+    }
+
+    return () => {
+      const el = document.getElementById('vernunt-events-jsonld');
+      if (el) el.remove();
+    };
+  }, [eventsList]);
 
   // Parent GPS coordinates (default to userProfile or Bangalore/Central location)
   const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
@@ -838,6 +908,14 @@ export default function EventsTab({
         return false;
       }
 
+      // 0.5. Sub-category check: Events (1-7 days) vs Activities (sports, chess, camps) vs Classes (permanent music, tuition)
+      if (activeSubCategory !== 'all') {
+        const subCat = getGatheringSubCategory(evt);
+        if (subCat !== activeSubCategory) {
+          return false;
+        }
+      }
+
       // 1. Category check
       if (categoryFilter !== 'All' && evt.category !== categoryFilter) {
         return false;
@@ -885,6 +963,91 @@ export default function EventsTab({
     });
 
   // Categorized & Ranked Event Pools for Carousel Exploration (BookMyShow UX Pattern)
+  const subCategoryCounts = useMemo(() => {
+    let events = 0;
+    let activities = 0;
+    let classes = 0;
+
+    eventsList.forEach(e => {
+      if (getEventStatus(e) === 'Past') return;
+      const sub = getGatheringSubCategory(e);
+      if (sub === 'event') events++;
+      else if (sub === 'activity') activities++;
+      else if (sub === 'classes') classes++;
+    });
+
+    return {
+      all: events + activities + classes,
+      event: events,
+      activity: activities,
+      classes: classes
+    };
+  }, [eventsList]);
+
+  // Sub-Category Dedicated Pools
+  const shortTermEventsPool = useMemo(() => {
+    return filteredEvents.filter(e => getGatheringSubCategory(e) === 'event');
+  }, [filteredEvents]);
+
+  const activitiesPool = useMemo(() => {
+    return filteredEvents.filter(e => getGatheringSubCategory(e) === 'activity');
+  }, [filteredEvents]);
+
+  const permanentClassesPool = useMemo(() => {
+    return filteredEvents.filter(e => getGatheringSubCategory(e) === 'classes');
+  }, [filteredEvents]);
+
+  // Activity Specific Sub-Pools (Swimming, Chess, Sports & Camps)
+  const swimmingActivities = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /swim|aqua|pool|water polo/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const chessActivities = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /chess|grandmaster|strategy|puzzle/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const sportsAndCampActivities = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /football|soccer|cricket|sports|agility|relay|camp|athletics|skating|badminton|tennis|adventure|obstacle|trail/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  // Classes Specific Sub-Pools (Music, Tuition, Robotics, Pottery)
+  const musicClasses = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /music|vocal|carnatic|classical|flute|singing|piano|guitar|violin/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const tuitionClasses = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /tuition|math|science|foundation|academic|coaching|school/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const stemAndRoboticsClasses = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /robot|stem|lego|coding|scratch|python|space|astronomy/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
+  const studioCraftClasses = useMemo(() => {
+    return filteredEvents.filter(e => {
+      const matchText = `${e.title} ${e.description} ${(e.tags || []).join(' ')}`.toLowerCase();
+      return /pottery|clay|ceramic|sculpt|art studio|craft studio/i.test(matchText);
+    });
+  }, [filteredEvents]);
+
   const popularEvents = useMemo(() => {
     return [...filteredEvents].sort((a, b) => (b.attendeesCount || 0) - (a.attendeesCount || 0));
   }, [filteredEvents]);
@@ -1051,6 +1214,9 @@ ${deepLink}`;
 
   return (
     <div id="events-dashboard-section" className="space-y-6">
+      {/* Visual CMS Admin Custom Blocks for Events Page */}
+      <PageCustomBlocksSection pageId="events" isAdmin={userProfile?.userRole === 'Admin'} />
+
       {/* Toast Notification when event link is copied */}
       {shareToast && (
         <div 
@@ -1142,11 +1308,20 @@ ${deepLink}`;
           <button
             id="btn-trigger-propose-event"
             type="button"
-            onClick={() => setShowCreateWizard(true)}
+            onClick={() => {
+              setWizardInitialSubCat(activeSubCategory !== 'all' ? activeSubCategory : 'event');
+              setShowCreateWizard(true);
+            }}
             className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Publish Vernunt Event</span>
+            <span>
+              {activeSubCategory === 'classes' 
+                ? 'Publish Vernunt Class' 
+                : activeSubCategory === 'activity' 
+                ? 'Publish Activity / Camp' 
+                : 'Publish Vernunt Event'}
+            </span>
           </button>
 
           {/* Scan Event QR Code Button */}
@@ -1204,6 +1379,201 @@ ${deepLink}`;
             )}
           </div>
         </div>
+      </div>
+
+      {/* Primary Gathering Sub-Category Switcher: Events (1–7d) vs Activities (Sports/Camps) vs Classes (Permanent) */}
+      <div id="events-subcategory-tabs-container" className="space-y-3">
+        {/* Navigation Tabs Bar */}
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-2 sm:p-2.5 shadow-2xs">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 px-1">
+              <div className="w-8 h-8 rounded-xl bg-orange-100/70 text-orange-600 flex items-center justify-center shrink-0">
+                <Layers className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-xs font-black uppercase tracking-wider text-slate-800 block">
+                  Sub-Categories
+                </span>
+                <span className="text-[11px] text-slate-500 hidden sm:block">
+                  Separate short-term events (1–7 days), activities & sports camps, and permanent classes
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Tabs: All | Events (1–7d) | Activities (Sports/Camps) | Classes (Permanent) */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2">
+              {/* Tab 1: All */}
+              <button
+                type="button"
+                id="btn-subcat-all"
+                onClick={() => setActiveSubCategory('all')}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeSubCategory === 'all'
+                    ? 'bg-slate-900 border-slate-950 text-white shadow-xs'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Sparkles className="w-3.5 h-3.5 shrink-0 text-orange-400" />
+                  <span className="truncate">All Gatherings</span>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                  activeSubCategory === 'all' ? 'bg-slate-800 text-slate-200' : 'bg-white text-slate-500 border border-slate-200/60'
+                }`}>
+                  {subCategoryCounts.all}
+                </span>
+              </button>
+
+              {/* Tab 2: Events (1–7 Days) */}
+              <button
+                type="button"
+                id="btn-subcat-event"
+                onClick={() => setActiveSubCategory('event')}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeSubCategory === 'event'
+                    ? 'bg-gradient-to-r from-orange-600 to-amber-600 border-orange-600 text-white shadow-md shadow-orange-500/20'
+                    : 'bg-orange-50/60 hover:bg-orange-100/70 text-orange-800 border-orange-200/70'
+                }`}
+                title="Short term events like 1 to 7 days (festivals, weekend popups, carnivals, fairs)"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">🎪</span>
+                  <div className="text-left min-w-0">
+                    <span className="truncate block font-black leading-tight">Events</span>
+                    <span className={`text-[9px] block leading-none ${activeSubCategory === 'event' ? 'text-orange-100' : 'text-orange-600'}`}>
+                      1–7 Days
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                  activeSubCategory === 'event' ? 'bg-orange-700/60 text-white' : 'bg-white text-orange-700 border border-orange-200'
+                }`}>
+                  {subCategoryCounts.event}
+                </span>
+              </button>
+
+              {/* Tab 3: Activities (Swimming, Chess, Sports) */}
+              <button
+                type="button"
+                id="btn-subcat-activity"
+                onClick={() => setActiveSubCategory('activity')}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeSubCategory === 'activity'
+                    ? 'bg-gradient-to-r from-emerald-600 to-teal-600 border-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                    : 'bg-emerald-50/60 hover:bg-emerald-100/70 text-emerald-800 border-emerald-200/70'
+                }`}
+                title="Activities as swimming, chess, sports, summer camps etc."
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">🏊</span>
+                  <div className="text-left min-w-0">
+                    <span className="truncate block font-black leading-tight">Activities</span>
+                    <span className={`text-[9px] block leading-none ${activeSubCategory === 'activity' ? 'text-emerald-100' : 'text-emerald-600'}`}>
+                      Sports & Camps
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                  activeSubCategory === 'activity' ? 'bg-emerald-700/60 text-white' : 'bg-white text-emerald-700 border border-emerald-200'
+                }`}>
+                  {subCategoryCounts.activity}
+                </span>
+              </button>
+
+              {/* Tab 4: Classes (Permanent Music, Tuition) */}
+              <button
+                type="button"
+                id="btn-subcat-classes"
+                onClick={() => setActiveSubCategory('classes')}
+                className={`flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                  activeSubCategory === 'classes'
+                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 border-purple-600 text-white shadow-md shadow-purple-500/20'
+                    : 'bg-purple-50/60 hover:bg-purple-100/70 text-purple-800 border-purple-200/70'
+                }`}
+                title="Classes as permanent classes like music, tuition, robotics academy etc."
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span className="text-sm">🎓</span>
+                  <div className="text-left min-w-0">
+                    <span className="truncate block font-black leading-tight">Classes</span>
+                    <span className={`text-[9px] block leading-none ${activeSubCategory === 'classes' ? 'text-purple-100' : 'text-purple-600'}`}>
+                      Permanent & Tuition
+                    </span>
+                  </div>
+                </div>
+                <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full ${
+                  activeSubCategory === 'classes' ? 'bg-purple-700/60 text-white' : 'bg-white text-purple-700 border border-purple-200'
+                }`}>
+                  {subCategoryCounts.classes}
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Informative Subcategory Guidance Banner (when a specific subcategory is selected) */}
+        {activeSubCategory !== 'all' && (
+          <div className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+            activeSubCategory === 'event'
+              ? 'bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100/60 border-orange-200 text-orange-950'
+              : activeSubCategory === 'activity'
+              ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100/60 border-emerald-200 text-emerald-950'
+              : 'bg-gradient-to-r from-purple-50 via-indigo-50 to-purple-100/60 border-purple-200 text-purple-950'
+          }`}>
+            <div className="flex items-start gap-3">
+              <span className="text-2xl shrink-0 p-1.5 bg-white/80 rounded-xl shadow-2xs border border-white">
+                {GATHERING_SUBCATEGORIES[activeSubCategory].emoji}
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-extrabold text-sm sm:text-base leading-tight">
+                    {GATHERING_SUBCATEGORIES[activeSubCategory].label}
+                  </h4>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                    activeSubCategory === 'event' ? 'bg-orange-500 text-white' : activeSubCategory === 'activity' ? 'bg-emerald-600 text-white' : 'bg-purple-600 text-white'
+                  }`}>
+                    {filteredEvents.length} Available
+                  </span>
+                </div>
+                <p className="text-xs opacity-90 mt-0.5 leading-relaxed">
+                  {GATHERING_SUBCATEGORIES[activeSubCategory].description}
+                </p>
+                <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider opacity-75">Popular:</span>
+                  {GATHERING_SUBCATEGORIES[activeSubCategory].examples.map((ex, i) => (
+                    <span key={i} className="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-white/70 border border-black/5 shadow-2xs">
+                      {ex}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setWizardInitialSubCat(activeSubCategory);
+                  setShowCreateWizard(true);
+                }}
+                className={`px-3 py-1.5 rounded-xl font-bold text-xs text-white shadow-sm transition active:scale-95 flex items-center gap-1.5 cursor-pointer ${
+                  activeSubCategory === 'event' ? 'bg-orange-600 hover:bg-orange-700' : activeSubCategory === 'activity' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Publish {activeSubCategory === 'classes' ? 'Class' : activeSubCategory === 'activity' ? 'Activity' : 'Event'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveSubCategory('all')}
+                className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 bg-white/80 hover:bg-white border border-slate-200 transition cursor-pointer"
+                title="Show all gatherings"
+              >
+                Show All
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Aligned Filter & Sort Options in One Collapsible Block (Hidden by default) */}
@@ -1467,11 +1837,20 @@ ${deepLink}`;
             )}
             <button
               type="button"
-              onClick={() => setShowCreateWizard(true)}
+              onClick={() => {
+                setWizardInitialSubCat(activeSubCategory !== 'all' ? activeSubCategory : 'event');
+                setShowCreateWizard(true);
+              }}
               className="px-4 py-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white rounded-xl text-xs font-bold shadow-md transition active:scale-95 flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Host Event / Classes / Activity</span>
+              <span>
+                {activeSubCategory === 'classes'
+                  ? 'Host Permanent Class'
+                  : activeSubCategory === 'activity'
+                  ? 'Host Activity / Sports Camp'
+                  : 'Host Short-Term Event (1–7d)'}
+              </span>
             </button>
           </div>
         </div>
@@ -1494,126 +1873,411 @@ ${deepLink}`;
             />
           )}
 
-          {/* 1. Top Selling & Popular Events */}
-          <EventCarouselSection
-            title="Popular & Top Selling Events"
-            subtitle="Most booked weekend activities, kids shows, and workshops"
-            events={popularEvents}
-            defaultBadge="PROMOTED"
-            onSeeAll={() => {
-              setShowFilterSortBlock(true);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onSelectEvent={(evt) => {
-              setSelectedEventId(evt.id);
-              handleInitiateBooking(evt);
-            }}
-            onBookEvent={(evt) => handleInitiateBooking(evt)}
-            onShareQr={(evt) => setHostQrModalEvent(evt)}
-            myTickets={myTickets}
-          />
+          {/* VIEW MODE 1: ALL GATHERINGS VIEW (Prominently partitions the 3 Subcategories First) */}
+          {activeSubCategory === 'all' && (
+            <>
+              {/* Subcategory Partition 1: Short-Term Events (1–7 Days) */}
+              {shortTermEventsPool.length > 0 && (
+                <EventCarouselSection
+                  title="🎪 Short-Term Events (1–7 Days)"
+                  subtitle="Weekend popups, 1 to 7 days family carnivals, puppet shows & community festivals"
+                  events={shortTermEventsPool}
+                  defaultBadge="1–7d EVENT"
+                  onSeeAll={() => {
+                    setActiveSubCategory('event');
+                    window.scrollTo({ top: 300, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
 
-          {/* 2. Featured Celebrations & Family Fests */}
-          <EventCarouselSection
-            title="Featured Celebrations & Family Fests"
-            subtitle="Curated family carnivals, seasonal celebrations & special passes"
-            events={featuredEvents}
-            defaultBadge="FEATURED"
-            onSeeAll={() => {
-              setShowFilterSortBlock(true);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onSelectEvent={(evt) => {
-              setSelectedEventId(evt.id);
-              handleInitiateBooking(evt);
-            }}
-            onBookEvent={(evt) => handleInitiateBooking(evt)}
-            onShareQr={(evt) => setHostQrModalEvent(evt)}
-            myTickets={myTickets}
-          />
+              {/* Subcategory Partition 2: Activities & Summer Camps (Swimming, Chess, Sports) */}
+              {activitiesPool.length > 0 && (
+                <EventCarouselSection
+                  title="🏊 Activities & Summer Camps (Sports, Swimming, Chess)"
+                  subtitle="Active physical & strategic recreation: swimming coaching, chess tournaments, football & summer camps"
+                  events={activitiesPool}
+                  defaultBadge="ACTIVITY"
+                  onSeeAll={() => {
+                    setActiveSubCategory('activity');
+                    window.scrollTo({ top: 300, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
 
-          {/* 3. Top Games & Sports Events */}
-          {sportsEvents.length > 0 && (
-            <EventCarouselSection
-              title="Top Games & Sports Events"
-              subtitle="Weekend football turfs, cricket academies, skating rallies & chess tourneys"
-              events={sportsEvents}
-              onSeeAll={() => {
-                setCategoryFilter('Competition');
-                setShowFilterSortBlock(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onSelectEvent={(evt) => {
-                setSelectedEventId(evt.id);
-                handleInitiateBooking(evt);
-              }}
-              onBookEvent={(evt) => handleInitiateBooking(evt)}
-              onShareQr={(evt) => setHostQrModalEvent(evt)}
-              myTickets={myTickets}
-            />
+              {/* Subcategory Partition 3: Permanent Classes & Tuitions (Music, Tuition, STEM) */}
+              {permanentClassesPool.length > 0 && (
+                <EventCarouselSection
+                  title="🎓 Permanent Classes & Tuitions (Music, Academics, STEM)"
+                  subtitle="Permanent ongoing weekly batches: classical vocal & music training, school tuitions, and robotics academies"
+                  events={permanentClassesPool}
+                  defaultBadge="PERMANENT CLASS"
+                  onSeeAll={() => {
+                    setActiveSubCategory('classes');
+                    window.scrollTo({ top: 300, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Popular & Top Selling Gatherings */}
+              <EventCarouselSection
+                title="Popular & Top Selling Gatherings"
+                subtitle="Most booked weekend activities, kids shows, and ongoing workshops"
+                events={popularEvents}
+                defaultBadge="PROMOTED"
+                onSeeAll={() => {
+                  setShowFilterSortBlock(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onSelectEvent={(evt) => {
+                  setSelectedEventId(evt.id);
+                  handleInitiateBooking(evt);
+                }}
+                onBookEvent={(evt) => handleInitiateBooking(evt)}
+                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                myTickets={myTickets}
+              />
+
+              {/* Featured Celebrations & Family Fests */}
+              <EventCarouselSection
+                title="Featured Celebrations & Family Fests"
+                subtitle="Curated family carnivals, seasonal celebrations & special passes"
+                events={featuredEvents}
+                defaultBadge="FEATURED"
+                onSeeAll={() => {
+                  setShowFilterSortBlock(true);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onSelectEvent={(evt) => {
+                  setSelectedEventId(evt.id);
+                  handleInitiateBooking(evt);
+                }}
+                onBookEvent={(evt) => handleInitiateBooking(evt)}
+                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                myTickets={myTickets}
+              />
+            </>
           )}
 
-          {/* 4. Creative Arts, Music & Theatre */}
-          {creativeArtsEvents.length > 0 && (
-            <EventCarouselSection
-              title="Creative Arts, Theatre & Music"
-              subtitle="Pottery wheels, Broadway drama, live puppet shows & paint studios"
-              events={creativeArtsEvents}
-              onSeeAll={() => {
-                setCategoryFilter('Activity');
-                setShowFilterSortBlock(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onSelectEvent={(evt) => {
-                setSelectedEventId(evt.id);
-                handleInitiateBooking(evt);
-              }}
-              onBookEvent={(evt) => handleInitiateBooking(evt)}
-              onShareQr={(evt) => setHostQrModalEvent(evt)}
-              myTickets={myTickets}
-            />
+          {/* VIEW MODE 2: DEDICATED SHORT-TERM EVENTS (1–7 DAYS) */}
+          {activeSubCategory === 'event' && (
+            <>
+              <EventCarouselSection
+                title="🎪 All Short-Term Events (1–7 Days Duration)"
+                subtitle="Curated events lasting 1 to 7 days: family popups, carnivals, puppet shows & festivals"
+                events={shortTermEventsPool}
+                defaultBadge="1–7d EVENT"
+                onSelectEvent={(evt) => {
+                  setSelectedEventId(evt.id);
+                  handleInitiateBooking(evt);
+                }}
+                onBookEvent={(evt) => handleInitiateBooking(evt)}
+                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                myTickets={myTickets}
+              />
+
+              {/* Weekend Carnivals & Puppet Shows */}
+              {shortTermEventsPool.some(e => /carnival|puppet|fest|theatre|story/i.test(`${e.title} ${e.description}`)) && (
+                <EventCarouselSection
+                  title="🎭 Weekend Carnivals & Storytelling Puppet Fests"
+                  subtitle="Short-term live theater, puppet storytelling, stage carnivals and celebratory fairs"
+                  events={shortTermEventsPool.filter(e => /carnival|puppet|fest|theatre|story/i.test(`${e.title} ${e.description}`))}
+                  defaultBadge="FESTIVAL"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Creative Family Meets & 1-Day Workshops */}
+              {shortTermEventsPool.some(e => /art|sketch|paint|picnic|nature|bubble/i.test(`${e.title} ${e.description}`)) && (
+                <EventCarouselSection
+                  title="🎨 Family Art, Sketching & Creative Popups (1–2 Days)"
+                  subtitle="Short weekend popups with guided sketching, outdoor picnics, and bubble circles"
+                  events={shortTermEventsPool.filter(e => /art|sketch|paint|picnic|nature|bubble/i.test(`${e.title} ${e.description}`))}
+                  defaultBadge="WEEKEND"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+            </>
           )}
 
-          {/* 5. STEM, Robotics & Science Camps */}
-          {stemScienceEvents.length > 0 && (
-            <EventCarouselSection
-              title="STEM, Robotics & Science Camps"
-              subtitle="Hands-on coding, space astronomy, bot challenges & nature walks"
-              events={stemScienceEvents}
-              onSeeAll={() => {
-                setCategoryFilter('Class');
-                setShowFilterSortBlock(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onSelectEvent={(evt) => {
-                setSelectedEventId(evt.id);
-                handleInitiateBooking(evt);
-              }}
-              onBookEvent={(evt) => handleInitiateBooking(evt)}
-              onShareQr={(evt) => setHostQrModalEvent(evt)}
-              myTickets={myTickets}
-            />
+          {/* VIEW MODE 3: DEDICATED ACTIVITIES (SWIMMING, CHESS, SPORTS & CAMPS) */}
+          {activeSubCategory === 'activity' && (
+            <>
+              {/* Swimming Activities */}
+              {swimmingActivities.length > 0 && (
+                <EventCarouselSection
+                  title="🏊 Swimming, Water Polo & Aquatic Camps"
+                  subtitle="Certified swimming instruction, stroke mechanics, water polo scrimmages and pool safety"
+                  events={swimmingActivities}
+                  defaultBadge="SWIMMING"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Chess Activities */}
+              {chessActivities.length > 0 && (
+                <EventCarouselSection
+                  title="♟️ Chess Tournaments & Strategy Camps"
+                  subtitle="Grandmaster tactical training, endgame strategies, puzzle rounds and friendly championships"
+                  events={chessActivities}
+                  defaultBadge="CHESS"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Football & Sports Agility Camps */}
+              {sportsAndCampActivities.length > 0 && (
+                <EventCarouselSection
+                  title="⚽ Football, Sports Drills & Summer Camps"
+                  subtitle="Energetic sports drills, dribbling obstacle courses, relay races, and outdoor camps"
+                  events={sportsAndCampActivities}
+                  defaultBadge="SPORTS CAMP"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* All Recreational Activities Pool */}
+              <EventCarouselSection
+                title="🧗 All Recreational Activities & Camps"
+                subtitle="Complete collection of active sports, swimming coaching, chess camps and adventure trails"
+                events={activitiesPool}
+                defaultBadge="ACTIVITY"
+                onSelectEvent={(evt) => {
+                  setSelectedEventId(evt.id);
+                  handleInitiateBooking(evt);
+                }}
+                onBookEvent={(evt) => handleInitiateBooking(evt)}
+                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                myTickets={myTickets}
+              />
+            </>
           )}
 
-          {/* 6. Toddler & Early Years Circles */}
-          {toddlerEvents.length > 0 && (
-            <EventCarouselSection
-              title="Toddler & Early Years Discovery"
-              subtitle="Gentle sensory play, bubble rhymes & infant social playgroups"
-              events={toddlerEvents}
-              onSeeAll={() => {
-                setCategoryFilter('Event');
-                setShowFilterSortBlock(true);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onSelectEvent={(evt) => {
-                setSelectedEventId(evt.id);
-                handleInitiateBooking(evt);
-              }}
-              onBookEvent={(evt) => handleInitiateBooking(evt)}
-              onShareQr={(evt) => setHostQrModalEvent(evt)}
-              myTickets={myTickets}
-            />
+          {/* VIEW MODE 4: DEDICATED CLASSES (PERMANENT MUSIC, TUITION & ACADEMIES) */}
+          {activeSubCategory === 'classes' && (
+            <>
+              {/* Music Permanent Classes */}
+              {musicClasses.length > 0 && (
+                <EventCarouselSection
+                  title="🎵 Classical Carnatic, Vocal & Instrumental Music Classes"
+                  subtitle="Permanent ongoing traditional music training: voice culture, sarali varisai, geethams and instruments"
+                  events={musicClasses}
+                  defaultBadge="PERMANENT MUSIC"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Tuitions Permanent Classes */}
+              {tuitionClasses.length > 0 && (
+                <EventCarouselSection
+                  title="📐 Mathematics & Science Academic Tuition Batches"
+                  subtitle="Permanent school tuition & foundation concept building classes with small batches and personalized homework guidance"
+                  events={tuitionClasses}
+                  defaultBadge="TUITION"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* STEM & Lego Robotics Permanent Academy */}
+              {stemAndRoboticsClasses.length > 0 && (
+                <EventCarouselSection
+                  title="🤖 STEM, Lego Robotics & Coding Permanent Academies"
+                  subtitle="Permanent weekly academies: micro-controller programming, Python/Scratch game dev, and motorized builds"
+                  events={stemAndRoboticsClasses}
+                  defaultBadge="STEM ACADEMY"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Clay Pottery & Creative Arts Studio Classes */}
+              {studioCraftClasses.length > 0 && (
+                <EventCarouselSection
+                  title="🏺 Pottery, Clay Sculpting & Fine Arts Studios"
+                  subtitle="Permanent weekly pottery studios: electric wheels, clay sculpting, and ongoing artistic expression"
+                  events={studioCraftClasses}
+                  defaultBadge="STUDIO CLASS"
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* All Permanent Classes Pool */}
+              <EventCarouselSection
+                title="🎓 All Permanent Classes & Academies"
+                subtitle="Complete directory of ongoing classes: music academies, school tuitions, robotics and studios"
+                events={permanentClassesPool}
+                defaultBadge="PERMANENT CLASS"
+                onSelectEvent={(evt) => {
+                  setSelectedEventId(evt.id);
+                  handleInitiateBooking(evt);
+                }}
+                onBookEvent={(evt) => handleInitiateBooking(evt)}
+                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                myTickets={myTickets}
+              />
+            </>
+          )}
+
+          {/* Common General Interest Carousels across All */}
+          {activeSubCategory === 'all' && (
+            <>
+              {/* Top Games & Sports Events */}
+              {sportsEvents.length > 0 && (
+                <EventCarouselSection
+                  title="Top Games & Sports Events"
+                  subtitle="Weekend football turfs, cricket academies, skating rallies & chess tourneys"
+                  events={sportsEvents}
+                  onSeeAll={() => {
+                    setCategoryFilter('Competition');
+                    setShowFilterSortBlock(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Creative Arts, Music & Theatre */}
+              {creativeArtsEvents.length > 0 && (
+                <EventCarouselSection
+                  title="Creative Arts, Theatre & Music"
+                  subtitle="Pottery wheels, Broadway drama, live puppet shows & paint studios"
+                  events={creativeArtsEvents}
+                  onSeeAll={() => {
+                    setCategoryFilter('Activity');
+                    setShowFilterSortBlock(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* STEM, Robotics & Science Camps */}
+              {stemScienceEvents.length > 0 && (
+                <EventCarouselSection
+                  title="STEM, Robotics & Science Camps"
+                  subtitle="Hands-on coding, space astronomy, bot challenges & nature walks"
+                  events={stemScienceEvents}
+                  onSeeAll={() => {
+                    setCategoryFilter('Class');
+                    setShowFilterSortBlock(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+
+              {/* Toddler & Early Years Circles */}
+              {toddlerEvents.length > 0 && (
+                <EventCarouselSection
+                  title="Toddler & Early Years Discovery"
+                  subtitle="Gentle sensory play, bubble rhymes & infant social playgroups"
+                  events={toddlerEvents}
+                  onSeeAll={() => {
+                    setCategoryFilter('Event');
+                    setShowFilterSortBlock(true);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  onSelectEvent={(evt) => {
+                    setSelectedEventId(evt.id);
+                    handleInitiateBooking(evt);
+                  }}
+                  onBookEvent={(evt) => handleInitiateBooking(evt)}
+                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  myTickets={myTickets}
+                />
+              )}
+            </>
           )}
         </div>
       )}
@@ -2284,6 +2948,7 @@ ${deepLink}`;
         <CreateEventWizardModal
           userProfile={userProfile}
           customCategories={customCats}
+          initialSubCategory={wizardInitialSubCat}
           onClose={() => setShowCreateWizard(false)}
           onAddEvent={(newEvent) => {
             setEventsList(prev => [newEvent, ...prev]);

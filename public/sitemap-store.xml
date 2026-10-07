@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
+  <url><loc>https://app.vernunt.com/store</loc><lastmod>2026-10-07</lastmod><changefreq>daily</changefreq><priority>0.95</priority></url>
+  <url>
+    <loc>https://app.vernunt.com/store/organic-sprouted-ragi-almond-baby-porridge</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image><image:loc>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Organic Sprouted Ragi & Almond Baby Porridge Mix</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://app.vernunt.com/store/organic-cotton-infant-romper-set</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image><image:loc>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&auto=format&fit=crop&q=80</image:loc><image:title>100% Organic Bamboo Cotton Infant Romper & Jumpsuit Set</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://app.vernunt.com/store/montessori-wooden-sensory-activity-board</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image><image:loc>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Montessori Wooden Sensory Busy Board & Motor Agility Board</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://app.vernunt.com/store/hallmarked-925-silver-baby-nazariya-bangles</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image><image:loc>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Hallmarked 925 Pure Silver Baby Nazariya Evil Eye Bangles</image:title></image:image>
+  </url>
+  <url>
+    <loc>https://app.vernunt.com/store/chemical-free-bamboo-baby-diapers-tape-style</loc>
+    <lastmod>2026-10-07</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image><image:loc>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Ultra-Soft Chemical-Free Bamboo Diapers with Wetness Indicator</image:title></image:image>
+  </url>
+</urlset>

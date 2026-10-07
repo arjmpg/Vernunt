@@ -2054,6 +2054,32 @@ export const saveStoredProducts = (products: StoreProduct[]) => {
   try {
     localStorage.setItem('vernunt_store_products_v1', JSON.stringify(products));
     window.dispatchEvent(new CustomEvent('vernunt_products_updated', { detail: products }));
+    
+    // Automatic Real-Time Google Merchant Center & Search Console Indexing
+    if (products.length > 0 && typeof window !== 'undefined') {
+      const latestProd = products[0]; // Most recent or updated
+      if (latestProd) {
+        import('../services/seoAutoIndexer.ts').then(({ triggerAutoIndex }) => {
+          triggerAutoIndex({
+            type: 'product',
+            item: {
+              id: latestProd.id,
+              name: latestProd.name,
+              title: latestProd.name,
+              slug: latestProd.slug || latestProd.id,
+              sku: latestProd.sku || latestProd.id,
+              price: latestProd.salePrice || latestProd.price,
+              regularPrice: latestProd.regularPrice || latestProd.price,
+              category: latestProd.category,
+              featuredImage: latestProd.featuredImage,
+              shortDescription: latestProd.shortDescription || latestProd.description,
+              onSale: latestProd.onSale,
+              salePrice: latestProd.salePrice
+            }
+          }).catch(() => {});
+        });
+      }
+    }
   } catch (err) {
     console.error('Error saving products:', err);
   }

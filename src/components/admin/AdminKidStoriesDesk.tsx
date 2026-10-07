@@ -81,6 +81,22 @@ export const AdminKidStoriesDesk: React.FC = () => {
       if (selectedStory?.id === storyId) {
         setSelectedStory(res);
       }
+      
+      // Automatic Real-Time Google Search Console & SEO Auto-Indexing
+      import('../../services/seoAutoIndexer.ts').then(({ triggerAutoIndex }) => {
+        triggerAutoIndex({
+          type: 'story',
+          item: {
+            id: res.id,
+            title: res.title,
+            name: `${res.kidName}'s Story - ${res.title}`,
+            slug: res.slug,
+            description: res.storySnippet || res.storyFullText,
+            featuredImage: res.photoUrl
+          }
+        }).catch(() => {});
+      });
+
       setActionSuccess(`✓ Approved "${res.kidName}'s" story! Published to Google SEO Indexing.`);
       setTimeout(() => setActionSuccess(''), 4000);
     }

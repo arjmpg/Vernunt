@@ -467,6 +467,8 @@ export interface EventAttendee {
   passType?: 'General' | 'VIP' | 'Workshop' | 'EarlyBird' | 'ParentPass' | string;
 }
 
+export type GatheringSubCategory = 'all' | 'event' | 'activity' | 'classes';
+
 export interface CommunityEvent {
   id: string;
   title: string;

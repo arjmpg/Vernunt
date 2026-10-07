@@ -12,6 +12,7 @@ import { saveEventPurchase } from '../../data/eventPurchases.ts';
 import EventMenuComponent from './EventMenuComponent.tsx';
 import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
+import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -322,27 +323,39 @@ export default function EventBookingModal({
       <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-auto">
         
         {/* Modal Header */}
-        <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-5 text-white flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/30">
-              <Ticket className="w-5 h-5" />
+        {(() => {
+          const subCategoryKey = getGatheringSubCategory(event);
+          const subCategoryMeta = GATHERING_SUBCATEGORIES[subCategoryKey];
+          return (
+            <div className="bg-gradient-to-r from-orange-600 to-amber-600 p-5 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white border border-white/30">
+                  <Ticket className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] uppercase tracking-widest font-extrabold text-orange-200 block">
+                      Vernunt Events Verified Checkout
+                    </span>
+                    <span className="inline-flex items-center gap-1 text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-black/25 text-white border border-white/20">
+                      <span>{subCategoryMeta.emoji}</span>
+                      <span>{subCategoryMeta.badgeText}</span>
+                    </span>
+                  </div>
+                  <h3 className="text-base font-black leading-tight text-white line-clamp-1">
+                    {event.title}
+                  </h3>
+                </div>
+              </div>
+              <button
+                onClick={onClose}
+                className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div>
-              <span className="text-[10px] uppercase tracking-widest font-extrabold text-orange-200 block">
-                Vernunt Events Verified Checkout
-              </span>
-              <h3 className="text-base font-black leading-tight text-white line-clamp-1">
-                {event.title}
-              </h3>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+          );
+        })()}
 
         {/* Step Progress Bar */}
         <div className="bg-slate-100 px-6 py-2 border-b border-slate-200 flex items-center justify-between text-xs font-semibold text-slate-500">

@@ -3,32 +3,48 @@ User-agent: *
 Disallow: /radar
 Disallow: /profile
 Disallow: /playmates
-Disallow: /groups
-Disallow: /chat
-Disallow: /messages
 Disallow: /tracker
 Disallow: /vaccines
 Disallow: /api/
 Disallow: /*?token=*
 Disallow: /*?user=*
 Disallow: /*?child=*
-Disallow: /*?group=*
 
-# Allow only public educational guides, pediatric directories, verified clinic services & kid stories
+# Vernunt Groups Privacy Policy:
+# Allow public group names & categories on search, but strictly block all private group chat messages, members & discussions
+Allow: /groups$
+Allow: /groups?
+Disallow: /groups/*/messages
+Disallow: /groups/*/chat
+Disallow: /groups/*/members
+Disallow: /groups/*/feed
+Disallow: /groups/*/media
+Disallow: /groups/*/threads
+Disallow: /chat
+Disallow: /messages
+
+# Allow only public educational guides, pediatric directories, verified clinic services, store, events & kid stories
 Allow: /
+Allow: /store
 Allow: /knowledge
 Allow: /specialists
 Allow: /doctors/
 Allow: /events
 Allow: /safety
+Allow: /terms
+Allow: /privacy
+Allow: /shipping
+Allow: /refund
 Allow: /kid-stories/
 Allow: /web-stories/
 Allow: /stories/
 
 Sitemap: https://app.vernunt.com/sitemap.xml
+Sitemap: https://app.vernunt.com/sitemap-store.xml
+Sitemap: https://app.vernunt.com/sitemap-events.xml
 Sitemap: https://app.vernunt.com/sitemap-doctors.xml
 Sitemap: https://app.vernunt.com/sitemap-guides.xml
 Sitemap: https://app.vernunt.com/sitemap-stories.xml
 Sitemap: https://app.vernunt.com/sitemap-webstories.xml
 Sitemap: https://app.vernunt.com/sitemap-kid-stories.xml
-
+Sitemap: https://app.vernunt.com/google-merchant-feed.xml

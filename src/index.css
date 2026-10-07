@@ -53,3 +53,85 @@ html, body {
   animation: shake 0.6s cubic-bezier(.36,.07,.19,.97) both;
 }
 
+@keyframes pop-in {
+  0% { transform: scale(0.6); opacity: 0; }
+  70% { transform: scale(1.08); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pop-in {
+  animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 0.4; }
+  100% { transform: scale(0.95); opacity: 0.8; }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s infinite ease-in-out;
+}
+
+@keyframes checkmark-draw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes cross-draw {
+  0% {
+    stroke-dashoffset: 100;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes feedback-ripple {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+
+.animate-checkmark-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: checkmark-draw 0.45s ease-out forwards;
+}
+
+.animate-cross-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: cross-draw 0.45s ease-out forwards;
+}
+
+.animate-feedback-ripple {
+  animation: feedback-ripple 1.4s infinite cubic-bezier(0, 0.2, 0.8, 1);
+}
+
+/* Extra spacing for #global-page-footer to prevent content cutoff when fixed bottom navigation bar is active */
+body:has(#bottom-navigation-bar) #global-page-footer {
+  padding-bottom: max(10rem, calc(8.5rem + env(safe-area-inset-bottom, 0px)));
+}
+
+/* Additional 20px bottom padding specifically when user's device is in portrait mode */
+@media (orientation: portrait) {
+  #global-page-footer {
+    padding-bottom: calc(4rem + 20px) !important;
+  }
+
+  body:has(#bottom-navigation-bar) #global-page-footer {
+    padding-bottom: max(calc(10rem + 20px), calc(8.5rem + 20px + env(safe-area-inset-bottom, 0px))) !important;
+  }
+}
+
+

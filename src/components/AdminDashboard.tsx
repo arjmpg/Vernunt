@@ -51,6 +51,7 @@ import { AdminCommerceEngineDesk } from './admin/AdminCommerceEngineDesk.tsx';
 import GoogleIndexingInspectorModal from './admin/GoogleIndexingInspectorModal.tsx';
 import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
+import AdminVisualCmsDesk from './admin/AdminVisualCmsDesk.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -82,8 +83,8 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo | visual-cms
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo' | 'visual-cms'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -1778,6 +1779,28 @@ export default function AdminDashboard({
                   <span>SEO & Indexing</span>
                   <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
                     Rank Math
+                  </span>
+                </div>
+              )}
+            </button>
+
+            {/* MENU ITEM: Visual Page Builder & In-Place Editor */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('visual-cms'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'visual-cms'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-amber-400 shadow-md'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Visual Page Builder & Frontend Content Editor"
+            >
+              <Edit3 className="w-4 h-4 shrink-0 text-emerald-300" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Visual Page Builder</span>
+                  <span className="bg-emerald-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                    Live CMS
                   </span>
                 </div>
               )}
@@ -5492,12 +5515,21 @@ export default function AdminDashboard({
             </div>
           )}
 
-          {/* ========================================================================= */}
-          {/* VIEW L: VERNUNT ENTERPRISE SEO & INSTANT INDEXING STUDIO                 */}
-          {/* ========================================================================= */}
+          {/* ========================================================= */}
+          {/* VIEW L: VERNUNT ENTERPRISE SEO & INSTANT INDEXING STUDIO */}
+          {/* ========================================================= */}
           {activeMenu === 'seo' && (
             <div className="space-y-4 animate-fadeIn">
               <VernuntSeoSuite />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* VIEW M: VERNUNT VISUAL FRONTEND CMS & PAGE BUILDER        */}
+          {/* ========================================================= */}
+          {activeMenu === 'visual-cms' && (
+            <div className="space-y-4 animate-fadeIn">
+              <AdminVisualCmsDesk />
             </div>
           )}
 

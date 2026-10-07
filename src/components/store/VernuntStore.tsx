@@ -37,6 +37,9 @@ import { logProductSearch } from '../../data/productSearchAnalytics.ts';
 import { AdminProductSearchesDesk } from '../admin/AdminProductSearchesDesk.tsx';
 import { CommerceApiClient } from '../../services/commerceApiClient.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
+import { generateProductJsonLd } from '../../utils/googleMerchantFeed.ts';
+import { GoogleSearchConsoleAndMerchantModal } from '../seo/GoogleSearchConsoleAndMerchantModal.tsx';
+import { PageCustomBlocksSection } from '../admin/visual/PageCustomBlocksSection.tsx';
 
 // Helper to load Razorpay script
 const loadRazorpayScript = (): Promise<boolean> => {
@@ -58,6 +61,7 @@ interface VernuntStoreProps {
   userProfile: ChildProfile | null;
   onNavigateToTab?: (tab: string) => void;
   onContactSupport?: () => void;
+  onOpenGoogleMerchantModal?: () => void;
 }
 
 const STORAGE_KEY_CART = 'vernunt_store_cart_v1';
@@ -67,8 +71,19 @@ const STORAGE_KEY_WISHLIST = 'vernunt_store_wishlist_v1';
 export const VernuntStore: React.FC<VernuntStoreProps> = ({
   userProfile,
   onNavigateToTab,
-  onContactSupport
+  onContactSupport,
+  onOpenGoogleMerchantModal
 }) => {
+  // Google Merchant Center & Search Console Modal state
+  const [showLocalMerchantModal, setShowLocalMerchantModal] = useState<boolean>(false);
+  const handleOpenMerchantHub = () => {
+    if (onOpenGoogleMerchantModal) {
+      onOpenGoogleMerchantModal();
+    } else {
+      setShowLocalMerchantModal(true);
+    }
+  };
+
   // Master Vernunt Store Settings
   const [storeSettings, setStoreSettings] = useState<StoreSettings>(getStoredStoreSettings);
 
@@ -216,6 +231,34 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [detailQuantity, setDetailQuantity] = useState<number>(1);
   const [pincodeCheck, setPincodeCheck] = useState<string>('560102');
   const [pincodeResult, setPincodeResult] = useState<string | null>('🚚 Express Delivery Available (Tomorrow by 2 PM)');
+
+  // Dynamic Google Search & Google Merchant Center Schema.org Product JSON-LD Injection
+  useEffect(() => {
+    if (!selectedProduct) {
+      const existing = document.getElementById('vernunt-active-product-jsonld');
+      if (existing) existing.remove();
+      return;
+    }
+
+    try {
+      const jsonLd = generateProductJsonLd(selectedProduct);
+      let scriptTag = document.getElementById('vernunt-active-product-jsonld') as HTMLScriptElement | null;
+      if (!scriptTag) {
+        scriptTag = document.createElement('script');
+        scriptTag.id = 'vernunt-active-product-jsonld';
+        scriptTag.type = 'application/ld+json';
+        document.head.appendChild(scriptTag);
+      }
+      scriptTag.text = JSON.stringify(jsonLd);
+    } catch (e) {
+      console.warn('Failed to inject Product JSON-LD', e);
+    }
+
+    return () => {
+      const existing = document.getElementById('vernunt-active-product-jsonld');
+      if (existing) existing.remove();
+    };
+  }, [selectedProduct]);
 
   // Review Form in Detail Modal
   const [showReviewForm, setShowReviewForm] = useState<boolean>(false);
@@ -1089,6 +1132,20 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   {cartItemCount}
                 </span>
               </button>
+
+              {/* Google Merchant Center & Shopping Integration Hub */}
+              <button
+                type="button"
+                id="btn-store-google-merchant-hub"
+                onClick={handleOpenMerchantHub}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-orange-50 hover:bg-orange-100 border border-orange-200/90 text-orange-800 text-xs font-bold transition shadow-2xs active:scale-95 cursor-pointer"
+                title="Link Store to Google Merchant Center & Google Shopping"
+              >
+                <ShoppingBag className="w-3.5 h-3.5 text-orange-600" />
+                <span className="hidden xl:inline">Google Merchant</span>
+                <span className="hidden sm:inline xl:hidden">Merchant</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </button>
             </div>
           </div>
         </div>
@@ -1161,6 +1218,52 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         {/* ========================================================================= */}
         {activeView === 'shop' && (
           <div className="space-y-6 animate-fade-in">
+            {/* Visual CMS Admin Custom Blocks for Store Page */}
+            <PageCustomBlocksSection pageId="store" isAdmin={userProfile?.userRole === 'Admin'} />
+
+            {/* Google Merchant Center & Free Google Shopping Sync Highlight Strip */}
+            <div className="bg-gradient-to-r from-orange-50 via-amber-50/60 to-white border border-orange-200/90 rounded-2xl p-3.5 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-orange-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <ShoppingBag className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs sm:text-sm font-extrabold text-slate-900">Google Merchant Center &amp; Google Shopping</span>
+                    <span className="px-2 py-0.2 rounded-full text-[10px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                      <span>{products.length} Products Synced</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold hidden lg:inline">
+                      &bull; Scheduled RSS 2.0 Fetch &bull; India (IN) INR (₹)
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                    Free product listings across Google Shopping, Google Search, and Google Images with verified Schema.org Product markup.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleOpenMerchantHub}
+                  className="px-3.5 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shadow-xs active:scale-95 flex items-center gap-1.5"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5 text-white" />
+                  <span>Merchant Center Hub</span>
+                </button>
+                <a
+                  href="/google-merchant-feed.xml"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 rounded-xl text-xs font-semibold transition inline-flex items-center gap-1 shadow-2xs"
+                >
+                  <ExternalLink className="w-3 h-3 text-slate-500" />
+                  <span>XML Feed</span>
+                </a>
+              </div>
+            </div>
             {/* CATEGORY-FIRST MODE: When selectedCategory is 'all' and no active search query */}
             {selectedCategory === 'all' && !searchQuery ? (
               <div className="space-y-6 animate-fade-in">
@@ -2322,10 +2425,20 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           <div className="bg-white w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[92vh]">
             {/* Modal Header */}
             <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between shrink-0 bg-slate-50">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-bold text-rose-700 uppercase tracking-wide">{selectedProduct.category}</span>
                 <span className="text-slate-300">•</span>
                 <span className="text-xs font-semibold text-slate-600">{selectedProduct.ageLabel}</span>
+                <span className="text-slate-300 hidden sm:inline">•</span>
+                <button
+                  type="button"
+                  onClick={handleOpenMerchantHub}
+                  className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-orange-100 hover:bg-orange-200 text-orange-800 transition cursor-pointer"
+                  title="Google Merchant Center & Google Shopping Sync Active"
+                >
+                  <ShoppingBag className="w-3 h-3 text-orange-600" />
+                  <span>Google Shopping Synced</span>
+                </button>
               </div>
               <button
                 type="button"
@@ -3642,6 +3755,18 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         <ShiprocketTrackerModal
           awb={shiprocketTrackingModalAwb}
           onClose={() => setShiprocketTrackingModalAwb(null)}
+        />
+      )}
+
+      {/* ========================================================================= */}
+      {/* GOOGLE MERCHANT CENTER & SEARCH CONSOLE MODAL                             */}
+      {/* ========================================================================= */}
+      {showLocalMerchantModal && (
+        <GoogleSearchConsoleAndMerchantModal
+          isOpen={showLocalMerchantModal}
+          onClose={() => setShowLocalMerchantModal(false)}
+          onNavigateToTab={onNavigateToTab}
+          initialTab="merchant"
         />
       )}
     </div>

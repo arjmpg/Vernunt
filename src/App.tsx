@@ -80,6 +80,7 @@ import { PWAInstallButton } from './components/PWAInstallButton.tsx';
 import { AndroidPlayStoreModal } from './components/AndroidPlayStoreModal.tsx';
 import { IosAppInstallModal } from './components/IosAppInstallModal.tsx';
 import { AndroidDownloadBanner } from './components/AndroidDownloadBanner.tsx';
+import { GoogleSearchConsoleAndMerchantModal } from './components/seo/GoogleSearchConsoleAndMerchantModal.tsx';
 import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
 import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
 import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
@@ -87,6 +88,11 @@ import KidsInvestmentsTab from './components/investments/KidsInvestmentsTab.tsx'
 import WalletModal from './components/WalletModal.tsx';
 import { getStoredWallet } from './utils/walletStorage.ts';
 import { UserWallet } from './types.ts';
+import { LegalPolicyTab } from './components/LegalPolicyModal.tsx';
+import { isAuthorizedSystemAdmin } from './utils/security.ts';
+import { auth } from './utils/firebase.ts';
+import { AdminVisualPageEditor } from './components/admin/visual/AdminVisualPageEditor.tsx';
+import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlocksSection.tsx';
 
 // Icons
 import { 
@@ -96,7 +102,7 @@ import {
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus
+  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, ArrowUp, Globe
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -430,6 +436,9 @@ export default function App() {
   }), []);
 
   const effectiveProfile = userProfile || guestProfile;
+  const isSuperAdmin = Boolean(
+    isAuthorizedSystemAdmin(auth.currentUser?.email || userProfile?.email, userProfile?.userRole || userRole)
+  );
   const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -2399,7 +2408,28 @@ export default function App() {
   const [activeReportProfile, setActiveReportProfile] = useState<ChildProfile | null>(null);
   const [activeVerifyProfile, setActiveVerifyProfile] = useState<ChildProfile | null>(null);
   const [showSOSModal, setShowSOSModal] = useState(false);
-  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalModalTab, setLegalModalTab] = useState<LegalPolicyTab>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const p = new URLSearchParams(window.location.search).get('legal');
+        if (p) return p as LegalPolicyTab;
+      } catch (_e) {
+        // Fallback to default terms tab
+      }
+    }
+    return 'terms';
+  });
+  const [showLegalModal, setShowLegalModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        return !!new URLSearchParams(window.location.search).get('legal');
+      } catch (_e) {
+        // Fallback to hidden
+      }
+    }
+    return false;
+  });
+  const [showGoogleSeoModal, setShowGoogleSeoModal] = useState(false);
   const [showKannadaVoiceModal, setShowKannadaVoiceModal] = useState<boolean>(false);
   const [showContactUsModal, setShowContactUsModal] = useState<boolean>(false);
   const [showInstagramFlyerModal, setShowInstagramFlyerModal] = useState<boolean>(false);
@@ -3641,6 +3671,9 @@ export default function App() {
         ) : appMode === 'dashboard' && (
           <div id="dashboard-content-wrapper" className="space-y-6 animate-fade-in">
             
+            {/* Visual CMS: Admin Custom Page Blocks (Editable & deletable by admin visually in-place) */}
+            <PageCustomBlocksSection pageId={activeTab || 'home'} isAdmin={isSuperAdmin} />
+
             {/* KYC Verification Pending Status Banner */}
             {userProfile && userProfile.userRole !== 'Admin' && (userProfile.verificationStatus === VerificationStatus.PENDING || userProfile.verificationStatus === 'PENDING' || !userProfile.aadhaarVerified || userProfile.verificationStatus === VerificationStatus.UNVERIFIED) && (
               <div 
@@ -4205,6 +4238,7 @@ export default function App() {
                 userProfile={userProfile}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
                 onContactSupport={() => setShowSupportChat(true)}
+                onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
               />
             )}
 
@@ -4214,10 +4248,48 @@ export default function App() {
       </main>
 
       {/* Persistent global footer with safe clearance for fixed bottom navigation */}
-      <footer id="global-page-footer" className="bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-12 pb-28 sm:pb-32 mt-auto text-slate-600">
+      <footer 
+        id="global-page-footer" 
+        className={`bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-12 mt-auto text-slate-600 transition-all ${
+          appMode === 'dashboard' 
+            ? 'pb-40 sm:pb-44 md:pb-48 portrait:pb-[calc(10rem+20px)] sm:portrait:pb-[calc(11rem+20px)] md:portrait:pb-[calc(12rem+20px)]' 
+            : 'pb-16 sm:pb-20 portrait:pb-[calc(4rem+20px)] sm:portrait:pb-[calc(5rem+20px)]'
+        }`}
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
           
 
+
+          {/* Top Footer Strip: Brand + Google Merchant & Search Console Badge + Back to Top button */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-5">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <VernuntLogo size="sm" />
+              <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
+              <button
+                type="button"
+                id="btn-footer-open-google-seo"
+                onClick={() => setShowGoogleSeoModal(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-extrabold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 transition cursor-pointer shadow-2xs"
+                title="Google Merchant Center & Search Console Indexing Hub"
+              >
+                <Globe className="w-3 h-3 text-indigo-600" />
+                <span>Google Merchant &amp; Search Console</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              </button>
+            </div>
+
+            {/* Back to Top button */}
+            <button
+              type="button"
+              id="btn-footer-back-to-top"
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-2xs text-xs font-bold transition-all cursor-pointer group shrink-0 active:scale-95"
+              title="Smoothly scroll back to top of page"
+            >
+              <span>Back to Top</span>
+              <ArrowUp className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-y-0.5 transition-transform" />
+            </button>
+          </div>
 
           {/* Structured 4-Column Navigation & Info Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-10 text-left pt-2">
@@ -4397,11 +4469,105 @@ export default function App() {
                   <button
                     type="button"
                     id="btn-footer-tac-toggle"
-                    onClick={() => setShowLegalModal(true)}
+                    onClick={() => {
+                      setLegalModalTab('terms');
+                      setShowLegalModal(true);
+                    }}
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
-                    <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-xs shrink-0">📄</span>
-                    <span>Guardian Terms of Service &amp; Privacy</span>
+                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">📄</span>
+                    <span>1. Terms &amp; Conditions (Safe Harbor)</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('privacy');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs shrink-0">🔒</span>
+                    <span>2. Privacy Policy (DPDP Act 2023)</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('safety');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center text-xs shrink-0">🛡️</span>
+                    <span>3. Safety &amp; Meetup Release</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('shipping');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center text-xs shrink-0">🚚</span>
+                    <span>4. Shipping &amp; Logistics Policy</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('refund');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-purple-50 text-purple-700 flex items-center justify-center text-xs shrink-0">🔄</span>
+                    <span>5. Returns &amp; Refund Policy</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('child-safety');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-red-50 text-red-700 flex items-center justify-center text-xs shrink-0">🚨</span>
+                    <span>6. POCSO &amp; Child Protection</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('seller-terms');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-700 flex items-center justify-center text-xs shrink-0">🏪</span>
+                    <span>7. Marketplace Seller Indemnity</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLegalModalTab('groups-privacy');
+                      setShowLegalModal(true);
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">💬</span>
+                    <span>8. Groups &amp; Chat Safe Harbor</span>
                   </button>
                 </li>
                 <li>
@@ -4599,6 +4765,7 @@ export default function App() {
       {showLegalModal && (
         <LegalPolicyModal 
           isOpen={showLegalModal}
+          initialTab={legalModalTab}
           onClose={() => setShowLegalModal(false)}
           onKeepClose={() => setShowLegalModal(false)}
         />
@@ -5464,6 +5631,18 @@ export default function App() {
         />
       )}
 
+      {/* Google Merchant Center & Google Search Console Integration Hub Modal */}
+      {showGoogleSeoModal && (
+        <GoogleSearchConsoleAndMerchantModal
+          isOpen={showGoogleSeoModal}
+          onClose={() => setShowGoogleSeoModal(false)}
+          onNavigateToTab={(tabId) => {
+            setAppMode('dashboard');
+            setActiveTab(tabId as any);
+          }}
+        />
+      )}
+
       {/* Conditionally Render Animated Loader overlay */}
       {isLoading && (
         <LoadingScreen 
@@ -5544,6 +5723,13 @@ export default function App() {
           </div>
         </nav>
       )}
+
+      {/* Admin Visual Frontend CMS & In-Place Page Editor (Available ONLY to authorized administrators) */}
+      <AdminVisualPageEditor 
+        currentPageId={activeTab || 'home'} 
+        isAdmin={isSuperAdmin} 
+        onNavigateTab={(tab) => setActiveTab(tab as any)} 
+      />
 
     </div>
   );

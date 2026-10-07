@@ -317,3 +317,7 @@ export interface StoreAttribute {
   description?: string;
   visibleOnProductPage: boolean;
 }
+
+// Runtime value export to prevent Node.js ESM loader syntax error when imported without 'type'
+export const StoreProduct = {} as unknown as any;
+

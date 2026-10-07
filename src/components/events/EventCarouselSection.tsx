@@ -5,6 +5,7 @@ import {
   Sparkles, Flame, Users, Clock, Calendar, ArrowRight, QrCode 
 } from 'lucide-react';
 import { getEventStatus } from '../EventsTab.tsx';
+import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
 
 interface EventCarouselSectionProps {
   title: string;
@@ -126,6 +127,8 @@ export default function EventCarouselSection({
           const status = getEventStatus(evt);
           const formattedDate = formatEventDate(evt.date);
           const isPromoted = evt.featured || evt.isSponsored || defaultBadge === 'PROMOTED';
+          const subCategoryKey = getGatheringSubCategory(evt);
+          const subCategoryMeta = GATHERING_SUBCATEGORIES[subCategoryKey];
 
           return (
             <div
@@ -148,29 +151,29 @@ export default function EventCarouselSection({
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20 pointer-events-none" />
 
                 {/* Top Promoted / Status Badges */}
-                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10">
-                  {/* Promoted / Featured badge (Matching BookMyShow pink PROMOTED badge) */}
-                  {isPromoted ? (
-                    <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-sm tracking-wider shadow-md">
-                      PROMOTED
-                    </span>
-                  ) : evt.isSponsored ? (
-                    <span className="bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-sm tracking-wider shadow-md flex items-center gap-1">
-                      <Flame className="w-2.5 h-2.5 fill-slate-950" />
-                      SPONSORED
-                    </span>
-                  ) : (
-                    <span className="bg-slate-900/80 backdrop-blur-xs text-white text-[9px] font-bold uppercase px-2 py-0.5 rounded-md tracking-wider">
-                      {evt.category || 'EVENT'}
-                    </span>
-                  )}
+                <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10 flex-wrap">
+                  {/* Distinct Sub-Category Pill: Event (1-7 Days) vs Activity (Sports/Camp) vs Class (Permanent) */}
+                  <span className={`text-[8px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md backdrop-blur-xs flex items-center gap-1 ${
+                    subCategoryKey === 'classes'
+                      ? 'bg-purple-700/90 text-white border border-purple-400/30'
+                      : subCategoryKey === 'activity'
+                      ? 'bg-emerald-700/90 text-white border border-emerald-400/30'
+                      : 'bg-orange-600/90 text-white border border-orange-400/30'
+                  }`}>
+                    <span>{subCategoryMeta.emoji}</span>
+                    <span>{subCategoryKey === 'classes' ? 'Class' : subCategoryKey === 'activity' ? 'Activity' : '1–7d Event'}</span>
+                  </span>
 
                   {/* Joined / Ticket badge */}
-                  {isEventJoined && (
+                  {isEventJoined ? (
                     <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md shadow-md">
                       Booked ✓
                     </span>
-                  )}
+                  ) : isPromoted ? (
+                    <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-sm tracking-wider shadow-md">
+                      PROMOTED
+                    </span>
+                  ) : null}
                 </div>
 
                 {/* Bottom Overlay Info (Price & Distance) */}
@@ -191,6 +194,21 @@ export default function EventCarouselSection({
 
               {/* Poster Meta Content */}
               <div className="mt-2.5 px-0.5 space-y-1">
+                {/* Subcategory & Duration Pill */}
+                <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                  <span className={`px-1.5 py-0.2 rounded-md ${
+                    subCategoryKey === 'classes' 
+                      ? 'bg-purple-100 text-purple-700' 
+                      : subCategoryKey === 'activity' 
+                      ? 'bg-emerald-100 text-emerald-700' 
+                      : 'bg-orange-100 text-orange-700'
+                  }`}>
+                    {subCategoryKey === 'classes' ? '🎓 Permanent Class' : subCategoryKey === 'activity' ? '🏊 Sports & Camp' : '🎪 1–7 Days Event'}
+                  </span>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-slate-500 truncate">{evt.category || 'Gathering'}</span>
+                </div>
+
                 {/* Date */}
                 <div className="text-[11px] sm:text-xs font-bold text-slate-500 flex items-center gap-1">
                   <Calendar className="w-3 h-3 text-rose-500 shrink-0" />

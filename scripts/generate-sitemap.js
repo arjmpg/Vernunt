@@ -11,15 +11,15 @@ const baseUrl = 'https://app.vernunt.com';
 
 const corePages = [
   { path: '', changefreq: 'daily', priority: '1.0' },
-  { path: 'radar', changefreq: 'daily', priority: '0.9' },
+  { path: 'store', changefreq: 'daily', priority: '1.0' },
   { path: 'events', changefreq: 'daily', priority: '0.9' },
-  { path: 'playdates', changefreq: 'daily', priority: '0.9' },
+  { path: 'knowledge', changefreq: 'daily', priority: '0.9' },
+  { path: 'specialists', changefreq: 'daily', priority: '0.9' },
+  { path: 'kid-stories', changefreq: 'daily', priority: '0.9' },
+  { path: 'sitting', changefreq: 'daily', priority: '0.8' },
   { path: 'planner', changefreq: 'weekly', priority: '0.8' },
-  { path: 'specialists', changefreq: 'daily', priority: '0.8' },
   { path: 'community', changefreq: 'daily', priority: '0.8' },
-  { path: 'parenting-copilot', changefreq: 'weekly', priority: '0.8' },
-  { path: 'safety-matrix', changefreq: 'monthly', priority: '0.7' },
-  { path: 'business-hub', changefreq: 'weekly', priority: '0.7' },
+  { path: 'safety', changefreq: 'monthly', priority: '0.7' },
   { path: 'pricing', changefreq: 'monthly', priority: '0.6' },
   { path: 'terms', changefreq: 'monthly', priority: '0.5' },
   { path: 'privacy', changefreq: 'monthly', priority: '0.5' }
@@ -282,9 +282,55 @@ for (const docPath of doctorSeoPages) {
 doctorsXml += `</urlset>`;
 fs.writeFileSync(path.join(publicDir, 'sitemap-doctors.xml'), doctorsXml, 'utf-8');
 
-console.log(`[Sitemap Generator] Generated ${publicSitemap} with ${corePages.length + categoryPages.length + doctorSeoPages.length + eventSeoPages.length + kidStoriesSeoPages.length + (knowledgePillars.length * ageSlugs.length)} URLs.`);
+// Sub-sitemap: Store Products (Vernunt Store)
+const storeProductItems = [
+  { slug: 'organic-sprouted-ragi-almond-baby-porridge', sku: 'VRN-FOOD-001', name: 'Organic Sprouted Ragi & Almond Baby Porridge Mix', price: '349.00', cat: 'Food, Beverages & Tobacco > Food Items > Baby & Toddler Food', img: 'https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=80' },
+  { slug: 'organic-cotton-infant-romper-set', sku: 'VRN-CLOTH-001', name: '100% Organic Bamboo Cotton Infant Romper & Jumpsuit Set', price: '699.00', cat: 'Apparel & Accessories > Clothing > Baby & Toddler Clothing', img: 'https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&auto=format&fit=crop&q=80' },
+  { slug: 'montessori-wooden-sensory-activity-board', sku: 'VRN-STEM-001', name: 'Montessori Wooden Sensory Busy Board & Motor Agility Board', price: '1299.00', cat: 'Toys & Games > Toys > Educational Toys', img: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80' },
+  { slug: 'hallmarked-925-silver-baby-nazariya-bangles', sku: 'VRN-JEWEL-001', name: 'Hallmarked 925 Pure Silver Baby Nazariya Evil Eye Bangles', price: '899.00', cat: 'Apparel & Accessories > Jewelry', img: 'https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80' },
+  { slug: 'chemical-free-bamboo-baby-diapers-tape-style', sku: 'VRN-CARE-001', name: 'Ultra-Soft Chemical-Free Bamboo Diapers with Wetness Indicator', price: '749.00', cat: 'Baby & Toddler > Diapering', img: 'https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&auto=format&fit=crop&q=80' }
+];
 
-// Also write to /dist/sitemap.xml if /dist exists
+let storeSitemapXml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n`;
+storeSitemapXml += `  <url><loc>${baseUrl}/store</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.95</priority></url>\n`;
+for (const p of storeProductItems) {
+  storeSitemapXml += `  <url>\n    <loc>${baseUrl}/store/${p.slug}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.85</priority>\n    <image:image><image:loc>${p.img}</image:loc><image:title>${p.name}</image:title></image:image>\n  </url>\n`;
+}
+storeSitemapXml += `</urlset>`;
+fs.writeFileSync(path.join(publicDir, 'sitemap-store.xml'), storeSitemapXml, 'utf-8');
+
+// Official Google Merchant Center Product Feed XML (RSS 2.0 with google base namespace)
+let merchantXml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+merchantXml += `<rss version="2.0" xmlns:g="http://base.google.com/ns/1.0" xmlns:atom="http://www.w3.org/2005/Atom">\n`;
+merchantXml += `  <channel>\n`;
+merchantXml += `    <title>Vernunt Store Official Product Feed</title>\n`;
+merchantXml += `    <link>${baseUrl}/store</link>\n`;
+merchantXml += `    <description>Verified child play gear, organic toddler nutrition, and child safety equipment on Vernunt.</description>\n`;
+merchantXml += `    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>\n`;
+merchantXml += `    <atom:link href="${baseUrl}/google-merchant-feed.xml" rel="self" type="application/rss+xml" />\n`;
+
+for (const p of storeProductItems) {
+  merchantXml += `    <item>\n`;
+  merchantXml += `      <g:id>${p.sku}</g:id>\n`;
+  merchantXml += `      <g:title>${p.name}</g:title>\n`;
+  merchantXml += `      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>\n`;
+  merchantXml += `      <g:link>${baseUrl}/store/${p.slug}</g:link>\n`;
+  merchantXml += `      <g:image_link>${p.img}</g:image_link>\n`;
+  merchantXml += `      <g:availability>in_stock</g:availability>\n`;
+  merchantXml += `      <g:price>${p.price} INR</g:price>\n`;
+  merchantXml += `      <g:google_product_category>${p.cat}</g:google_product_category>\n`;
+  merchantXml += `      <g:brand>Vernunt</g:brand>\n`;
+  merchantXml += `      <g:condition>new</g:condition>\n`;
+  merchantXml += `      <g:identifier_exists>no</g:identifier_exists>\n`;
+  merchantXml += `      <g:shipping>\n        <g:country>IN</g:country>\n        <g:service>Standard Delivery</g:service>\n        <g:price>0.00 INR</g:price>\n      </g:shipping>\n`;
+  merchantXml += `    </item>\n`;
+}
+merchantXml += `  </channel>\n</rss>`;
+fs.writeFileSync(path.join(publicDir, 'google-merchant-feed.xml'), merchantXml, 'utf-8');
+
+console.log(`[Sitemap Generator] Generated ${publicSitemap} with ${corePages.length + categoryPages.length + doctorSeoPages.length + eventSeoPages.length + kidStoriesSeoPages.length + (knowledgePillars.length * ageSlugs.length)} URLs, plus sitemap-store.xml and google-merchant-feed.xml.`);
+
+// Also write to /dist/ if /dist exists
 const distDir = path.resolve(__dirname, '../dist');
 if (fs.existsSync(distDir)) {
   const distSitemap = path.join(distDir, 'sitemap.xml');
@@ -293,6 +339,8 @@ if (fs.existsSync(distDir)) {
   fs.writeFileSync(path.join(distDir, 'sitemap-kid-stories.xml'), storiesXml, 'utf-8');
   fs.writeFileSync(path.join(distDir, 'sitemap-guides.xml'), guidesXml, 'utf-8');
   fs.writeFileSync(path.join(distDir, 'sitemap-doctors.xml'), doctorsXml, 'utf-8');
+  fs.writeFileSync(path.join(distDir, 'sitemap-store.xml'), storeSitemapXml, 'utf-8');
+  fs.writeFileSync(path.join(distDir, 'google-merchant-feed.xml'), merchantXml, 'utf-8');
   fs.writeFileSync(path.join(distDir, 'vernunt-indexnow-key.txt'), 'vernunt_indexnow_auth_2026', 'utf-8');
   console.log(`[Sitemap Generator] Also mirrored to ${distSitemap}`);
 }

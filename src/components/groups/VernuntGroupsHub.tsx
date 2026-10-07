@@ -284,6 +284,61 @@ export function VernuntGroupsHub({
   const [activeTab, setActiveTab] = useState<'all' | 'my_groups' | 'moms_only' | 'dads_only'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Google Search Privacy Protection for Vernunt Groups:
+  // Strictly block all group messages, chats, and member rosters from Google search; only show group names on Google search.
+  useEffect(() => {
+    let robotsMeta = document.getElementById('vernunt-groups-robots') as HTMLMetaElement | null;
+    let schemaScript = document.getElementById('vernunt-groups-schema') as HTMLScriptElement | null;
+
+    if (selectedGroupId) {
+      // Inside active group chat / messages: STRICT NOINDEX to ensure zero messages appear in search
+      if (!robotsMeta) {
+        robotsMeta = document.createElement('meta');
+        robotsMeta.id = 'vernunt-groups-robots';
+        robotsMeta.name = 'robots';
+        document.head.appendChild(robotsMeta);
+      }
+      robotsMeta.content = 'noindex, nofollow, noarchive, nosnippet';
+      if (schemaScript) schemaScript.remove();
+    } else {
+      // In public groups directory: show ONLY group names and public categories to Google Search
+      if (robotsMeta) {
+        robotsMeta.remove();
+      }
+      if (!schemaScript) {
+        schemaScript = document.createElement('script');
+        schemaScript.id = 'vernunt-groups-schema';
+        schemaScript.type = 'application/ld+json';
+        document.head.appendChild(schemaScript);
+      }
+      const safeGroupList = (groups || []).map((g, idx) => ({
+        '@type': 'ListItem',
+        'position': idx + 1,
+        'item': {
+          '@type': 'CommunityGroup',
+          'name': g.name,
+          'description': g.description,
+          'category': g.category,
+          'url': 'https://app.vernunt.com/groups'
+        }
+      }));
+      schemaScript.text = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'ItemList',
+        'name': 'Vernunt Verified Parent Community Groups',
+        'description': 'Neighborhood parent squads, mother support circles, and hobby groups in Bangalore. Group messages are strictly confidential and blocked from search.',
+        'itemListElement': safeGroupList
+      });
+    }
+
+    return () => {
+      const r = document.getElementById('vernunt-groups-robots');
+      if (r) r.remove();
+      const s = document.getElementById('vernunt-groups-schema');
+      if (s) s.remove();
+    };
+  }, [selectedGroupId, groups]);
+
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showLoginPromptModal, setShowLoginPromptModal] = useState(false);
@@ -1153,19 +1208,20 @@ export function VernuntGroupsHub({
                 </div>
               )}
 
-              {/* Discussion Feed */}
-              <div className="flex-1 space-y-4 overflow-y-auto max-h-[460px] pr-1">
+              {/* Discussion Feed (Strictly blocked from Google Search indexing using data-nosnippet and robots.txt) */}
+              <div data-nosnippet="true" className="flex-1 space-y-4 overflow-y-auto max-h-[460px] pr-1">
                 {currentMessages.length > 0 ? (
                   currentMessages.map((msg) => (
                     <div 
                       key={msg.id} 
+                      data-nosnippet="true"
                       className={`p-3.5 rounded-2xl border text-left transition ${
                         msg.senderId === currentUserId 
                           ? 'bg-rose-50/70 border-rose-200/70 ml-6' 
                           : 'bg-white border-slate-200/80 mr-6 shadow-2xs'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-1.5">
+                      <div data-nosnippet="true" className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
                           {msg.isAnonymous ? (
                             <div className="w-7 h-7 rounded-full bg-slate-900 text-amber-300 flex items-center justify-center text-xs font-black">
@@ -1197,7 +1253,7 @@ export function VernuntGroupsHub({
                         </span>
                       </div>
 
-                      <p className="text-xs text-slate-800 leading-relaxed font-normal pl-9">
+                      <p data-nosnippet="true" className="text-xs text-slate-800 leading-relaxed font-normal pl-9">
                         {msg.content}
                       </p>
 
@@ -1430,6 +1486,24 @@ export function VernuntGroupsHub({
             {/* Background vector graphic */}
             <div className="absolute right-0 bottom-0 text-white/5 text-9xl font-black pointer-events-none select-none">
               🌸
+            </div>
+          </div>
+
+          {/* Google Search Privacy Assurance Notice */}
+          <div className="bg-emerald-50 border border-emerald-200/90 rounded-2xl p-3.5 flex items-start sm:items-center gap-3 text-xs text-emerald-950 shadow-2xs">
+            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl shrink-0">
+              <ShieldCheck className="w-4 h-4" />
+            </div>
+            <div className="flex-1 space-y-0.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-extrabold text-emerald-900">Google Search Privacy Shield Active</span>
+                <span className="text-[10px] font-mono bg-emerald-200/70 text-emerald-800 px-2 py-0.2 rounded-full font-bold">
+                  robots.txt: Chat Blocked &bull; data-nosnippet
+                </span>
+              </div>
+              <p className="text-[11px] text-emerald-800 leading-snug">
+                Only public group names and categories are indexed on Google Search. All group messages, discussions, chats, and member rosters are strictly private and blocked from Google search snippets.
+              </p>
             </div>
           </div>
 

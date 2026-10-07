@@ -11,11 +11,18 @@ import {
   ExternalLink,
   Printer,
   ChevronRight,
-  Info
+  Info,
+  Scale,
+  HeartPulse,
+  Mail,
+  UserCheck,
+  ShieldAlert,
+  Store,
+  MessageSquare
 } from 'lucide-react';
 import VernuntLogo from './VernuntLogo.tsx';
 
-export type LegalPolicyTab = 'terms' | 'privacy' | 'shipping' | 'refund';
+export type LegalPolicyTab = 'terms' | 'privacy' | 'safety' | 'shipping' | 'refund' | 'disclaimer' | 'grievance' | 'child-safety' | 'seller-terms' | 'groups-privacy';
 
 interface LegalPolicyModalProps {
   isOpen?: boolean;
@@ -49,31 +56,31 @@ export default function LegalPolicyModal({
   return (
     <div 
       id="legal-policy-modal" 
-      className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 z-[9999] overflow-y-auto font-sans"
+      className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 z-[9999] overflow-y-auto font-sans animate-fadeIn"
       onClick={handleClose}
     >
       <div 
         id="legal-box" 
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 transform transition-all flex flex-col max-h-[90vh] my-auto animate-fade-in"
+        className="w-full max-w-4xl bg-white rounded-3xl overflow-hidden shadow-2xl border border-slate-200 transform transition-all flex flex-col max-h-[92vh] my-auto"
       >
         {/* Header */}
-        <div id="legal-header" className="px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-stone-900 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
+        <div id="legal-header" className="px-5 sm:px-6 py-4 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white flex justify-between items-center shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="bg-white p-1 rounded-xl shrink-0 shadow-xs">
               <VernuntLogo size="xs" animated={false} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-[10px] uppercase font-black tracking-widest text-amber-400 font-mono">
                   Vernunt Legal &amp; Compliance Center
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30">
-                  Updated September 2026
+                  IT Act Sec 79 &bull; DPDP 2023 &bull; COPPA
                 </span>
               </div>
               <h3 className="font-bold text-sm sm:text-base font-serif text-white flex items-center gap-1.5">
-                Official Platform Policies &amp; Guardian Safeguards
+                Official Platform Policies, Intermediary Disclaimers &amp; Safeguards
               </h3>
             </div>
           </div>
@@ -97,12 +104,12 @@ export default function LegalPolicyModal({
           </div>
         </div>
 
-        {/* 4 Policy Tabs Navigation Bar */}
-        <div className="bg-slate-100/90 border-b border-slate-200 px-4 py-2 flex items-center gap-1.5 overflow-x-auto shrink-0 select-none">
+        {/* 7 Policy Tabs Navigation Bar */}
+        <div className="bg-slate-100 border-b border-slate-200 px-3 sm:px-5 py-2 flex items-center gap-1.5 overflow-x-auto shrink-0 select-none no-scrollbar">
           <button
             type="button"
             onClick={() => setActiveTab('terms')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'terms'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
@@ -115,288 +122,603 @@ export default function LegalPolicyModal({
           <button
             type="button"
             onClick={() => setActiveTab('privacy')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'privacy'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
             <Lock className={`w-3.5 h-3.5 ${activeTab === 'privacy' ? 'text-emerald-600' : 'text-slate-400'}`} />
-            <span>2. Privacy Policy</span>
+            <span>2. Privacy Policy (DPDP Act)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('safety')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'safety'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <ShieldCheck className={`w-3.5 h-3.5 ${activeTab === 'safety' ? 'text-rose-600' : 'text-slate-400'}`} />
+            <span>3. Safety &amp; Meetup Release</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('shipping')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'shipping'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
             <Truck className={`w-3.5 h-3.5 ${activeTab === 'shipping' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>3. Shipping Policy</span>
+            <span>4. Shipping &amp; Logistics</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('refund')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
               activeTab === 'refund'
                 ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
             }`}
           >
             <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'refund' ? 'text-purple-600' : 'text-slate-400'}`} />
-            <span>4. Refund &amp; Shipping Policy</span>
+            <span>5. Returns &amp; Refunds</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('disclaimer')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'disclaimer'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <HeartPulse className={`w-3.5 h-3.5 ${activeTab === 'disclaimer' ? 'text-red-600' : 'text-slate-400'}`} />
+            <span>6. Medical &amp; Health Disclaimer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('grievance')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'grievance'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Scale className={`w-3.5 h-3.5 ${activeTab === 'grievance' ? 'text-indigo-600' : 'text-slate-400'}`} />
+            <span>7. Grievance Officer</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('child-safety')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'child-safety'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <ShieldAlert className={`w-3.5 h-3.5 ${activeTab === 'child-safety' ? 'text-rose-600' : 'text-slate-400'}`} />
+            <span>8. POCSO &amp; Child Protection</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('seller-terms')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'seller-terms'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Store className={`w-3.5 h-3.5 ${activeTab === 'seller-terms' ? 'text-teal-600' : 'text-slate-400'}`} />
+            <span>9. Marketplace Seller Indemnity</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('groups-privacy')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'groups-privacy'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <MessageSquare className={`w-3.5 h-3.5 ${activeTab === 'groups-privacy' ? 'text-amber-600' : 'text-slate-400'}`} />
+            <span>10. Groups &amp; Chat Safe Harbor</span>
           </button>
         </div>
 
         {/* Policy Body */}
-        <div id="legal-body" className="p-6 overflow-y-auto text-xs text-slate-700 leading-relaxed flex-1 space-y-6">
+        <div id="legal-body" className="p-5 sm:p-6 overflow-y-auto text-xs text-slate-700 leading-relaxed flex-1 space-y-6">
           
           {/* ========================================================= */}
-          {/* TAB 1: TERMS & CONDITIONS */}
+          {/* TAB 1: TERMS & CONDITIONS                                 */}
           {/* ========================================================= */}
           {activeTab === 'terms' && (
-            <div className="space-y-5 animate-fade-in">
+            <div className="space-y-5 animate-fadeIn">
               
-              {/* Critical Disclaimers Callout Box */}
-              <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 space-y-2.5 text-amber-950">
-                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-amber-900">
+              {/* Critical Legal Safe Harbor Box */}
+              <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-4 sm:p-5 space-y-3 text-amber-950 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-amber-900">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Important Legal Disclaimers &amp; Marketplace Notice</span>
+                  <span>Statutory Intermediary Safe Harbor &bull; Section 79 Information Technology Act, 2000</span>
                 </div>
-                <ul className="list-disc list-inside space-y-1.5 text-xs text-amber-900/90 leading-relaxed">
-                  <li>
-                    <strong>Free App Usage Policy:</strong> The Vernunt platform is currently provided <strong>100% Free</strong> for all users. Free app usage, complimentary features, quotas, and access levels can be modified, adjusted, paused, converted, or changed at any time by Vernunt with or without prior notice to users.
-                  </li>
-                  <li>
-                    <strong>Marketplace Facilitator Disclaimer:</strong> Vernunt is strictly an online discovery technology marketplace and platform facilitator. Vernunt is <strong>NOT responsible or liable</strong> for any user conduct, offline playdates, physical interactions, safety occurrences, injuries, damages, transactions, or communications.
-                  </li>
-                  <li>
-                    <strong>Basic Verification Only:</strong> Vernunt only performs <em>basic surface-level verification</em> (mobile OTP verification, email confirmation, self-declarations, optional basic identity checks). Basic verification does NOT constitute background investigation, criminal vetting, character guarantee, or safety warranty.
-                  </li>
-                  <li>
-                    <strong>Mandatory Parent Supervision &amp; Due Diligence:</strong> Parents and legal guardians are strictly required to independently exercise thorough due diligence, verify credentials, supervise all meetups, accompany children at all times, and carefully get connected with other families and service providers.
-                  </li>
-                </ul>
+                <p className="text-xs text-amber-950 leading-relaxed">
+                  <strong>VERNUNT TECHNOLOGIES PRIVATE LIMITED</strong> ("Vernunt", "Platform", "We", "Us") operates strictly as an <strong>Intermediary Telecommunications &amp; Software Platform</strong> under Section 79 of the Information Technology Act, 2000 (India) and the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. Vernunt provides a peer-to-peer digital discovery technology connecting independent parents, activity organizers, daycare operators, and merchant vendors.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-[11.5px]">
+                  <div className="bg-white/80 p-3 rounded-xl border border-amber-200 space-y-1">
+                    <strong>1. Complete "AS IS" Disclaimers:</strong>
+                    <p className="text-amber-900">All services, communications, connections, listings, and directories are provided strictly "AS IS" and "AS AVAILABLE" without warranties of any kind.</p>
+                  </div>
+                  <div className="bg-white/80 p-3 rounded-xl border border-amber-200 space-y-1">
+                    <strong>2. Zero Platform Liability:</strong>
+                    <p className="text-amber-900">Vernunt bears ZERO liability for any in-person playdate, bodily injury, altercation, transport incident, property loss, or transaction dispute between users.</p>
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-sm font-serif">1. Acceptance of Terms &amp; Eligibility</h4>
-                <p>
-                  By accessing or using Vernunt (including vernunt.com, app.vernunt.com, mobile web views, and related APIs), you agree to be bound by these Terms and Conditions. Direct account creation by minors under 18 years of age is strictly prohibited. All child profiles, playmate requests, and story submissions must be created solely by a verified parent or legal guardian.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Eligibility &amp; Mandatory Parental Authority</h4>
+                  <p className="mt-1">
+                    Direct account creation or usage by minors under the age of 18 is strictly prohibited. By registering on Vernunt, you affirmatively warrant that you are at least 18 years of age, have legal competence under the Indian Contract Act, 1872, and are the legal parent or court-appointed legal guardian of every child added to your account. You warrant that you have sole legal authority to manage their profiles, playdate requests, and bookings.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">2. Marketplace Platform Status &amp; Complete Limitation of Liability</h4>
-                <p>
-                  Vernunt acts solely as an intermediary technology platform enabling independent guardians, daycare providers, activity specialists, and event organizers to discover each other. Vernunt does not employ, supervise, endorse, or manage any parents, children, daycares, or specialists listed on the platform.
-                </p>
-                <p>
-                  To the maximum extent permitted by applicable law, Vernunt, its founders, directors, employees, and affiliates shall not be liable for any direct, indirect, incidental, punitive, or consequential damages arising out of in-person playdates, interactions at community venues, childcare sessions, advice provided by specialists, or transactions between users.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Absolute Release &amp; Limitation of Liability</h4>
+                  <p className="mt-1">
+                    To the maximum extent permissible under applicable law, in no event shall Vernunt Technologies Pvt Ltd, its founders, directors, officers, employees, affiliates, investors, or licensors be liable for any direct, indirect, punitive, incidental, special, consequential, or exemplary damages, including but not limited to damages for personal injury, pain and suffering, emotional distress, loss of child supervision, illness, accident, loss of profits, goodwill, data, or other intangible losses arising from:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1.5 pl-2 mt-2 text-slate-600">
+                    <li>Any in-person interactions, meetings, playdates, neighborhood groups, rides, or travel arranged via the platform.</li>
+                    <li>Conduct, actions, omissions, statements, or representations of any third party (parents, sitters, doctors, drivers, vendors, attendees).</li>
+                    <li>Any product purchased from third-party vendors or events hosted by independent organizers.</li>
+                    <li>Unauthorized access to or alteration of your transmissions or data.</li>
+                  </ul>
+                  <p className="mt-2 font-semibold text-slate-800">
+                    In all events, Vernunt's aggregate cumulative liability to any user for all claims, causes of action, or disputes shall never exceed the total amount actually paid by the user to Vernunt in the thirty (30) days preceding the claim or ₹100 INR (One Hundred Indian Rupees), whichever is lower. If you have paid zero fees, your sole and exclusive remedy is to discontinue use of the platform.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">3. Basic Verification &amp; Guardian Responsibility</h4>
-                <p>
-                  User badges (such as "Mobile Verified", "Aadhaar Match Indicator", "Parent Verified") signify only that automated technical checks were executed against user-supplied inputs. They do not constitute an exhaustive police verification or safety guarantee. Guardians must always:
-                </p>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li>Meet first in well-lit, public playgrounds, schools, or parks.</li>
-                  <li>Personally supervise their minor children for the entire duration of any meetup.</li>
-                  <li>Never disclose sensitive home addresses, financial credentials, or private travel plans.</li>
-                  <li>Directly verify references and government identification of any service provider before engaging.</li>
-                </ul>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Comprehensive User Indemnification</h4>
+                  <p className="mt-1">
+                    You agree to defend, indemnify, and hold harmless Vernunt, its directors, officers, employees, contractors, and agents from and against any and all claims, damages, obligations, losses, liabilities, costs, debts, and legal fees arising from: (a) your use of and access to the platform; (b) any physical or digital interaction between you and another user or third party; (c) your violation of any term of these Terms; (d) your violation of any third-party right, including child custody rights, privacy rights, or intellectual property rights; or (e) any claim that content submitted by you caused damage to a third party.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">4. Modification of Free Access &amp; Platform Features</h4>
-                <p>
-                  Vernunt provides free community discovery and publication features. Vernunt reserves the exclusive right, at its sole discretion, to modify, restrict, terminate, introduce paid tiers for, or discontinue any free features or the entire application at any time, with or without prior notification to users.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">4. Surface Verification Disclaimer (No Character Warranty)</h4>
+                  <p className="mt-1">
+                    Verification badges (including "DigiLocker Govt ID Match", "Phone OTP Verified", "Parent Badge") indicate only that automated cryptographic checks confirmed user-provided credentials against government records at the moment of verification. <strong>Verification DOES NOT constitute an investigation of criminal history, psychological evaluation, character warranty, or moral guarantee.</strong> Parents must independently verify all credentials before leaving any child in another's company.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">5. Content Ownership &amp; Kid Storybook Gazette</h4>
-                <p>
-                  Parents retain ownership of the photos, achievements, and narratives submitted for their children. By submitting a child achievement story, you grant Vernunt a non-exclusive, royalty-free license to display, format, and index the story in the Vernunt Gazette and Google search indexing. Published stories undergo editorial review; to maintain integrity, modifications can only be requested through the Editorial Admin.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">5. Class Action Waiver &amp; Exclusive Jurisdiction</h4>
+                  <p className="mt-1">
+                    All claims must be brought in the parties' individual capacity and not as a plaintiff or class member in any purported class, collective, or representative proceeding. Any dispute, controversy, or claim arising out of or relating to these Terms shall be referred to and finally resolved by arbitration in accordance with the Arbitration and Conciliation Act, 1996 of India. The seat and venue of arbitration shall be <strong>Bengaluru, Karnataka</strong>. The courts of Bengaluru shall have exclusive jurisdiction over any court proceedings.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">6. Code of Conduct &amp; Immediate Termination</h4>
-                <p>
-                  Any fraudulent activity, harassment, bullying, unauthorized solicitations, child endangerment, or abusive behavior will result in immediate and permanent account termination, phone/device blocking, and referral to relevant cybercrime and law enforcement authorities under India's POCSO and IT Acts.
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 space-y-1">
-                <p><strong>Governing Law:</strong> These terms are governed by and construed in accordance with the laws of India, with exclusive jurisdiction in the courts of Bengaluru, Karnataka.</p>
-                <p><strong>Contact Legal Desk:</strong> legal@vernunt.com • support@vernunt.com</p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">6. Modification of Platform Tiers &amp; Termination</h4>
+                  <p className="mt-1">
+                    Vernunt reserves the unconditional right to modify, adjust, introduce pricing for, suspend, or terminate any free features, groups, sitemaps, directories, or the entire application at any time without prior notice or compensation.
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* TAB 2: PRIVACY POLICY */}
+          {/* TAB 2: PRIVACY POLICY                                     */}
           {/* ========================================================= */}
           {activeTab === 'privacy' && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-emerald-950 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-emerald-900">
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 sm:p-5 text-emerald-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-emerald-900">
                   <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Child Privacy &amp; Data Protection Certified</span>
+                  <span>Digital Personal Data Protection (DPDP) Act 2023 &bull; COPPA Certified</span>
                 </div>
-                <p className="text-xs text-emerald-900/90 leading-relaxed">
-                  Vernunt strictly complies with India's <strong>Digital Personal Data Protection (DPDP) Act 2023</strong> and the <strong>Children's Online Privacy Protection Act (COPPA, 16 CFR Part 312)</strong>. We enforce zero behavioral ad tracking, verifiable parental consent, and concentric location masking.
+                <p className="text-xs text-emerald-900 leading-relaxed">
+                  Vernunt strictly adheres to India's <strong>Digital Personal Data Protection Act, 2023</strong>, the <strong>Information Technology (Reasonable Security Practices and Procedures and Sensitive Personal Data or Information) Rules, 2011</strong>, and the <strong>Children's Online Privacy Protection Act (COPPA, 16 CFR Part 312)</strong>.
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-sm font-serif">1. Verifiable Parental Consent (VPC)</h4>
-                <p>
-                  No minor under 18 may directly create an account. Accounts are created solely by guardians using verified mobile OTP and email verification. Child profiles are managed exclusively under the parent's authenticated account.
-                </p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Verifiable Parental Consent (VPC)</h4>
+                  <p className="mt-1">
+                    Under Section 9 of the DPDP Act 2023, processing of any child's data is carried out strictly upon obtaining verifiable consent from the parent or lawful guardian via authenticated multi-factor mobile OTP and government credentials.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">2. Information We Collect</h4>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li><strong>Parent Contact Details:</strong> Mobile number (verified via SMS OTP), email address, and optional city/pincode.</li>
-                  <li><strong>Child Profile Details:</strong> First name/nickname, age, general play interests (e.g., Lego, football, chess), and parent-provided photos.</li>
-                  <li><strong>Playground Radar Coordinates:</strong> Fuzzy, rounded geographic coordinates used strictly for neighborhood distance matching (e.g., within 2 km). Precise home street addresses are never stored or exposed to other users.</li>
-                </ul>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Zero Biometric &amp; Zero Aadhaar Number Storage</h4>
+                  <p className="mt-1">
+                    Vernunt utilizes Government-approved DigiLocker / UIDAI verification gateways via tokenized cryptography. <strong>Vernunt NEVER stores raw Aadhaar numbers, biometric fingerprints, or iris scans on its servers.</strong> Verification generates a transient cryptographic hash that affirms government identity match without retaining sensitive citizen credentials.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">3. Zero-Targeted-Advertising Policy</h4>
-                <p>
-                  Child behavioral patterns and play preferences are never sold, rented, or monetized for commercial advertising or third-party behavioral profiling.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Zero Third-Party Advertising &amp; No Sale of Data</h4>
+                  <p className="mt-1">
+                    Vernunt enforces a strict, unconditional <strong>Zero-Ad-Network Policy</strong>. Children's activities, names, ages, milestones, health notes, and locations are <strong>NEVER sold, rented, leased, or licensed</strong> to any commercial advertisers, data brokers, or profiling agencies.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">4. Data Security &amp; Encryption</h4>
-                <p>
-                  All data transmitted across Vernunt is secured using TLS 1.3 encryption in transit and AES-256 encryption at rest. Accounts are safeguarded with verified multi-factor mobile OTP and encrypted password authentication; user data and credentials are strictly stored in compliance with Indian IT and DPDP guidelines.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">4. Vernunt Groups Confidentiality Shield</h4>
+                  <p className="mt-1">
+                    Group chat messages, member rosters, shared media, and parent discussions are strictly confidential. <strong>Group chat contents and member personal numbers are permanently blocked from search engines via robots.txt, noindex headers, and cryptographic session tokens.</strong> Google Search and Googlebot are permitted to index only public group names and categories in the search directory.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">5. Parental Rights: Access, Export &amp; Permanent Erasure</h4>
-                <p>
-                  Under the DPDP Act 2023, parents retain unconditional rights to review dependent child records, download data archives, or request immediate permanent deletion (Right to be Forgotten) at any time through our compliance desk.
-                </p>
-              </div>
-
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500">
-                <p><strong>Designated Grievance &amp; Child Safety Officer:</strong></p>
-                <p>Grievance Officer, Vernunt Technologies Pvt Ltd, Bengaluru, Karnataka • Email: safety@vernunt.com</p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">5. Right to Erasure &amp; The Right to be Forgotten</h4>
+                  <p className="mt-1">
+                    Parents hold the unconditional legal right under Section 12 of the DPDP Act to access, correct, export, or permanently erase all child profiles, chat history, and uploaded images. Deletion requests are processed and irreversibly purged across all active clusters within forty-eight (48) hours upon request to <code>privacy@vernunt.com</code>.
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* TAB 3: SHIPPING POLICY */}
+          {/* TAB 3: SAFETY & MEETUP LIABILITY RELEASE                  */}
+          {/* ========================================================= */}
+          {activeTab === 'safety' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 text-rose-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-rose-900">
+                  <ShieldCheck className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Assumption of Risk &bull; Physical Meetups &bull; Zero Platform Supervision</span>
+                </div>
+                <p className="text-xs text-rose-900 leading-relaxed">
+                  Vernunt is solely a digital software communications tool. Vernunt does NOT organize, staff, manage, police, inspect, or oversee in-person playdates, park meetups, sports sessions, or daycare premises.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Mandatory Continuous Parental Custody &amp; Supervision</h4>
+                  <p className="mt-1">
+                    Parents and legal guardians warrant that they or their designated adult representative shall physically accompany and directly supervise their minor children at all times during any meetup, playdate, or class arranged through the platform. <strong>Vernunt is not a child care agency, baby sitting employer, or security guard service.</strong> Leaving a minor unattended with another family or provider is undertaken entirely at the guardian's sole risk and discretion.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Absolute Assumption of Risk</h4>
+                  <p className="mt-1">
+                    You acknowledge that physical play, sports, swimming, outdoor adventures, cycling, and playground activities involve inherent risks of physical injury, illness, allergic reaction, animal bites, environmental hazards, accidents, and property damage. By using Vernunt to discover activities or playmates, you voluntarily and knowingly assume all risks on behalf of yourself and your minor dependents.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Emergency SOS Feature Disclaimer</h4>
+                  <p className="mt-1">
+                    The platform's in-app Emergency SOS button is an auxiliary digital convenience tool designed solely to dispatch automated SMS and location coordinates to pre-selected personal family emergency contacts. <strong>The SOS feature is NOT a substitute for municipal emergency services. In any acute emergency, always immediately dial 112 (National Emergency Number), 100 (Police), or 108 (Ambulance).</strong> Vernunt guarantees no response time, cellular network connectivity, or dispatch service.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">4. Third-Party Premises &amp; Daycares</h4>
+                  <p className="mt-1">
+                    All daycare listings, playhome facilities, and private venues are independently owned and operated by third parties. Vernunt conducts no health inspections, structural engineering assessments, fire safety checks, or CCTV audits of listed facilities. Parents must physically inspect and evaluate all centers independently before enrolling any child.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 4: SHIPPING & LOGISTICS POLICY                        */}
           {/* ========================================================= */}
           {activeTab === 'shipping' && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-blue-950 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-blue-900">
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 sm:p-5 text-blue-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-blue-900">
                   <Truck className="w-4 h-4 text-blue-600 shrink-0" />
-                  <span>Physical Orders &amp; Play Gear Shipping Guidelines</span>
+                  <span>Marketplace Courier Logistics &bull; Third-Party Fulfillment</span>
                 </div>
-                <p className="text-xs text-blue-900/90 leading-relaxed">
-                  This Shipping Policy applies to physical goods purchased via the Vernunt Store, including printed hardcover kid achievement storybooks, developmental toys, outdoor play kits, and event pass merchandise.
+                <p className="text-xs text-blue-900 leading-relaxed">
+                  Vernunt Store operates as a curated intermediary marketplace connecting independent merchant vendors with customers. Physical products are packaged and dispatched by independent certified vendors and transported by third-party logistics aggregators.
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-sm font-serif">1. Order Processing &amp; Dispatch Time</h4>
-                <p>
-                  All standard orders are verified, packaged, and dispatched within <strong>24 to 48 business hours</strong> (excluding Sundays and national holidays) from our fulfillment centers. Custom printed hardcover kid storybooks undergo color calibration and binding and are dispatched within <strong>3 to 4 business days</strong>.
-                </p>
-
-                <h4 className="font-bold text-slate-900 text-sm font-serif">2. Shipping Coverage &amp; Delivery Timelines</h4>
-                <p>
-                  We deliver across all serviceable pincodes in India through premier courier partners including Bluedart, Delhivery, DTDC, and India Post Speed Post:
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="font-bold text-slate-800 block text-xs">Metro Cities &amp; Tier 1</span>
-                    <span className="text-[11px] text-slate-600">Bengaluru, Mumbai, Delhi NCR, Hyderabad, Chennai, Kolkata, Pune: <strong>2 to 4 business days</strong></span>
-                  </div>
-                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                    <span className="font-bold text-slate-800 block text-xs">Tier 2 &amp; Regional Towns</span>
-                    <span className="text-[11px] text-slate-600">Rest of India &amp; regional districts: <strong>4 to 7 business days</strong></span>
-                  </div>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Dispatch Timelines &amp; Courier Aggregators</h4>
+                  <p className="mt-1">
+                    Standard in-stock merchandise is packed and handed over to independent courier partners (Shiprocket, BlueDart, Delhivery, DTDC, India Post) within <strong>24 to 48 business hours</strong> of payment verification. Personalized hardcover achievement storybooks undergo printing and binding and dispatch within <strong>3 to 4 business days</strong>.
+                  </p>
                 </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">3. Shipping Rates</h4>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li><strong>Standard Shipping:</strong> Free shipping across India on all orders of ₹499 and above.</li>
-                  <li><strong>Orders under ₹499:</strong> A nominal flat shipping charge of ₹49 is applied at checkout.</li>
-                  <li><strong>Express Air Courier:</strong> Optional priority 24-hour dispatch available in select metros for ₹99.</li>
-                </ul>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Estimated Delivery Windows &amp; Force Majeure</h4>
+                  <p className="mt-1">
+                    Estimated delivery times (2-4 business days for metros, 4-7 business days for regional towns) are estimates provided by courier companies and are <strong>not legally binding guarantees</strong>. Vernunt and its merchants shall not be held liable for shipment delays caused by Force Majeure events, including severe weather, flooding, strikes, transport blockages, customs holds, or regional civil unrest.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">4. Real-Time Tracking</h4>
-                <p>
-                  As soon as your package is scanned by our logistics carrier, an automated SMS and email with the courier tracking ID and live tracking URL will be sent to the contact details provided.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Mandatory Unboxing Video Proof for Transit Damage</h4>
+                  <p className="mt-1">
+                    To prevent fraudulent claims and establish courier fault, <strong>all transit damage claims, broken item reports, or missing item complaints REQUIRE a clear, unedited continuous video recording of the outer parcel package being opened from its original sealed state</strong>. Claims submitted without unboxing video proof cannot be entertained by logistics carriers.
+                  </p>
+                </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">5. Transit Delays &amp; Damaged Deliveries</h4>
-                <p>
-                  While we work with leading carriers, unforeseen weather disruptions or local restrictions may cause slight delays. If a package arrives visibly tampered with or damaged, please take photos and notify our shipping desk at <strong>support@vernunt.com</strong> within 48 hours for immediate replacement.
-                </p>
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">4. Non-Manufacturing Intermediary Disclaimer</h4>
+                  <p className="mt-1">
+                    Vernunt does not design, manufacture, or chemically produce store merchandise. All warranties regarding product safety, BIS certification, FSSAI compliance, material non-toxicity, and hypoallergenic claims are strictly between the consumer and the respective product manufacturer/brand.
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
           {/* ========================================================= */}
-          {/* TAB 4: REFUND & SHIPPING POLICY */}
+          {/* TAB 5: RETURNS & REFUNDS POLICY                           */}
           {/* ========================================================= */}
           {activeTab === 'refund' && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 text-purple-950 space-y-2">
-                <div className="flex items-center gap-2 font-bold text-xs uppercase tracking-wider text-purple-900">
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 sm:p-5 text-purple-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-purple-900">
                   <RotateCcw className="w-4 h-4 text-purple-600 shrink-0" />
-                  <span>Comprehensive Refund, Return &amp; Shipping Policy</span>
+                  <span>Returns, Replacements &amp; Refund Guidelines (7-Day Sealed Window)</span>
                 </div>
-                <p className="text-xs text-purple-900/90 leading-relaxed">
-                  We strive to ensure complete satisfaction for families. This policy details refund eligibility, return conditions, replacement steps, and shipping fee adjustments for both physical store merchandise and digital event passes.
+                <p className="text-xs text-purple-900 leading-relaxed">
+                  Vernunt facilitates a fair, transparent return and replacement process for eligible physical store purchases and community event passes.
                 </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. 7-Day Return Eligibility (Physical Items)</h4>
+                  <p className="mt-1">
+                    Eligible non-perishable goods (Montessori STEM kits, unopened clothing sets, sealed books) can be returned within <strong>seven (7) calendar days of delivery</strong> provided the item is strictly unused, unwashed, and in its pristine original packaging with all security tags intact.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Strictly Non-Returnable Hygiene &amp; Safety Categories</h4>
+                  <p className="mt-1">
+                    For the vital health, hygiene, and medical safety of babies and toddlers, the following product categories are <strong>strictly NON-RETURNABLE and NON-REFUNDABLE once delivered</strong>:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 pl-2 mt-1.5 text-slate-600">
+                    <li>Organic infant porridge mixes, baby purees, snacks, and consumable food items.</li>
+                    <li>Diaper packs, baby wipes, bath soaps, and rash creams if the protective seal is broken.</li>
+                    <li>Teething toys, pacifiers, feeding bottles, and breast pumps.</li>
+                    <li>Worn or pierced baby earrings, silver nazariya bangles, or custom-engraved jewelry.</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Refund Method &amp; Timelines</h4>
+                  <p className="mt-1">
+                    Upon receipt and warehouse inspection of returned items, approved refunds are initiated within <strong>24 business hours</strong> directly to the original payment source (UPI, Debit/Credit Card, Net Banking). Bank reflection typically takes 5 to 7 business days. Shipping fees and express courier charges are non-refundable.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">4. Digital Event Passes &amp; Ticket Cancellations</h4>
+                  <p className="mt-1">
+                    Paid event passes are eligible for 100% refund if cancelled at least 24 hours prior to scheduled event commencement. If an organizer cancels an event, ticket holders receive an automatic 100% refund within 3 business days. Vernunt bears no liability for travel, lodging, or ancillary expenses incurred by attendees.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 6: MEDICAL & HEALTH DISCLAIMER                        */}
+          {/* ========================================================= */}
+          {activeTab === 'disclaimer' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 sm:p-5 text-red-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-red-900">
+                  <HeartPulse className="w-4 h-4 text-red-600 shrink-0" />
+                  <span>Educational Informational Reference &bull; Not Medical Advice</span>
+                </div>
+                <p className="text-xs text-red-900 leading-relaxed">
+                  <strong>IMPORTANT HEALTH NOTICE:</strong> The Vernunt platform, its 1,000+ child growth guides, milestone trackers, nutritional articles, developmental milestones, and specialist portfolios DO NOT constitute medical advice, clinical diagnosis, pediatric treatment, or prescription therapy.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. No Doctor-Patient Relationship</h4>
+                  <p className="mt-1">
+                    Accessing articles, using milestone trackers, or viewing doctor directory cards on Vernunt DOES NOT establish a doctor-patient relationship between you and Vernunt or any listed healthcare professional. Any consultations booked with verified pediatricians are independent professional transactions governed solely by the provider's professional code of conduct.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Mandatory Clinical Consultation</h4>
+                  <p className="mt-1">
+                    Always seek the advice of your licensed pediatrician, family physician, or qualified medical specialist regarding any medical condition, infant fever, acute illness, feeding intolerance, behavioral concern, or vaccination schedule. Never disregard professional clinical advice or delay seeking medical care based on content read on this platform.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Acute Medical Emergencies</h4>
+                  <p className="mt-1">
+                    If your child is experiencing a medical emergency, difficulty breathing, seizures, severe allergic reaction (anaphylaxis), trauma, or high unresponsive fever, <strong>DO NOT use the app. Call 112 / 108 or proceed immediately to the nearest hospital emergency room.</strong>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 7: GRIEVANCE OFFICER & STATUTORY NOTICE               */}
+          {/* ========================================================= */}
+          {activeTab === 'grievance' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 sm:p-5 text-indigo-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-indigo-900">
+                  <Scale className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Statutory Grievance Redressal Mechanism &bull; Rule 3(2) IT Rules, 2021</span>
+                </div>
+                <p className="text-xs text-indigo-900 leading-relaxed">
+                  In compliance with Rule 3(2) of the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021, and the DPDP Act 2023, Vernunt has appointed a dedicated Nodal &amp; Grievance Officer in India.
+                </p>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3">
+                <h4 className="font-bold text-slate-900 text-sm">Designated Grievance &amp; Compliance Officer</h4>
+                <div className="space-y-1.5 text-xs text-slate-700">
+                  <p><strong>Name / Designation:</strong> Nodal Grievance Redressal Officer, Vernunt Technologies Pvt Ltd</p>
+                  <p><strong>Corporate Address:</strong> Indiranagar 100ft Road, Bengaluru, Karnataka 560038, India</p>
+                  <p><strong>Official Legal &amp; Grievance Email:</strong> <a href="mailto:grievance@vernunt.com" className="text-indigo-600 font-bold underline">grievance@vernunt.com</a> &bull; <a href="mailto:legal@vernunt.com" className="text-indigo-600 font-bold underline">legal@vernunt.com</a></p>
+                  <p><strong>Child Safety Escalations:</strong> <a href="mailto:safety@vernunt.com" className="text-rose-600 font-bold underline">safety@vernunt.com</a></p>
+                </div>
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-bold text-slate-900 text-sm font-serif">1. Physical Goods Return &amp; Replacement (7-Day Guarantee)</h4>
-                <p>
-                  Physical merchandise (educational toys, sports play gear, reading materials) can be returned or exchanged within <strong>7 days of delivery</strong> under the following conditions:
-                </p>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li>Item arrived physically damaged, defective, or incomplete.</li>
-                  <li>Item is in unused condition with all original tags, boxes, and accessories intact.</li>
-                  <li>Custom printed hardcover kid storybooks with verified personalization errors made by our printing facility will be reprinted and reshipped at zero cost.</li>
+                <h4 className="font-extrabold text-slate-900 text-sm font-serif">Statutory Turnaround Timelines</h4>
+                <ul className="list-disc list-inside space-y-1.5 pl-2 text-slate-600">
+                  <li><strong>Acknowledgment of Grievance:</strong> Within twenty-four (24) hours of receipt.</li>
+                  <li><strong>Redressal &amp; Investigation:</strong> Within fifteen (15) days of receipt.</li>
+                  <li><strong>Emergency Child Safety &amp; Non-Consensual Content Takedowns:</strong> Within twenty-four (24) hours of prima facie notification under Rule 3(2)(b).</li>
                 </ul>
+              </div>
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">2. Return Shipping Process &amp; Costs</h4>
-                <p>
-                  For verified defective, damaged, or incorrect items, Vernunt will arrange a free reverse pickup from your doorstep. If reverse pickup is unavailable at your pincode, you may courier the package back via India Post Speed Post, and we will reimburse the return shipping charges upon receipt of receipt.
-                </p>
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[11px] text-amber-900">
+                <strong>Notice &amp; Takedown Procedure:</strong> Any copyright owner, parent, or government authority seeking content removal must submit a formal notice detailing the URL, exact content description, and basis of infringement or violation to <code>grievance@vernunt.com</code>.
+              </div>
+            </div>
+          )}
 
-                <h4 className="font-bold text-slate-900 text-sm font-serif">3. Refund Processing &amp; Timelines</h4>
-                <p>
-                  Once the returned item is inspected at our fulfillment warehouse:
-                </p>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li>Approved refunds are initiated within <strong>24 business hours</strong>.</li>
-                  <li>Funds will reflect back in your original source payment method (UPI, Bank Account, Debit/Credit Card) within <strong>5 to 7 business days</strong> depending on your bank.</li>
-                  <li>For Cash on Delivery (COD) orders, refunds are issued via direct UPI transfer or NEFT upon providing verified account details.</li>
-                </ul>
-
-                <h4 className="font-bold text-slate-900 text-sm font-serif">4. Digital Passes &amp; Community Event Tickets</h4>
-                <p>
-                  For paid tickets to community events, workshops, or festivals hosted by verified event organizers on Vernunt:
-                </p>
-                <ul className="list-disc list-inside space-y-1 pl-2 text-slate-600">
-                  <li>Cancellations requested up to <strong>24 hours prior</strong> to the scheduled start time are eligible for a 100% refund.</li>
-                  <li>If an event is rescheduled or canceled by the organizer, attendees will receive an automatic 100% full refund within 3 business days.</li>
-                </ul>
-
-                <h4 className="font-bold text-slate-900 text-sm font-serif">5. Non-Refundable Items &amp; Free Services</h4>
-                <p>
-                  All complimentary free platform services, promotional credits, and referral reward bonuses hold no monetary cash value and cannot be redeemed for cash. As stated in our Terms, free app services can be modified or withdrawn at any time without monetary compensation.
+          {/* ========================================================= */}
+          {/* TAB 8: POCSO ACT 2012 & CHILD PROTECTION POLICY           */}
+          {/* ========================================================= */}
+          {activeTab === 'child-safety' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 sm:p-5 text-rose-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-rose-900">
+                  <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Zero-Tolerance Child Protection &bull; POCSO Act 2012 &bull; IT Act Sec 67B</span>
+                </div>
+                <p className="text-xs text-rose-950 leading-relaxed">
+                  Vernunt enforces an unconditional zero-tolerance protocol towards child abuse material (CSAM), grooming, sexual exploitation, or endangerment under the Protection of Children from Sexual Offences (POCSO) Act, 2012, and Section 67B of the Information Technology Act, 2000.
                 </p>
               </div>
 
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500">
-                <p><strong>To Initiate a Return or Refund:</strong></p>
-                <p>Email: returns@vernunt.com or support@vernunt.com with your Order ID, contact number, and photographs of the item. Support responds within 12 business hours.</p>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Mandatory Statutory Reporting</h4>
+                  <p className="mt-1">
+                    Any suspected child exploitation, predatory messaging, or inappropriate contact triggers immediate account suspension, permanent cryptographic blacklisting, and automatic reporting to law enforcement authorities including the National Cyber Crime Reporting Portal (cybercrime.gov.in) and local police cyber cells.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Automated Safety Filtering &amp; Aadhaar Verification</h4>
+                  <p className="mt-1">
+                    Vernunt deploys automated heuristics, phone OTP binding, and Aadhaar-based cryptographic ID matching to verify parent accounts. Parents retain sole custody and physical responsibility for children at all times.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Emergency Child Protection Contacts</h4>
+                  <p className="mt-1">
+                    National Emergency: <strong>112</strong> &bull; Childline India: <strong>1098</strong> &bull; Cyber Crime Helpline: <strong>1930</strong>. Platform Safety Escalations: <code>safety@vernunt.com</code>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 9: MARKETPLACE SELLER TERMS & PRODUCT INDEMNITY       */}
+          {/* ========================================================= */}
+          {activeTab === 'seller-terms' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 sm:p-5 text-teal-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-teal-900">
+                  <Store className="w-4 h-4 text-teal-600 shrink-0" />
+                  <span>Marketplace Intermediary Safe Harbor &bull; Consumer Protection Rules, 2020</span>
+                </div>
+                <p className="text-xs text-teal-950 leading-relaxed">
+                  Vernunt operates as an independent marketplace platform. All developmental kits, Montessori toys, apparel, and baby products are sold, packaged, and fulfilled by independent vetted third-party sellers, merchants, and brands.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Absolute Product Defect Release</h4>
+                  <p className="mt-1">
+                    Vernunt does not design, manufacture, inspect individual units, hold inventory title, or warrant fitness for a particular purpose of any merchandise. You expressly agree that Vernunt bears <strong>ZERO product liability</strong> for manufacturing defects, choking hazards, material allergic reactions, or delivery errors. All warranty and defect claims are solely between the buyer and the merchant vendor.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Mandatory Seller Warranty &amp; BIS Compliance</h4>
+                  <p className="mt-1">
+                    All sellers on Vernunt contractually warrant that their toys, infant care items, and baby gear comply with Bureau of Indian Standards (BIS) safety norms, non-toxic paint certifications, and applicable consumer laws. Sellers agree to fully indemnify Vernunt against any third-party claims, consumer forum proceedings, or regulatory penalties.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Google Merchant Center Feed Accuracy</h4>
+                  <p className="mt-1">
+                    Product prices, stock availability, and specifications published on Vernunt Store and mirrored to Google Merchant Center feeds are maintained with high automated fidelity. In the event of pricing discrepancies or stockouts, merchants reserve the right to cancel orders with full refund of the amount paid.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 10: GROUPS & COMMUNICATIONS SAFE HARBOR               */}
+          {/* ========================================================= */}
+          {activeTab === 'groups-privacy' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 text-amber-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-amber-900">
+                  <MessageSquare className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Groups Safe Harbor &bull; Google Search Privacy Architecture</span>
+                </div>
+                <p className="text-xs text-amber-950 leading-relaxed">
+                  Vernunt Parenting Groups are peer-to-peer discussion spaces. Vernunt acts as a passive intermediary telecommunications carrier and does not curate, author, verify, endorse, or pre-screen user messages, parent opinions, or group announcements.
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Absolute Exclusion of Chat Messages from Search Engines</h4>
+                  <p className="mt-1">
+                    To strictly safeguard parental privacy and family conversations, <strong>all internal group chat messages, discussion threads, member conversations, and user posts are completely blocked from Google Search Engine indexing</strong>. Vernunt implements server-level <code>robots.txt</code> disallow rules, dynamic <code>noindex</code> meta directives, and HTML5 <code>data-nosnippet</code> tags to ensure that ONLY high-level public group names and categories are discoverable on Google Search.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. User Sole Liability for Statements &amp; Defamation</h4>
+                  <p className="mt-1">
+                    Each group participant and author is solely legally responsible for the truthfulness, legality, and consequences of their messages, recommendations, or complaints. Defamatory speech, harassment, hate speech, medical malpractice claims, or commercial spam are strictly prohibited.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Offline In-Person Meetup Safe Harbor</h4>
+                  <p className="mt-1">
+                    Vernunt does not organize, supervise, staff, monitor, or insure group meetups arranged by parents (e.g., park stroller walks, playgroups, cycling trips). Attendees participate entirely at their own risk and waive all claims against Vernunt.
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -407,7 +729,7 @@ export default function LegalPolicyModal({
         <div id="legal-footer" className="p-4 bg-slate-50 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
           <div className="text-[11px] text-slate-500 flex items-center gap-1.5">
             <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-            <span>Vernunt is an intermediary marketplace. Parents must exercise careful independent verification.</span>
+            <span>Vernunt is an intermediary discovery technology. Parents maintain absolute custody &amp; supervision.</span>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -415,9 +737,9 @@ export default function LegalPolicyModal({
               id="btn-agree-legal-footer"
               type="button"
               onClick={handleClose}
-              className="flex-1 sm:flex-none px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95"
+              className="flex-1 sm:flex-none px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition cursor-pointer shadow-xs active:scale-95"
             >
-              I Understand &amp; Agree
+              I Acknowledge &amp; Accept Platform Terms
             </button>
           </div>
         </div>

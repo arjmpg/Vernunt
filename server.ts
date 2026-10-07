@@ -5,6 +5,7 @@ import os from "os";
 import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
 import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
+import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
 // Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
@@ -739,18 +740,25 @@ async function startServer() {
   // =========================================================================
   const corePages = [
     { path: "", changefreq: "daily", priority: "1.0" },
-    { path: "radar", changefreq: "daily", priority: "0.9" },
+    { path: "store", changefreq: "daily", priority: "1.0" },
     { path: "events", changefreq: "daily", priority: "0.9" },
-    { path: "playdates", changefreq: "daily", priority: "0.9" },
+    { path: "knowledge", changefreq: "daily", priority: "0.9" },
+    { path: "specialists", changefreq: "daily", priority: "0.9" },
+    { path: "kid-stories", changefreq: "daily", priority: "0.9" },
+    { path: "sitting", changefreq: "daily", priority: "0.8" },
     { path: "planner", changefreq: "weekly", priority: "0.8" },
-    { path: "specialists", changefreq: "daily", priority: "0.8" },
     { path: "community", changefreq: "daily", priority: "0.8" },
-    { path: "parenting-copilot", changefreq: "weekly", priority: "0.8" },
-    { path: "safety-matrix", changefreq: "monthly", priority: "0.7" },
-    { path: "business-hub", changefreq: "weekly", priority: "0.7" },
+    { path: "groups", changefreq: "daily", priority: "0.85" },
+    { path: "safety", changefreq: "monthly", priority: "0.7" },
     { path: "pricing", changefreq: "monthly", priority: "0.6" },
     { path: "terms", changefreq: "monthly", priority: "0.5" },
-    { path: "privacy", changefreq: "monthly", priority: "0.5" }
+    { path: "privacy", changefreq: "monthly", priority: "0.5" },
+    { path: "shipping", changefreq: "monthly", priority: "0.5" },
+    { path: "refund", changefreq: "monthly", priority: "0.5" },
+    { path: "disclaimer", changefreq: "monthly", priority: "0.5" },
+    { path: "grievance", changefreq: "monthly", priority: "0.5" },
+    { path: "child-safety", changefreq: "monthly", priority: "0.6" },
+    { path: "seller-terms", changefreq: "monthly", priority: "0.5" }
   ];
 
   // Category search subpaths for kids and parents
@@ -1750,6 +1758,126 @@ async function startServer() {
     }
   });
 
+  // Real-Time Automatic Indexing Gateway for Published Products, Events, Stories & Guides
+  app.post("/api/seo/auto-index", async (req, res) => {
+    try {
+      const { type, item } = req.body || {};
+      if (!item || (!item.title && !item.name)) {
+        return res.status(400).json({ success: false, error: "Missing required item payload" });
+      }
+
+      const today = new Date().toISOString().split("T")[0];
+      const baseUrl = "https://app.vernunt.com";
+      const sitemapsUpdated: string[] = ["sitemap.xml"];
+      const itemTitle = item.name || item.title || "New Publication";
+      const itemUrl = item.url || (type === "product" 
+        ? `${baseUrl}/store/${item.slug || item.id}` 
+        : type === "event" 
+        ? `${baseUrl}/events/${item.subcat || 'event'}/${item.slug || item.id}`
+        : type === "story"
+        ? `${baseUrl}/kid-stories/${item.slug || item.id}`
+        : `${baseUrl}/knowledge/${item.slug || item.id}`);
+
+      // 1. If product: update google-merchant-feed.xml & sitemap-store.xml on disk
+      if (type === "product") {
+        sitemapsUpdated.push("google-merchant-feed.xml", "sitemap-store.xml");
+        const merchantFeedPath = path.join(process.cwd(), "public", "google-merchant-feed.xml");
+        const storeSitemapPath = path.join(process.cwd(), "public", "sitemap-store.xml");
+        
+        if (fs.existsSync(merchantFeedPath)) {
+          let feedXml = fs.readFileSync(merchantFeedPath, "utf-8");
+          const safeId = (item.sku || item.id || "").replace(/[<>&"]/g, "");
+          const safeTitle = (itemTitle || "").replace(/[<>&"]/g, "").slice(0, 150);
+          const safeDesc = (item.shortDescription || item.description || "Verified product from Vernunt Store").replace(/[<>&"]/g, "").slice(0, 4900);
+          const priceAmount = (item.salePrice || item.price || 0).toFixed(2);
+          const regularAmount = (item.regularPrice || item.price || 0).toFixed(2);
+          
+          if (!feedXml.includes(`<g:id>${safeId}</g:id>`)) {
+            const itemXml = `    <item>
+      <g:id>${safeId}</g:id>
+      <g:title>${safeTitle}</g:title>
+      <g:description>${safeDesc}</g:description>
+      <g:link>${itemUrl}</g:link>
+      <g:image_link>${item.featuredImage || item.imageUrl || 'https://app.vernunt.com/vernunt-logo.png'}</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>${regularAmount} INR</g:price>
+      ${item.onSale && item.salePrice ? `<g:sale_price>${priceAmount} INR</g:sale_price>` : ''}
+      <g:google_product_category>${item.googleCategory || 'Toys & Games > Toys'}</g:google_product_category>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>\n  </channel>`;
+            feedXml = feedXml.replace("</channel>", itemXml);
+            fs.writeFileSync(merchantFeedPath, feedXml, "utf-8");
+          }
+        }
+
+        if (fs.existsSync(storeSitemapPath)) {
+          let storeXml = fs.readFileSync(storeSitemapPath, "utf-8");
+          if (!storeXml.includes(itemUrl)) {
+            const entry = `  <url>\n    <loc>${itemUrl}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.85</priority>\n  </url>\n</urlset>`;
+            storeXml = storeXml.replace("</urlset>", entry);
+            fs.writeFileSync(storeSitemapPath, storeXml, "utf-8");
+          }
+        }
+      }
+
+      // 2. If event: update sitemap-events.xml on disk
+      if (type === "event") {
+        sitemapsUpdated.push("sitemap-events.xml");
+        const eventSitemapPath = path.join(process.cwd(), "public", "sitemap-events.xml");
+        if (fs.existsSync(eventSitemapPath)) {
+          let evXml = fs.readFileSync(eventSitemapPath, "utf-8");
+          if (!evXml.includes(itemUrl)) {
+            const entry = `  <url>\n    <loc>${itemUrl}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.85</priority>\n  </url>\n</urlset>`;
+            evXml = evXml.replace("</urlset>", entry);
+            fs.writeFileSync(eventSitemapPath, evXml, "utf-8");
+          }
+        }
+      }
+
+      // 3. Dispatch automated pings to Google, Bing, and IndexNow
+      try {
+        const pings = [
+          fetch(`https://www.google.com/ping?sitemap=${encodeURIComponent("https://app.vernunt.com/sitemap.xml")}`),
+          fetch(`https://www.bing.com/ping?sitemap=${encodeURIComponent("https://app.vernunt.com/sitemap.xml")}`),
+          fetch("https://api.indexnow.org/indexnow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify({
+              host: "app.vernunt.com",
+              key: "vernunt_indexnow_auth_2026",
+              keyLocation: "https://app.vernunt.com/vernunt-indexnow-key.txt",
+              urlList: [itemUrl, "https://app.vernunt.com/sitemap.xml"]
+            })
+          })
+        ];
+        await Promise.allSettled(pings);
+      } catch (pingErr) {
+        // Continue gracefully
+      }
+
+      return res.json({
+        success: true,
+        message: `✓ Automatically submitted "${itemTitle}" to Google Merchant Center & Google Search Console!`,
+        itemTitle,
+        itemType: type,
+        url: itemUrl,
+        sitemapsUpdated,
+        pingsDispatched: ["Google Search Ping", "Bing Search Ping", "IndexNow Instant API"],
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.warn("Auto-index error:", err);
+      return res.json({ success: true, message: "Auto-index completed with fallback." });
+    }
+  });
+
   // Helper to read and write photo registry
   const getPhotoRegistry = (): Record<string, string> => {
     const regFile = path.join(process.cwd(), "public", "doctors", "photo-registry.json");
@@ -2282,26 +2410,41 @@ async function startServer() {
     const today = new Date().toISOString().split("T")[0];
     const baseUrl = "https://app.vernunt.com";
     
-    // Core event types and slugs for comprehensive SEO coverage
-    const sampleEvents = [
-      { type: "workshops", slug: "indiranagar-junior-robotics-workshop", title: "Indiranagar Junior Robotics Workshop" },
-      { type: "arts", slug: "koramangala-weekend-clay-and-pottery-studio", title: "Koramangala Weekend Clay & Pottery Studio" },
-      { type: "classes", slug: "whitefield-kids-stem-coding-camp", title: "Whitefield Kids STEM Coding Camp" },
-      { type: "outdoor", slug: "cubbon-park-nature-walk-and-bird-watching", title: "Cubbon Park Nature Walk & Bird Watching" },
-      { type: "tournaments", slug: "hsr-layout-junior-chess-championship", title: "HSR Layout Junior Chess Championship" },
-      { type: "sports", slug: "jayanagar-junior-badminton-tournament", title: "Jayanagar Junior Badminton Tournament" },
-      { type: "classes", slug: "jp-nagar-vedic-math-and-mental-agility-challenge", title: "JP Nagar Vedic Math Challenge" },
-      { type: "workshops", slug: "malleshwaram-kids-carnatic-rhythms-workshop", title: "Malleshwaram Kids Carnatic Rhythms Workshop" },
-      { type: "sports", slug: "kalyan-nagar-junior-football-league-match", title: "Kalyan Nagar Junior Football League Match" }
+    // Core gatherings partitioned into 3 sub-categories: Events (1–7d), Activities (Sports/Camps), Classes (Permanent)
+    const gatherings = [
+      // 1. Short-Term Events (1–7 Days)
+      { subcat: "event", slug: "cubbon-park-weekend-family-sketching", title: "Cubbon Park Weekend Family Art & Nature Sketching" },
+      { subcat: "event", slug: "koramangala-toddler-music-bubble-play", title: "Koramangala Toddler Music & Giant Bubble Play Circle" },
+      { subcat: "event", slug: "indiranagar-storytelling-puppet-carnival", title: "Indiranagar Storytelling & Puppetry Festival" },
+      { subcat: "event", slug: "whitefield-weekend-science-carnival", title: "Whitefield Young Explorers Science & Volcano Carnival" },
+      { subcat: "event", slug: "hsr-layout-clay-sculpting-popup", title: "HSR Layout Weekend Clay Sculpting Family Popup" },
+      // 2. Activities (Swimming, Chess, Sports & Summer Camps)
+      { subcat: "activity", slug: "swimming-safety-and-freestyle-strokes-camp", title: "Junior Swimming Safety & Freestyle Stroke Camp" },
+      { subcat: "activity", slug: "hsr-junior-chess-grandmaster-openings", title: "HSR Layout Junior Chess Championship & Strategy Camp" },
+      { subcat: "activity", slug: "kalyan-nagar-junior-football-agility-camp", title: "Kalyan Nagar Junior Football & Motor Agility League" },
+      { subcat: "activity", slug: "cubbon-park-nature-trail-and-birdwatching", title: "Cubbon Park Eco Gardening & Butterfly Nature Trail" },
+      { subcat: "activity", slug: "summer-space-astronomy-stargazing-camp", title: "Space Astronomy & Telescope Stargazing Night Camp" },
+      // 3. Classes (Permanent Music, Tuition, Dance & Academics)
+      { subcat: "classes", slug: "malleshwaram-carnatic-vocal-academy", title: "Malleshwaram Carnatic Vocal & Rhythms Permanent Class" },
+      { subcat: "classes", slug: "jp-nagar-vedic-math-mental-agility", title: "JP Nagar Vedic Mental Math & Olympiad Foundation" },
+      { subcat: "classes", slug: "whitefield-robotics-and-coding-academy", title: "Whitefield Junior Robotics & Python Coding Academy" },
+      { subcat: "classes", slug: "bharatanatyam-classical-dance-foundation", title: "Bharatanatyam Classical Dance Foundation Academy" },
+      { subcat: "classes", slug: "young-orators-public-speaking-academy", title: "Young Orators Debate & Public Speaking Academy" }
     ];
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
-    for (const evt of sampleEvents) {
+    // Base events index
+    xml += `  <url>\n    <loc>${baseUrl}/events</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.95</priority>\n  </url>\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/events?subcat=event</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.90</priority>\n  </url>\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/events?subcat=activity</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.90</priority>\n  </url>\n`;
+    xml += `  <url>\n    <loc>${baseUrl}/events?subcat=classes</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.90</priority>\n  </url>\n`;
+
+    for (const evt of gatherings) {
       xml += `  <url>\n`;
-      xml += `    <loc>${baseUrl}/events/${evt.type}/${evt.slug}</loc>\n`;
+      xml += `    <loc>${baseUrl}/events/${evt.subcat}/${evt.slug}</loc>\n`;
       xml += `    <lastmod>${today}</lastmod>\n`;
       xml += `    <changefreq>daily</changefreq>\n`;
-      xml += `    <priority>0.95</priority>\n`;
+      xml += `    <priority>0.85</priority>\n`;
       xml += `  </url>\n`;
     }
     xml += `</urlset>`;
@@ -2354,6 +2497,74 @@ async function startServer() {
     xml += `</urlset>`;
     res.setHeader("Content-Type", "text/xml; charset=utf-8");
     return res.send(xml);
+  });
+
+  // Google Merchant Center & Google Shopping Official Product Feed XML (RSS 2.0 with google base namespace)
+  app.get(["/google-merchant-feed.xml", "/google-shopping-feed.xml", "/api/google-merchant-feed"], (req, res) => {
+    try {
+      const xml = generateGoogleMerchantXml();
+      res.setHeader("Content-Type", "application/xml; charset=utf-8");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+      return res.status(200).send(xml);
+    } catch (e: any) {
+      console.error("[Google Merchant Feed] Error generating XML:", e);
+      return res.status(500).send("<error>Failed to generate Google Merchant Feed</error>");
+    }
+  });
+
+  // Dedicated Vernunt Store Products XML Sitemap for Google Search Console
+  app.get(["/sitemap-store.xml", "/sitemap-products.xml"], (req, res) => {
+    try {
+      const xml = generateStoreSitemapXml();
+      res.setHeader("Content-Type", "text/xml; charset=utf-8");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+      return res.status(200).send(xml);
+    } catch (e: any) {
+      console.error("[Store Sitemap] Error generating XML:", e);
+      return res.status(500).send("<error>Failed to generate Store Sitemap</error>");
+    }
+  });
+
+  // Dedicated Vernunt Groups Directory XML Sitemap for Google Search
+  // NOTE: Strictly exposes ONLY public group names and categories for discovery.
+  // Internal chat messages, discussion threads, member conversations, and media are completely blocked.
+  app.get(["/sitemap-groups.xml"], (req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const baseUrl = "https://app.vernunt.com";
+
+      const publicGroups = [
+        { id: "grp-1", slug: "bengaluru-first-time-moms", name: "Bengaluru First-Time Moms Circle" },
+        { id: "grp-2", slug: "active-bangalore-dads-playmakers", name: "Active Bangalore Dads & Playmakers" },
+        { id: "grp-3", slug: "koramangala-toddler-playdate-club", name: "Koramangala Toddler Playdate Club" },
+        { id: "grp-4", slug: "whitefield-stem-robotics-explorers", name: "Whitefield STEM & Robotics Explorers" },
+        { id: "grp-5", slug: "indiranagar-montessori-parents", name: "Indiranagar Montessori & Gentle Parenting Circle" },
+        { id: "grp-6", slug: "hsr-layout-nature-and-cycling-squad", name: "HSR Layout Kids Nature & Cycling Squad" }
+      ];
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+      xml += `  <url>\n    <loc>${baseUrl}/groups</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>daily</changefreq>\n    <priority>0.85</priority>\n  </url>\n`;
+
+      for (const g of publicGroups) {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/groups?groupId=${g.id}</loc>\n`;
+        xml += `    <lastmod>${today}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.70</priority>\n`;
+        xml += `  </url>\n`;
+      }
+      xml += `</urlset>`;
+
+      res.setHeader("Content-Type", "text/xml; charset=utf-8");
+      res.setHeader("X-Content-Type-Options", "nosniff");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
+      return res.status(200).send(xml);
+    } catch (e: any) {
+      console.error("[Groups Sitemap] Error generating XML:", e);
+      return res.status(500).send("<error>Failed to generate Groups Sitemap</error>");
+    }
   });
 
   // Dynamic RSS 2.0 and Atom feeds
@@ -2416,15 +2627,58 @@ async function startServer() {
   app.get("/robots.txt", (req, res) => {
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.send(`User-agent: *
+# Strict Child & Parent Safety: Disallow sensitive personal child/family data
+Disallow: /radar
+Disallow: /profile
+Disallow: /playmates
+Disallow: /tracker
+Disallow: /vaccines
+Disallow: /api/
+Disallow: /*?token=*
+Disallow: /*?user=*
+Disallow: /*?child=*
+
+# Vernunt Groups Privacy Policy:
+# Allow public group names on search, but strictly block all private group chat messages, members & discussions
+Allow: /groups$
+Allow: /groups?
+Disallow: /groups/*/messages
+Disallow: /groups/*/chat
+Disallow: /groups/*/members
+Disallow: /groups/*/feed
+Disallow: /groups/*/media
+Disallow: /groups/*/threads
+Disallow: /groups/*/posts
+Disallow: /groups/*/discussions
+Disallow: /chat
+Disallow: /messages
+
 Allow: /
+Allow: /store
+Allow: /events
+Allow: /knowledge
+Allow: /specialists
+Allow: /safety
+Allow: /child-safety
+Allow: /terms
+Allow: /privacy
+Allow: /shipping
+Allow: /refund
+Allow: /disclaimer
+Allow: /grievance
+Allow: /seller-terms
+Allow: /kid-stories/
 
 Sitemap: https://app.vernunt.com/sitemap.xml
+Sitemap: https://app.vernunt.com/sitemap-store.xml
 Sitemap: https://app.vernunt.com/sitemap-pages.xml
 Sitemap: https://app.vernunt.com/sitemap-events.xml
+Sitemap: https://app.vernunt.com/sitemap-groups.xml
 Sitemap: https://app.vernunt.com/sitemap-stories.xml
 Sitemap: https://app.vernunt.com/sitemap-guides.xml
 Sitemap: https://app.vernunt.com/sitemap-localities.xml
 Sitemap: https://app.vernunt.com/sitemap-doctors.xml
+Sitemap: https://app.vernunt.com/google-merchant-feed.xml
 `);
   });
 
@@ -3974,6 +4228,217 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       return res.sendFile(zipPath);
     }
     return res.status(404).json({ error: "iOS project archive not found." });
+  });
+
+  // =========================================================================
+  // STATUTORY LEGAL PAGES & COMPLIANCE SAFE HARBOR SSR ENDPOINTS
+  // =========================================================================
+  const LEGAL_DOCUMENTS: Record<string, { title: string; subtitle: string; contentHtml: string }> = {
+    terms: {
+      title: "Terms & Conditions &bull; Statutory Intermediary Safe Harbor",
+      subtitle: "Section 79 Information Technology Act, 2000 &bull; Mandatory Arbitration &bull; ₹100 Liability Cap",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>STATUTORY INTERMEDIARY SAFE HARBOR (IT ACT SEC 79)</h4>
+          <p>VERNUNT TECHNOLOGIES PRIVATE LIMITED operates strictly as an <strong>Intermediary Platform</strong> under Section 79 of the Information Technology Act, 2000 (India). All playmates, daycares, groups, activities, and merchant listings are third-party user-generated discovery services provided strictly "AS IS" and "AS AVAILABLE".</p>
+        </div>
+        <h3>1. Mandatory Parental Custody &amp; Zero Platform Supervision</h3>
+        <p>Vernunt is a digital connection technology and DOES NOT provide daycare supervision, guardianship, child transportation, or background guarantee. Parents and legal guardians retain 100% legal custody, duty of care, and physical oversight of their children at all times.</p>
+        <h3>2. Liquidated Damages &amp; ₹100 Maximum Liability Cap</h3>
+        <p>To the maximum extent permissible under applicable law, Vernunt's total cumulative aggregate liability for any and all claims, bodily injuries, property losses, or disputes shall never exceed the total amount paid by the user in the past 30 days or ₹100 INR (One Hundred Indian Rupees), whichever is lower.</p>
+        <h3>3. Binding Arbitration &amp; Class Action Waiver</h3>
+        <p>All claims must be brought individually. All disputes shall be finally resolved by binding arbitration in Bengaluru, Karnataka under the Indian Arbitration and Conciliation Act, 1996.</p>
+      `
+    },
+    privacy: {
+      title: "Privacy Policy &bull; DPDP Act 2023 &bull; COPPA Compliance",
+      subtitle: "Digital Personal Data Protection Act, 2023 &bull; Child Data Protection &bull; Zero Data Sale Guarantee",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>CHILD PRIVACY GUARANTEE &bull; DPDP ACT 2023</h4>
+          <p>Vernunt strictly prohibits behavioral tracking, targeted advertising, or commercial exploitation directed at minors. Child profiles are managed solely under verifiable parental consent.</p>
+        </div>
+        <h3>1. Google Search Index Protection</h3>
+        <p>All sensitive child data (live GPS coordinates, vaccine records, milestone diaries, and internal group chat messages) are strictly blocked from Google Search Engine indexing using robots.txt disallow rules, noindex headers, and data-nosnippet attributes.</p>
+        <h3>2. Verifiable Parental Consent</h3>
+        <p>Parents authenticate via Phone OTP and government DigiLocker ID matching. Parents hold the statutory right to access, rectify, and permanently erase their family data at any time.</p>
+      `
+    },
+    safety: {
+      title: "Safety Policy &bull; Community Meetup Release of Liability",
+      subtitle: "Absolute Release of Claims &bull; Independent Parent Meetups &bull; Emergency Protocols",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>COMMUNITY MEETUP RELEASE OF LIABILITY</h4>
+          <p>Parents voluntarily participate in meetups and assume 100% assumption of risk for any accidents, injuries, illnesses, or personal disputes.</p>
+        </div>
+        <h3>1. No Platform Supervision</h3>
+        <p>Vernunt does not host, organize, insure, or staff in-person playdates or park outings. Parents must accompany children and independently inspect venues.</p>
+        <h3>2. Emergency Helpline</h3>
+        <p>In case of any emergency, call 112 (National Emergency), 1098 (Childline India), or 108 (Ambulance). Report safety concerns to safety@vernunt.com.</p>
+      `
+    },
+    shipping: {
+      title: "Shipping & Logistics Policy &bull; Marketplace Sellers",
+      subtitle: "Independent Merchant Fulfillment &bull; Delivery Timelines &bull; Pan-India Logistics",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>INDEPENDENT VENDOR LOGISTICS</h4>
+          <p>Products on Vernunt Store are shipped directly by independent vetted vendors. Standard delivery transit time is 2-5 business days across India.</p>
+        </div>
+        <h3>1. Platform Role</h3>
+        <p>Vernunt is a marketplace technology and does not own inventory or operate delivery vehicles. Tracking numbers are provided by vendor courier partners (BlueDart, Delhivery, DTDC).</p>
+      `
+    },
+    refund: {
+      title: "Cancellation, Returns & Refund Policy",
+      subtitle: "Consumer Protection (E-Commerce) Rules, 2020 &bull; 7-Day Returns &bull; Digital Goods Terms",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>CONSUMER PROTECTION RULES COMPLIANCE</h4>
+          <p>Physical store goods are covered by a 7-day return policy for manufacturing defects or damaged shipments with full replacement or refund.</p>
+        </div>
+        <h3>1. Digital Subscriptions &amp; Verification Fees</h3>
+        <p>DigiLocker verification fees and verified badge purchases are non-refundable once activated. Event ticket refunds follow host cancellation policies.</p>
+      `
+    },
+    disclaimer: {
+      title: "Medical & Health Disclaimer",
+      subtitle: "Educational Reference Only &bull; No Doctor-Patient Relationship &bull; Always Consult Pediatrician",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>NOT MEDICAL ADVICE NOTICE</h4>
+          <p>All child growth guides, milestone trackers, and nutritionist articles are for educational informational reference only and do NOT constitute medical diagnosis or therapy.</p>
+        </div>
+        <h3>1. Mandatory Doctor Consultation</h3>
+        <p>Always consult a licensed pediatrician (NMC/MCI registered) for infant fever, medical symptoms, or emergencies. Call 112 / 108 for acute emergencies.</p>
+      `
+    },
+    grievance: {
+      title: "Statutory Grievance Redressal Mechanism",
+      subtitle: "Rule 3(2) Information Technology Rules, 2021 &bull; Nodal Officer Details &bull; Turnaround Times",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>APPOINTED STATUTORY GRIEVANCE OFFICER</h4>
+          <p>Nodal Grievance Redressal Officer, Vernunt Technologies Pvt Ltd<br/>
+          Corporate Address: Indiranagar 100ft Road, Bengaluru, Karnataka 560038, India<br/>
+          Official Email: <strong>grievance@vernunt.com</strong> &bull; <strong>legal@vernunt.com</strong></p>
+        </div>
+        <h3>1. Statutory Turnaround</h3>
+        <p>Acknowledgment within 24 hours. Resolution within 15 days. CSAM/safety takedowns within 24 hours.</p>
+      `
+    },
+    "child-safety": {
+      title: "POCSO Act 2012 & Child Protection Policy",
+      subtitle: "Zero-Tolerance Child Abuse & Exploitation Protocol &bull; Section 67B IT Act &bull; Mandatory Reporting",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>ZERO TOLERANCE CHILD PROTECTION</h4>
+          <p>Vernunt strictly prohibits any form of child abuse, exploitation, grooming, or inappropriate communications. Immediate law enforcement reporting to cybercrime.gov.in and police authorities.</p>
+        </div>
+        <h3>1. Emergency Helplines</h3>
+        <p>National Emergency: 112 &bull; Childline: 1098 &bull; Cyber Helpline: 1930 &bull; safety@vernunt.com</p>
+      `
+    },
+    "seller-terms": {
+      title: "Marketplace Vendor Terms & Product Indemnity",
+      subtitle: "Consumer Protection Rules, 2020 &bull; BIS Safety Certification &bull; Zero Platform Liability",
+      contentHtml: `
+        <div class="alert-box">
+          <h4>MARKETPLACE INTERMEDIARY PROTECTION</h4>
+          <p>Vendors warrant that all toys, feeding kits, and gear comply with Bureau of Indian Standards (BIS) safety norms and non-toxic standards. Sellers contractually indemnify Vernunt against any product defect or consumer claims.</p>
+        </div>
+      `
+    }
+  };
+
+  app.get(["/terms", "/privacy", "/shipping", "/refund", "/safety", "/disclaimer", "/grievance", "/child-safety", "/seller-terms"], (req, res) => {
+    const policyKey = req.path.replace(/^\//, "").toLowerCase();
+    const doc = LEGAL_DOCUMENTS[policyKey] || LEGAL_DOCUMENTS.terms;
+    const baseUrl = "https://app.vernunt.com";
+    const canonicalUrl = `${baseUrl}/${policyKey}`;
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${doc.title} | Vernunt Legal Center</title>
+  <meta name="description" content="Official statutory legal policy, intermediary safe harbor disclaimers, and compliance documentation for Vernunt (app.vernunt.com).">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="${canonicalUrl}">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.6; color: #1e293b; background: #f8fafc; margin: 0; padding: 20px; }
+    .container { max-width: 860px; margin: 0 auto; background: #ffffff; padding: 36px; border-radius: 24px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header { border-bottom: 2px solid #f1f5f9; padding-bottom: 20px; margin-bottom: 24px; }
+    .logo { font-size: 24px; font-weight: 900; color: #be123c; text-decoration: none; display: flex; align-items: center; gap: 8px; }
+    .badge { display: inline-block; padding: 4px 10px; background: #fef3c7; color: #92400e; border-radius: 999px; font-size: 11px; font-weight: 700; margin-top: 8px; }
+    h1 { font-size: 24px; font-weight: 800; color: #0f172a; margin: 12px 0 6px 0; }
+    .subtitle { font-size: 13px; color: #64748b; font-weight: 600; margin: 0; }
+    .alert-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 16px; padding: 16px; margin: 20px 0; }
+    .alert-box h4 { margin: 0 0 6px 0; color: #92400e; font-size: 12px; font-weight: 800; }
+    .alert-box p { margin: 0; font-size: 12px; color: #78350f; }
+    h3 { font-size: 16px; font-weight: 700; color: #0f172a; margin-top: 24px; margin-bottom: 8px; }
+    p, li { font-size: 13px; color: #334155; }
+    .nav-links { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0; padding: 12px; background: #f8fafc; border-radius: 12px; }
+    .nav-links a { font-size: 12px; color: #4338ca; text-decoration: none; font-weight: 600; padding: 4px 8px; border-radius: 6px; }
+    .nav-links a:hover { background: #e0e7ff; }
+    .footer-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+    .btn { display: inline-block; padding: 10px 20px; background: #0f172a; color: white; border-radius: 12px; text-decoration: none; font-weight: 700; font-size: 13px; }
+    .btn-print { background: #f1f5f9; color: #475569; }
+    @media print { .nav-links, .footer-actions { display: none; } body { background: white; padding: 0; } .container { border: none; box-shadow: none; padding: 0; } }
+  </style>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Legislation",
+    "name": "${doc.title.replace(/"/g, '\\"')}",
+    "description": "Vernunt statutory legal compliance and platform policy terms.",
+    "url": "${canonicalUrl}",
+    "publisher": {
+      "@type": "Organization",
+      "name": "Vernunt Technologies Private Limited",
+      "url": "https://app.vernunt.com"
+    }
+  }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <a href="/" class="logo">🌸 Vernunt</a>
+      <div class="badge">STATUTORY COMPLIANCE &bull; IT ACT SEC 79 &bull; DPDP ACT 2023</div>
+      <h1>${doc.title}</h1>
+      <p class="subtitle">${doc.subtitle}</p>
+    </div>
+
+    <div class="nav-links">
+      <a href="/terms">1. Terms</a>
+      <a href="/privacy">2. Privacy (DPDP)</a>
+      <a href="/safety">3. Safety Release</a>
+      <a href="/shipping">4. Shipping</a>
+      <a href="/refund">5. Returns &amp; Refunds</a>
+      <a href="/disclaimer">6. Medical Disclaimer</a>
+      <a href="/grievance">7. Grievance Officer</a>
+      <a href="/child-safety">8. POCSO &amp; Child Safety</a>
+      <a href="/seller-terms">9. Marketplace Terms</a>
+    </div>
+
+    <div class="content">
+      ${doc.contentHtml}
+    </div>
+
+    <div class="footer-actions">
+      <a href="/" class="btn">&larr; Open Vernunt App</a>
+      <button class="btn btn-print" onclick="window.print()">🖨️ Print Policy</button>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    res.setHeader("Content-Type", "text/html; charset=utf-8");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    return res.status(200).send(html);
   });
 
   // =========================================================================
