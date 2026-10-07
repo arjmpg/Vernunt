@@ -18,11 +18,12 @@ import {
   UserCheck,
   ShieldAlert,
   Store,
-  MessageSquare
+  MessageSquare,
+  Cookie
 } from 'lucide-react';
 import VernuntLogo from './VernuntLogo.tsx';
 
-export type LegalPolicyTab = 'terms' | 'privacy' | 'safety' | 'shipping' | 'refund' | 'disclaimer' | 'grievance' | 'child-safety' | 'seller-terms' | 'groups-privacy';
+export type LegalPolicyTab = 'terms' | 'privacy' | 'cookie' | 'safety' | 'shipping' | 'refund' | 'disclaimer' | 'grievance' | 'child-safety' | 'seller-terms' | 'groups-privacy';
 
 interface LegalPolicyModalProps {
   isOpen?: boolean;
@@ -78,6 +79,9 @@ export default function LegalPolicyModal({
                 <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[9px] font-bold border border-emerald-500/30">
                   IT Act Sec 79 &bull; DPDP 2023 &bull; COPPA
                 </span>
+                <span className="text-[10px] text-amber-300 font-mono">
+                  v2.4.0 &bull; Effective: Oct 1, 2026 &bull; Updated: Oct 7, 2026
+                </span>
               </div>
               <h3 className="font-bold text-sm sm:text-base font-serif text-white flex items-center gap-1.5">
                 Official Platform Policies, Intermediary Disclaimers &amp; Safeguards
@@ -104,7 +108,7 @@ export default function LegalPolicyModal({
           </div>
         </div>
 
-        {/* 7 Policy Tabs Navigation Bar */}
+        {/* Policy Tabs Navigation Bar */}
         <div className="bg-slate-100 border-b border-slate-200 px-3 sm:px-5 py-2 flex items-center gap-1.5 overflow-x-auto shrink-0 select-none no-scrollbar">
           <button
             type="button"
@@ -116,7 +120,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <FileText className={`w-3.5 h-3.5 ${activeTab === 'terms' ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span>1. Terms &amp; Conditions</span>
+            <span>Terms &amp; Conditions</span>
           </button>
 
           <button
@@ -129,7 +133,20 @@ export default function LegalPolicyModal({
             }`}
           >
             <Lock className={`w-3.5 h-3.5 ${activeTab === 'privacy' ? 'text-emerald-600' : 'text-slate-400'}`} />
-            <span>2. Privacy Policy (DPDP Act)</span>
+            <span>Privacy Policy (DPDP Act)</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('cookie')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'cookie'
+                ? 'bg-white text-slate-900 shadow-xs border border-slate-200 font-extrabold'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
+            }`}
+          >
+            <Cookie className={`w-3.5 h-3.5 ${activeTab === 'cookie' ? 'text-amber-600' : 'text-slate-400'}`} />
+            <span>Cookie Policy</span>
           </button>
 
           <button
@@ -142,7 +159,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <ShieldCheck className={`w-3.5 h-3.5 ${activeTab === 'safety' ? 'text-rose-600' : 'text-slate-400'}`} />
-            <span>3. Safety &amp; Meetup Release</span>
+            <span>Safety &amp; Meetup Release</span>
           </button>
 
           <button
@@ -155,7 +172,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <Truck className={`w-3.5 h-3.5 ${activeTab === 'shipping' ? 'text-blue-600' : 'text-slate-400'}`} />
-            <span>4. Shipping &amp; Logistics</span>
+            <span>Shipping &amp; Logistics</span>
           </button>
 
           <button
@@ -168,7 +185,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <RotateCcw className={`w-3.5 h-3.5 ${activeTab === 'refund' ? 'text-purple-600' : 'text-slate-400'}`} />
-            <span>5. Returns &amp; Refunds</span>
+            <span>Returns &amp; Refunds</span>
           </button>
 
           <button
@@ -181,7 +198,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <HeartPulse className={`w-3.5 h-3.5 ${activeTab === 'disclaimer' ? 'text-red-600' : 'text-slate-400'}`} />
-            <span>6. Medical &amp; Health Disclaimer</span>
+            <span>Medical &amp; Health Disclaimer</span>
           </button>
 
           <button
@@ -194,7 +211,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <Scale className={`w-3.5 h-3.5 ${activeTab === 'grievance' ? 'text-indigo-600' : 'text-slate-400'}`} />
-            <span>7. Grievance Officer</span>
+            <span>Grievance Officer</span>
           </button>
 
           <button
@@ -207,7 +224,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <ShieldAlert className={`w-3.5 h-3.5 ${activeTab === 'child-safety' ? 'text-rose-600' : 'text-slate-400'}`} />
-            <span>8. POCSO &amp; Child Protection</span>
+            <span>POCSO &amp; Child Protection</span>
           </button>
 
           <button
@@ -220,7 +237,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <Store className={`w-3.5 h-3.5 ${activeTab === 'seller-terms' ? 'text-teal-600' : 'text-slate-400'}`} />
-            <span>9. Marketplace Seller Indemnity</span>
+            <span>Marketplace Seller Indemnity</span>
           </button>
 
           <button
@@ -233,7 +250,7 @@ export default function LegalPolicyModal({
             }`}
           >
             <MessageSquare className={`w-3.5 h-3.5 ${activeTab === 'groups-privacy' ? 'text-amber-600' : 'text-slate-400'}`} />
-            <span>10. Groups &amp; Chat Safe Harbor</span>
+            <span>Groups &amp; Chat Safe Harbor</span>
           </button>
         </div>
 
@@ -369,7 +386,91 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">5. Right to Erasure &amp; The Right to be Forgotten</h4>
                   <p className="mt-1">
-                    Parents hold the unconditional legal right under Section 12 of the DPDP Act to access, correct, export, or permanently erase all child profiles, chat history, and uploaded images. Deletion requests are processed and irreversibly purged across all active clusters within forty-eight (48) hours upon request to <code>privacy@vernunt.com</code>.
+                    Parents hold the unconditional legal right under Section 12 of the DPDP Act to access, correct, export, or permanently erase all child profiles, chat history, and uploaded images. Deletion requests are processed and irreversibly purged across all active clusters within forty-eight (48) hours upon request to <code>privacy@vernunt.com</code> or via Account Settings &gt; Privacy &amp; Data.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 3: COOKIE & TRACKING TECHNOLOGIES POLICY              */}
+          {/* ========================================================= */}
+          {activeTab === 'cookie' && (
+            <div className="space-y-5 animate-fadeIn">
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 text-amber-950 space-y-2.5 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-amber-900">
+                  <Cookie className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Cookie Policy &bull; DPDP Act 2023 &bull; IT Act 2000 Section 43A</span>
+                </div>
+                <p className="text-xs text-amber-900 leading-relaxed">
+                  Vernunt uses strictly necessary and privacy-preserving cookies and localStorage records to ensure secure parent authentication, child profile privacy barriers, and seamless session integrity. <strong>Vernunt NEVER uses cross-site ad tracking, behavioural profiling, or third-party marketing beacons on children.</strong>
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Cookie Classification &amp; Purpose</h4>
+                  <p className="mt-1">
+                    In compliance with international and Indian privacy guidelines, our cookies are classified into four distinct operational tiers:
+                  </p>
+                  
+                  <div className="mt-3 overflow-x-auto border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 border-b border-slate-200 text-slate-700 font-bold">
+                        <tr>
+                          <th className="p-3">Category</th>
+                          <th className="p-3">Type</th>
+                          <th className="p-3">Purpose</th>
+                          <th className="p-3">Retention</th>
+                          <th className="p-3">Consent Required?</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        <tr>
+                          <td className="p-3 font-bold text-slate-900">Strictly Necessary</td>
+                          <td className="p-3 font-mono text-[11px]">First-Party</td>
+                          <td className="p-3">Parent login session, CSRF security, encrypted token caching</td>
+                          <td className="p-3">Session / 30 Days</td>
+                          <td className="p-3 text-emerald-700 font-bold">Exempt (Essential)</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold text-slate-900">Functional &amp; Voice</td>
+                          <td className="p-3 font-mono text-[11px]">First-Party</td>
+                          <td className="p-3">Kannada/Hindi voice agent settings, radar locality cache</td>
+                          <td className="p-3">90 Days</td>
+                          <td className="p-3 text-amber-700 font-bold">User Opt-In</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold text-slate-900">Privacy Analytics</td>
+                          <td className="p-3 font-mono text-[11px]">First-Party</td>
+                          <td className="p-3">Aggregated page rendering times, zero PII or IP stored</td>
+                          <td className="p-3">30 Days</td>
+                          <td className="p-3 text-amber-700 font-bold">User Opt-In</td>
+                        </tr>
+                        <tr>
+                          <td className="p-3 font-bold text-slate-900">Marketing &amp; Events</td>
+                          <td className="p-3 font-mono text-[11px]">First-Party</td>
+                          <td className="p-3">Community family workshop and children sports class alerts</td>
+                          <td className="p-3">30 Days</td>
+                          <td className="p-3 text-rose-700 font-bold">Explicit Opt-In Only</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Zero Third-Party Advertising Beacons</h4>
+                  <p className="mt-1">
+                    Unlike commercial social networks, Vernunt does not embed Facebook Pixel, Google Ads remarketing beacons, or third-party data tracking trackers. Children’s profiles and playdates are never monetized through behavioral ad networks.
+                  </p>
+                </div>
+
+                <div>
+                  <h4 className="font-extrabold text-slate-900 text-sm font-serif">3. Managing and Withdrawing Cookie Consent</h4>
+                  <p className="mt-1">
+                    You can inspect, modify, or withdraw your cookie consent at any time by clicking <strong>"Cookie Preferences"</strong> in the platform footer or visiting <em>Account Settings &gt; Privacy &amp; Data</em>. You can also configure your browser (Chrome, Safari, Firefox, Edge) to reject all non-essential cookies.
                   </p>
                 </div>
               </div>

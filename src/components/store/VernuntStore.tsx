@@ -2538,14 +2538,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       </button>
                     </div>
 
-                    {/* PIN Code Delivery Estimator (Powered by Shiprocket) */}
+                    {/* PIN Code Delivery Estimator (Powered by Shipping Network) */}
                     <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-indigo-100/80 text-xs space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                          <Truck className="w-3.5 h-3.5 text-indigo-600" /> Shiprocket Delivery Check:
+                          <Truck className="w-3.5 h-3.5 text-indigo-600" /> Shipping Delivery Check:
                         </span>
                         <span className="text-[9.5px] uppercase font-black tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                          ⚡ Shiprocket
+                          ⚡ Verified Shipping
                         </span>
                       </div>
                       <div className="flex gap-2">
@@ -3237,17 +3237,17 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                 </div>
               )}
 
-              {/* STEP 2: Shipping Method (Powered by Shiprocket) */}
+              {/* STEP 2: Shipping Method (Powered by National Shipping Network) */}
               {checkoutStep === 2 && (
                 <div className="space-y-4 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">Select Shiprocket Courier Speed</h3>
+                      <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">Select Courier Shipping Speed</h3>
                       <p className="text-[11px] text-slate-500">Serviceable to PIN: <strong className="font-mono text-slate-800">{shippingAddress.pincode}</strong> ({shippingAddress.city})</p>
                     </div>
                     <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-black uppercase">
                       <Truck className="w-3 h-3 text-indigo-600" />
-                      Shiprocket Verified
+                      Verified Shipping
                     </span>
                   </div>
 
@@ -3255,7 +3255,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     {[
                       {
                         id: 'express',
-                        name: '⚡ BlueDart Express Air (via Shiprocket)',
+                        name: '⚡ BlueDart Express Air (via Shipping)',
                         desc: 'Guaranteed Next-Day Delivery • Priority Air Transit with tamper-proof seal.',
                         cost: cartSubtotal >= 499 ? 0 : 99,
                         badge: 'Fastest Air',
@@ -3264,7 +3264,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       },
                       {
                         id: 'standard',
-                        name: '📦 Delhivery Surface Express (via Shiprocket)',
+                        name: '📦 Delhivery Surface Express (via Shipping)',
                         desc: 'Eco-friendly national surface transport across 24,000+ PIN codes.',
                         cost: cartSubtotal >= 499 ? 0 : 49,
                         badge: 'Best Value',
@@ -3273,7 +3273,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       },
                       {
                         id: 'instant',
-                        name: '🚀 Shadowfax Hyperlocal / Same-Day (via Shiprocket)',
+                        name: '🚀 Shadowfax Hyperlocal / Same-Day (via Shipping)',
                         desc: 'Direct doorstep dispatch for local city societies and instant playdates.',
                         cost: 149,
                         badge: 'Within 3 Hours',
@@ -3504,7 +3504,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 max-w-md mx-auto text-left text-xs space-y-2.5">
                     <div className="flex items-center justify-between pb-1 border-b border-slate-200">
                       <span className="text-[10px] font-black uppercase text-indigo-700 tracking-wider">
-                        ⚡ Shiprocket Express Fulfillment
+                        ⚡ Verified Shipping Fulfillment
                       </span>
                       <span className="font-mono text-[10px] font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">
                         AWB: {completedOrder.shiprocketAwb || completedOrder.trackingNumber}

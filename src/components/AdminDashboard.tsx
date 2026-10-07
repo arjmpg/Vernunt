@@ -98,20 +98,20 @@ export default function AdminDashboard({
     {
       id: 'coupon-1',
       code: 'INFLUENCER365',
-      title: '1-Year Free Access VIP Influencer Pass',
+      title: 'VIP Influencer Access Pass',
       benefitType: 'free_1_year_vip',
       durationDays: 365,
       isActive: true,
       maxRedemptions: 1000,
       timesRedeemed: 14,
       assignedInfluencerName: 'Bangalore Mommy Community (@bangalore_mommy_diaries)',
-      notes: 'Gives parents 1 year free access across app. Paid events require host fee.',
+      notes: 'Gives parents complimentary VIP access across app. Paid events require host fee.',
       createdAt: new Date().toISOString()
     },
     {
       id: 'coupon-2',
       code: 'VIPMOM',
-      title: 'Mom Creator Community 1-Year Free Pass',
+      title: 'Mom Creator Community VIP Pass',
       benefitType: 'free_1_year_vip',
       durationDays: 365,
       isActive: true,
@@ -124,7 +124,7 @@ export default function AdminDashboard({
     {
       id: 'coupon-3',
       code: 'BANGALOREKIDS',
-      title: 'Bangalore Co-op 1-Year Free Pass',
+      title: 'Bangalore Co-op VIP Pass',
       benefitType: 'free_1_year_vip',
       durationDays: 365,
       isActive: true,
@@ -137,7 +137,7 @@ export default function AdminDashboard({
     {
       id: 'coupon-4',
       code: 'VERNUNT1YEAR',
-      title: 'Vernunt Launch 1-Year Pass',
+      title: 'Vernunt Launch VIP Pass',
       benefitType: 'free_1_year_vip',
       durationDays: 365,
       isActive: true,
@@ -825,16 +825,16 @@ export default function AdminDashboard({
   const defaultAdminPlans: SubscriptionPlan[] = [
     {
       id: 'free-parent-1yr',
-      title: 'Parent 1-Year Free Pass',
+      title: 'Parent VIP Access Pass',
       price: 0,
-      period: '12 Months Free',
+      period: 'Verified Parent Pass',
       popular: true,
       saving: '100% Free Offer',
       color: 'border-emerald-400 ring-2 ring-emerald-400',
       durationDays: 365,
-      description: 'Exclusive 1-Year zero-cost access for all registered parents & children.',
+      description: 'Exclusive access for all registered parents & children.',
       capabilities: [
-        '🎁 100% FREE Full App Usage for 1 Full Year',
+        '🎁 100% Full App Usage for Verified Parents',
         'Unlimited companion playdate chats',
         '✨ FREE Bookings for non-paid classes',
         '🔐 FREE view of Professional Portfolios',
@@ -3360,16 +3360,16 @@ export default function AdminDashboard({
                     type="button"
                     onClick={() => handleOpenAddPlan({
                       id: 'free-parent-1yr',
-                      title: 'Parent 1-Year Free Pass',
+                      title: 'Parent VIP Access Pass',
                       price: 0,
-                      period: '12 Months Free',
+                      period: 'Verified Parent Pass',
                       durationDays: 365,
                       popular: true,
                       color: 'border-emerald-400',
                       saving: '100% Free',
-                      description: 'Exclusive 1-Year zero-cost access for all registered parents & children.',
+                      description: 'Exclusive access for all registered parents & children.',
                       capabilities: [
-                        '🎁 100% FREE Full App Usage for 1 Full Year',
+                        '🎁 100% Full App Usage for Verified Parents',
                         'Unlimited companion playdate chats',
                         '✨ FREE Bookings for non-paid classes',
                         '🔐 FREE view of Professional Portfolios',
@@ -4164,7 +4164,7 @@ export default function AdminDashboard({
           )}
 
           {/* ========================================================================= */}
-          {/* VIEW E2: COUPONS & 1-YEAR FREE VIP PASSES MANAGEMENT                      */}
+          {/* VIEW E2: COUPONS & VIP PASSES MANAGEMENT                                  */}
           {/* ========================================================================= */}
           {activeMenu === 'coupons' && (
             <div className="space-y-6 animate-fadeIn">
@@ -4174,10 +4174,10 @@ export default function AdminDashboard({
                   <div>
                     <h1 className="text-xl font-normal text-[#1d2327] flex items-center gap-2">
                       <Ticket className="w-5 h-5 text-amber-500" />
-                      Influencer Coupon Codes &amp; 1-Year Free VIP Passes
+                      Influencer Coupon Codes &amp; VIP Passes
                     </h1>
                     <p className="text-xs text-[#646970] mt-0.5">
-                      Generate and manage VIP coupon codes. When parents redeem a code, they unlock <strong>1 full year of 100% free app access</strong> and 60 bonus decrypt credits (excluding third-party paid event fees).
+                      Generate and manage VIP coupon codes. When parents redeem a code, they unlock <strong>complimentary VIP app access</strong> and bonus credits (excluding third-party paid event fees).
                     </p>
                   </div>
 
@@ -4187,12 +4187,12 @@ export default function AdminDashboard({
                       setEditingCouponId(null);
                       setCouponCodeForm({
                         code: `CREATOR${Math.floor(100 + Math.random() * 900)}`,
-                        title: '1-Year Free Access VIP Pass',
+                        title: 'VIP Access Pass',
                         benefitType: 'free_1_year_vip',
                         durationDays: 365,
                         maxRedemptions: 500,
                         assignedInfluencerName: '',
-                        notes: '1-year free access promo code for Instagram creator campaigns.',
+                        notes: 'VIP access promo code for creator campaigns.',
                         validUntil: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
                         isActive: true
                       });
@@ -4391,7 +4391,7 @@ export default function AdminDashboard({
                       {editingCouponId ? 'Edit VIP Coupon Code' : 'Generate New VIP Coupon Code'}
                     </h3>
                     <p className="text-xs text-[#646970]">
-                      Configure coupon for influencer partnerships or special promotions granting 1-year free access.
+                      Configure coupon for influencer partnerships or special promotions granting complimentary VIP access.
                     </p>
                   </div>
                   <button
@@ -4413,7 +4413,7 @@ export default function AdminDashboard({
                       const updated = couponsList.map(c => c.id === editingCouponId ? {
                         ...c,
                         code: cleanCode,
-                        title: couponCodeForm.title || '1-Year Free Access VIP Pass',
+                        title: couponCodeForm.title || 'VIP Access Pass',
                         benefitType: couponCodeForm.benefitType,
                         durationDays: couponCodeForm.durationDays || 365,
                         maxRedemptions: couponCodeForm.maxRedemptions,
@@ -4427,7 +4427,7 @@ export default function AdminDashboard({
                       const newCoupon: AdminCouponCode = {
                         id: `coupon-${Date.now()}`,
                         code: cleanCode,
-                        title: couponCodeForm.title || '1-Year Free Access VIP Pass',
+                        title: couponCodeForm.title || 'VIP Access Pass',
                         benefitType: couponCodeForm.benefitType,
                         durationDays: couponCodeForm.durationDays || 365,
                         maxRedemptions: couponCodeForm.maxRedemptions,
@@ -4464,7 +4464,7 @@ export default function AdminDashboard({
                       <input
                         type="text"
                         required
-                        placeholder="e.g. 1-Year Free VIP Parent Pass"
+                        placeholder="e.g. VIP Parent Pass"
                         value={couponCodeForm.title}
                         onChange={(e) => setCouponCodeForm({ ...couponCodeForm, title: e.target.value })}
                         className="w-full p-2.5 border border-[#8c8f94] rounded-xs text-[#1d2327] focus:border-[#2271b1] focus:outline-none"

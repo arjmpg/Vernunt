@@ -13,6 +13,82 @@ export enum LocationSharing {
 
 export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Admin' | 'eventbuyers' | 'EventBuyer';
 
+export type ChildProfileVisibility = 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC';
+
+export type ConsentType = 'GUARDIAN_AUTHORITY' | 'TERMS_OF_SERVICE' | 'DPDP_PRIVACY' | 'MARKETING_EMAIL' | 'COOKIE_ANALYTICS';
+
+export interface UserConsentRecord {
+  id: string;
+  userId: string;
+  childProfileId?: string;
+  consentType: ConsentType;
+  policyVersion: string;
+  timestamp: string;
+  status: 'GRANTED' | 'WITHDRAWN' | 'REVOKED';
+  ipHash?: string;
+}
+
+export type PrivacyRequestType = 
+  | 'DATA_ACCESS' 
+  | 'DATA_DOWNLOAD' 
+  | 'ACCOUNT_DELETION' 
+  | 'CHILD_PROFILE_DELETION' 
+  | 'DATA_CORRECTION' 
+  | 'CONSENT_WITHDRAWAL';
+
+export type PrivacyRequestStatus = 
+  | 'PENDING' 
+  | 'VERIFYING' 
+  | 'APPROVED' 
+  | 'PROCESSING' 
+  | 'COMPLETED' 
+  | 'REJECTED';
+
+export interface PrivacyRequestRecord {
+  id: string;
+  userId: string;
+  userEmail: string;
+  requestType: PrivacyRequestType;
+  status: PrivacyRequestStatus;
+  notes?: string;
+  createdAt: string;
+  processedAt?: string;
+}
+
+export interface ContentReportRecord {
+  id: string;
+  reporterId: string;
+  reporterEmail?: string;
+  targetType: 'profile' | 'child_profile' | 'post' | 'message' | 'review';
+  targetId: string;
+  reason: string;
+  details?: string;
+  status: 'PENDING' | 'INVESTIGATING' | 'WARNED' | 'ACTION_TAKEN' | 'DISMISSED';
+  createdAt: string;
+}
+
+export interface CookiePreferences {
+  essential: boolean;
+  functional: boolean;
+  analytics: boolean;
+  marketing: boolean;
+  updatedAt: string;
+}
+
+export interface AssetLicenseRecord {
+  id: string;
+  name: string;
+  type: 'image' | 'font' | 'icon' | 'illustration';
+  source: string;
+  creator: string;
+  license: string;
+  licenseUrl?: string;
+  commercialUse: boolean;
+  attributionRequired: boolean;
+  expiry?: string;
+  verified: boolean;
+}
+
 export type DevelopmentStage = 
   | 'Newborn (0-3 months)'
   | 'Infant (4-11 months)'
@@ -38,6 +114,10 @@ export interface ChildProfile {
     distance?: number; // Calculated proximity
   };
   locationSharing: LocationSharing;
+  profileVisibility?: ChildProfileVisibility; // Safest default: 'PRIVATE'
+  neighbourhood?: string; // Fuzzed area (e.g. "Indiranagar / Koramangala")
+  fuzzedLatitude?: number; // Obfuscated jitter coordinate for radar privacy
+  fuzzedLongitude?: number; // Obfuscated jitter coordinate for radar privacy
   verificationStatus: VerificationStatus;
   interests: string[];
   photoUrl: string;
@@ -412,7 +492,7 @@ export interface EventCoupon {
 export interface AdminCouponCode {
   id: string;
   code: string; // e.g. "INFLUENCER365", "VIPMOM", "VERNUNT1YEAR"
-  title: string; // e.g. "1-Year Free VIP Parent Pass"
+  title: string; // e.g. "VIP Parent Pass"
   benefitType: 'free_1_year_vip' | 'free_pass' | 'percentage' | 'flat';
   durationDays: number; // e.g. 365 days
   discountValue?: number;
@@ -500,6 +580,8 @@ export interface CommunityEvent {
   googleChatLink?: string;
   virtualPlatform?: string;
   virtualMeetingDetails?: string;
+  externalRegistrationUrl?: string;
+  externalPortalUrl?: string;
   subjectSkill?: string;
   batchSchedule?: string;
   batchSize?: number;

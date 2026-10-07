@@ -542,7 +542,7 @@ export const WriteKidStoryModal: React.FC<WriteKidStoryModalProps> = ({
                   <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
                     {isLifetimeUnlocked 
                       ? 'You have active lifetime access to write unlimited milestone chapters for your child!'
-                      : 'Refer just 1 fellow parent. Once they sign up, you unlock free lifetime story writing + 1 year free Playmate Search Radar!'}
+                      : 'Refer just 1 fellow parent. Once they sign up, you unlock free lifetime story writing + complimentary Playmate Search Radar!'}
                   </p>
                 </div>
               </div>

@@ -1,0 +1,132 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675" width="1200" height="675">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e102d"/>
+      <stop offset="35%" stop-color="#3b154c"/>
+      <stop offset="70%" stop-color="#831843"/>
+      <stop offset="100%" stop-color="#ea580c"/>
+    </linearGradient>
+    <radialGradient id="sunGlow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#fef08a" stop-opacity="0.9"/>
+      <stop offset="40%" stop-color="#f59e0b" stop-opacity="0.6"/>
+      <stop offset="70%" stop-color="#ea580c" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#7c2d12" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fef9c3"/>
+      <stop offset="40%" stop-color="#fde047"/>
+      <stop offset="70%" stop-color="#eab308"/>
+      <stop offset="100%" stop-color="#ca8a04"/>
+    </linearGradient>
+    <linearGradient id="bookGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#be123c"/>
+      <stop offset="50%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="675" fill="url(#bgGrad)"/>
+  <circle cx="600" cy="300" r="380" fill="url(#sunGlow)"/>
+
+  <!-- Decorative Mandala Patterns / Rays -->
+  <g opacity="0.18" stroke="#fde047" stroke-width="1.5" fill="none">
+    <circle cx="600" cy="300" r="160"/>
+    <circle cx="600" cy="300" r="240"/>
+    <circle cx="600" cy="300" r="320"/>
+    <path d="M600,60 L600,540 M360,300 L840,300 M430,130 L770,470 M430,470 L770,130"/>
+    <!-- Lotus Petal repeats -->
+    <path d="M600,140 Q620,180 600,220 Q580,180 600,140 Z"/>
+    <path d="M600,380 Q620,420 600,460 Q580,420 600,380 Z"/>
+    <path d="M440,300 Q480,320 520,300 Q480,280 440,300 Z"/>
+    <path d="M680,300 Q720,320 760,300 Q720,280 680,300 Z"/>
+  </g>
+
+  <!-- Sacred Om Glow Symbol -->
+  <g transform="translate(600, 190) scale(1.1)" filter="url(#glow)">
+    <circle cx="0" cy="0" r="65" fill="#fef08a" opacity="0.2"/>
+    <text x="0" y="24" font-family="'Segoe UI', Roboto, sans-serif" font-size="70" font-weight="900" fill="#fef08a" text-anchor="middle">ॐ</text>
+  </g>
+
+  <!-- Decorative Holy Book (Bhagavad Gita) on Stand -->
+  <g transform="translate(600, 375)">
+    <!-- Wooden Book Stand (Vyasapeetha) -->
+    <path d="M-140,80 L-10,20 L10,20 L140,80 L110,95 L0,40 L-110,95 Z" fill="#78350f"/>
+    <path d="M-10,20 L10,20 L0,110 Z" fill="#92400e"/>
+    <path d="M-120,85 L0,30 L120,85 L130,95 L0,45 L-130,95 Z" fill="#451a03"/>
+
+    <!-- Open Book Pages (Left & Right) -->
+    <!-- Left Page -->
+    <path d="M-160,25 C-120,-10 -40,-15 0,15 L0,65 C-40,35 -120,40 -160,75 Z" fill="#fffbeb"/>
+    <path d="M-155,20 C-115,-15 -35,-20 0,10 L0,15 C-35,-15 -115,-10 -155,25 Z" fill="#fde68a"/>
+    <!-- Right Page -->
+    <path d="M160,25 C120,-10 40,-15 0,15 L0,65 C40,35 120,40 160,75 Z" fill="#fffbeb"/>
+    <path d="M155,20 C115,-15 35,-20 0,10 L0,15 C35,-15 115,-10 155,25 Z" fill="#fde68a"/>
+
+    <!-- Red / Maroon Book Cover Outer -->
+    <path d="M-170,25 C-125,-15 -45,-20 0,15 C45,-20 125,-15 170,25 L165,80 C120,40 40,35 0,65 C-40,35 -120,40 -165,80 Z" fill="url(#bookGrad)" opacity="0.35"/>
+
+    <!-- Shloka text lines simulation -->
+    <g stroke="#92400e" stroke-width="2" stroke-linecap="round" opacity="0.6">
+      <line x1="-130" y1="20" x2="-25" y2="10"/>
+      <line x1="-130" y1="35" x2="-25" y2="25"/>
+      <line x1="-130" y1="50" x2="-25" y2="40"/>
+      <line x1="25" y1="10" x2="130" y2="20"/>
+      <line x1="25" y1="25" x2="130" y2="35"/>
+      <line x1="25" y1="40" x2="130" y2="50"/>
+    </g>
+
+    <!-- Golden Bookmark Ribbon -->
+    <path d="M0,15 Q20,60 10,95 L0,85 L-10,95 Q0,60 0,15 Z" fill="#eab308"/>
+  </g>
+
+  <!-- Divine Bansuri (Flute) & Peacock Feather (Mor Pankh) -->
+  <g transform="translate(600, 315) rotate(-14)">
+    <!-- Golden Flute -->
+    <rect x="-220" y="-8" width="440" height="16" rx="8" fill="url(#goldGrad)" filter="url(#glow)"/>
+    <circle cx="-160" cy="0" r="3.5" fill="#78350f"/>
+    <circle cx="-130" cy="0" r="3.5" fill="#78350f"/>
+    <circle cx="-100" cy="0" r="3.5" fill="#78350f"/>
+    <circle cx="-70" cy="0" r="3.5" fill="#78350f"/>
+    <circle cx="-40" cy="0" r="3.5" fill="#78350f"/>
+    <circle cx="-10" cy="0" r="3.5" fill="#78350f"/>
+
+    <!-- Peacock Feather (Mayur Pankh) resting on flute -->
+    <g transform="translate(140, -45) rotate(25) scale(0.9)">
+      <path d="M0,0 Q-40,-70 0,-130 Q40,-70 0,0 Z" fill="#0284c7"/>
+      <path d="M0,-25 Q-28,-75 0,-120 Q28,-75 0,-25 Z" fill="#059669"/>
+      <path d="M0,-50 Q-18,-85 0,-112 Q18,-85 0,-50 Z" fill="#eab308"/>
+      <circle cx="0" cy="-80" r="14" fill="#1e1b4b"/>
+      <circle cx="0" cy="-80" r="7" fill="#38bdf8"/>
+    </g>
+  </g>
+
+  <!-- Top Badge: 100% FREE ONLINE CLASSES -->
+  <g transform="translate(600, 75)">
+    <rect x="-190" y="-22" width="380" height="44" rx="22" fill="#15803d" stroke="#86efac" stroke-width="2" filter="url(#glow)"/>
+    <text x="0" y="6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" font-weight="900" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">
+      ★ 100% FREE ONLINE CLASS FOR KIDS &amp; FAMILIES ★
+    </text>
+  </g>
+
+  <!-- Main Headline Title Text Overlay -->
+  <text x="600" y="525" font-family="'Georgia', serif" font-size="38" font-weight="900" fill="#ffffff" text-anchor="middle" filter="url(#glow)">
+    Learn Bhagavad Geeta Online
+  </text>
+  
+  <text x="600" y="565" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" font-weight="700" fill="#fde047" text-anchor="middle" letter-spacing="0.5">
+    Geeta Pariwar • Live Zoom Batches • 13 Languages • All 18 Chapters
+  </text>
+
+  <!-- Bottom Details Bar -->
+  <g transform="translate(600, 618)">
+    <rect x="-420" y="-18" width="840" height="36" rx="18" fill="#0f172a" fill-opacity="0.85" stroke="#f59e0b" stroke-width="1.5"/>
+    <text x="0" y="6" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" font-weight="700" fill="#f1f5f9" text-anchor="middle">
+      📖 Daily 40 Mins (Mon–Fri) • Flexible Timing (5 AM – 2 AM) • Free E-Certificates &amp; Audio PDFs
+    </text>
+  </g>
+</svg>

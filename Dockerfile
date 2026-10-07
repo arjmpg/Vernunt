@@ -1,4 +1,4 @@
-FROM node:20-slim AS builder
+FROM node:22-slim AS builder
 
 WORKDIR /app
 
@@ -15,12 +15,12 @@ COPY . .
 RUN npm run build
 
 # Production image
-FROM node:20-slim AS runner
+FROM node:22-slim AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
 # Copy package files and install production dependencies only
 COPY package.json ./
@@ -33,6 +33,9 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/index.html ./index.html
 COPY --from=builder /app/firebase-blueprint.json ./firebase-blueprint.json
 COPY --from=builder /app/firestore.rules ./firestore.rules
+COPY --from=builder /app/server.ts ./server.ts
+COPY --from=builder /app/server ./server
+COPY --from=builder /app/src ./src
 
 EXPOSE 8080 3000
 

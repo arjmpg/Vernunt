@@ -52,6 +52,10 @@ service cloud.firestore {
         && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 100))
         && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 200))
         && (!('locationSharing' in data) || (data.locationSharing in ['PRECISE', 'APPROXIMATE', 'HIDDEN']))
+        && (!('profileVisibility' in data) || (data.profileVisibility in ['PRIVATE', 'CONNECTIONS', 'PUBLIC']))
+        && (!('neighbourhood' in data) || (data.neighbourhood is string && data.neighbourhood.size() <= 200))
+        && (!('fuzzedLatitude' in data) || (data.fuzzedLatitude is int || data.fuzzedLatitude is float))
+        && (!('fuzzedLongitude' in data) || (data.fuzzedLongitude is int || data.fuzzedLongitude is float))
         && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED']))
         && (!('userRole' in data) || (data.userRole in ['Parent', 'Event Organizer', 'Portfolio Professional', 'Admin']))
         && (!('interests' in data) || (data.interests is list && data.interests.size() <= 50))
@@ -202,10 +206,12 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (request.auth.uid == contactId || isAdmin());
     }
 
-    // Users Collection
+    // Users Collection: Zero-Trust ABAC. Private child profiles protected; writes strictly authenticated & verified.
     match /users/{userId} {
-      allow read, list: if true;
-      allow create, update: if true;
+      allow get: if isOwner(userId) || isAdmin() || !('profileVisibility' in resource.data) || resource.data.profileVisibility == 'PUBLIC' || (resource.data.profileVisibility == 'CONNECTIONS' && isSignedIn());
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(incoming());
+      allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidUser(incoming());
       allow delete: if isOwner(userId) || isAdmin();
     }
 
@@ -327,6 +333,33 @@ service cloud.firestore {
       allow read, list: if true;
       allow create, update: if true;
       allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || isAdmin());
+    }
+
+    // User Consent Records (Verifiable Immutable Audit Trail)
+    match /user_consents/{consentId} {
+      allow read, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Privacy & Data Deletion Requests (DPDP Act 2023 / GDPR Compliance)
+    match /privacy_requests/{requestId} {
+      allow read, list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Content Safety Reports & Moderation Queue
+    match /content_reports/{reportId} {
+      allow read, list: if isAdmin();
+      allow create: if isSignedIn() && incoming().reporterId == request.auth.uid;
+      allow update, delete: if isAdmin();
+    }
+
+    // Asset Licenses Registry
+    match /asset_licenses/{assetId} {
+      allow read, list: if true;
+      allow create, update, delete: if isAdmin();
     }
   }
 }

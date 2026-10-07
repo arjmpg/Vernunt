@@ -211,7 +211,7 @@ export const ContactUsModal: React.FC<ContactUsModalProps> = ({
                   </div>
                   <div className="bg-white p-2 rounded-xl border border-indigo-200 flex items-center justify-between gap-1.5 text-xs">
                     <div>
-                      <span className="text-[10px] text-slate-500 font-bold block">Grievance Contact:</span>
+                      <span className="text-[10px] text-slate-500 font-bold block">Grievance &amp; Compliance:</span>
                       <code className="font-mono font-bold text-indigo-900 text-[11px]">grievance@vernunt.com</code>
                     </div>
                     <a
@@ -223,12 +223,48 @@ export const ContactUsModal: React.FC<ContactUsModalProps> = ({
                   </div>
                   <div className="bg-white p-2 rounded-xl border border-emerald-200 flex items-center justify-between gap-1.5 text-xs">
                     <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Privacy &amp; DPDP Rights:</span>
+                      <code className="font-mono font-bold text-emerald-900 text-[11px]">privacy@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:privacy@vernunt.com?subject=Vernunt%20DPDP%20Data%20Privacy%20Request"
+                      className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-red-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Child Safety &amp; POCSO Desk:</span>
+                      <code className="font-mono font-bold text-red-900 text-[11px]">safety@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:safety@vernunt.com?subject=Vernunt%20Child%20Safety%20Escalation"
+                      className="p-1 rounded bg-red-50 hover:bg-red-100 text-red-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-purple-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-bold block">Legal &amp; IP Notices:</span>
+                      <code className="font-mono font-bold text-purple-900 text-[11px]">legal@vernunt.com</code>
+                    </div>
+                    <a
+                      href="mailto:legal@vernunt.com?subject=Vernunt%20Legal%20Notice"
+                      className="p-1 rounded bg-purple-50 hover:bg-purple-100 text-purple-700 text-[11px] font-bold"
+                    >
+                      Email
+                    </a>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-amber-200 flex items-center justify-between gap-1.5 text-xs">
+                    <div>
                       <span className="text-[10px] text-slate-500 font-bold block">Real Estate Support:</span>
-                      <code className="font-mono font-bold text-emerald-900 text-[11px]">estate@vernunt.com</code>
+                      <code className="font-mono font-bold text-amber-900 text-[11px]">estate@vernunt.com</code>
                     </div>
                     <a
                       href="mailto:estate@vernunt.com?subject=Vernunt%20Daycare%20Real%20Estate%20Enquiry"
-                      className="p-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold"
+                      className="p-1 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold"
                     >
                       Email
                     </a>

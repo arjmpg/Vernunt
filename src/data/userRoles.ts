@@ -22,7 +22,7 @@ export const USER_ROLES_CONFIG: Record<UserPlatformRole, UserRoleMeta> = {
     role: 'Parent',
     label: 'Parent & Kid Profile',
     shortLabel: 'Parent',
-    badge: '1-Year Free Access',
+    badge: 'Verified Family Access',
     icon: '👪',
     description: 'Find verified neighborhood playmates, match kids by age and hobbies, book vetted sitters, and coordinate safe playdates.',
     requiredFields: [

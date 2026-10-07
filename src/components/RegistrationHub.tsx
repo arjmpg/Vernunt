@@ -57,6 +57,7 @@ interface RegistrationHubProps {
   initialParentName?: string;
   initialPhotoUrl?: string;
   initialPhoneVerified?: boolean;
+  initialEmailVerified?: boolean;
 }
 
 // Verhoeff Algorithm Tables for authentic 12-digit Aadhaar validity checks
@@ -116,7 +117,8 @@ export default function RegistrationHub({
   initialEmail = '',
   initialParentName = '',
   initialPhotoUrl = '',
-  initialPhoneVerified = false
+  initialPhoneVerified = false,
+  initialEmailVerified = false
 }: RegistrationHubProps) {
   const t = getDictionary(language);
   const [step, setStep] = useState(1);
@@ -137,13 +139,13 @@ export default function RegistrationHub({
 
   // --- REUSED COMMON STATES ---
   const [phoneNumber, setPhoneNumber] = useState(formattedInitialPhone);
-  const [phoneVerified, setPhoneVerified] = useState(initialPhoneVerified || (!!formattedInitialPhone && formattedInitialPhone.length >= 10));
+  const [phoneVerified, setPhoneVerified] = useState<boolean>(Boolean(initialPhoneVerified));
   const [verificationCode, setVerificationCode] = useState('');
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpMsg, setOtpMsg] = useState({ 
-    text: (initialPhoneVerified || (!!formattedInitialPhone && formattedInitialPhone.length >= 10)) 
+    text: initialPhoneVerified 
       ? '✓ Mobile number verified securely!' 
       : '', 
     type: 'success' as 'info' | 'error' | 'success' 
@@ -154,18 +156,25 @@ export default function RegistrationHub({
 
   // --- EMAIL ID & EMAIL OTP AUTHENTICATION STATES ---
   const [email, setEmail] = useState(initialEmail || auth.currentUser?.email || '');
-  const [emailVerified, setEmailVerified] = useState(!!auth.currentUser?.emailVerified || (!!initialEmail && initialEmail.includes('@')));
+  const [emailVerified, setEmailVerified] = useState<boolean>(Boolean(auth.currentUser?.emailVerified || initialEmailVerified));
   const [emailVerificationCode, setEmailVerificationCode] = useState('');
   const [isSendingEmailOtp, setIsSendingEmailOtp] = useState(false);
   const [isVerifyingEmailOtp, setIsVerifyingEmailOtp] = useState(false);
   const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [emailOtpMsg, setEmailOtpMsg] = useState({ 
-    text: (!!auth.currentUser?.emailVerified || (!!initialEmail && initialEmail.includes('@'))) 
+    text: (auth.currentUser?.emailVerified || initialEmailVerified) 
       ? '✓ Email address verified securely!' 
       : '', 
     type: 'success' as 'info' | 'error' | 'success' 
   });
   const [expectedEmailOtpCode, setExpectedEmailOtpCode] = useState('');
+
+  // Automatically request phone verification OTP if arriving with a 10-digit number that isn't verified yet
+  useEffect(() => {
+    if (!initialPhoneVerified && formattedInitialPhone && formattedInitialPhone.length === 10) {
+      handleRegSendPhoneOtp();
+    }
+  }, []);
 
   // Aadhaar States - Mandatory 3 MB Document Upload
   const [aadhaarNumber, setAadhaarNumber] = useState('');
@@ -1813,7 +1822,7 @@ export default function RegistrationHub({
     let finalProfile: ChildProfile;
 
     const now = new Date();
-    // Free App Usage Promotion: 1 Year (365 days) for Parents & Influencers, 6 Months (180 days) for Hosts & Specialists
+    // Complimentary App Usage Membership: VIP (365 days) for Parents & Influencers, 6 Months (180 days) for Hosts & Specialists
     const freeDurationDays = (preferredRole === 'Parent' || preferredRole === 'Influencer') ? 365 : 180;
     const initialExpiry = new Date(now);
     initialExpiry.setDate(now.getDate() + freeDurationDays);
@@ -1883,7 +1892,7 @@ export default function RegistrationHub({
         kycSubmittedAt: new Date().toISOString(),
         kycVerifiedAt: preferredRole === 'Admin' ? new Date().toISOString() : undefined,
 
-        // 1-Year Free Membership for Parents & Influencers
+        // Complimentary Membership for Parents & Influencers
         subscriptionActive: preferredRole === 'Influencer', // Instant VIP access for Influencer Partners!
         subscriptionPlan: 'yearly',
         subscriptionExpiryDate: initialExpiryDateStr,
@@ -1966,7 +1975,7 @@ export default function RegistrationHub({
         aadhaarDocName: aadhaarDocName || undefined,
         aadhaarDocSize: aadhaarDocSize || undefined,
 
-        // 1-Year Free Membership & Commercial Daycare Listing
+        // Complimentary Membership & Commercial Daycare Listing
         subscriptionActive: true,
         subscriptionPlan: 'yearly',
         subscriptionExpiryDate: initialExpiryDateStr,

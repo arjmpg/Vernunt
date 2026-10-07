@@ -378,6 +378,74 @@ export default function EventBookingModal({
           {/* STEP 1: Tier Selection & Quantity */}
           {step === 'tier_selection' && (
             <div className="space-y-4">
+
+              {/* External Online Class Registration & Program Details (e.g. Learn Geeta) */}
+              {event.externalRegistrationUrl && (
+                <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-50 via-orange-50 to-purple-50 border-2 border-amber-300 shadow-sm space-y-3.5 animate-fadeIn">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white px-2.5 py-1 rounded-full shadow-2xs">
+                      ★ 100% Free Online Class ★
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200">
+                      Live on Zoom
+                    </span>
+                  </div>
+
+                  <div>
+                    <h4 className="text-sm font-black text-slate-900 leading-snug">
+                      Official Free Bhagavad Gita Program by Geeta Pariwar
+                    </h4>
+                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                      {event.description}
+                    </p>
+                  </div>
+
+                  {/* Highlights Grid */}
+                  <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+                    <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/80">
+                      <span className="font-bold text-amber-900 block">⏱️ Daily Duration:</span>
+                      <span className="text-slate-600 font-medium">40 Mins (Mon–Fri)</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/80">
+                      <span className="font-bold text-amber-900 block">🕒 Flexible Batches:</span>
+                      <span className="text-slate-600 font-medium">18+ Slots (5 AM – 2 AM IST)</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/80">
+                      <span className="font-bold text-amber-900 block">🗣️ 13 Languages:</span>
+                      <span className="text-slate-600 font-medium">En, Hi, Kn, Ta, Te, Mr, Gu, etc.</span>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white/90 border border-amber-200/80">
+                      <span className="font-bold text-amber-900 block">📜 Free Certification:</span>
+                      <span className="text-slate-600 font-medium">Gītā Guñjana E-Certificate</span>
+                    </div>
+                  </div>
+
+                  {/* External Links */}
+                  <div className="pt-2 flex flex-col sm:flex-row gap-2">
+                    <a
+                      href={event.externalRegistrationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <span>Register for Free Class (New Tab) ↗</span>
+                    </a>
+                    {event.externalPortalUrl && (
+                      <a
+                        href={event.externalPortalUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-3 px-4 bg-white hover:bg-slate-50 border border-amber-300 text-slate-800 font-bold text-xs rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <span>Visit Play Portal ↗</span>
+                      </a>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-center text-slate-500">
+                    Clicking opens the official registration form in a new tab. Zero charges or hidden fees.
+                  </p>
+                </div>
+              )}
               
               {/* Event Schedule & Time Slots */}
               {event.recurringSlots && event.recurringSlots.length > 0 && (

@@ -227,9 +227,22 @@ export default function EventCarouselSection({
 
                 {/* Fast Action */}
                 <div className="pt-1.5 flex items-center justify-between">
-                  <span className="text-[11px] font-black text-rose-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
-                    Book Pass <ArrowRight className="w-3 h-3" />
-                  </span>
+                  {evt.externalRegistrationUrl ? (
+                    <a
+                      href={evt.externalRegistrationUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-[11px] font-black text-emerald-600 hover:text-emerald-700 group-hover:translate-x-0.5 transition-transform flex items-center gap-1"
+                      title="Open Free Online Registration (New Tab)"
+                    >
+                      <span>Free Register ↗</span>
+                    </a>
+                  ) : (
+                    <span className="text-[11px] font-black text-rose-600 group-hover:translate-x-0.5 transition-transform flex items-center gap-1">
+                      Book Pass <ArrowRight className="w-3 h-3" />
+                    </span>
+                  )}
                   
                   <div className="flex items-center gap-1.5">
                     {onShareQr && (

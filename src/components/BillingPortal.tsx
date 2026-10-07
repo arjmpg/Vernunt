@@ -344,7 +344,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
       const systemCoupons = [
         {
           code: 'INFLUENCER365',
-          description: '1 Year Free Access VIP Creator Pass',
+          description: 'VIP Creator Access Pass',
           freeDurationDays: 365,
           grantPlan: 'yearly',
           bonusCredits: 60,
@@ -352,7 +352,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         },
         {
           code: 'VIPMOM',
-          description: 'Bangalore Mom Ambassador 1-Year Free Access',
+          description: 'Bangalore Mom Ambassador VIP Access',
           freeDurationDays: 365,
           grantPlan: 'yearly',
           bonusCredits: 60,
@@ -360,7 +360,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         },
         {
           code: 'BANGALOREKIDS',
-          description: 'Bangalore Community 1-Year Free Access',
+          description: 'Bangalore Community VIP Access',
           freeDurationDays: 365,
           grantPlan: 'yearly',
           bonusCredits: 60,
@@ -368,7 +368,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         },
         {
           code: 'VERNUNT1YEAR',
-          description: 'Full 1-Year Platform Free Access Pass',
+          description: 'Platform VIP Access Pass',
           freeDurationDays: 365,
           grantPlan: 'yearly',
           bonusCredits: 60,
@@ -448,7 +448,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         console.debug('Confetti animation bypassed', confettiErr);
       }
 
-      setCouponSuccessMsg(`🎉 Success! Coupon "${cleanCode}" applied! You now have ${freeDays} Days (1 Year) of FREE VIP Access for all app features!`);
+      setCouponSuccessMsg(`🎉 Success! Coupon "${cleanCode}" applied! You now have ${freeDays} Days of VIP Access for all app features!`);
       setCouponCodeInput('');
     } catch (err: any) {
       setCouponErrorMsg(err.message || 'Failed to apply coupon.');
@@ -529,10 +529,10 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
               </span>
             </div>
             <h3 className="text-base sm:text-lg font-black text-slate-900 font-serif mt-1">
-              Refer &amp; Get Free 1-Year Subscription!
+              Refer &amp; Unlock Free Premium Membership!
             </h3>
             <p className="text-xs text-slate-600 font-medium mt-0.5">
-              Invite 1 parent friend or playmate family to Vernunt. When they sign up, you both unlock 1 Full Year of Vernunt Premium Connect (worth ₹2,499) completely free!
+              Invite 1 parent friend or playmate family to Vernunt. When they sign up, you both unlock complimentary Vernunt Premium Connect (worth ₹2,499) completely free!
             </p>
           </div>
         </div>
@@ -565,12 +565,12 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
                 Have an Influencer Partner or Admin Coupon Code?
               </h3>
               <p className="text-xs text-slate-500">
-                Redeem your code for <strong className="text-orange-600">1 Full Year of 100% Free VIP Access</strong> across the entire app.
+                Redeem your code for <strong className="text-orange-600">Complimentary VIP Access</strong> across the entire app.
               </p>
             </div>
           </div>
           <span className="text-[10px] uppercase font-bold text-orange-700 bg-orange-50 px-2.5 py-1 rounded-full border border-orange-200 w-fit">
-            1-Year Free Pass
+            VIP Partner Pass
           </span>
         </div>
 

@@ -1140,7 +1140,7 @@ export default function PlaymateCard({
                   Refer & get Free Subscription
                 </span>
                 <span className="text-[8.5px] text-amber-700 font-semibold block leading-tight">
-                  Invite 1 parent friend to unlock 1 Year Free Access!
+                  Invite 1 parent friend to unlock Free Access!
                 </span>
               </div>
             </div>

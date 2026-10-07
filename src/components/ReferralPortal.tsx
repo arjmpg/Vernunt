@@ -48,22 +48,22 @@ export default function ReferralPortal({ userProfile, onUpdateUserProfile, allPl
   return (
     <div id="referral-portal-wrapper" className="max-w-3xl mx-auto space-y-6 animate-fade-in">
       
-      {/* Hero Banner: Refer & Earn 1-Year Free Access */}
+      {/* Hero Banner: Refer & Earn Free Access */}
       <div className="bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden text-center">
         <div className="absolute -right-10 -top-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         <div className="absolute -left-10 -bottom-10 w-48 h-48 bg-white/10 rounded-full blur-2xl pointer-events-none" />
         
         <div className="relative z-10 space-y-4">
           <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-wider text-amber-100 border border-white/20">
-            <Gift className="w-4 h-4 animate-bounce" /> 1-Year Free Access Referral Program
+            <Gift className="w-4 h-4 animate-bounce" /> Free Access Referral Program
           </div>
           
           <div className="space-y-2">
             <h2 className="text-2xl sm:text-3xl font-bold font-serif leading-tight">
-              Refer a Parent & Get 1-Year Full Access Free!
+              Refer a Parent & Get Full Access Free!
             </h2>
             <p className="text-xs sm:text-sm text-orange-50 max-w-xl mx-auto leading-relaxed">
-              Default access for parents is <strong>₹2,499/year</strong>. Refer just <strong>1 parent friend in Bangalore</strong>, and when they sign up with your referral link, you instantly unlock <strong>1 Full Year of 100% Free Access (₹2,499 Value) + Free Contact Credits!</strong>
+              Default access for parents is <strong>₹2,499/year</strong>. Refer just <strong>1 parent friend in Bangalore</strong>, and when they sign up with your referral link, you instantly unlock <strong>100% Free Access (₹2,499 Value) + Free Contact Credits!</strong>
             </p>
           </div>
 
@@ -166,7 +166,7 @@ export default function ReferralPortal({ userProfile, onUpdateUserProfile, allPl
             <Gift className="w-6 h-6" />
           </div>
           <div>
-            <span className="block text-[10px] uppercase font-black text-slate-400">1-Year Free Access</span>
+            <span className="block text-[10px] uppercase font-black text-slate-400">Full Free Access</span>
             <span className="text-base font-serif font-black text-emerald-700">
               {userProfile?.subscriptionActive || (userProfile?.referralCount && userProfile.referralCount > 0) ? 'Unlocked (Active)' : '1 Referral Needed'}
             </span>

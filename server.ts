@@ -5,6 +5,7 @@ import os from "os";
 import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
 import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
+import { registerPrivacyComplianceRoutes } from "./server/privacyComplianceService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
@@ -72,6 +73,9 @@ async function startServer() {
 
   // Shiprocket Shipping & Logistics Fulfillment Routes
   registerShiprocketRoutes(app);
+
+  // DPDP Act 2023, POCSO, Cookie & Child Privacy Compliance Routes
+  registerPrivacyComplianceRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {
@@ -4485,10 +4489,11 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  // In dev / AI studio preview environment, port 3000 is always required.
-  // In production deployments (e.g. standalone Cloud Run), honor process.env.PORT.
-  const port = isProduction && process.env.PORT
-    ? parseInt(process.env.PORT, 10) || 3000
+  // On Google Cloud Run (identified by K_SERVICE or NODE_ENV=production) or when dist/index.html is served, honor process.env.PORT.
+  // In AI Studio local dev environment, port 3000 is required because Nginx proxies 8080 -> 3000.
+  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.NODE_ENV === "production" || isProduction);
+  const port = isCloudRun && process.env.PORT
+    ? parseInt(process.env.PORT, 10) || 8080
     : 3000;
 
   const server = app.listen(port, "0.0.0.0", () => {

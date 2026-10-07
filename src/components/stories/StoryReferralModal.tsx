@@ -115,7 +115,7 @@ ${shareUrl}`;
                   <span className="px-2 py-0.5 rounded bg-emerald-200 text-emerald-800 text-[10px] font-bold">Active</span>
                 </div>
                 <h4 className="text-sm font-bold text-emerald-950">
-                  Lifetime Free Story Writing + 1 Year Free Search Radar
+                  Lifetime Free Story Writing + Full Free Search Radar
                 </h4>
                 <p className="text-xs text-emerald-700 leading-relaxed">
                   Congratulations! You have active lifetime unlimited authoring access for all your children's stories, plus complimentary Search Radar and Playdate Planner access valid through September 2027!
@@ -169,13 +169,13 @@ ${shareUrl}`;
                 <Zap className="w-4 h-4" />
               </div>
               <h5 className="text-xs font-bold text-slate-900">
-                1 Year Free Search Radar All-Access
+                Full Free Search Radar All-Access
               </h5>
               <p className="text-[11px] text-slate-600 leading-relaxed">
                 Full access to Bangalore Concentric Playmate Radar, neighborhood child directory, playdate planner, and direct verified parent messaging.
               </p>
               <div className="text-[10px] font-black text-orange-700 uppercase">
-                Worth ₹2,400 • FREE 1 YEAR
+                Worth ₹2,400 • FREE ALL-ACCESS
               </div>
             </div>
           </div>

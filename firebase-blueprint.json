@@ -15,6 +15,10 @@
         "bio": { "type": "string" },
         "location": { "type": "object" },
         "locationSharing": { "type": "string", "enum": ["PRECISE", "APPROXIMATE", "HIDDEN"] },
+        "profileVisibility": { "type": "string", "enum": ["PRIVATE", "CONNECTIONS", "PUBLIC"] },
+        "neighbourhood": { "type": "string" },
+        "fuzzedLatitude": { "type": "number" },
+        "fuzzedLongitude": { "type": "number" },
         "verificationStatus": { "type": "string", "enum": ["UNVERIFIED", "PENDING", "VERIFIED"] },
         "interests": { "type": "array" },
         "photoUrl": { "type": "string" },
@@ -264,6 +268,74 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "groupId", "senderId", "content"]
+    },
+    "UserConsent": {
+      "title": "UserConsent",
+      "description": "Verifiable record of parental, legal, and privacy policy consent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "childProfileId": { "type": "string" },
+        "consentType": { "type": "string", "enum": ["GUARDIAN_AUTHORITY", "TERMS_OF_SERVICE", "DPDP_PRIVACY", "MARKETING_EMAIL", "COOKIE_ANALYTICS"] },
+        "policyVersion": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "status": { "type": "string", "enum": ["GRANTED", "WITHDRAWN", "REVOKED"] },
+        "ipHash": { "type": "string" }
+      },
+      "required": ["id", "userId", "consentType", "policyVersion", "timestamp", "status"]
+    },
+    "PrivacyRequest": {
+      "title": "PrivacyRequest",
+      "description": "Formal user request for data access, export, rectification, or erasure",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "requestType": { "type": "string", "enum": ["DATA_ACCESS", "DATA_DOWNLOAD", "ACCOUNT_DELETION", "CHILD_PROFILE_DELETION", "DATA_CORRECTION", "CONSENT_WITHDRAWAL"] },
+        "status": { "type": "string", "enum": ["PENDING", "VERIFYING", "APPROVED", "PROCESSING", "COMPLETED", "REJECTED"] },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "processedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "requestType", "status", "createdAt"]
+    },
+    "ContentReport": {
+      "title": "ContentReport",
+      "description": "User safety report regarding inappropriate profile, message, or review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reporterEmail": { "type": "string" },
+        "targetType": { "type": "string", "enum": ["profile", "child_profile", "post", "message", "review"] },
+        "targetId": { "type": "string" },
+        "reason": { "type": "string" },
+        "details": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "INVESTIGATING", "WARNED", "ACTION_TAKEN", "DISMISSED"] },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "reporterId", "targetType", "targetId", "reason", "status", "createdAt"]
+    },
+    "AssetLicense": {
+      "title": "AssetLicense",
+      "description": "Audit record for platform fonts, images, icons, and illustrations",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["image", "font", "icon", "illustration"] },
+        "source": { "type": "string" },
+        "creator": { "type": "string" },
+        "license": { "type": "string" },
+        "licenseUrl": { "type": "string" },
+        "commercialUse": { "type": "boolean" },
+        "attributionRequired": { "type": "boolean" },
+        "expiry": { "type": "string" },
+        "verified": { "type": "boolean" }
+      },
+      "required": ["id", "name", "type", "license", "commercialUse", "verified"]
     }
   },
   "firestore": {
@@ -338,6 +410,22 @@
     "/group_messages/{msgId}": {
       "schema": "VernuntGroupMessage",
       "description": "Stores real-time messages within Vernunt parent groups"
+    },
+    "/user_consents/{id}": {
+      "schema": "UserConsent",
+      "description": "Stores verifiable parental and user consent records"
+    },
+    "/privacy_requests/{id}": {
+      "schema": "PrivacyRequest",
+      "description": "Stores DPDP 2023 data access, download, and deletion requests"
+    },
+    "/content_reports/{id}": {
+      "schema": "ContentReport",
+      "description": "Stores user safety reports and moderation queue records"
+    },
+    "/asset_licenses/{id}": {
+      "schema": "AssetLicense",
+      "description": "Stores licensing records for platform fonts, images, and visual assets"
     }
   }
 }

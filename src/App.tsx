@@ -675,6 +675,7 @@ export default function App() {
     phone?: string;
     email?: string;
     phoneVerified?: boolean;
+    emailVerified?: boolean;
     parentName?: string;
     photoUrl?: string;
   }>({});
@@ -2453,7 +2454,7 @@ export default function App() {
   // Handle Sign Up with optional pre-verified details
   const handleStartSignUp = (
     role: 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer',
-    details?: { phone?: string; email?: string; phoneVerified?: boolean; parentName?: string; photoUrl?: string }
+    details?: { phone?: string; email?: string; phoneVerified?: boolean; emailVerified?: boolean; parentName?: string; photoUrl?: string }
   ) => {
     setIsLoading(true);
     setLoadingTitle(
@@ -3626,6 +3627,7 @@ export default function App() {
               initialParentName={pendingRegisterDetails.parentName}
               initialPhotoUrl={pendingRegisterDetails.photoUrl}
               initialPhoneVerified={pendingRegisterDetails.phoneVerified}
+              initialEmailVerified={pendingRegisterDetails.emailVerified}
             />
           </div>
         )}
@@ -4465,7 +4467,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">📄</span>
-                    <span>1. Terms &amp; Conditions (Safe Harbor)</span>
+                    <span>Terms &amp; Conditions (Safe Harbor)</span>
                   </button>
                 </li>
                 <li>
@@ -4478,7 +4480,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs shrink-0">🔒</span>
-                    <span>2. Privacy Policy (DPDP Act 2023)</span>
+                    <span>Privacy Policy (DPDP Act 2023)</span>
                   </button>
                 </li>
                 <li>
@@ -4491,7 +4493,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center text-xs shrink-0">🛡️</span>
-                    <span>3. Safety &amp; Meetup Release</span>
+                    <span>Safety &amp; Meetup Release</span>
                   </button>
                 </li>
                 <li>
@@ -4504,7 +4506,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center text-xs shrink-0">🚚</span>
-                    <span>4. Shipping &amp; Logistics Policy</span>
+                    <span>Shipping &amp; Logistics Policy</span>
                   </button>
                 </li>
                 <li>
@@ -4517,7 +4519,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-purple-50 text-purple-700 flex items-center justify-center text-xs shrink-0">🔄</span>
-                    <span>5. Returns &amp; Refund Policy</span>
+                    <span>Returns &amp; Refund Policy</span>
                   </button>
                 </li>
                 <li>
@@ -4530,7 +4532,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-red-50 text-red-700 flex items-center justify-center text-xs shrink-0">🚨</span>
-                    <span>6. POCSO &amp; Child Protection</span>
+                    <span>POCSO &amp; Child Protection</span>
                   </button>
                 </li>
                 <li>
@@ -4543,7 +4545,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-700 flex items-center justify-center text-xs shrink-0">🏪</span>
-                    <span>7. Marketplace Seller Indemnity</span>
+                    <span>Marketplace Seller Indemnity</span>
                   </button>
                 </li>
                 <li>
@@ -4556,7 +4558,7 @@ export default function App() {
                     className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">💬</span>
-                    <span>8. Groups &amp; Chat Safe Harbor</span>
+                    <span>Groups &amp; Chat Safe Harbor</span>
                   </button>
                 </li>
                 <li>
@@ -4568,36 +4570,6 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">💬</span>
                     <span>Help &amp; Support Hub</span>
                   </button>
-                </li>
-                <li>
-                  <a
-                    href="mailto:support@vernunt.com"
-                    className="hover:text-rose-700 transition flex items-center gap-2 text-slate-600"
-                    title="Customer Care Support"
-                  >
-                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">✉️</span>
-                    <span>Support: support@vernunt.com</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="mailto:grievance@vernunt.com"
-                    className="hover:text-indigo-700 transition flex items-center gap-2 text-slate-600"
-                    title="Grievance Redressal Officer"
-                  >
-                    <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">⚖️</span>
-                    <span>Grievance: grievance@vernunt.com</span>
-                  </a>
-                </li>
-                <li>
-                  <a
-                    href="mailto:estate@vernunt.com"
-                    className="hover:text-emerald-700 transition flex items-center gap-2 text-slate-600"
-                    title="Real Estate Support"
-                  >
-                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🏢</span>
-                    <span>Real Estate: estate@vernunt.com</span>
-                  </a>
                 </li>
               </ul>
             </div>
@@ -5156,7 +5128,7 @@ export default function App() {
                     }}
                     className="w-full py-2 px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-900 font-bold rounded-xl text-xs transition cursor-pointer flex items-center justify-between text-left"
                   >
-                    <span className="flex items-center gap-1.5">📞 <span>Help &amp; Support (support@vernunt.com)</span></span>
+                    <span className="flex items-center gap-1.5">📞 <span>Help &amp; Support Hub</span></span>
                     <ArrowRight className="w-3.5 h-3.5 text-rose-700" />
                   </button>
 

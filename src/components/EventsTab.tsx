@@ -997,6 +997,11 @@ export default function EventsTab({
     return filteredEvents.filter(e => getGatheringSubCategory(e) === 'classes');
   }, [filteredEvents]);
 
+  // Spotlight Online Class: Bhagavad Gita Classes by Geeta Pariwar
+  const geetaClassEvent = useMemo(() => {
+    return eventsList.find(e => e.id === 'class-bhagavad-geeta-online' || e.title.includes('Bhagavad Gita')) || MOCK_EVENTS.find(e => e.id === 'class-bhagavad-geeta-online') || MOCK_EVENTS[0];
+  }, [eventsList]);
+
   // Activity Specific Sub-Pools (Swimming, Chess, Sports & Camps)
   const swimmingActivities = useMemo(() => {
     return filteredEvents.filter(e => {
@@ -1856,6 +1861,155 @@ ${deepLink}`;
         </div>
       ) : (
         <div id="events-carousel-explorer" className="space-y-12">
+          {/* ========================================================================= */}
+          {/* SPOTLIGHT: 100% FREE BHAGAVAD GITA ONLINE CLASSES (SUB-CATEGORY: CLASSES) */}
+          {/* ========================================================================= */}
+          {(activeSubCategory === 'all' || activeSubCategory === 'classes') && geetaClassEvent && (
+            <div 
+              id="spotlight-bhagavad-geeta"
+              className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950 via-slate-900 to-purple-950 border-2 border-amber-400 shadow-2xl p-5 sm:p-7 text-white animate-fade-in group"
+            >
+              {/* Subtle background glow */}
+              <div className="absolute -right-20 -top-20 w-80 h-80 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -left-20 -bottom-20 w-80 h-80 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+
+              <div className="relative z-10 flex flex-col lg:flex-row items-center gap-6 justify-between">
+                
+                {/* Left Column: Information, Highlights, Schedule & CTAs */}
+                <div className="space-y-4 max-w-2xl text-left flex-1">
+                  
+                  {/* Badges Bar */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 text-[10px] font-black uppercase tracking-wider shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+                      <span>Spotlight Online Class</span>
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/40 text-[10px] font-black uppercase tracking-wider">
+                      ★ 100% Free Classes ★
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/20 text-purple-300 border border-purple-400/40 text-[10px] font-black uppercase tracking-wider">
+                      🎓 Sub Category: Classes
+                    </span>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/40 text-[10px] font-black uppercase tracking-wider">
+                      Live on Zoom
+                    </span>
+                  </div>
+
+                  {/* Title & Organization */}
+                  <div className="space-y-1.5">
+                    <h3 className="text-xl sm:text-2xl md:text-3xl font-serif font-black text-white leading-tight">
+                      Free Online Bhagavad Gita Classes for Kids &amp; Families
+                    </h3>
+                    <p className="text-xs sm:text-sm text-amber-100 font-medium leading-relaxed">
+                      Conducted by <strong>Geeta Pariwar (LearnGeeta)</strong>. Learn authentic Sanskrit shloka recitation with correct pronunciation, meanings, and fun moral stories. Over 490,000 learners across 134 countries. Free e-certificates, study PDFs &amp; audio guides included!
+                    </p>
+                  </div>
+
+                  {/* Schedules & Information Cards Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs pt-1">
+                    <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15 space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-300 block">⏱️ Daily Duration</span>
+                      <span className="font-extrabold text-white text-xs">40 Mins / Day</span>
+                      <p className="text-[10px] text-white/70">Monday to Friday</p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15 space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-300 block">🕒 Flexible Batches</span>
+                      <span className="font-extrabold text-white text-xs">18+ Daily Slots</span>
+                      <p className="text-[10px] text-white/70">5:00 AM – 2:00 AM IST</p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15 space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-300 block">🗣️ Languages</span>
+                      <span className="font-extrabold text-white text-xs">13 Languages</span>
+                      <p className="text-[10px] text-white/70">En, Hi, Kn, Ta, Te, Mr...</p>
+                    </div>
+
+                    <div className="p-3 rounded-2xl bg-white/10 backdrop-blur-xs border border-white/15 space-y-0.5">
+                      <span className="text-[10px] uppercase font-bold text-amber-300 block">📜 Certification</span>
+                      <span className="font-extrabold text-emerald-300 text-xs">Gītā Guñjana</span>
+                      <p className="text-[10px] text-white/70">Free E-Certificate</p>
+                    </div>
+                  </div>
+
+                  {/* Schedule Details Table Snippet */}
+                  <div className="p-3 rounded-2xl bg-black/40 border border-amber-400/30 text-[11px] text-amber-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-amber-400 shrink-0" />
+                      <span>
+                        <strong>Sample Batch Timings:</strong> 06:00 AM, 07:00 AM, 04:00 PM (Kids Special), 06:00 PM, 07:30 PM, 08:30 PM IST.
+                      </span>
+                    </div>
+                    <span className="text-[10px] bg-amber-400/20 text-amber-200 px-2 py-0.5 rounded-full shrink-0">
+                      No Sanskrit Prior Knowledge Needed
+                    </span>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    {/* Primary Button: Register in New Tab */}
+                    <a
+                      href="https://online.learngeeta.com/participant/reg_participant.php?source=golden50"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-6 py-3.5 bg-gradient-to-r from-amber-400 via-orange-400 to-amber-300 hover:from-amber-300 hover:to-orange-300 text-slate-950 font-black text-xs sm:text-sm rounded-2xl shadow-lg hover:shadow-amber-500/30 transition transform hover:scale-102 flex items-center justify-center gap-2 cursor-pointer text-center"
+                    >
+                      <Ticket className="w-4 h-4 text-slate-950" />
+                      <span>Register for Free Classes (New Tab) ↗</span>
+                    </a>
+
+                    {/* Secondary Link: Attend Program Portal in New Tab */}
+                    <a
+                      href="https://play.learngeeta.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-4 py-3.5 bg-white/10 hover:bg-white/20 border border-white/25 text-white font-extrabold text-xs sm:text-sm rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer text-center backdrop-blur-xs"
+                    >
+                      <ExternalLink className="w-4 h-4 text-amber-300" />
+                      <span>Attend / Play LearnGeeta Portal ↗</span>
+                    </a>
+
+                    {/* In-app Schedule & Modal Preview Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEventId(geetaClassEvent.id);
+                        handleInitiateBooking(geetaClassEvent);
+                      }}
+                      className="px-4 py-3.5 text-xs text-amber-200 hover:text-white font-bold hover:underline cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>View Full Schedules &amp; FAQ ℹ️</span>
+                    </button>
+                  </div>
+
+                </div>
+
+                {/* Right Column: Visual Poster Card & Artwork */}
+                <div className="w-full sm:w-72 md:w-80 shrink-0">
+                  <div className="relative rounded-2xl overflow-hidden border-2 border-amber-400/60 shadow-2xl bg-slate-900 group-hover:border-amber-300 transition aspect-[16/10] sm:aspect-[4/3]">
+                    <img 
+                      src="/bhagavad-geeta-class.svg" 
+                      alt="Free Online Bhagavad Gita Classes"
+                      className="w-full h-full object-cover group-hover:scale-103 transition duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent flex flex-col justify-end p-4">
+                      <span className="text-[10px] font-black uppercase text-amber-300 bg-black/60 backdrop-blur-xs px-2.5 py-0.5 rounded-full border border-amber-400/40 w-fit">
+                        ✨ Bal Geeta • Kids Batch
+                      </span>
+                      <h4 className="text-xs sm:text-sm font-black text-white mt-1 leading-snug">
+                        Master All 18 Chapters in 4 Levels
+                      </h4>
+                      <p className="text-[10px] text-white/80 mt-0.5">
+                        Free study PDFs, audio tracks &amp; WhatsApp group mentors.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          )}
+
           {/* Active Filter / Search Matching Section */}
           {isAnyFilterActive && (
             <EventCarouselSection

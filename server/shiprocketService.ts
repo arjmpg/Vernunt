@@ -401,7 +401,7 @@ export function registerShiprocketRoutes(app: Express) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Shiprocket Official Shipping Label - ${awb}</title>
+  <title>Shipping Official Dispatch Label - ${awb}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f1f5f9; padding: 24px; margin: 0; }
     .label-box { max-width: 440px; margin: 0 auto; background: #fff; border: 2px solid #000; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
@@ -431,7 +431,7 @@ export function registerShiprocketRoutes(app: Express) {
     <div class="header">
       <div>
         <div class="logo-title">VERNUNT LOGISTICS</div>
-        <div class="powered">Powered by Shiprocket Logistics Engine</div>
+        <div class="powered">Powered by National Shipping Network</div>
       </div>
       <div style="text-align: right;">
         <span class="courier-badge">${courier}</span>
@@ -472,7 +472,7 @@ export function registerShiprocketRoutes(app: Express) {
     </div>
 
     <div class="footer">
-      Shiprocket Logistics Network • 24/7 Verified Dispatch • Do Not Accept If Seal Is Broken
+      National Shipping Network • 24/7 Verified Dispatch • Do Not Accept If Seal Is Broken
     </div>
   </div>
   <button class="btn-print" onclick="window.print()">Print Official Shipping Label</button>
@@ -493,7 +493,7 @@ export function registerShiprocketRoutes(app: Express) {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Shiprocket Handover Manifest - ${token}</title>
+  <title>Courier Handover Manifest - ${token}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #fff; padding: 24px; color: #0f172a; }
     .manifest { max-width: 700px; margin: 0 auto; border: 2px solid #000; padding: 20px; }
@@ -510,7 +510,7 @@ export function registerShiprocketRoutes(app: Express) {
   <div class="manifest">
     <div class="header">
       <div>
-        <h2 style="margin: 0; font-size: 18px;">SHIPROCKET COURIER HANDOVER MANIFEST</h2>
+        <h2 style="margin: 0; font-size: 18px;">COURIER HANDOVER MANIFEST</h2>
         <p style="margin: 4px 0 0; font-size: 11px; color: #64748b;">Vernunt Multi-Vendor Central Logistics System</p>
       </div>
       <div style="text-align: right; font-size: 12px;">

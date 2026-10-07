@@ -76,7 +76,7 @@ export const EventSeoSitemapModal: React.FC<EventSeoSitemapModalProps> = ({
           <div className="flex items-start justify-between relative z-10">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] font-black uppercase tracking-wider">
-                <Globe className="w-3.5 h-3.5 text-blue-400" /> Google Search Console & SEO Engine
+                <Globe className="w-3.5 h-3.5 text-blue-400" /> Vernunt Merchant Hub &amp; SEO Engine
               </div>
               <h3 className="text-xl font-bold font-serif">
                 Event, Activity & Class SEO Sitemap Center
