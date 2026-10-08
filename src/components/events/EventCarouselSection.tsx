@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { CommunityEvent } from '../../types.ts';
 import { 
   ChevronLeft, ChevronRight, Ticket, Navigation, 
-  Sparkles, Flame, Users, Clock, Calendar, ArrowRight, QrCode 
+  Sparkles, Flame, Users, Clock, Calendar, ArrowRight, QrCode, Share2 
 } from 'lucide-react';
 import { getEventStatus } from '../EventsTab.tsx';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
@@ -29,6 +29,7 @@ export default function EventCarouselSection({
   seeAllLabel = 'See All',
   onSelectEvent,
   onBookEvent,
+  onShareEvent,
   onShareQr,
   myTickets = [],
   defaultBadge
@@ -245,6 +246,20 @@ export default function EventCarouselSection({
                   )}
                   
                   <div className="flex items-center gap-1.5">
+                    {onShareEvent && (
+                      <button
+                        type="button"
+                        id={`btn-share-social-${evt.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShareEvent(evt);
+                        }}
+                        className="p-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-600 hover:text-orange-700 border border-orange-200 transition cursor-pointer"
+                        title="Share Event on WhatsApp, Facebook, X, etc."
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {onShareQr && (
                       <button
                         type="button"

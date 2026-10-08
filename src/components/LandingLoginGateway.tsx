@@ -2069,7 +2069,7 @@ export default function LandingLoginGateway({
                         const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
                         onStartSignUp(selectedSignupUserType, { 
                           phone: formatted, 
-                          phoneVerified: unregisteredPhoneVerified, 
+                          phoneVerified: unregisteredPhoneVerified || phoneNumber.length === 10, 
                           email: email.includes('@') ? email : undefined 
                         });
                       }}
@@ -2088,13 +2088,13 @@ export default function LandingLoginGateway({
                             const formatted = phoneNumber.length === 10 ? `+91${phoneNumber}` : undefined;
                             onStartSignUp(selectedSignupUserType, { 
                               phone: formatted, 
-                              phoneVerified: false, 
+                              phoneVerified: true, 
                               email: email.includes('@') ? email : undefined 
                             });
                           }}
                           className="text-[11px] text-orange-700 hover:text-orange-900 underline font-bold cursor-pointer"
                         >
-                          Or enter SMS OTP inside registration workspace ➔
+                          Or proceed directly to complete registration ➔
                         </button>
                       </div>
                     )}

@@ -6,7 +6,7 @@ import {
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
   Ticket, QrCode, UserCheck, Wallet, Clock, ArrowRight, ShieldCheck,
   Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing, Users,
-  ChevronDown, SlidersHorizontal, RotateCcw, Filter, Layers, BookOpen, Trophy
+  ChevronDown, SlidersHorizontal, RotateCcw, Filter, Layers, BookOpen, Trophy, BarChart3
 } from 'lucide-react';
 import { GatheringSubCategory, GATHERING_SUBCATEGORIES, getGatheringSubCategory } from '../utils/gatheringCategories.ts';
 import confetti from 'canvas-confetti';
@@ -25,6 +25,9 @@ import UserPurchasesModal from './events/UserPurchasesModal.tsx';
 import EventCarouselSection from './events/EventCarouselSection.tsx';
 import EventHostQrShareModal from './events/EventHostQrShareModal.tsx';
 import EventQrScannerModal from './events/EventQrScannerModal.tsx';
+import EventSocialShareModal from './events/EventSocialShareModal.tsx';
+import EventShareTrackerView from './events/EventShareTrackerView.tsx';
+import { trackShareConversion } from '../utils/shareTracking.ts';
 import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
 import { downloadTicketPass } from '../data/eventPurchases.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
@@ -293,6 +296,13 @@ export default function EventsTab({
     // Also call global app onAddBooking
     onAddBooking(booking);
 
+    // Track inbound share attribution conversion if visitor booked from a shared link
+    try {
+      trackShareConversion(booking.id);
+    } catch (shareConvErr) {
+      console.debug('Share conversion attribution note:', shareConvErr);
+    }
+
     // Update event attended status
     setEventsList(prev => prev.map(e => {
       if (e.id === booking.itemId) {
@@ -350,6 +360,8 @@ export default function EventsTab({
 
   // Event Host QR Code Pass & Share Station state
   const [hostQrModalEvent, setHostQrModalEvent] = useState<CommunityEvent | null>(null);
+  const [socialShareEvent, setSocialShareEvent] = useState<CommunityEvent | null>(null);
+  const [showShareTrackerModal, setShowShareTrackerModal] = useState<boolean>(false);
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
 
   // Parse deep link if ?eventId= or ?ticket= is present in URL (e.g. from scanned QR code)
@@ -1180,6 +1192,7 @@ ${deepLink}`;
       }
       setCopiedEventId(evt.id);
       setShareToast({ title: evt.title, link: deepLink });
+      setSocialShareEvent(evt);
       setTimeout(() => {
         setCopiedEventId((curr) => (curr === evt.id ? null : curr));
       }, 2500);
@@ -1339,6 +1352,18 @@ ${deepLink}`;
           >
             <QrCode className="w-3.5 h-3.5 text-orange-600" />
             <span>Scan Event QR</span>
+          </button>
+
+          {/* Social Share Tracking & Audit Desk Button */}
+          <button
+            id="btn-open-share-tracker-audit"
+            type="button"
+            onClick={() => setShowShareTrackerModal(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 text-orange-900 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-orange-200"
+            title="Track who shared events to which mobile number (Audit Ledger)"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-orange-600" />
+            <span>Track Shares Audit</span>
           </button>
 
           {/* My Passes & Tickets Wallet Button */}
@@ -2022,6 +2047,7 @@ ${deepLink}`;
                 handleInitiateBooking(evt);
               }}
               onBookEvent={(evt) => handleInitiateBooking(evt)}
+              onShareEvent={(evt) => setSocialShareEvent(evt)}
               onShareQr={(evt) => setHostQrModalEvent(evt)}
               myTickets={myTickets}
             />
@@ -2046,7 +2072,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2067,7 +2094,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2088,7 +2116,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2108,7 +2137,8 @@ ${deepLink}`;
                   handleInitiateBooking(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
-                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                 myTickets={myTickets}
               />
 
@@ -2127,7 +2157,8 @@ ${deepLink}`;
                   handleInitiateBooking(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
-                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                 myTickets={myTickets}
               />
             </>
@@ -2146,7 +2177,8 @@ ${deepLink}`;
                   handleInitiateBooking(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
-                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                 myTickets={myTickets}
               />
 
@@ -2162,7 +2194,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2179,7 +2212,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2201,7 +2235,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2218,7 +2253,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2235,7 +2271,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2251,7 +2288,8 @@ ${deepLink}`;
                   handleInitiateBooking(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
-                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                 myTickets={myTickets}
               />
             </>
@@ -2272,7 +2310,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2289,7 +2328,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2306,7 +2346,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2323,7 +2364,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2339,7 +2381,8 @@ ${deepLink}`;
                   handleInitiateBooking(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
-                onShareQr={(evt) => setHostQrModalEvent(evt)}
+                onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                 myTickets={myTickets}
               />
             </>
@@ -2364,7 +2407,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2385,7 +2429,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2406,7 +2451,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -2427,7 +2473,8 @@ ${deepLink}`;
                     handleInitiateBooking(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
-                  onShareQr={(evt) => setHostQrModalEvent(evt)}
+                  onShareEvent={(evt) => setSocialShareEvent(evt)}
+              onShareQr={(evt) => setHostQrModalEvent(evt)}
                   myTickets={myTickets}
                 />
               )}
@@ -3090,6 +3137,7 @@ ${deepLink}`;
           userProfile={userProfile}
           globalCommissionRate={globalCommissionRate}
           onClose={() => setBookingModalEvent(null)}
+          onShare={(evt) => setSocialShareEvent(evt)}
           onBookingSuccess={(newBooking) => {
             handleSaveNewTicket(newBooking);
             setBookingModalEvent(null);
@@ -3125,6 +3173,35 @@ ${deepLink}`;
             handleInitiateBooking(evt);
           }}
         />
+      )}
+
+      {/* Social Share Modal for Events */}
+      {socialShareEvent && (
+        <EventSocialShareModal
+          event={socialShareEvent}
+          userProfile={userProfile}
+          onClose={() => setSocialShareEvent(null)}
+          onBookEvent={(evt) => {
+            setSocialShareEvent(null);
+            handleInitiateBooking(evt);
+          }}
+          onOpenQrModal={(evt) => {
+            setSocialShareEvent(null);
+            setHostQrModalEvent(evt);
+          }}
+        />
+      )}
+
+      {/* Social Share Telemetry & Tracking Audit Modal */}
+      {showShareTrackerModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
+          <div className="relative w-full max-w-5xl my-auto">
+            <EventShareTrackerView
+              userProfile={userProfile}
+              onClose={() => setShowShareTrackerModal(false)}
+            />
+          </div>
+        </div>
       )}
 
       {/* In-App Camera / Image QR Scanner for Event Direct Booking */}

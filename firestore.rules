@@ -56,8 +56,8 @@ service cloud.firestore {
         && (!('neighbourhood' in data) || (data.neighbourhood is string && data.neighbourhood.size() <= 200))
         && (!('fuzzedLatitude' in data) || (data.fuzzedLatitude is int || data.fuzzedLatitude is float))
         && (!('fuzzedLongitude' in data) || (data.fuzzedLongitude is int || data.fuzzedLongitude is float))
-        && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED']))
-        && (!('userRole' in data) || (data.userRole in ['Parent', 'Daycare Center', 'Event Organizer', 'Portfolio Professional', 'Influencer', 'Vendor', 'Admin']))
+        && (!('verificationStatus' in data) || (data.verificationStatus in ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED']))
+        && (!('userRole' in data) || (data.userRole in ['Parent', 'Daycare Center', 'Event Organizer', 'Portfolio Professional', 'Influencer', 'Vendor', 'Admin', 'eventbuyers', 'EventBuyer']))
         && (!('interests' in data) || (data.interests is list && data.interests.size() <= 50))
         && (!('availableDays' in data) || (data.availableDays is list && data.availableDays.size() <= 14))
         && (!('availableTimes' in data) || (data.availableTimes is list && data.availableTimes.size() <= 10))
@@ -172,6 +172,24 @@ service cloud.firestore {
         && data.placeholder.size() <= 200;
     }
 
+    // Entity validator: SocialShare
+    function isValidSocialShare(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && data.eventId is string
+        && data.eventId.size() <= 128
+        && data.eventTitle is string
+        && data.eventTitle.size() <= 300
+        && data.platform is string
+        && data.platform.size() <= 100
+        && data.shareToken is string
+        && data.shareToken.size() <= 128
+        && data.clicksCount is int
+        && data.conversionsCount is int
+        && data.createdAt is string
+        && data.timestamp is int;
+    }
+
     // ----------------- COLLECTIONS -----------------
 
     // System Admins Collection: Read only by verified Admin; Write completely disabled from client
@@ -210,8 +228,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || !('profileVisibility' in resource.data) || resource.data.profileVisibility == 'PUBLIC' || (resource.data.profileVisibility == 'CONNECTIONS' && isSignedIn());
       allow list: if isSignedIn();
-      allow create: if isSignedIn() && (request.auth.uid == userId || isAdmin()) && isValidUser(incoming());
-      allow update: if isSignedIn() && (isOwner(userId) || isAdmin()) && isValidUser(incoming());
+      allow create: if ((isSignedIn() && (request.auth.uid == userId || isAdmin())) || (!isSignedIn() && request.resource.id == userId)) && isValidUser(incoming());
+      allow update: if (isSignedIn() && (isOwner(userId) || isAdmin())) && isValidUser(incoming());
       allow delete: if isOwner(userId) || isAdmin();
     }
 
@@ -360,6 +378,14 @@ service cloud.firestore {
     match /asset_licenses/{assetId} {
       allow read, list: if true;
       allow create, update, delete: if isAdmin();
+    }
+
+    // Social Shares Tracking & Multi-Channel Attribution Registry
+    match /social_shares/{shareId} {
+      allow read, list: if true;
+      allow create: if isValidSocialShare(incoming());
+      allow update: if isValidSocialShare(incoming());
+      allow delete: if isAdmin();
     }
   }
 }

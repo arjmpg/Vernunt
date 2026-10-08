@@ -3,7 +3,7 @@ import { CommunityEvent, Booking, TicketTier, EventCoupon, EventSelectedMenuItem
 import { 
   X, Ticket, Calendar, Clock, MapPin, Check, Sparkles, 
   CreditCard, ShieldCheck, Tag, AlertCircle, Plus, Minus, 
-  User, Phone, ChevronRight, CheckCircle2, Mail, Send, Wallet, Utensils
+  User, Phone, ChevronRight, CheckCircle2, Mail, Send, Wallet, Utensils, Share2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendEventBookingNotifications, NotificationStatus } from '../../utils/notifications.ts';
@@ -20,6 +20,7 @@ interface EventBookingModalProps {
   onClose: () => void;
   onBookingSuccess: (booking: Booking) => void;
   globalCommissionRate: number;
+  onShare?: (event: CommunityEvent) => void;
 }
 
 const AVAILABLE_COUPONS: EventCoupon[] = [
@@ -34,7 +35,8 @@ export default function EventBookingModal({
   userProfile,
   onClose,
   onBookingSuccess,
-  globalCommissionRate
+  globalCommissionRate,
+  onShare
 }: EventBookingModalProps) {
   // Available Tiers (fallback to event base price if no custom tiers)
   const defaultTiers: TicketTier[] = event.ticketTiers && event.ticketTiers.length > 0 
@@ -347,12 +349,25 @@ export default function EventBookingModal({
                   </h3>
                 </div>
               </div>
-              <button
-                onClick={onClose}
-                className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2">
+                {onShare && (
+                  <button
+                    type="button"
+                    id="btn-modal-share-event"
+                    onClick={() => onShare(event)}
+                    className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
+                    title="Share Event on Social Media"
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           );
         })()}
@@ -985,6 +1000,18 @@ export default function EventBookingModal({
                   ✓ Full admission receipt, QR check-in code, and calendar reminders sent.
                 </p>
               </div>
+
+              {onShare && (
+                <button
+                  type="button"
+                  id="btn-confirmed-share-event"
+                  onClick={() => onShare(event)}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-orange-500 to-rose-500 hover:from-orange-600 hover:to-rose-600 text-white font-black text-xs shadow-md transition flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                >
+                  <Share2 className="w-4 h-4" />
+                  <span>Invite Friends &amp; Share Event on WhatsApp / Social</span>
+                </button>
+              )}
 
               <button
                 type="button"

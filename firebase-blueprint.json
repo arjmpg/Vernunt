@@ -30,7 +30,7 @@
         "aadhaarVerified": { "type": "boolean" },
         "attendedEventsCount": { "type": "integer" },
         "checkedInEvents": { "type": "array" },
-        "userRole": { "type": "string", "enum": ["Parent", "Daycare Center", "Event Organizer", "Portfolio Professional", "Influencer", "Vendor", "Admin"] },
+        "userRole": { "type": "string", "enum": ["Parent", "Daycare Center", "Event Organizer", "Portfolio Professional", "Influencer", "Vendor", "Admin", "eventbuyers", "EventBuyer"] },
         "availableDays": { "type": "array" },
         "availableTimes": { "type": "array" }
       },
@@ -336,6 +336,37 @@
         "verified": { "type": "boolean" }
       },
       "required": ["id", "name", "type", "license", "commercialUse", "verified"]
+    },
+    "SocialShare": {
+      "title": "SocialShare",
+      "description": "Multi-channel event share and recipient attribution tracking record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "eventId": { "type": "string" },
+        "eventTitle": { "type": "string" },
+        "eventCategory": { "type": "string" },
+        "eventDate": { "type": "string" },
+        "eventLocation": { "type": "string" },
+        "senderUserId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "senderPhone": { "type": "string" },
+        "senderEmail": { "type": "string" },
+        "senderRole": { "type": "string" },
+        "recipientPhone": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "platform": { "type": "string" },
+        "shareToken": { "type": "string" },
+        "shareUrl": { "type": "string" },
+        "referralCode": { "type": "string" },
+        "clicksCount": { "type": "integer" },
+        "conversionsCount": { "type": "integer" },
+        "attributedBookings": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "userAgent": { "type": "string" }
+      },
+      "required": ["id", "eventId", "eventTitle", "senderName", "platform", "shareToken", "shareUrl", "clicksCount", "conversionsCount", "createdAt", "timestamp"]
     }
   },
   "firestore": {
@@ -426,6 +457,10 @@
     "/asset_licenses/{id}": {
       "schema": "AssetLicense",
       "description": "Stores licensing records for platform fonts, images, and visual assets"
+    },
+    "/social_shares/{shareId}": {
+      "schema": "SocialShare",
+      "description": "Stores outbound social share logs and attribution click metrics"
     }
   }
 }

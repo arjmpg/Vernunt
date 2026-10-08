@@ -1125,4 +1125,55 @@ export interface BabyMilestone {
   parentTips?: string;
 }
 
+// Social Share & Multi-Channel Attribution Record
+export type SocialSharePlatform = 
+  | 'whatsapp_direct' 
+  | 'whatsapp_general' 
+  | 'facebook' 
+  | 'twitter' 
+  | 'telegram' 
+  | 'linkedin' 
+  | 'email' 
+  | 'native_share' 
+  | 'link_copy'
+  | 'qr_flyer';
+
+export interface SocialShareRecord {
+  id: string; // Unique share identifier / token (e.g. "sh_1741234567")
+  eventId: string;
+  eventTitle: string;
+  eventCategory?: string;
+  eventDate?: string;
+  eventLocation?: string;
+  
+  // SENDER (From which account or which mobile number)
+  senderUserId?: string;
+  senderName: string;
+  senderPhone?: string;
+  senderEmail?: string;
+  senderRole?: string;
+  
+  // RECIPIENT (To which mobile number or contact)
+  recipientPhone?: string;
+  recipientName?: string;
+  
+  // CHANNEL & TOKEN
+  platform: SocialSharePlatform;
+  shareToken: string;
+  shareUrl: string;
+  referralCode?: string;
+  
+  // ENGAGEMENT METRICS
+  clicksCount: number;
+  conversionsCount: number;
+  attributedBookings?: string[];
+  
+  // TELEMETRY & AUDIT
+  createdAt: string;
+  timestamp: number;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+
 

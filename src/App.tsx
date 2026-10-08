@@ -107,6 +107,7 @@ import {
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
 import { captureAffiliateFromUrl } from './utils/affiliate.ts';
+import { trackInboundShareClick } from './utils/shareTracking.ts';
 
 export interface TabDefinition {
   id: string;
@@ -700,6 +701,12 @@ export default function App() {
       if (refCode) {
         sessionStorage.setItem('vernunt_referral_code', refCode);
         console.log('📌 Captured and cached referral code from URL link:', refCode);
+      }
+
+      // Track inbound social share click attribution
+      const shareId = params.get('shareId');
+      if (shareId) {
+        trackInboundShareClick(shareId);
       }
 
       const targetTab = params.get('tab');
@@ -2519,8 +2526,18 @@ export default function App() {
   const handleCompleteRegistration = async (newProfile: ChildProfile, options?: { openCreateWizard?: boolean }) => {
     setIsLoading(true);
     setLoadingTitle('Saving verified guardian profile...');
+
+    // Ensure Firebase Auth session exists so Firestore security rules allow persistent write
+    if (!auth.currentUser) {
+      try {
+        const { signInAnonymously } = await import('firebase/auth');
+        await signInAnonymously(auth);
+      } catch (anonErr) {
+        console.warn('Anonymous auth session note:', anonErr);
+      }
+    }
     
-    const uid = auth.currentUser?.uid || `user-${Date.now()}`;
+    const uid = auth.currentUser?.uid || newProfile.id || `user-${Date.now()}`;
     const autoReferralCode = `REF-${(newProfile.parentName || 'PARENT').split(' ')[0].toUpperCase()}-${uid.slice(0, 4).toUpperCase()}`;
     const sessionReferral = sessionStorage.getItem('vernunt_referral_code') || undefined;
     const activeAffiliateCode = sessionStorage.getItem('vernunt_active_affiliate_ref') || localStorage.getItem('vernunt_active_affiliate_ref') || undefined;
@@ -3617,7 +3634,7 @@ export default function App() {
               onNavigateToRadar={(interestKeyword) => {
                 handleStartSignUp('Parent');
               }}
-              onStartSignUp={(role) => handleStartSignUp((role as any) || 'Parent')}
+              onStartSignUp={(role, details) => handleStartSignUp((role as any) || 'Parent', details)}
               onBackToLanding={() => {
                 setIsGuestViewingKnowledge(false);
                 setGuestKnowledgeSlug(undefined);
