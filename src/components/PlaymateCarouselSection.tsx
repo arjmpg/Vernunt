@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { ChildProfile } from '../types.ts';
 import { 
   ChevronLeft, ChevronRight, Navigation, 
-  ShieldCheck, ArrowRight, Bookmark, Sparkles, MessageSquare
+  ShieldCheck, ArrowRight, Bookmark, Sparkles, MessageSquare, EyeOff
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 
@@ -21,6 +21,8 @@ interface PlaymateCarouselSectionProps {
   userLat?: number;
   userLng?: number;
   badgeType?: 'VERIFIED' | 'TOP MATCH' | 'NEARBY' | 'ACTIVE';
+  isAadhaarVerified?: boolean;
+  currentUserProfile?: ChildProfile | null;
 }
 
 export default function PlaymateCarouselSection({
@@ -37,7 +39,9 @@ export default function PlaymateCarouselSection({
   onToggleSave,
   userLat = 12.9716,
   userLng = 77.5946,
-  badgeType
+  badgeType,
+  isAadhaarVerified,
+  currentUserProfile
 }: PlaymateCarouselSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -124,6 +128,7 @@ export default function PlaymateCarouselSection({
           const proxBadge = getProximityBadge(dKm);
           const isVerified = p.aadhaarVerified || p.digilockerVerified;
           const isWithin500m = dKm <= 0.5;
+          const isPhotoUnlocked = isConnected || isAadhaarVerified || !!currentUserProfile?.aadhaarVerified || currentUserProfile?.userRole === 'Admin';
 
           return (
             <div
@@ -141,7 +146,9 @@ export default function PlaymateCarouselSection({
                 <img
                   src={p.photoUrl}
                   alt={p.childName}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ${
+                    !isPhotoUnlocked ? 'blur-2xl saturate-[0.15] brightness-75 select-none pointer-events-none' : ''
+                  }`}
                   referrerPolicy="no-referrer"
                   loading="lazy"
                   onError={(e) => {
@@ -150,6 +157,22 @@ export default function PlaymateCarouselSection({
                       : 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=400&crop=faces';
                   }}
                 />
+
+                {/* Locked state overlay with EyeOff icon until Aadhaar KYC is verified */}
+                {!isPhotoUnlocked && (
+                  <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-md flex flex-col items-center justify-center p-3 text-center select-none z-10 font-serif">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/25 border border-amber-400/60 flex items-center justify-center mb-1.5 shadow-md">
+                      <EyeOff className="w-5 h-5 text-amber-400 animate-pulse" />
+                    </div>
+                    <span className="text-[10px] text-white uppercase font-black tracking-widest font-mono flex items-center gap-1">
+                      <EyeOff className="w-3 h-3 text-amber-400" />
+                      <span>Photo Locked</span>
+                    </span>
+                    <span className="text-[8.5px] text-slate-200 leading-tight mt-1 font-sans">
+                      Aadhaar KYC Required
+                    </span>
+                  </div>
+                )}
 
                 {/* Gradient overlay on bottom of poster */}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-black/25 pointer-events-none" />

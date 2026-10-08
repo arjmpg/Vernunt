@@ -4,7 +4,7 @@ import {
   Award, ShieldCheck, Heart, Star, MapPin, Compass, Briefcase, Sparkles, 
   SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
   CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
-  Globe, RefreshCw, ArrowUp, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp,
+  Globe, RefreshCw, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, ArrowLeft, ArrowRight
 } from 'lucide-react';
 import { MutualFundAdvisor } from '../types/investment.ts';
@@ -1873,18 +1873,6 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         </div>
       )}
 
-      {/* Floating Back to Top Button */}
-      {showScrollTop && (
-        <button
-          type="button"
-          onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-50 p-3 bg-slate-900/90 hover:bg-slate-900 text-white rounded-full shadow-lg backdrop-blur-xs transition hover:scale-105 active:scale-95 flex items-center gap-2 text-xs font-bold"
-          title="Back to Top"
-        >
-          <ArrowUp className="w-4 h-4 text-orange-400" />
-          <span className="hidden sm:inline">Top</span>
-        </button>
-      )}
 
       {/* Booking and Razorpay Payment Integrated Modal */}
       {showBookingModal && selectedSpecialist && (

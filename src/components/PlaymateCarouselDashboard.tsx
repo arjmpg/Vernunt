@@ -654,6 +654,8 @@ export default function PlaymateCarouselDashboard({
               userLat={userLat}
               userLng={userLng}
               badgeType="NEARBY"
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
 
@@ -672,6 +674,8 @@ export default function PlaymateCarouselDashboard({
               userLat={userLat}
               userLng={userLng}
               badgeType="TOP MATCH"
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
 
@@ -690,6 +694,8 @@ export default function PlaymateCarouselDashboard({
               userLat={userLat}
               userLng={userLng}
               badgeType="VERIFIED"
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
 
@@ -707,6 +713,8 @@ export default function PlaymateCarouselDashboard({
               onToggleSave={onToggleSave}
               userLat={userLat}
               userLng={userLng}
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
 
@@ -724,6 +732,8 @@ export default function PlaymateCarouselDashboard({
               onToggleSave={onToggleSave}
               userLat={userLat}
               userLng={userLng}
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
 
@@ -741,6 +751,8 @@ export default function PlaymateCarouselDashboard({
               onToggleSave={onToggleSave}
               userLat={userLat}
               userLng={userLng}
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
             />
           )}
         </div>

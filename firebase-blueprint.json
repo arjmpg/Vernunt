@@ -30,7 +30,7 @@
         "aadhaarVerified": { "type": "boolean" },
         "attendedEventsCount": { "type": "integer" },
         "checkedInEvents": { "type": "array" },
-        "userRole": { "type": "string", "enum": ["Parent", "Event Organizer", "Portfolio Professional", "Admin"] },
+        "userRole": { "type": "string", "enum": ["Parent", "Daycare Center", "Event Organizer", "Portfolio Professional", "Influencer", "Vendor", "Admin"] },
         "availableDays": { "type": "array" },
         "availableTimes": { "type": "array" }
       },

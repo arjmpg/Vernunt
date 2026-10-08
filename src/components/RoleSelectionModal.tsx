@@ -21,6 +21,7 @@ interface RoleSelectionModalProps {
   onClose?: () => void;
   verifiedEmail?: string;
   verifiedPhone?: string;
+  phoneVerified?: boolean;
   language?: LanguageCode;
 }
 
@@ -30,15 +31,17 @@ export default function RoleSelectionModal({
   onClose,
   verifiedEmail,
   verifiedPhone,
+  phoneVerified = false,
   language = 'en'
 }: RoleSelectionModalProps) {
   const [selectedRole, setSelectedRole] = useState<UserPlatformRole>('Parent');
 
   if (!isOpen) return null;
 
+  const isContactActuallyVerified = phoneVerified || (Boolean(verifiedEmail) && !verifiedPhone);
   const contactLabel = verifiedPhone 
     ? verifiedPhone 
-    : (verifiedEmail || 'Verified User');
+    : (verifiedEmail || 'User');
 
   const currentRoleMeta = USER_ROLES_CONFIG[selectedRole];
 
@@ -75,10 +78,17 @@ export default function RoleSelectionModal({
               <VernuntLogo size="md" animated={true} />
             </div>
 
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-[11px] sm:text-xs font-bold border border-emerald-200">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>Verified: <span className="font-mono font-semibold">{contactLabel}</span></span>
-            </div>
+            {isContactActuallyVerified ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-800 rounded-full text-[11px] sm:text-xs font-bold border border-emerald-200">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Verified: <span className="font-mono font-semibold">{contactLabel}</span></span>
+              </div>
+            ) : (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-900 rounded-full text-[11px] sm:text-xs font-bold border border-amber-200">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>Mobile: <span className="font-mono font-semibold">{contactLabel}</span> <span className="text-[10px] text-amber-700 font-normal">(OTP verification required)</span></span>
+              </div>
+            )}
 
             <h2 className="text-xl sm:text-2xl font-serif font-black text-slate-900 tracking-tight leading-tight">
               Sign Up for Vernunt

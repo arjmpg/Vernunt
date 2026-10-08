@@ -157,9 +157,13 @@ export default function AadhaarUploadField({
             <UserCheck className="w-3 h-3 text-amber-600" />
             <span>Admin Review &amp; Approval</span>
           </span>
-          {required && (
+          {required ? (
             <span className="text-[9.5px] bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
               Required
+            </span>
+          ) : (
+            <span className="text-[9.5px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+              KYC Trust Badge
             </span>
           )}
         </div>

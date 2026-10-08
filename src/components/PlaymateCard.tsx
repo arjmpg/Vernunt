@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
-import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin, Navigation } from 'lucide-react';
+import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin, Navigation, EyeOff } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
 
@@ -208,9 +208,10 @@ export default function PlaymateCard({
   const [liked, setLiked] = useState(isInterestSent || isConnected);
   const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
 
-  const isViewerKycVerified = currentUserProfile?.userRole === 'Admin' || (currentUserProfile?.verificationStatus === VerificationStatus.VERIFIED && !!currentUserProfile?.aadhaarVerified);
-  const isParentPhotoUnlocked = isConnected || isViewerKycVerified;
-  const isProfileUnlocked = isConnected || !!currentUserProfile?.subscriptionActive || isViewerKycVerified;
+  const isViewerKycVerified = currentUserProfile?.userRole === 'Admin' || !!currentUserProfile?.aadhaarVerified;
+  // All profile photos must remain strictly locked with EyeOff state until viewer Aadhaar and KYC is verified
+  const isParentPhotoUnlocked = isViewerKycVerified;
+  const isProfileUnlocked = isViewerKycVerified && (isConnected || !!currentUserProfile?.subscriptionActive);
   const uLat = currentUserLat || 12.9716;
   const uLng = currentUserLng || 77.5946;
   const distKm = getHaversineDistance(uLat, uLng, profile.location.lat, profile.location.lng);
@@ -266,7 +267,7 @@ export default function PlaymateCard({
           <img 
             src={parentPhoto} 
             alt={`Parent/Guardian: ${profile.parentName}`} 
-            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isParentPhotoUnlocked ? 'blur-xl saturate-[0.2] brightness-75 select-none' : ''}`} 
+            className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isParentPhotoUnlocked ? 'blur-2xl saturate-[0.15] brightness-75 select-none pointer-events-none' : ''}`} 
             referrerPolicy="no-referrer"
           />
         ) : (
@@ -275,7 +276,7 @@ export default function PlaymateCard({
             <img 
               src={childPhoto} 
               alt={isProfileUnlocked ? profile.childName : "[🔒 Child Identity Securely Locked]"} 
-              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isProfileUnlocked ? 'blur-xl saturate-[0.15] brightness-75 select-none' : ''}`} 
+              className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isProfileUnlocked ? 'blur-2xl saturate-[0.1] brightness-75 select-none pointer-events-none' : ''}`} 
               referrerPolicy="no-referrer"
             />
           ) : (
@@ -305,13 +306,16 @@ export default function PlaymateCard({
 
         {/* Lock mask for parent photo when viewer KYC is not verified */}
         {activePhotoTab === 'parent' && !isParentPhotoUnlocked && (
-          <div className="absolute inset-0 bg-slate-950/50 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
-            <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400/40 flex items-center justify-center mb-1.5 shadow-sm">
-              <Lock className="w-5 h-5 text-amber-400 animate-pulse" />
+          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
+            <div className="w-11 h-11 rounded-full bg-amber-500/25 border border-amber-400/60 flex items-center justify-center mb-1.5 shadow-md">
+              <EyeOff className="w-6 h-6 text-amber-400 animate-pulse" />
             </div>
-            <span className="text-[10.5px] text-white uppercase font-black tracking-widest font-mono">Parent Photo Locked</span>
-            <span className="text-[9px] text-slate-200 leading-tight max-w-[200px] mt-1 font-sans">
-              Finish your Aadhaar & Address KYC to view verified parent photos & connect
+            <span className="text-[11px] text-white uppercase font-black tracking-widest font-mono flex items-center gap-1.5">
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span>Profile Photo Locked</span>
+            </span>
+            <span className="text-[9.5px] text-slate-200 leading-tight max-w-[210px] mt-1 font-sans">
+              Finish your Aadhaar &amp; Address KYC verification to view verified profile photos
             </span>
             {onOpenVerify && (
               <button
@@ -320,9 +324,10 @@ export default function PlaymateCard({
                   e.stopPropagation();
                   onOpenVerify(profile);
                 }}
-                className="mt-2 px-3 py-1 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-[9.5px] font-black rounded-lg transition shadow-md cursor-pointer"
+                className="mt-2.5 px-3 py-1.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-slate-950 text-[10px] font-black rounded-xl transition shadow-md cursor-pointer flex items-center gap-1.5 active:scale-95"
               >
-                Complete KYC ⚡
+                <EyeOff className="w-3 h-3 text-slate-950" />
+                <span>Verify Aadhaar to Unlock</span>
               </button>
             )}
           </div>
@@ -330,10 +335,17 @@ export default function PlaymateCard({
 
         {/* Lock mask for child photo when profile is locked */}
         {activePhotoTab === 'child' && hasChildPhoto && !isProfileUnlocked && (
-          <div className="absolute inset-0 bg-slate-950/45 flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
-            <Lock className="w-6 h-6 text-amber-400 mb-1.5 animate-pulse" />
-            <span className="text-[10px] text-white uppercase font-black tracking-widest font-mono">Pediatric Security Mask</span>
-            <span className="text-[9px] text-slate-300 leading-tight max-w-[180px] mt-1">Connect with parent {profile.parentName} to reveal full profile</span>
+          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-md flex flex-col items-center justify-center p-4 text-center select-none z-10 font-serif">
+            <div className="w-11 h-11 rounded-full bg-amber-500/25 border border-amber-400/60 flex items-center justify-center mb-1.5 shadow-md">
+              <EyeOff className="w-6 h-6 text-amber-400 animate-pulse" />
+            </div>
+            <span className="text-[10.5px] text-white uppercase font-black tracking-widest font-mono flex items-center gap-1.5">
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span>Pediatric Security Mask</span>
+            </span>
+            <span className="text-[9.5px] text-slate-300 leading-tight max-w-[190px] mt-1 font-sans">
+              Connect with parent {profile.parentName} &amp; verify Aadhaar to reveal child profile
+            </span>
           </div>
         )}
 

@@ -102,7 +102,7 @@ import {
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, ArrowUp, Globe
+  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, Globe
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -945,7 +945,7 @@ export default function App() {
                 setPendingRegisterDetails({
                   email: emailLower || undefined,
                   phone: cleanPhone || undefined,
-                  phoneVerified: Boolean(cleanPhone),
+                  phoneVerified: false, // Must be verified via explicit OTP
                   parentName: fallbackName || undefined,
                   photoUrl: firebaseUser.photoURL || undefined
                 });
@@ -1222,6 +1222,7 @@ export default function App() {
         email: emailLower,
         phone: '',
         phoneVerified: false,
+        emailVerified: true,
         parentName: account.displayName,
         photoUrl: account.photoURL
       };
@@ -3201,15 +3202,33 @@ export default function App() {
                 className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-full hover:bg-slate-100 border border-slate-200 transition cursor-pointer shrink-0"
                 title="View & Edit Profile"
               >
-                <img 
-                  src={userProfile?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                  alt={userProfile?.parentName || 'Parent'} 
-                  className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-rose-200 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="relative shrink-0">
+                  <img 
+                    src={userProfile?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                    alt={userProfile?.parentName || 'Parent'} 
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-rose-200 shrink-0 ${
+                      !userProfile?.aadhaarVerified ? 'blur-xs saturate-50 brightness-90' : ''
+                    }`}
+                    referrerPolicy="no-referrer"
+                  />
+                  {!userProfile?.aadhaarVerified && (
+                    <div 
+                      className="absolute inset-0 bg-slate-950/60 rounded-full flex items-center justify-center shadow-xs" 
+                      title="Profile photo locked until Aadhaar & KYC verified"
+                    >
+                      <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                    </div>
+                  )}
+                </div>
                 <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[100px] truncate leading-tight">
                   {userProfile?.parentName}
                 </span>
+                {!userProfile?.aadhaarVerified && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded-full">
+                    <EyeOff className="w-2.5 h-2.5 text-amber-700" />
+                    <span>Locked</span>
+                  </span>
+                )}
               </button>
 
               {/* Universal Side Menu & Explorer Trigger */}
@@ -4262,24 +4281,12 @@ export default function App() {
           
 
 
-          {/* Top Footer Strip: Brand + Google Merchant & Search Console Badge + Back to Top button */}
+          {/* Top Footer Strip: Brand + India's Child-Safe Community */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-5">
             <div className="flex items-center gap-2.5 flex-wrap">
               <VernuntLogo size="sm" />
               <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
             </div>
-
-            {/* Back to Top button */}
-            <button
-              type="button"
-              id="btn-footer-back-to-top"
-              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-2xs text-xs font-bold transition-all cursor-pointer group shrink-0 active:scale-95"
-              title="Smoothly scroll back to top of page"
-            >
-              <span>Back to Top</span>
-              <ArrowUp className="w-3.5 h-3.5 text-slate-500 group-hover:-translate-y-0.5 transition-transform" />
-            </button>
           </div>
 
           {/* Structured 4-Column Navigation & Info Grid */}
@@ -4915,14 +4922,34 @@ export default function App() {
             {/* User profile mini summary */}
             <div className="px-5 py-3 bg-white border-b border-slate-100 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
-                <img 
-                  src={userProfile?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                  alt={userProfile?.parentName || 'Parent'} 
-                  className="w-10 h-10 rounded-full object-cover border border-rose-200 shrink-0"
-                  referrerPolicy="no-referrer"
-                />
+                <div className="relative shrink-0">
+                  <img 
+                    src={userProfile?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
+                    alt={userProfile?.parentName || 'Parent'} 
+                    className={`w-10 h-10 rounded-full object-cover border border-rose-200 shrink-0 ${
+                      !userProfile?.aadhaarVerified ? 'blur-xs saturate-50 brightness-90' : ''
+                    }`}
+                    referrerPolicy="no-referrer"
+                  />
+                  {!userProfile?.aadhaarVerified && (
+                    <div 
+                      className="absolute inset-0 bg-slate-950/60 rounded-full flex items-center justify-center shadow-xs"
+                      title="Profile photo locked until Aadhaar & KYC verified"
+                    >
+                      <EyeOff className="w-4 h-4 text-amber-400" />
+                    </div>
+                  )}
+                </div>
                 <div className="min-w-0">
-                  <h4 className="text-xs font-bold text-slate-800 truncate leading-tight">{userProfile?.parentName || 'Parent Member'}</h4>
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-slate-800 truncate leading-tight">{userProfile?.parentName || 'Parent Member'}</h4>
+                    {!userProfile?.aadhaarVerified && (
+                      <span className="inline-flex items-center gap-0.5 text-[8.5px] font-black uppercase text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded-full">
+                        <EyeOff className="w-2.5 h-2.5 text-amber-700" />
+                        <span>Locked</span>
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded ${
                       userProfile?.userRole === 'Admin' 
@@ -5488,6 +5515,7 @@ export default function App() {
         }}
         verifiedEmail={pendingAuthUser?.email}
         verifiedPhone={pendingAuthUser?.phone}
+        phoneVerified={pendingRegisterDetails?.phoneVerified || false}
         language={language}
       />
 
