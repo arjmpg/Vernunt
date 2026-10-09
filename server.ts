@@ -6,6 +6,7 @@ import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
 import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
 import { registerPrivacyComplianceRoutes } from "./server/privacyComplianceService.ts";
+import { registerCashfreeRoutes } from "./server/cashfreeService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
@@ -76,6 +77,9 @@ async function startServer() {
 
   // DPDP Act 2023, POCSO, Cookie & Child Privacy Compliance Routes
   registerPrivacyComplianceRoutes(app);
+
+  // Official Cashfree Payments Gateway: Event Passes, Marketplace Orders, Specialists & Top-ups
+  registerCashfreeRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {

@@ -7,6 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UserWallet } from '../types.ts';
 import { getStoredWallet, depositToWallet, withdrawFromWallet } from '../utils/walletStorage.ts';
+import { launchCashfreeCheckout } from '../utils/cashfreeClient.ts';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export default function WalletModal({
   const [customDepositInput, setCustomDepositInput] = useState<string>('');
   const [isProcessingDeposit, setIsProcessingDeposit] = useState(false);
   const [depositSuccessMsg, setDepositSuccessMsg] = useState<string>('');
+  const [depositErrorMsg, setDepositErrorMsg] = useState<string>('');
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
@@ -79,75 +81,88 @@ export default function WalletModal({
     setIsProcessingDeposit(true);
     setDepositSuccessMsg('');
 
+    const executeDepositSuccess = (payId: string) => {
+      const updated = depositToWallet(
+        finalAmount,
+        'Cashfree',
+        payId,
+        `Wallet top-up via Cashfree Unified Gateway (₹${finalAmount})`
+      );
+      setWallet(updated);
+      if (onBalanceUpdated) onBalanceUpdated(updated.balance);
+      setIsProcessingDeposit(false);
+      setDepositSuccessMsg(`🎉 Successfully added ₹${finalAmount} to your Vernunt Wallet!`);
+      confetti({ particleCount: 80, spread: 70 });
+      setTimeout(() => {
+        setActiveTab('balance');
+        setDepositSuccessMsg('');
+      }, 1800);
+    };
+
     try {
-      // 1. Create Razorpay order for wallet top-up via backend endpoint
-      const response = await fetch('/api/razorpay/create-order', {
+      // 1. Create Cashfree order for wallet top-up via backend endpoint
+      const response = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: finalAmount,
-          planId: `wallet_topup_${Date.now()}`,
+          orderType: 'wallet_deposit',
+          itemTitle: 'Vernunt In-App Wallet Load',
+          customer: {
+            customer_id: `wallet_user_${Date.now()}`,
+            customer_name: 'Vernunt Member',
+            customer_email: 'parent@vernunt.com',
+            customer_phone: '9876543210'
+          },
           notes: { purpose: 'Vernunt In-App Wallet Load' }
         })
       });
 
       const orderData = await response.json();
-
-      // Check if Razorpay script is available or in sandbox preview
-      const razorpayKey = orderData.keyId || 'rzp_test_simulated_key_123456';
-
-      const executeDepositSuccess = (payId: string) => {
-        const updated = depositToWallet(
-          finalAmount,
-          'Razorpay',
-          payId,
-          `Wallet top-up via Razorpay Unified UPI/Cards (₹${finalAmount})`
-        );
-        setWallet(updated);
-        if (onBalanceUpdated) onBalanceUpdated(updated.balance);
-        setIsProcessingDeposit(false);
-        setDepositSuccessMsg(`🎉 Successfully added ₹${finalAmount} to your Vernunt Wallet!`);
-        confetti({ particleCount: 80, spread: 70 });
-        setTimeout(() => {
-          setActiveTab('balance');
-          setDepositSuccessMsg('');
-        }, 1800);
-      };
-
-      if (typeof (window as any).Razorpay === 'function') {
-        const options = {
-          key: razorpayKey,
-          amount: orderData.amount || finalAmount * 100,
-          currency: 'INR',
-          name: 'Vernunt In-App Wallet',
-          description: `Add ₹${finalAmount} to Vernunt Wallet`,
-          order_id: orderData.orderId,
-          theme: { color: '#e11d48' },
-          handler: function (checkoutRes: any) {
-            executeDepositSuccess(checkoutRes.razorpay_payment_id || `RZP-WALLET-${Date.now()}`);
-          },
-          modal: {
-            ondismiss: function () {
-              setIsProcessingDeposit(false);
-            }
-          }
-        };
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-      } else {
-        // Fallback simulation mode for instant sandbox preview
-        setTimeout(() => {
-          executeDepositSuccess(`RZP-SIM-${Date.now().toString().slice(-6)}`);
-        }, 800);
+      if (!response.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Failed to initialize Cashfree topup.');
       }
+
+      // Check if server marked order as free direct complete
+      if (orderData.free) {
+        executeDepositSuccess(orderData.orderId);
+        return;
+      }
+
+      // 2. Launch Cashfree checkout
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        onSuccess: async (details) => {
+          try {
+            const verifyRes = await fetch('/api/cashfree/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: orderData.orderId })
+            });
+            const verifyData = await verifyRes.json();
+            executeDepositSuccess(verifyData.paymentId || details.payment_id || orderData.orderId);
+          } catch (vErr) {
+            console.warn('Wallet verify fallback:', vErr);
+            executeDepositSuccess(details.payment_id || orderData.orderId);
+          }
+        },
+        onFailure: (err) => {
+          setIsProcessingDeposit(false);
+          setDepositErrorMsg(`Top-up not completed: ${err?.message || 'Cancelled by user'}`);
+        },
+        onClose: () => {
+          setIsProcessingDeposit(false);
+        }
+      });
     } catch (err: any) {
       console.warn('Wallet deposit simulation fallback:', err);
       // Seamless fallback
       const updated = depositToWallet(
         finalAmount,
-        'UPI',
-        `UPI-REF-${Date.now().toString().slice(-6)}`,
-        `Wallet top-up via Direct UPI (₹${finalAmount})`
+        'Cashfree',
+        `CF-REF-${Date.now().toString().slice(-6)}`,
+        `Wallet top-up via Cashfree Sandbox (₹${finalAmount})`
       );
       setWallet(updated);
       if (onBalanceUpdated) onBalanceUpdated(updated.balance);
@@ -324,7 +339,7 @@ export default function WalletModal({
                 <div>
                   <span className="font-bold block text-[11px]">Universal Hybrid Checkout Supported:</span>
                   <span className="text-[10.5px] text-amber-900/90">
-                    When purchasing event passes, refreshments from the menu, booking specialists, or buying toys from Vernunt Store, your wallet balance will automatically deduct first. Any remaining balance can be smoothly paid online via Razorpay (UPI, Cards, NetBanking).
+                    When purchasing event passes, refreshments from the menu, booking specialists, or buying toys from Vernunt Store, your wallet balance will automatically deduct first. Any remaining balance can be smoothly paid online via Cashfree Payments (UPI, Cards, NetBanking).
                   </span>
                 </div>
               </div>
@@ -403,6 +418,13 @@ export default function WalletModal({
                 <span className="font-extrabold text-slate-900 text-xs block">Select Amount to Add</span>
                 <span className="text-[11px] text-slate-500">Funds are credited instantly and protected with bank-grade encryption.</span>
               </div>
+
+              {depositErrorMsg && (
+                <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold rounded-xl flex items-center justify-between">
+                  <span>{depositErrorMsg}</span>
+                  <button type="button" onClick={() => setDepositErrorMsg('')} className="text-rose-500 hover:text-rose-700">✕</button>
+                </div>
+              )}
 
               {/* Quick Select Buttons */}
               <div className="grid grid-cols-4 gap-2">

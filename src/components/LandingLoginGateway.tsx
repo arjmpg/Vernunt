@@ -915,7 +915,7 @@ export default function LandingLoginGateway({
   };
 
   return (
-    <div id="landing-gateway" className="relative min-h-[90vh] w-full flex flex-col items-center justify-start bg-gradient-to-b from-amber-50/70 via-orange-50/30 to-rose-50/20 px-4 sm:px-6 lg:px-8 py-8 md:py-12 overflow-hidden">
+    <div id="landing-gateway" className="relative min-h-[90vh] w-full flex flex-col items-center justify-start bg-gradient-to-b from-amber-50/70 via-orange-50/30 to-rose-50/20 px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4 sm:pb-6 overflow-hidden">
       {/* Invisible container for Firebase invisible Recaptcha safety */}
       <div id="recaptcha-invisible-box" className="hidden"></div>
 
@@ -2420,7 +2420,7 @@ export default function LandingLoginGateway({
 
       </div>
 
-      <div className="text-center mt-12 max-w-sm font-medium text-[10px] text-slate-400 leading-relaxed" id="footer-branding-info">
+      <div className="text-center mt-4 sm:mt-5 max-w-sm font-medium text-[10px] text-slate-400 leading-relaxed" id="footer-branding-info">
         🔒 All connections are encrypted under standard secure cryptographic rules. Information remains localized. Designed for Indian parents with local safeguards.
       </div>
 

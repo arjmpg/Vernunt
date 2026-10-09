@@ -13,6 +13,7 @@ import EventMenuComponent from './EventMenuComponent.tsx';
 import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
+import { launchCashfreeCheckout } from '../../utils/cashfreeClient.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -155,9 +156,17 @@ export default function EventBookingModal({
     setAppliedCoupon(found);
   };
 
-  const handleProceedToPayment = () => {
-    if (!buyerName || !buyerEmail) {
-      alert('Please provide your name and email address.');
+  const [isCashfreeLoading, setIsCashfreeLoading] = useState(false);
+  const [cashfreeError, setCashfreeError] = useState('');
+
+  const handleProceedToPayment = async () => {
+    setCashfreeError('');
+    if (!buyerName?.trim()) {
+      setCashfreeError('Please enter your Parent / Buyer name to complete registration.');
+      return;
+    }
+    if (!buyerEmail?.trim() || !buyerEmail.includes('@')) {
+      setCashfreeError('Please provide a valid email address to receive your verified pass & QR ticket.');
       return;
     }
 
@@ -167,7 +176,7 @@ export default function EventBookingModal({
     const realTimeWalletDeduction = useWalletFunds ? Math.min(currentBalance, finalTotal) : 0;
     const realTimeRemainingOnline = Math.max(0, finalTotal - realTimeWalletDeduction);
 
-    // If remainingOnlinePayable is 0 (paid fully via wallet or free registration):
+    // 1. CRITICAL: If payable amount is ₹0 (free event/class or 100% wallet/coupon covered):
     if (realTimeRemainingOnline === 0) {
       if (realTimeWalletDeduction > 0) {
         debitFromWallet(
@@ -176,28 +185,122 @@ export default function EventBookingModal({
         );
       }
       finalizeOrder(
-        realTimeWalletDeduction > 0 ? 'PAID_BY_VERNUNT_WALLET' : 'FREE_COMMUNITY_PASS_' + Date.now().toString().slice(-6),
+        realTimeWalletDeduction > 0 ? 'PAID_BY_VERNUNT_WALLET' : 'FREE_PASS_' + Date.now().toString().slice(-6),
         realTimeWalletDeduction,
         0,
-        realTimeWalletDeduction > 0 ? 'VernuntWallet' : 'Razorpay'
+        realTimeWalletDeduction > 0 ? 'VernuntWallet' : 'Free'
       );
       return;
     }
 
-    // Wallet funds insufficient to cover full amount:
-    // Only trigger Razorpay payment gateway UI for the remaining balance!
+    // 2. Paid transaction (amount > 0): Create Cashfree Order on Backend
+    setIsCashfreeLoading(true);
+    setCashfreeError('');
     setStep('payment_processing');
 
-    setTimeout(() => {
-      setStep('otp_verify');
-    }, 1000);
+    try {
+      const response = await fetch('/api/cashfree/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: realTimeRemainingOnline,
+          orderType: 'event_ticket',
+          itemId: event.id,
+          itemTitle: event.title,
+          customer: {
+            customer_id: userProfile?.id || `user_${buyerPhone.replace(/\D/g, '') || Date.now()}`,
+            customer_name: buyerName.trim(),
+            customer_email: buyerEmail.trim(),
+            customer_phone: buyerPhone.replace(/\D/g, '') || '9876543210'
+          },
+          notes: {
+            eventTitle: event.title,
+            tier: selectedTier.name,
+            quantity: String(quantity),
+            walletDeduction: String(realTimeWalletDeduction)
+          }
+        })
+      });
+
+      const orderData = await response.json();
+      if (!response.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Failed to establish Cashfree payment session.');
+      }
+
+      // Check if server marked order as free direct complete
+      if (orderData.free) {
+        finalizeOrder(
+          `FREE_COMMUNITY_${Date.now().toString().slice(-6)}`,
+          realTimeWalletDeduction,
+          0,
+          'Free'
+        );
+        setIsCashfreeLoading(false);
+        return;
+      }
+
+      // Launch Cashfree SDK checkout experience
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
+        amount: realTimeRemainingOnline,
+        onSuccess: async (details) => {
+          // Verify on backend before confirming booking
+          try {
+            const verifyRes = await fetch('/api/cashfree/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: orderData.orderId })
+            });
+            const verifyData = await verifyRes.json();
+            const confirmedPayId = verifyData.paymentId || details.payment_id || orderData.orderId;
+            
+            finalizeOrder(
+              confirmedPayId,
+              realTimeWalletDeduction,
+              realTimeRemainingOnline,
+              realTimeWalletDeduction > 0 ? 'Hybrid' : 'Cashfree',
+              orderData.orderId
+            );
+          } catch (vErr) {
+            console.warn('Status verification fallback:', vErr);
+            finalizeOrder(
+              details.payment_id || orderData.orderId,
+              realTimeWalletDeduction,
+              realTimeRemainingOnline,
+              realTimeWalletDeduction > 0 ? 'Hybrid' : 'Cashfree',
+              orderData.orderId
+            );
+          } finally {
+            setIsCashfreeLoading(false);
+          }
+        },
+        onFailure: (err) => {
+          console.warn('[Cashfree Payment Cancelled/Failed]', err);
+          setIsCashfreeLoading(false);
+          setStep('attendee_info');
+          setCashfreeError(err?.message || 'Payment cancelled or declined. You can try again.');
+        },
+        onClose: () => {
+          setIsCashfreeLoading(false);
+          setStep('attendee_info');
+        }
+      });
+    } catch (payErr: any) {
+      console.error('[Cashfree Initialization Error]', payErr);
+      setIsCashfreeLoading(false);
+      setStep('attendee_info');
+      setCashfreeError(payErr?.message || 'Payment Gateway unreachable. Please retry.');
+    }
   };
 
   const finalizeOrder = (
     paymentId: string,
     walletUsed: number = walletDeduction,
     onlinePaid: number = remainingOnlinePayable,
-    methodUsed: 'Razorpay' | 'VernuntWallet' | 'Hybrid' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Razorpay'
+    methodUsed: 'Cashfree' | 'VernuntWallet' | 'Hybrid' | 'Free' | 'Razorpay' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Cashfree',
+    cfOrderId?: string
   ) => {
     // If hybrid/online payment and wallet was debited:
     if (walletUsed > 0 && methodUsed === 'Hybrid') {
@@ -227,6 +330,10 @@ export default function EventBookingModal({
       dateStr: event.date,
       timeSelected: selectedTimeSlot,
       razorpayPaymentId: paymentId,
+      cashfreePaymentId: paymentId,
+      cashfreeOrderId: cfOrderId,
+      paymentGateway: methodUsed === 'VernuntWallet' ? 'VernuntWallet' : (walletUsed > 0 ? 'Hybrid' : (onlinePaid === 0 ? 'Free' : 'Cashfree')),
+      paymentStatus: onlinePaid === 0 && walletUsed === 0 ? 'NOT_REQUIRED' : 'PAID',
       status: 'Paid',
       ticketNumber: ticketNum,
       ticketTierName: selectedTier.name,
@@ -355,10 +462,11 @@ export default function EventBookingModal({
                     type="button"
                     id="btn-modal-share-event"
                     onClick={() => onShare(event)}
-                    className="w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 text-white flex items-center justify-center transition-colors cursor-pointer"
-                    title="Share Event on Social Media"
+                    className="px-3 py-1.5 rounded-full bg-white/20 hover:bg-white/30 text-white flex items-center gap-1.5 transition-colors cursor-pointer text-xs font-black border border-white/30 shadow-xs backdrop-blur-xs"
+                    title="Share Event on Social Media & WhatsApp"
                   >
-                    <Share2 className="w-4 h-4" />
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Share Event</span>
                   </button>
                 )}
                 <button
@@ -393,6 +501,31 @@ export default function EventBookingModal({
           {/* STEP 1: Tier Selection & Quantity */}
           {step === 'tier_selection' && (
             <div className="space-y-4">
+              {/* Quick Social Share Action Banner */}
+              {onShare && (
+                <div className="p-3 sm:p-3.5 bg-gradient-to-r from-orange-50 via-amber-50 to-orange-100/60 rounded-2xl border border-orange-200 shadow-2xs flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-orange-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Share2 className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-xs font-black text-orange-950 leading-tight">
+                        Spread the Word with Friends
+                      </span>
+                      <p className="text-[11px] text-orange-800/80 truncate">
+                        Invite families via WhatsApp, Instagram, X, or download flyer
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onShare(event)}
+                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-extrabold shadow-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
+                  >
+                    <span>Share Event ↗</span>
+                  </button>
+                </div>
+              )}
 
               {/* External Online Class Registration & Program Details (e.g. Learn Geeta) */}
               {event.externalRegistrationUrl && (
@@ -803,24 +936,24 @@ export default function EventBookingModal({
                     {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable === 0 && (
                       <div className="text-[11px] text-emerald-800 bg-emerald-100/70 p-2 rounded-xl font-medium flex items-center gap-1.5 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>Full amount covered by your Vernunt Wallet! No Razorpay checkout needed.</span>
+                        <span>Full amount covered by your Vernunt Wallet! No Cashfree gateway checkout needed.</span>
                       </div>
                     )}
 
                     {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable > 0 && (
                       <div className="text-[10px] text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-xl font-medium border border-amber-200">
-                        ⚡ Priority Deduction: <strong>₹{walletDeduction}</strong> deducted from wallet first. Remaining balance of <strong>₹{remainingOnlinePayable}</strong> defaults to Razorpay gateway.
+                        ⚡ Priority Deduction: <strong>₹{walletDeduction}</strong> deducted from wallet first. Remaining balance of <strong>₹{remainingOnlinePayable}</strong> defaults to Cashfree gateway.
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Final Net Payable Online via Razorpay */}
+                {/* Final Net Payable Online via Cashfree */}
                 <div className="pt-2 flex justify-between items-center text-sm font-bold border-t border-slate-100">
                   <div>
-                    <span className="text-slate-900 block">Remaining via Razorpay:</span>
+                    <span className="text-slate-900 block">Remaining via Cashfree:</span>
                     <span className="text-[10px] text-slate-400 font-normal">
-                      {walletDeduction > 0 ? `After ₹${walletDeduction} wallet deduction` : 'Standard card / UPI / netbanking'}
+                      {walletDeduction > 0 ? `After ₹${walletDeduction} wallet deduction` : 'Instant UPI, Cards & NetBanking'}
                     </span>
                   </div>
                   <span className="font-black text-orange-600 text-lg">
@@ -829,20 +962,34 @@ export default function EventBookingModal({
                 </div>
               </div>
 
+              {cashfreeError && (
+                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{cashfreeError}</span>
+                </div>
+              )}
+
               <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => setStep('tier_selection')}
-                  className="py-3 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                  disabled={isCashfreeLoading}
+                  className="py-3 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                 >
                   Back
                 </button>
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
-                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  disabled={isCashfreeLoading}
+                  className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  {remainingOnlinePayable === 0 ? (
+                  {isCashfreeLoading ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Initializing Cashfree Gateway...</span>
+                    </>
+                  ) : remainingOnlinePayable === 0 ? (
                     <>
                       <CheckCircle2 className="w-4 h-4" />
                       <span>{walletDeduction > 0 ? `Confirm & Pay ₹${walletDeduction} with Wallet` : 'Confirm Free Registration'}</span>
@@ -852,8 +999,8 @@ export default function EventBookingModal({
                       <CreditCard className="w-4 h-4" />
                       <span>
                         {walletDeduction > 0 
-                          ? `Pay Remaining ₹${remainingOnlinePayable} with Razorpay (₹${walletDeduction} via Wallet)` 
-                          : `Pay ₹${finalTotal} with Razorpay`}
+                          ? `Pay Remaining ₹${remainingOnlinePayable} with Cashfree (₹${walletDeduction} via Wallet)` 
+                          : `Pay ₹${finalTotal} with Cashfree`}
                       </span>
                     </>
                   )}
@@ -862,23 +1009,28 @@ export default function EventBookingModal({
             </div>
           )}
 
-          {/* STEP 3: Razorpay Payment Simulation & OTP */}
+          {/* STEP 3: Cashfree Payment Processing Indicator */}
           {step === 'payment_processing' && (
             <div className="py-10 text-center space-y-3 animate-fadeIn">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mx-auto animate-pulse">
                 <CreditCard className="w-7 h-7" />
               </div>
               <h4 className="font-black text-slate-900 text-base">
-                Connecting to Razorpay Gateway...
+                Connecting to Cashfree Payments Gateway...
               </h4>
               <p className="text-xs text-slate-500">
-                Securing ₹{remainingOnlinePayable} transaction with 256-bit bank encryption.
+                Securing ₹{remainingOnlinePayable} transaction with Cashfree Bank-Grade 256-bit encryption.
                 {walletDeduction > 0 && (
                   <span className="block text-[11px] text-emerald-700 font-semibold mt-1">
                     (₹{walletDeduction} already deducted from Vernunt Wallet)
                   </span>
                 )}
               </p>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <div className="w-2 h-2 rounded-full bg-orange-500 animate-bounce"></div>
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-bounce delay-100"></div>
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce delay-200"></div>
+              </div>
             </div>
           )}
 

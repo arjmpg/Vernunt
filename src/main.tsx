@@ -115,7 +115,16 @@ if (pathname === '/sitemap.xml') {
     ReactDOM.createRoot(rootElement).render(
       <React.StrictMode>
         <ErrorBoundary>
-          <App />
+          <React.Suspense fallback={
+            <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-9 h-9 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs font-bold text-slate-400">Loading Vernunt...</span>
+              </div>
+            </div>
+          }>
+            <App />
+          </React.Suspense>
         </ErrorBoundary>
       </React.StrictMode>
     );

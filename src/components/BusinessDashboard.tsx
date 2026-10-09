@@ -1376,7 +1376,12 @@ export default function BusinessDashboard({
                   <tbody className="divide-y divide-slate-100 font-bold text-slate-705">
                     {bookingsList.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-50/50">
-                        <td className="py-3.5 px-3 font-mono font-bold text-[10px] text-slate-800">{log.razorpayPaymentId}</td>
+                        <td className="py-3.5 px-3 font-mono font-bold text-[10px] text-slate-800">
+                          {log.cashfreePaymentId || log.razorpayPaymentId || log.id}
+                          {log.paymentGateway && (
+                            <span className="block text-[9px] font-normal text-slate-400">{log.paymentGateway}</span>
+                          )}
+                        </td>
                         <td className="py-3.5 px-3 font-medium text-slate-500">{log.buyerName} ({log.buyerEmail})</td>
                         <td className="py-3.5 px-3 text-slate-700">{log.itemTitle}</td>
                         <td className="py-3.5 px-3">₹{log.amountPaid}</td>

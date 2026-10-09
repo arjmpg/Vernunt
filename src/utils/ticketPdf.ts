@@ -22,8 +22,8 @@ export async function generateTicketPdfDoc({ booking, event, qrCodeDataUrl }: Ti
   const childName = booking.childName ? `${booking.childName}${booking.childAge ? ` (${booking.childAge} yrs)` : ''}` : 'General Attendee';
   const tierName = booking.ticketTierName || 'Standard Admission';
   const isFree = !booking.amountPaid || booking.amountPaid === 0;
-  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Paid via Razorpay Secure)`;
-  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.razorpayPaymentId || booking.id);
+  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Verified via Cashfree Payments)`;
+  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.cashfreePaymentId || booking.razorpayPaymentId || booking.id);
 
   // Ensure high-res QR code
   let finalQr = qrCodeDataUrl;

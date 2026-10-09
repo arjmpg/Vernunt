@@ -28,14 +28,14 @@ export default function LoadingScreen({ onFinished, title }: LoadingScreenProps)
           clearInterval(interval);
           setTimeout(() => {
             onFinished();
-          }, 450);
+          }, 100);
           return 100;
         }
-        // Multi-stage random increments
-        const increment = Math.floor(Math.random() * 15) + 5;
+        // Fast increment for immediate transition
+        const increment = Math.floor(Math.random() * 25) + 30;
         return Math.min(prev + increment, 100);
       });
-    }, 120);
+    }, 40);
 
     return () => clearInterval(interval);
   }, [onFinished]);

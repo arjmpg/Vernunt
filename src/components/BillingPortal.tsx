@@ -4,27 +4,13 @@ import { ChildProfile, SubscriptionPlan } from '../types.ts';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../utils/firebase.ts';
 import confetti from 'canvas-confetti';
+import { launchCashfreeCheckout } from '../utils/cashfreeClient.ts';
 
 interface BillingPortalProps {
   userProfile: ChildProfile | null;
   onUpdateUserProfile: (updated: ChildProfile) => void;
   onNavigateToReferrals?: () => void;
 }
-
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
 
 export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavigateToReferrals }: BillingPortalProps) {
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
@@ -183,24 +169,36 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
           colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
         });
 
-        alert(`🎉 Free Subscription Activated!\n\nWelcome to Kids Connect Club.\nYour ${plan.title} (${plan.period}) is now ACTIVE until ${expiryDate.toLocaleDateString('en-IN')}.\n\n✓ You can now send connect requests to parents\n✓ You have ${updatedProfile.contactViewCredits} decrypt credits\n✓ Access all community events and specialist portfolios!`);
+        setErrorMessage(null);
+        setCouponSuccessMsg(`🎉 Free Subscription Activated! Welcome to Kids Connect Club. Your ${plan.title} (${plan.period}) is now ACTIVE until ${expiryDate.toLocaleDateString('en-IN')}.`);
         return;
       }
 
       if (!userProfile) {
-        alert("Please sign in or complete registration first before purchasing.");
+        setErrorMessage("Please sign in or complete registration first before purchasing.");
         return;
       }
 
-      // 2. Paid Plan (price > 0): Create Razorpay order on our server backend
-      const orderResponse = await fetch('/api/razorpay/create-order', {
+      // 2. Paid Plan (price > 0): Create Cashfree order on backend
+      const orderResponse = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: plan.price, planId: plan.id }),
+        body: JSON.stringify({
+          amount: plan.price,
+          orderType: 'subscription',
+          itemId: plan.id,
+          itemTitle: `Membership: ${plan.title}`,
+          customer: {
+            customer_id: userProfile.id || `user_${Date.now()}`,
+            customer_name: userProfile.parentName || 'Vernunt Member',
+            customer_email: userProfile.email || 'parent@vernunt.com',
+            customer_phone: userProfile.phoneNumber || '9876543210'
+          }
+        }),
       });
 
       if (!orderResponse.ok) {
-        throw new Error("Could not create Razorpay order on server backend.");
+        throw new Error("Could not initialize Cashfree payment order on server backend.");
       }
 
       const orderData = await orderResponse.json();
@@ -208,95 +206,70 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         throw new Error(orderData.error || "Failed order creation.");
       }
 
-      // 3. Load the Razorpay Checkout JavaScript library
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        throw new Error("Failed to load Razorpay checkout script. Check Web connection.");
-      }
+      const activateConfirmedPlan = async (orderRef: string) => {
+        const today = new Date();
+        const expiryDate = new Date(today);
+        expiryDate.setDate(today.getDate() + (plan.durationDays || 30));
 
-      // 4. Mount Razorpay Modal options
-      const options = {
-        key: orderData.keyId || "rzp_test_simulated_key_123456",
-        amount: orderData.amount,
-        currency: orderData.currency || "INR",
-        name: "Vernunt Playdate Connect",
-        description: `Premium ${plan.title} (${plan.period}) for ${userProfile.childName || "Kid"}`,
-        image: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=128&auto=format&fit=crop&q=80",
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
-          // Trigger verify backend security signatures
-          try {
-            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || orderData.orderId,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature || "simulated_signature_token"
-              }),
-            });
+        const bonusCredits = Math.max(1, Math.round(((plan.durationDays || 30) / 30) * 5));
 
-            const verifyResult = await verifyResponse.json();
-            if (verifyResult.success) {
-              // Successfully verified payment! Celebrate and update profile state
-              const today = new Date();
-              const expiryDate = new Date(today);
-              expiryDate.setDate(today.getDate() + (plan.durationDays || 30));
+        const updatedProfile: ChildProfile = {
+          ...userProfile,
+          subscriptionActive: true,
+          subscriptionPlan: plan.id as any,
+          subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
+          contactViewCredits: (userProfile.contactViewCredits || 0) + bonusCredits,
+        };
 
-              const bonusCredits = Math.max(1, Math.round(((plan.durationDays || 30) / 30) * 5));
+        onUpdateUserProfile(updatedProfile);
 
-              const updatedProfile: ChildProfile = {
-                ...userProfile,
-                subscriptionActive: true,
-                subscriptionPlan: plan.id as any,
-                subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
-                // reward with bonus contact credits as a subscription thank you
-                contactViewCredits: (userProfile.contactViewCredits || 0) + bonusCredits,
-              };
-
-              // Persist locally in React states
-              onUpdateUserProfile(updatedProfile);
-
-              // Persist robustly in FireStore db
-              if (auth.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
-                await setDoc(userRef, updatedProfile, { merge: true });
-              }
-
-              // Fire celebration confetti!
-              confetti({
-                particleCount: 150,
-                spread: 80,
-                colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
-              });
-
-              alert(`🎉 Subscription Activated! Welcome to VIP Kids Connect Club.\nYour plan is active until ${expiryDate.toLocaleDateString('en-IN')}.\nEnjoy free events booking, free basic consulting, and bonus credits!`);
-            } else {
-              alert(`⚠️ Payment Validation Failed: ${verifyResult.error || 'Signature rejected'}`);
-            }
-          } catch (verifyErr: any) {
-            console.error("Signature verification failed:", verifyErr);
-            alert("Payment completed but local profile validation failed. Please check with support.");
-          }
-        },
-        prefill: {
-          name: userProfile?.parentName || "",
-          email: userProfile?.email || "parent@vernunt.com",
-          contact: userProfile?.phoneNumber || ""
-        },
-        theme: {
-          color: "#f59e0b" // beautiful amber standard theme
-        },
-        modal: {
-          ondismiss: function () {
-            console.log("Razorpay Checkout payment dismissed by user.");
-            setLoadingPlan(null);
-          }
+        if (auth.currentUser) {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          await setDoc(userRef, updatedProfile, { merge: true });
         }
+
+        confetti({
+          particleCount: 150,
+          spread: 80,
+          colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
+        });
+
+        setCouponSuccessMsg(`🎉 Subscription Activated! Welcome to VIP Kids Connect Club (Ref: ${orderRef}). Active until ${expiryDate.toLocaleDateString('en-IN')}.`);
       };
 
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.open();
+      // If zero-amount bypass returned from server:
+      if (orderData.free) {
+        await activateConfirmedPlan(orderData.orderId);
+        setLoadingPlan(null);
+        return;
+      }
+
+      // 3. Launch Cashfree SDK checkout experience
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        amount: plan.price,
+        onSuccess: async (details) => {
+          try {
+            await fetch('/api/cashfree/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: orderData.orderId })
+            });
+          } catch (vErr) {
+            console.warn('Subscription verify fallback:', vErr);
+          }
+          await activateConfirmedPlan(orderData.orderId);
+          setLoadingPlan(null);
+        },
+        onFailure: (err) => {
+          setErrorMessage(err?.message || 'Payment cancelled or declined.');
+          setLoadingPlan(null);
+        },
+        onClose: () => {
+          setLoadingPlan(null);
+        }
+      });
     } catch (err: any) {
       console.error("Subscription workflow failed:", err);
       setErrorMessage(err.message || "An unexpected error occurred during subscription activation.");

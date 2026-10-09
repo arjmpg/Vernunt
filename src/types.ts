@@ -700,6 +700,10 @@ export interface Booking {
   dateStr: string;
   timeSelected: string;
   razorpayPaymentId: string;
+  cashfreePaymentId?: string;
+  cashfreeOrderId?: string;
+  paymentGateway?: 'Cashfree' | 'VernuntWallet' | 'Free' | 'COD' | 'Razorpay' | 'Hybrid';
+  paymentStatus?: 'NOT_REQUIRED' | 'PAID' | 'PENDING' | 'FAILED';
   status: 'Paid' | 'Refunded';
   // WooCommerce Affiliate Tracking & Attribution
   affiliateId?: string;

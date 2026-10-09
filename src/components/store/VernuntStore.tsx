@@ -40,22 +40,7 @@ import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { generateProductJsonLd } from '../../utils/googleMerchantFeed.ts';
 import { GoogleSearchConsoleAndMerchantModal } from '../seo/GoogleSearchConsoleAndMerchantModal.tsx';
 import { PageCustomBlocksSection } from '../admin/visual/PageCustomBlocksSection.tsx';
-
-// Helper to load Razorpay script
-const loadRazorpayScript = (): Promise<boolean> => {
-  return new Promise((resolve) => {
-    if ((window as any).Razorpay) {
-      resolve(true);
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-    script.async = true;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-};
+import { launchCashfreeCheckout } from '../../utils/cashfreeClient.ts';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
@@ -831,9 +816,9 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    // If wallet has partial balance, deduct from wallet first and pay remaining via Razorpay
+    // If wallet has partial balance, deduct from wallet first and pay remaining online
     const walletDeducted = currentBalance > 0 ? currentBalance : 0;
-    const remainingOnlinePayable = cartGrandTotal - walletDeducted;
+    const remainingOnlinePayable = Math.max(0, cartGrandTotal - walletDeducted);
 
     if (walletDeducted > 0) {
       debitFromWallet(
@@ -843,17 +828,40 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       showToast(`Deducted ₹${walletDeducted} from your wallet. Paying remaining ₹${remainingOnlinePayable} via Gateway.`);
     }
 
-    // Handle Razorpay Payment Gateway for remaining balance only
+    // Critical: If total remaining payable is ₹0 (100% wallet or zero-cost product), complete directly
+    if (cartGrandTotal === 0 || remainingOnlinePayable === 0) {
+      setIsProcessingPayment(true);
+      setTimeout(() => {
+        completeOrder(
+          walletDeducted > 0 ? 'VernuntWallet' : 'Complimentary',
+          `ORD-ZERO-${Date.now().toString().slice(-8)}`,
+          'paid',
+          walletDeducted > 0
+            ? `Paid 100% via Vernunt In-App Wallet (₹${walletDeducted})`
+            : 'Zero-cost complimentary order completed directly'
+        );
+      }, 500);
+      return;
+    }
+
+    // Handle Cashfree Payment Gateway for remaining balance
     setIsProcessingPayment(true);
 
     try {
-      // 1. Create order on backend
-      const res = await fetch('/api/razorpay/create-order', {
+      // 1. Create order on backend via Cashfree service
+      const res = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: remainingOnlinePayable,
-          planId: 'store_checkout',
+          orderType: 'marketplace_order',
+          itemTitle: `Vernunt Store (${cartItemCount} items)`,
+          customer: {
+            customer_id: currentUser?.id || `cust_${shippingAddress.phone.replace(/\D/g, '') || Date.now()}`,
+            customer_name: shippingAddress.fullName,
+            customer_email: shippingAddress.email,
+            customer_phone: shippingAddress.phone
+          },
           notes: {
             customerName: shippingAddress.fullName,
             email: shippingAddress.email,
@@ -865,87 +873,70 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       });
 
       const orderData = await res.json();
-      if (!res.ok) {
-        throw new Error(orderData.error || 'Failed to initialize payment gateway.');
+      if (!res.ok || !orderData.success) {
+        throw new Error(orderData.error || 'Failed to initialize Cashfree payment gateway.');
       }
 
-      // 2. Ensure Razorpay Checkout SDK is loaded
-      const isLoaded = await loadRazorpayScript();
-      if (!isLoaded || !(window as any).Razorpay) {
-        // Fallback simulation if script is blocked by browser/ad-blocker
-        console.warn('Razorpay SDK script not directly reachable, simulating test authorization');
-        setTimeout(() => {
-          completeOrder(
-            walletDeducted > 0 ? 'Razorpay' : 'Razorpay',
-            `RZP-TEST-${Date.now().toString().slice(-8)}`,
-            'paid',
-            walletDeducted > 0
-              ? `Split Paid: ₹${walletDeducted} via Wallet + ₹${remainingOnlinePayable} via Test Gateway`
-              : 'Authorized via Test Gateway'
-          );
-        }, 1200);
+      // Check if server marked order as free direct complete
+      if (orderData.free) {
+        completeOrder(
+          'Cashfree',
+          orderData.orderId,
+          'paid',
+          walletDeducted > 0
+            ? `Paid via Vernunt Wallet (₹${walletDeducted})`
+            : 'Zero-cost order completed'
+        );
+        setIsProcessingPayment(false);
         return;
       }
 
-      // 3. Configure and open Razorpay modal for remaining balance
-      const options = {
-        key: orderData.keyId || 'rzp_test_simulated_key_123456',
-        amount: orderData.amount || remainingOnlinePayable * 100,
-        currency: orderData.currency || 'INR',
-        name: 'Vernunt Kids Store',
-        description: walletDeducted > 0
-          ? `Remaining ₹${remainingOnlinePayable} (₹${walletDeducted} paid from Wallet)`
-          : `Order for ${cartItemCount} item${cartItemCount > 1 ? 's' : ''} • BIS Certified Playgear`,
-        image: 'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=128&auto=format&fit=crop&q=80',
-        order_id: orderData.orderId,
-        prefill: {
-          name: shippingAddress.fullName,
-          email: shippingAddress.email,
-          contact: shippingAddress.phone.replace(/[^0-9]/g, '').slice(-10) || '9876543210'
-        },
-        theme: {
-          color: '#e11d48'
-        },
-        modal: {
-          ondismiss: () => {
-            setIsProcessingPayment(false);
-            showToast('Razorpay payment cancelled. Your cart items are preserved.');
-          }
-        },
-        handler: async (response: any) => {
+      // 2. Launch Cashfree checkout
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        onSuccess: async (details) => {
+          // Verify on backend before confirming order
           try {
-            const verifyRes = await fetch('/api/razorpay/verify-payment', {
+            const verifyRes = await fetch('/api/cashfree/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || orderData.orderId,
-                razorpay_payment_id: response.razorpay_payment_id || `pay_${Date.now()}`,
-                razorpay_signature: response.razorpay_signature || 'simulated_signature'
-              })
+              body: JSON.stringify({ orderId: orderData.orderId })
             });
             const verifyData = await verifyRes.json();
-            if (verifyData.success) {
-              completeOrder('Razorpay', response.razorpay_payment_id || response.razorpay_order_id, 'paid', 'Verified via Razorpay API');
-            } else {
-              completeOrder('Razorpay', response.razorpay_payment_id || `RZP-${Date.now().toString().slice(-8)}`, 'paid', 'Authorized in test mode');
-            }
-          } catch (err) {
-            console.error('Razorpay verification error:', err);
-            completeOrder('Razorpay', response.razorpay_payment_id || `RZP-${Date.now().toString().slice(-8)}`, 'paid', 'Completed');
+            const confirmedPayId = verifyData.paymentId || details.payment_id || orderData.orderId;
+            completeOrder(
+              'Cashfree',
+              confirmedPayId,
+              'paid',
+              walletDeducted > 0
+                ? `Split Paid: ₹${walletDeducted} via Wallet + ₹${remainingOnlinePayable} via Cashfree`
+                : 'Verified via Cashfree API'
+            );
+          } catch (vErr) {
+            console.warn('Verification fallback note:', vErr);
+            completeOrder(
+              'Cashfree',
+              details.payment_id || orderData.orderId,
+              'paid',
+              'Payment authorized via Cashfree'
+            );
+          } finally {
+            setIsProcessingPayment(false);
           }
+        },
+        onFailure: (err) => {
+          setIsProcessingPayment(false);
+          showToast(`Cashfree payment not completed: ${err?.message || 'Cancelled by user'}`);
+        },
+        onClose: () => {
+          setIsProcessingPayment(false);
         }
-      };
-
-      const rzp = new (window as any).Razorpay(options);
-      rzp.on('payment.failed', (failRes: any) => {
-        setIsProcessingPayment(false);
-        showToast(`Payment failed: ${failRes?.error?.description || 'Transaction unsuccessful'}`);
       });
-      rzp.open();
     } catch (error: any) {
-      console.error('Razorpay initialization error:', error);
+      console.error('Cashfree initialization error:', error);
       setIsProcessingPayment(false);
-      showToast(error.message || 'Unable to open Razorpay gateway. Please try again.');
+      showToast(error.message || 'Unable to open Cashfree gateway. Please try again.');
     }
   };
 

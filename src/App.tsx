@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback, Suspense } from 'react';
 import { ChildProfile, VerificationStatus, LocationSharing, CommunityEvent, SpecialistProfile, Booking, DaycarePlayhomeProfile, CareBookingRequest, CareBookingStatus } from './types.ts';
 import { INITIAL_PLAYMATES, MOCK_EVENTS, INITIAL_DAYCARE_PLAYHOMES, INITIAL_CARE_BOOKINGS, MOCK_MARKETPLACE } from './data/mockData.ts';
 import confetti from 'canvas-confetti';
@@ -11,25 +11,34 @@ import { createDailyRollingBackup } from './services/googleDriveBackup.ts';
 import VernuntLogo from './components/VernuntLogo.tsx';
 import LoadingScreen from './components/LoadingScreen.tsx';
 
-// UI Sub components
+// UI Sub components (Eagerly loaded core)
 import LandingLoginGateway from './components/LandingLoginGateway.tsx';
 import RegistrationHub from './components/RegistrationHub.tsx';
 import PlaymateCard, { calculateMatchScore } from './components/PlaymateCard.tsx';
 import { PlaymateDetailModal } from './components/PlaymateDetailModal.tsx';
 import ChatPanel from './components/ChatPanel.tsx';
-import PlaydatePlanner from './components/PlaydatePlanner.tsx';
-import EventsTab from './components/EventsTab.tsx';
-import SpecialistsTab from './components/SpecialistsTab.tsx';
-import BusinessDashboard from './components/BusinessDashboard.tsx';
-import AdminDashboard from './components/AdminDashboard.tsx';
 import EditProfileModal from './components/EditProfileModal.tsx';
-import PortfoliosTab from './components/PortfoliosTab.tsx';
-import ReferralPortal from './components/ReferralPortal.tsx';
-import BillingPortal from './components/BillingPortal.tsx';
-import { KnowledgeHub } from './components/KnowledgeHub.tsx';
-import AffiliateDashboard from './components/events/AffiliateDashboard.tsx';
-import DaycareSittingTab from './components/DaycareSittingTab.tsx';
-import { VernuntStore } from './components/store/VernuntStore.tsx';
+
+// Code-split heavy tab views for instant initial load and high performance
+const TabLoadingFallback = () => (
+  <div className="flex flex-col items-center justify-center min-h-[40vh] p-8 space-y-3 animate-fade-in">
+    <div className="w-8 h-8 border-3 border-orange-500 border-t-transparent rounded-full animate-spin" />
+    <span className="text-xs font-bold text-slate-500">Loading view...</span>
+  </div>
+);
+
+const PlaydatePlanner = React.lazy(() => import('./components/PlaydatePlanner.tsx'));
+const EventsTab = React.lazy(() => import('./components/EventsTab.tsx'));
+const SpecialistsTab = React.lazy(() => import('./components/SpecialistsTab.tsx'));
+const BusinessDashboard = React.lazy(() => import('./components/BusinessDashboard.tsx'));
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard.tsx'));
+const PortfoliosTab = React.lazy(() => import('./components/PortfoliosTab.tsx'));
+const ReferralPortal = React.lazy(() => import('./components/ReferralPortal.tsx'));
+const BillingPortal = React.lazy(() => import('./components/BillingPortal.tsx'));
+const KnowledgeHub = React.lazy(() => import('./components/KnowledgeHub.tsx').then(m => ({ default: m.KnowledgeHub })));
+const AffiliateDashboard = React.lazy(() => import('./components/events/AffiliateDashboard.tsx'));
+const DaycareSittingTab = React.lazy(() => import('./components/DaycareSittingTab.tsx'));
+const VernuntStore = React.lazy(() => import('./components/store/VernuntStore.tsx').then(m => ({ default: m.VernuntStore })));
 import GlobalUniversalSearch from './components/GlobalUniversalSearch.tsx';
 
 // Modal helpers
@@ -48,7 +57,7 @@ import { getSafeChildAreaName } from './utils/childSafetyFilter.ts';
 import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
 import EventOrganizerCheckInStation from './components/events/EventOrganizerCheckInStation.tsx';
 import EventBuyerRegistrationModal from './components/events/EventBuyerRegistrationModal.tsx';
-import { KidStoriesPortal } from './components/stories/KidStoriesPortal.tsx';
+const KidStoriesPortal = React.lazy(() => import('./components/stories/KidStoriesPortal.tsx').then(m => ({ default: m.KidStoriesPortal })));
 import { WriteKidStoryModal } from './components/stories/WriteKidStoryModal.tsx';
 import { unlockKidStoryLifetimeReferral } from './data/kidStories.ts';
 import { logProductSearch } from './data/productSearchAnalytics.ts';
@@ -70,28 +79,28 @@ import {
 
 // Vernunt Carousel Dashboard, Groups, Tracker, Community & Security features
 import PlaymateCarouselDashboard from './components/PlaymateCarouselDashboard.tsx';
-import { VernuntGroupsHub } from './components/groups/VernuntGroupsHub.tsx';
-import { GrowthTrackerHub } from './components/tracker/GrowthTrackerHub.tsx';
-import { VernuntPagesFeed } from './components/blog/VernuntPagesFeed.tsx';
-import { CommunityHostingHub } from './components/community/CommunityHostingHub.tsx';
+const VernuntGroupsHub = React.lazy(() => import('./components/groups/VernuntGroupsHub.tsx').then(m => ({ default: m.VernuntGroupsHub })));
+const GrowthTrackerHub = React.lazy(() => import('./components/tracker/GrowthTrackerHub.tsx').then(m => ({ default: m.GrowthTrackerHub })));
+const VernuntPagesFeed = React.lazy(() => import('./components/blog/VernuntPagesFeed.tsx').then(m => ({ default: m.VernuntPagesFeed })));
+const CommunityHostingHub = React.lazy(() => import('./components/community/CommunityHostingHub.tsx').then(m => ({ default: m.CommunityHostingHub })));
 import { ProfilePrivacyModal } from './components/profile/ProfilePrivacyModal.tsx';
 import { VernuntAppGuideModal } from './components/guide/VernuntAppGuideModal.tsx';
 import { PWAInstallButton } from './components/PWAInstallButton.tsx';
 import { AndroidPlayStoreModal } from './components/AndroidPlayStoreModal.tsx';
 import { IosAppInstallModal } from './components/IosAppInstallModal.tsx';
 import { AndroidDownloadBanner } from './components/AndroidDownloadBanner.tsx';
-import { GoogleSearchConsoleAndMerchantModal } from './components/seo/GoogleSearchConsoleAndMerchantModal.tsx';
+const GoogleSearchConsoleAndMerchantModal = React.lazy(() => import('./components/seo/GoogleSearchConsoleAndMerchantModal.tsx').then(m => ({ default: m.GoogleSearchConsoleAndMerchantModal })));
 import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
 import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
 import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
-import KidsInvestmentsTab from './components/investments/KidsInvestmentsTab.tsx';
+const KidsInvestmentsTab = React.lazy(() => import('./components/investments/KidsInvestmentsTab.tsx'));
 import WalletModal from './components/WalletModal.tsx';
 import { getStoredWallet } from './utils/walletStorage.ts';
 import { UserWallet } from './types.ts';
 import { LegalPolicyTab } from './components/LegalPolicyModal.tsx';
 import { isAuthorizedSystemAdmin } from './utils/security.ts';
 import { auth } from './utils/firebase.ts';
-import { AdminVisualPageEditor } from './components/admin/visual/AdminVisualPageEditor.tsx';
+const AdminVisualPageEditor = React.lazy(() => import('./components/admin/visual/AdminVisualPageEditor.tsx').then(m => ({ default: m.AdminVisualPageEditor })));
 import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlocksSection.tsx';
 
 // Icons
@@ -107,7 +116,6 @@ import {
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
 import { captureAffiliateFromUrl } from './utils/affiliate.ts';
-import { trackInboundShareClick } from './utils/shareTracking.ts';
 
 export interface TabDefinition {
   id: string;
@@ -703,19 +711,14 @@ export default function App() {
         console.log('📌 Captured and cached referral code from URL link:', refCode);
       }
 
-      // Track inbound social share click attribution
-      const shareId = params.get('shareId');
-      if (shareId) {
-        trackInboundShareClick(shareId);
-      }
-
       const targetTab = params.get('tab');
-      const targetEventId = params.get('eventId') || params.get('event');
+      const targetEventId = params.get('eventId') || params.get('event') || params.get('id');
       const guideSlug = params.get('guide') || params.get('article') || params.get('slug');
       const path = window.location.pathname;
 
-      if (targetTab === 'events' || targetEventId) {
+      if (targetTab === 'events' || targetEventId || path.startsWith('/events')) {
         setActiveTab('events');
+        setAppMode('dashboard');
       } else if (targetTab === 'affiliate') {
         setActiveTab('affiliate');
       } else if (targetTab === 'specialists') {
@@ -988,7 +991,37 @@ export default function App() {
         clearAuthSession();
         setUserProfile(null);
         setUserRole('Parent');
-        setAppMode('landing');
+        
+        // Preserve 'dashboard' mode if arriving via deep link (events, stories, investments, specialists, store)
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const hasDeepLink = params && (
+          params.get('tab') === 'events' ||
+          !!params.get('eventId') ||
+          !!params.get('event') ||
+          !!params.get('id') ||
+          params.get('tab') === 'kid_stories' ||
+          params.get('tab') === 'stories' ||
+          !!params.get('story') ||
+          params.get('tab') === 'kids_investments' ||
+          params.get('tab') === 'investments' ||
+          params.get('tab') === 'store' ||
+          params.get('tab') === 'specialists' ||
+          !!params.get('specialist') ||
+          !!params.get('portfolio') ||
+          !!params.get('doctor') ||
+          window.location.pathname.startsWith('/events') ||
+          window.location.pathname.startsWith('/store') ||
+          window.location.pathname.startsWith('/stories')
+        );
+
+        if (hasDeepLink) {
+          setAppMode('dashboard');
+          if (params?.get('tab') === 'events' || params?.get('eventId') || params?.get('event') || params?.get('id')) {
+            setActiveTab('events');
+          }
+        } else {
+          setAppMode('landing');
+        }
         setIsLoading(false);
         setIsAuthenticating(false);
       }
@@ -3543,7 +3576,7 @@ export default function App() {
       )}
 
       {/* Main content body panel */}
-      <main id="app-main" className={`flex-1 w-full ${appMode === 'landing' && !isGuestViewingKnowledge ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 pb-28 md:pb-32'}`}>
+      <main id="app-main" className={`flex-1 w-full ${appMode === 'landing' && !isGuestViewingKnowledge ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-6 pb-6 md:pb-8'}`}>
         
         {/* Onboarding View Logic */}
         {appMode === 'landing' && !isGuestViewingKnowledge && (
@@ -3628,26 +3661,28 @@ export default function App() {
         {/* Unregistered / Guest 1000+ Knowledge Base Open View */}
         {appMode === 'landing' && isGuestViewingKnowledge && (
           <div className="animate-fade-in">
-            <KnowledgeHub
-              initialSlug={guestKnowledgeSlug}
-              isGuest={true}
-              onNavigateToRadar={(interestKeyword) => {
-                handleStartSignUp('Parent');
-              }}
-              onStartSignUp={(role, details) => handleStartSignUp((role as any) || 'Parent', details)}
-              onBackToLanding={() => {
-                setIsGuestViewingKnowledge(false);
-                setGuestKnowledgeSlug(undefined);
-                if (typeof window !== 'undefined' && window.history?.replaceState) {
-                  const url = new URL(window.location.href);
-                  url.searchParams.delete('tab');
-                  url.searchParams.delete('guide');
-                  url.searchParams.delete('article');
-                  url.searchParams.delete('slug');
-                  window.history.replaceState({}, '', url.toString());
-                }
-              }}
-            />
+            <Suspense fallback={<TabLoadingFallback />}>
+              <KnowledgeHub
+                initialSlug={guestKnowledgeSlug}
+                isGuest={true}
+                onNavigateToRadar={(interestKeyword) => {
+                  handleStartSignUp('Parent');
+                }}
+                onStartSignUp={(role, details) => handleStartSignUp((role as any) || 'Parent', details)}
+                onBackToLanding={() => {
+                  setIsGuestViewingKnowledge(false);
+                  setGuestKnowledgeSlug(undefined);
+                  if (typeof window !== 'undefined' && window.history?.replaceState) {
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('tab');
+                    url.searchParams.delete('guide');
+                    url.searchParams.delete('article');
+                    url.searchParams.delete('slug');
+                    window.history.replaceState({}, '', url.toString());
+                  }
+                }}
+              />
+            </Suspense>
           </div>
         )}
 
@@ -4014,8 +4049,9 @@ export default function App() {
               </div>
             )}
 
-            {/* Tab: Kids Investment & Wealth Planning (Plots, Mutual Funds, Gold/Silver) */}
-            {activeTab === 'kids_investments' && (
+            <Suspense fallback={<TabLoadingFallback />}>
+              {/* Tab: Kids Investment & Wealth Planning (Plots, Mutual Funds, Gold/Silver) */}
+              {activeTab === 'kids_investments' && (
               <KidsInvestmentsTab 
                 currentProfile={userProfile} 
                 onNavigateToTab={(targetTab) => setActiveTab(targetTab as any)}
@@ -4279,6 +4315,7 @@ export default function App() {
                 onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
               />
             )}
+            </Suspense>
 
           </div>
         )}
@@ -4288,18 +4325,16 @@ export default function App() {
       {/* Persistent global footer with safe clearance for fixed bottom navigation */}
       <footer 
         id="global-page-footer" 
-        className={`bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-12 mt-auto text-slate-600 transition-all ${
+        className={`bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-3 sm:pt-4 mt-auto text-slate-600 transition-all ${
           appMode === 'dashboard' 
             ? 'pb-40 sm:pb-44 md:pb-48 portrait:pb-[calc(10rem+20px)] sm:portrait:pb-[calc(11rem+20px)] md:portrait:pb-[calc(12rem+20px)]' 
             : 'pb-16 sm:pb-20 portrait:pb-[calc(4rem+20px)] sm:portrait:pb-[calc(5rem+20px)]'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          
-
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
 
           {/* Top Footer Strip: Brand + India's Child-Safe Community */}
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
             <div className="flex items-center gap-2.5 flex-wrap">
               <VernuntLogo size="sm" />
               <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
@@ -4311,9 +4346,9 @@ export default function App() {
             
             {/* Column 1: Brand, Mission & Security */}
             <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <VernuntLogo size="sm" />
-              </div>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900 border-b border-slate-200/80 pb-2">
+                About Vernunt
+              </h4>
               <p className="text-xs text-slate-600 leading-relaxed font-normal">
                 India's verified neighborhood kids playmate radar, safe childcare network, and verified parent community.
               </p>
@@ -5660,14 +5695,16 @@ export default function App() {
 
       {/* Google Merchant Center & Google Search Console Integration Hub Modal */}
       {showGoogleSeoModal && (
-        <GoogleSearchConsoleAndMerchantModal
-          isOpen={showGoogleSeoModal}
-          onClose={() => setShowGoogleSeoModal(false)}
-          onNavigateToTab={(tabId) => {
-            setAppMode('dashboard');
-            setActiveTab(tabId as any);
-          }}
-        />
+        <Suspense fallback={null}>
+          <GoogleSearchConsoleAndMerchantModal
+            isOpen={showGoogleSeoModal}
+            onClose={() => setShowGoogleSeoModal(false)}
+            onNavigateToTab={(tabId) => {
+              setAppMode('dashboard');
+              setActiveTab(tabId as any);
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Conditionally Render Animated Loader overlay */}
@@ -5752,11 +5789,15 @@ export default function App() {
       )}
 
       {/* Admin Visual Frontend CMS & In-Place Page Editor (Available ONLY to authorized administrators) */}
-      <AdminVisualPageEditor 
-        currentPageId={activeTab || 'home'} 
-        isAdmin={isSuperAdmin} 
-        onNavigateTab={(tab) => setActiveTab(tab as any)} 
-      />
+      {isSuperAdmin && (
+        <Suspense fallback={null}>
+          <AdminVisualPageEditor 
+            currentPageId={activeTab || 'home'} 
+            isAdmin={isSuperAdmin} 
+            onNavigateTab={(tab) => setActiveTab(tab as any)} 
+          />
+        </Suspense>
+      )}
 
     </div>
   );

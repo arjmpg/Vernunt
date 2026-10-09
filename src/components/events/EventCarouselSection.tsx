@@ -151,7 +151,7 @@ export default function EventCarouselSection({
                 {/* Gradient overlay on bottom of poster */}
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/20 pointer-events-none" />
 
-                {/* Top Promoted / Status Badges */}
+                {/* Top Promoted / Status Badges & Quick Share */}
                 <div className="absolute top-2.5 left-2.5 right-2.5 flex items-start justify-between gap-1 z-10 flex-wrap">
                   {/* Distinct Sub-Category Pill: Event (1-7 Days) vs Activity (Sports/Camp) vs Class (Permanent) */}
                   <span className={`text-[8px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-md backdrop-blur-xs flex items-center gap-1 ${
@@ -165,16 +165,35 @@ export default function EventCarouselSection({
                     <span>{subCategoryKey === 'classes' ? 'Class' : subCategoryKey === 'activity' ? 'Activity' : '1–7d Event'}</span>
                   </span>
 
-                  {/* Joined / Ticket badge */}
-                  {isEventJoined ? (
-                    <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md shadow-md">
-                      Booked ✓
-                    </span>
-                  ) : isPromoted ? (
-                    <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-sm tracking-wider shadow-md">
-                      PROMOTED
-                    </span>
-                  ) : null}
+                  <div className="flex items-center gap-1 ml-auto">
+                    {/* Joined / Ticket badge */}
+                    {isEventJoined ? (
+                      <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md shadow-md">
+                        Booked ✓
+                      </span>
+                    ) : isPromoted ? (
+                      <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-sm tracking-wider shadow-md">
+                        PROMOTED
+                      </span>
+                    ) : null}
+
+                    {/* Floating Top Social Share Button */}
+                    {onShareEvent && (
+                      <button
+                        type="button"
+                        id={`btn-card-top-share-${evt.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShareEvent(evt);
+                        }}
+                        className="px-2 py-0.5 rounded-full bg-white/95 hover:bg-white text-slate-800 hover:text-orange-600 shadow-md backdrop-blur-xs border border-white/60 transition transform hover:scale-105 active:scale-95 flex items-center gap-1 cursor-pointer font-black text-[10px]"
+                        title="Share Event on WhatsApp, Facebook, X, etc."
+                      >
+                        <Share2 className="w-3 h-3 text-orange-600" />
+                        <span>Share</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Bottom Overlay Info (Price & Distance) */}
@@ -254,10 +273,11 @@ export default function EventCarouselSection({
                           e.stopPropagation();
                           onShareEvent(evt);
                         }}
-                        className="p-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-600 hover:text-orange-700 border border-orange-200 transition cursor-pointer"
+                        className="px-2 py-1 rounded-md bg-orange-50 hover:bg-orange-100 text-orange-700 hover:text-orange-800 border border-orange-200 transition cursor-pointer flex items-center gap-1 font-bold text-[10px]"
                         title="Share Event on WhatsApp, Facebook, X, etc."
                       >
-                        <Share2 className="w-3.5 h-3.5" />
+                        <Share2 className="w-3 h-3 text-orange-600" />
+                        <span>Share</span>
                       </button>
                     )}
                     {onShareQr && (

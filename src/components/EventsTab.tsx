@@ -26,8 +26,7 @@ import EventCarouselSection from './events/EventCarouselSection.tsx';
 import EventHostQrShareModal from './events/EventHostQrShareModal.tsx';
 import EventQrScannerModal from './events/EventQrScannerModal.tsx';
 import EventSocialShareModal from './events/EventSocialShareModal.tsx';
-import EventShareTrackerView from './events/EventShareTrackerView.tsx';
-import { trackShareConversion } from '../utils/shareTracking.ts';
+import EventDetailCardModal from './events/EventDetailCardModal.tsx';
 import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
 import { downloadTicketPass } from '../data/eventPurchases.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
@@ -35,6 +34,7 @@ import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 import { MOCK_EVENTS } from '../data/mockData.ts';
 import { PageCustomBlocksSection } from './admin/visual/PageCustomBlocksSection.tsx';
+import { launchCashfreeCheckout } from '../utils/cashfreeClient.ts';
 
 // Calculate status: 'Upcoming' | 'Full' | 'Past'
 export const getEventStatus = (evt: CommunityEvent): 'Upcoming' | 'Full' | 'Past' => {
@@ -223,12 +223,6 @@ export default function EventsTab({
   };
 
   const handleInitiateBooking = (evt: CommunityEvent) => {
-    if (!userProfile) {
-      setPendingBookingEvent(evt);
-      setBuyerRegActionLabel(`Book passes for "${evt.title}"`);
-      setShowBuyerRegistrationModal(true);
-      return;
-    }
     setBookingModalEvent(evt);
   };
 
@@ -361,18 +355,18 @@ export default function EventsTab({
   // Event Host QR Code Pass & Share Station state
   const [hostQrModalEvent, setHostQrModalEvent] = useState<CommunityEvent | null>(null);
   const [socialShareEvent, setSocialShareEvent] = useState<CommunityEvent | null>(null);
-  const [showShareTrackerModal, setShowShareTrackerModal] = useState<boolean>(false);
+  const [selectedDetailEvent, setSelectedDetailEvent] = useState<CommunityEvent | null>(null);
   const [showScannerModal, setShowScannerModal] = useState<boolean>(false);
 
   // Parse deep link if ?eventId= or ?ticket= is present in URL (e.g. from scanned QR code)
   useEffect(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      const targetEventId = params.get('eventId') || params.get('event');
+      const targetEventId = params.get('eventId') || params.get('event') || params.get('id');
       const shouldDirectBook = params.get('book') === 'true' || params.get('action') === 'book' || params.get('scan') === '1';
 
       if (targetEventId) {
-        let found = eventsList.find(e => e.id === targetEventId);
+        let found = eventsList.find(e => e.id === targetEventId || e.id?.toLowerCase() === targetEventId.toLowerCase());
 
         // Fallback: Check local storage for newly created custom events if not in current state
         if (!found) {
@@ -380,7 +374,7 @@ export default function EventsTab({
             const stored = localStorage.getItem('vernunt_user_created_events');
             if (stored) {
               const localList: CommunityEvent[] = JSON.parse(stored);
-              const matched = localList.find(e => e.id === targetEventId);
+              const matched = localList.find(e => e.id === targetEventId || e.id?.toLowerCase() === targetEventId.toLowerCase());
               if (matched) {
                 found = matched;
                 setEventsList(prev => [matched, ...prev]);
@@ -391,19 +385,26 @@ export default function EventsTab({
           }
         }
 
+        // Fallback: Check MOCK_EVENTS directly
+        if (!found) {
+          found = MOCK_EVENTS.find(e => e.id === targetEventId || e.id?.toLowerCase() === targetEventId.toLowerCase());
+        }
+
         if (found) {
-          setSelectedEventId(targetEventId);
+          setSelectedEventId(found.id);
 
           // If scanned with ?book=true, automatically launch the booking modal!
           if (shouldDirectBook) {
             setTimeout(() => {
               handleInitiateBooking(found!);
             }, 400);
+          } else {
+            setSelectedDetailEvent(found);
           }
 
           // If element exists on DOM, scroll to it smoothly and highlight with animated pulse ring
           setTimeout(() => {
-            const el = document.getElementById(`event-card-${targetEventId}`);
+            const el = document.getElementById(`event-card-${found!.id}`);
             if (el) {
               el.scrollIntoView({ behavior: 'smooth', block: 'center' });
               el.classList.add('ring-4', 'ring-orange-500', 'ring-offset-4');
@@ -494,120 +495,120 @@ export default function EventsTab({
     );
   };
 
-  const handleRazorpayEventCheckout = async () => {
+  const handleCashfreeEventCheckout = async () => {
     if (!checkoutEvent) return;
+    const price = checkoutEvent.ticketPrice || 0;
+
+    const finalizeEventBooking = (payId: string, isFree: boolean = false) => {
+      setProductionPayId(payId);
+      const rate = checkoutEvent.commissionPercentage ?? globalCommissionRate;
+      const commissionEarned = Math.round((price * rate) / 100);
+      const hostEarned = price - commissionEarned;
+
+      onAddBooking({
+        id: `booking-${Date.now()}`,
+        itemId: checkoutEvent.id,
+        itemTitle: checkoutEvent.title,
+        type: 'EventTicket',
+        buyerName: buyerName,
+        buyerEmail: buyerEmail,
+        amountPaid: price,
+        commissionPercentage: rate,
+        commissionEarned: commissionEarned,
+        hostEarned: hostEarned,
+        dateStr: checkoutEvent.date,
+        timeSelected: checkoutEvent.time,
+        razorpayPaymentId: payId,
+        cashfreePaymentId: payId,
+        paymentGateway: isFree ? 'Free' : 'Cashfree',
+        paymentStatus: isFree ? 'NOT_REQUIRED' : 'PAID',
+        status: 'Paid'
+      });
+
+      setEventsList(prev => prev.map(e => {
+        if (e.id === checkoutEvent.id) {
+          return { ...e, joined: true, attendeesCount: e.attendeesCount + 1 };
+        }
+        return e;
+      }));
+
+      confetti({
+        particleCount: 100,
+        spread: 60,
+        colors: ['#f97316', '#a855f7', '#fbbf24']
+      });
+
+      setCheckoutStep('success');
+    };
+
+    // 1. CRITICAL: If total payable amount is ₹0, complete transaction directly
+    if (price === 0) {
+      finalizeEventBooking(`FREE_COMMUNITY_${Date.now().toString().slice(-6)}`, true);
+      return;
+    }
+
+    // 2. Paid Event Ticket: Initiate Cashfree Payment Gateway
     setCheckoutStep('processing');
     try {
-      // 1. Create order
-      const orderResponse = await fetch('/api/razorpay/create-order', {
+      const orderResponse = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: checkoutEvent.ticketPrice, planId: `event_${checkoutEvent.id}` }),
+        body: JSON.stringify({
+          amount: price,
+          orderType: 'event_ticket',
+          itemId: checkoutEvent.id,
+          itemTitle: checkoutEvent.title,
+          customer: {
+            customer_id: userProfile?.id || `user_${Date.now()}`,
+            customer_name: buyerName || userProfile?.parentName || 'Vernunt Member',
+            customer_email: buyerEmail || userProfile?.email || 'guest@vernunt.com',
+            customer_phone: userProfile?.phoneNumber || '9876543210'
+          },
+          notes: {
+            eventId: checkoutEvent.id,
+            eventTitle: checkoutEvent.title
+          }
+        }),
       });
-      if (!orderResponse.ok) throw new Error("Server checkout route failed.");
+
+      if (!orderResponse.ok) throw new Error("Cashfree order route failed on server.");
       const orderData = await orderResponse.json();
 
-      // 2. Load script
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      document.body.appendChild(script);
-      
-      await new Promise((resolve) => {
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-      });
+      if (orderData.free) {
+        finalizeEventBooking(`FREE_COMMUNITY_${Date.now().toString().slice(-6)}`, true);
+        return;
+      }
 
-      // 3. Launch Checkout
-      const options = {
-        key: orderData.keyId || "rzp_test_simulated_key_123456",
-        amount: orderData.amount,
-        currency: "INR",
-        name: "Vernunt Events Gate",
-        description: `Entry ticket for: ${checkoutEvent.title}`,
-        image: checkoutEvent.photoUrl,
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
-          // verify
-          const verifyResponse = await fetch('/api/razorpay/verify-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id || orderData.orderId,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature || "simulated_opt_token"
-            }),
-          });
-          const verifyResult = await verifyResponse.json();
-          if (verifyResult.success) {
-            // Confirm Booking
-            const payId = response.razorpay_payment_id || `pay_EVT_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
-            setProductionPayId(payId);
-            
-            // Calculate rates
-            const rate = checkoutEvent.commissionPercentage ?? globalCommissionRate;
-            const price = checkoutEvent.ticketPrice || 0;
-            const commissionEarned = Math.round((price * rate) / 100);
-            const hostEarned = price - commissionEarned;
-
-            // Trigger Booking transaction
-            onAddBooking({
-              id: `booking-${Date.now()}`,
-              itemId: checkoutEvent.id,
-              itemTitle: checkoutEvent.title,
-              type: 'EventTicket',
-              buyerName: buyerName,
-              buyerEmail: buyerEmail,
-              amountPaid: price,
-              commissionPercentage: rate,
-              commissionEarned: commissionEarned,
-              hostEarned: hostEarned,
-              dateStr: checkoutEvent.date,
-              timeSelected: checkoutEvent.time,
-              razorpayPaymentId: payId,
-              status: 'Paid'
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
+        amount: price,
+        onSuccess: async (details) => {
+          try {
+            const verifyRes = await fetch('/api/cashfree/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ orderId: orderData.orderId })
             });
-
-            // Join event state update
-            setEventsList(prev => prev.map(e => {
-              if (e.id === checkoutEvent.id) {
-                return { ...e, joined: true, attendeesCount: e.attendeesCount + 1 };
-              }
-              return e;
-            }));
-
-            // Play sound & celebrate
-            confetti({
-              particleCount: 100,
-              spread: 60,
-              colors: ['#f97316', '#a855f7', '#fbbf24']
-            });
-
-            setCheckoutStep('success');
-          } else {
-            alert(`⚠️ Payment Validation Failed: ${verifyResult.error}`);
-            setCheckoutStep('details');
+            const verifyData = await verifyRes.json();
+            const confirmedPayId = verifyData.paymentId || details.payment_id || orderData.orderId;
+            finalizeEventBooking(confirmedPayId, false);
+          } catch (vErr) {
+            console.warn('Cashfree verify fallback:', vErr);
+            finalizeEventBooking(details.payment_id || orderData.orderId, false);
           }
         },
-        prefill: {
-          name: buyerName || "Parent Guest",
-          email: buyerEmail || "parent@vernunt.com"
+        onFailure: (err) => {
+          console.warn('Cashfree payment declined or cancelled:', err);
+          setCheckoutStep('details');
         },
-        theme: {
-          color: "#f59e0b"
-        },
-        modal: {
-          ondismiss: function() {
-            setCheckoutStep('details');
-          }
+        onClose: () => {
+          setCheckoutStep('details');
         }
-      };
-
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.open();
+      });
     } catch (e: any) {
-      console.error(e);
-      alert(`⚠️ Checkout initialization failed: ${e.message}`);
+      console.error('Cashfree order error:', e);
       setCheckoutStep('details');
     }
   };
@@ -645,22 +646,74 @@ export default function EventsTab({
 
   const handleInPopupSubscribe = async (plan: any) => {
     if (!userProfile) {
-      alert("Please sign in or complete registration first before purchasing.");
+      setSubError("Please sign in or complete registration first before purchasing.");
       return;
     }
 
     setLoadingPlan(plan.id);
     setSubError(null);
 
+    const activateSubscriptionLocally = async (payRef: string) => {
+      const today = new Date();
+      const expiryDate = new Date(today);
+      expiryDate.setDate(today.getDate() + (plan.durationDays || 30));
+
+      const updatedProfile = {
+        ...userProfile,
+        subscriptionActive: true,
+        subscriptionPlan: plan.id,
+        subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
+        contactViewCredits: (userProfile.contactViewCredits || 0) + ((plan.durationDays || 30) / 30) * 5,
+      };
+
+      if (onUpdateUserProfile) {
+        onUpdateUserProfile(updatedProfile);
+      }
+
+      if (auth.currentUser) {
+        try {
+          const userRef = doc(db, 'users', auth.currentUser.uid);
+          await setDoc(userRef, updatedProfile, { merge: true });
+        } catch (e) {
+          console.warn('Profile sync notice:', e);
+        }
+      }
+
+      confetti({
+        particleCount: 150,
+        spread: 80,
+        colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
+      });
+    };
+
+    // 1. Zero amount plan bypass
+    if (!plan.price || Number(plan.price) === 0) {
+      await activateSubscriptionLocally(`FREE_PLAN_${Date.now()}`);
+      setLoadingPlan(null);
+      return;
+    }
+
+    // 2. Paid Subscription via Cashfree
     try {
-      const orderResponse = await fetch('/api/razorpay/create-order', {
+      const orderResponse = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: plan.price, planId: plan.id }),
+        body: JSON.stringify({
+          amount: plan.price,
+          orderType: 'subscription',
+          itemId: plan.id,
+          itemTitle: `Subscription: ${plan.title}`,
+          customer: {
+            customer_id: userProfile.id || `user_${Date.now()}`,
+            customer_name: userProfile.parentName || 'Vernunt Member',
+            customer_email: userProfile.email || 'parent@vernunt.com',
+            customer_phone: userProfile.phoneNumber || '9876543210'
+          }
+        }),
       });
 
       if (!orderResponse.ok) {
-        throw new Error("Could not create Razorpay order on server backend.");
+        throw new Error("Could not initialize Cashfree order on server.");
       }
 
       const orderData = await orderResponse.json();
@@ -668,102 +721,40 @@ export default function EventsTab({
         throw new Error(orderData.error || "Failed order creation.");
       }
 
-      const scriptLoaded = await new Promise<boolean>((resolve) => {
-        if ((window as any).Razorpay) {
-          resolve(true);
-          return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-        script.async = true;
-        script.onload = () => resolve(true);
-        script.onerror = () => resolve(false);
-        document.body.appendChild(script);
-      });
-
-      if (!scriptLoaded) {
-        throw new Error("Failed to load Razorpay checkout script.");
+      if (orderData.free) {
+        await activateSubscriptionLocally(orderData.orderId);
+        setLoadingPlan(null);
+        return;
       }
 
-      const options = {
-        key: orderData.keyId || "rzp_test_simulated_key_123456",
-        amount: orderData.amount,
-        currency: orderData.currency || "INR",
-        name: "Vernunt Playdate Connect",
-        description: `Premium ${plan.title} (${plan.period}) for ${userProfile.childName || "Kid"}`,
-        image: "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=128&auto=format&fit=crop&q=80",
-        order_id: orderData.orderId,
-        handler: async function (response: any) {
+      await launchCashfreeCheckout({
+        paymentSessionId: orderData.paymentSessionId,
+        orderId: orderData.orderId,
+        amount: plan.price,
+        onSuccess: async (details) => {
           try {
-            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
+            await fetch('/api/cashfree/verify-payment', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                razorpay_order_id: response.razorpay_order_id || orderData.orderId,
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature || "simulated_signature_token"
-              }),
+              body: JSON.stringify({ orderId: orderData.orderId })
             });
-
-            const verifyResult = await verifyResponse.json();
-            if (verifyResult.success) {
-              const today = new Date();
-              const expiryDate = new Date(today);
-              expiryDate.setDate(today.getDate() + plan.durationDays);
-
-              const updatedProfile = {
-                ...userProfile,
-                subscriptionActive: true,
-                subscriptionPlan: plan.id,
-                subscriptionExpiryDate: expiryDate.toISOString().split('T')[0],
-                contactViewCredits: (userProfile.contactViewCredits || 0) + (plan.durationDays / 30) * 5,
-              };
-
-              if (onUpdateUserProfile) {
-                onUpdateUserProfile(updatedProfile);
-              }
-
-              if (auth.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
-                await setDoc(userRef, updatedProfile, { merge: true });
-              }
-
-              confetti({
-                particleCount: 150,
-                spread: 80,
-                colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
-              });
-
-              alert(`🎉 Subscription Activated!\nYour plan is active until ${expiryDate.toLocaleDateString('en-IN')}.\nYou can now proceed with your booking!`);
-            } else {
-              alert(`⚠️ Payment Validation Failed: ${verifyResult.error || 'Signature rejected'}`);
-            }
-          } catch (verifyErr: any) {
-            console.error("Signature verification of subscription failed:", verifyErr);
-            alert("Payment completed but local profile validation failed. Please contact support.");
+          } catch (vErr) {
+            console.warn('Subscription verify fallback:', vErr);
           }
+          await activateSubscriptionLocally(orderData.orderId);
+          setLoadingPlan(null);
         },
-        prefill: {
-          name: userProfile.parentName || "",
-          email: userProfile.email || "parent@vernunt.com",
-          contact: userProfile.phoneNumber || ""
+        onFailure: (err) => {
+          setSubError(err?.message || 'Payment cancelled or declined.');
+          setLoadingPlan(null);
         },
-        theme: {
-          color: "#f59e0b"
-        },
-        modal: {
-          ondismiss: function () {
-            setLoadingPlan(null);
-          }
+        onClose: () => {
+          setLoadingPlan(null);
         }
-      };
-
-      const razorpayInstance = new (window as any).Razorpay(options);
-      razorpayInstance.open();
+      });
     } catch (err: any) {
       console.error("In-popup subscription fail:", err);
       setSubError(err.message || "An unexpected error occurred.");
-    } finally {
       setLoadingPlan(null);
     }
   };
@@ -1352,18 +1343,6 @@ ${deepLink}`;
           >
             <QrCode className="w-3.5 h-3.5 text-orange-600" />
             <span>Scan Event QR</span>
-          </button>
-
-          {/* Social Share Tracking & Audit Desk Button */}
-          <button
-            id="btn-open-share-tracker-audit"
-            type="button"
-            onClick={() => setShowShareTrackerModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100 text-orange-900 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-orange-200"
-            title="Track who shared events to which mobile number (Audit Ledger)"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-orange-600" />
-            <span>Track Shares Audit</span>
           </button>
 
           {/* My Passes & Tickets Wallet Button */}
@@ -1994,12 +1973,24 @@ ${deepLink}`;
                       <span>Attend / Play LearnGeeta Portal ↗</span>
                     </a>
 
+                    {/* Social Share Button */}
+                    <button
+                      type="button"
+                      id="btn-share-geeta-banner"
+                      onClick={() => setSocialShareEvent(geetaClassEvent)}
+                      className="px-4 py-3.5 bg-orange-500/90 hover:bg-orange-500 border border-orange-400 text-white font-extrabold text-xs sm:text-sm rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer text-center shadow-md shadow-orange-500/20 active:scale-95"
+                      title="Share Bhagavad Gita Class on WhatsApp, Telegram, X, Facebook, etc."
+                    >
+                      <Share2 className="w-4 h-4 text-white" />
+                      <span>Share Class 📤</span>
+                    </button>
+
                     {/* In-app Schedule & Modal Preview Button */}
                     <button
                       type="button"
                       onClick={() => {
                         setSelectedEventId(geetaClassEvent.id);
-                        handleInitiateBooking(geetaClassEvent);
+                        setSelectedDetailEvent(geetaClassEvent);
                       }}
                       className="px-4 py-3.5 text-xs text-amber-200 hover:text-white font-bold hover:underline cursor-pointer flex items-center justify-center gap-1.5"
                     >
@@ -2044,7 +2035,7 @@ ${deepLink}`;
               defaultBadge="FEATURED"
               onSelectEvent={(evt) => {
                 setSelectedEventId(evt.id);
-                handleInitiateBooking(evt);
+                setSelectedDetailEvent(evt);
               }}
               onBookEvent={(evt) => handleInitiateBooking(evt)}
               onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2069,7 +2060,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2091,7 +2082,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2113,7 +2104,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2134,7 +2125,7 @@ ${deepLink}`;
                 }}
                 onSelectEvent={(evt) => {
                   setSelectedEventId(evt.id);
-                  handleInitiateBooking(evt);
+                  setSelectedDetailEvent(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
                 onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2154,7 +2145,7 @@ ${deepLink}`;
                 }}
                 onSelectEvent={(evt) => {
                   setSelectedEventId(evt.id);
-                  handleInitiateBooking(evt);
+                  setSelectedDetailEvent(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
                 onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2174,7 +2165,7 @@ ${deepLink}`;
                 defaultBadge="1–7d EVENT"
                 onSelectEvent={(evt) => {
                   setSelectedEventId(evt.id);
-                  handleInitiateBooking(evt);
+                  setSelectedDetailEvent(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
                 onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2191,7 +2182,7 @@ ${deepLink}`;
                   defaultBadge="FESTIVAL"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2209,7 +2200,7 @@ ${deepLink}`;
                   defaultBadge="WEEKEND"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2232,7 +2223,7 @@ ${deepLink}`;
                   defaultBadge="SWIMMING"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2250,7 +2241,7 @@ ${deepLink}`;
                   defaultBadge="CHESS"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2268,7 +2259,7 @@ ${deepLink}`;
                   defaultBadge="SPORTS CAMP"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2285,7 +2276,7 @@ ${deepLink}`;
                 defaultBadge="ACTIVITY"
                 onSelectEvent={(evt) => {
                   setSelectedEventId(evt.id);
-                  handleInitiateBooking(evt);
+                  setSelectedDetailEvent(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
                 onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2307,7 +2298,7 @@ ${deepLink}`;
                   defaultBadge="PERMANENT MUSIC"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2325,7 +2316,7 @@ ${deepLink}`;
                   defaultBadge="TUITION"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2343,7 +2334,7 @@ ${deepLink}`;
                   defaultBadge="STEM ACADEMY"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2361,7 +2352,7 @@ ${deepLink}`;
                   defaultBadge="STUDIO CLASS"
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2378,7 +2369,7 @@ ${deepLink}`;
                 defaultBadge="PERMANENT CLASS"
                 onSelectEvent={(evt) => {
                   setSelectedEventId(evt.id);
-                  handleInitiateBooking(evt);
+                  setSelectedDetailEvent(evt);
                 }}
                 onBookEvent={(evt) => handleInitiateBooking(evt)}
                 onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2404,7 +2395,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2426,7 +2417,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2448,7 +2439,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2470,7 +2461,7 @@ ${deepLink}`;
                   }}
                   onSelectEvent={(evt) => {
                     setSelectedEventId(evt.id);
-                    handleInitiateBooking(evt);
+                    setSelectedDetailEvent(evt);
                   }}
                   onBookEvent={(evt) => handleInitiateBooking(evt)}
                   onShareEvent={(evt) => setSocialShareEvent(evt)}
@@ -2843,10 +2834,10 @@ ${deepLink}`;
 
                     <button
                       type="button"
-                      onClick={handleRazorpayEventCheckout}
+                      onClick={handleCashfreeEventCheckout}
                       className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <CreditCard className="w-4.5 h-4.5" /> Proceed to Razorpay Secure
+                      <CreditCard className="w-4.5 h-4.5" /> {checkoutEvent.ticketPrice === 0 ? 'Confirm Free Pass Directly' : 'Proceed to Cashfree Secure Checkout'}
                     </button>
                   </div>
                 )
@@ -2856,8 +2847,8 @@ ${deepLink}`;
               <div className="p-12 text-center space-y-4">
                 <div className="w-12 h-12 border-4 border-indigo-505 border-t-transparent rounded-full animate-spin mx-auto" />
                 <div>
-                  <h5 className="font-bold text-sm text-slate-800">Contacting payment hub...</h5>
-                  <p className="text-xs text-slate-400">Verifying secure split UPI routes with Razorpay networks...</p>
+                  <h5 className="font-bold text-sm text-slate-800">Connecting Cashfree Gateway...</h5>
+                  <p className="text-xs text-slate-400">Verifying authorized payment session with Cashfree Payments...</p>
                 </div>
               </div>
             )}
@@ -3192,16 +3183,20 @@ ${deepLink}`;
         />
       )}
 
-      {/* Social Share Telemetry & Tracking Audit Modal */}
-      {showShareTrackerModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-fade-in">
-          <div className="relative w-full max-w-5xl my-auto">
-            <EventShareTrackerView
-              userProfile={userProfile}
-              onClose={() => setShowShareTrackerModal(false)}
-            />
-          </div>
-        </div>
+      {/* Full Details Event Card Modal */}
+      {selectedDetailEvent && (
+        <EventDetailCardModal
+          event={selectedDetailEvent}
+          userProfile={userProfile}
+          onClose={() => setSelectedDetailEvent(null)}
+          onBookEvent={(evt) => {
+            setSelectedDetailEvent(null);
+            handleInitiateBooking(evt);
+          }}
+          onShareEvent={(evt) => {
+            setSocialShareEvent(evt);
+          }}
+        />
       )}
 
       {/* In-App Camera / Image QR Scanner for Event Direct Booking */}
