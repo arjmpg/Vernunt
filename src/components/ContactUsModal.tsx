@@ -194,7 +194,7 @@ export const ContactUsModal: React.FC<ContactUsModalProps> = ({
                 </div>
                 <div>
                   <h4 className="font-serif font-black text-slate-900 text-sm">Official Email Channels</h4>
-                  <p className="text-xs text-slate-600">Parent care, grievance &amp; property desks</p>
+                  <p className="text-xs text-slate-600">Parent care &amp; grievance support desks</p>
                 </div>
                 <div className="space-y-1.5">
                   <div className="bg-white p-2 rounded-xl border border-rose-200 flex items-center justify-between gap-1.5 text-xs">

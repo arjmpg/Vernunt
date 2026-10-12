@@ -13,7 +13,6 @@ import {
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
   Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins
 } from 'lucide-react';
-import AdminKidsInvestmentsView from './admin/AdminKidsInvestmentsView.tsx';
 import { db, handleFirestoreError, OperationType, auth } from '../utils/firebase.ts';
 import { doc, setDoc, updateDoc, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
 import { ChildProfile, VerificationStatus, CommunityEvent, SubscriptionPlan, AdminCouponCode } from '../types.ts';
@@ -1709,28 +1708,6 @@ export default function AdminDashboard({
             >
               <Phone className="w-4 h-4 shrink-0 text-[#72aee6]" />
               {(isMobileMenuOpen || !isSidebarCollapsed) && <span>Contact Audits</span>}
-            </button>
-
-            {/* MENU ITEM: Kids Wealth & Leads Tracking */}
-            <button
-              type="button"
-              onClick={() => { setActiveMenu('kids-investments'); setIsMobileMenuOpen(false); }}
-              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
-                activeMenu === 'kids-investments'
-                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-amber-400'
-                  : 'hover:bg-[#135e96] hover:text-white'
-              }`}
-              title="Kids Wealth & Leads"
-            >
-              <Coins className="w-4 h-4 shrink-0 text-amber-300" />
-              {(isMobileMenuOpen || !isSidebarCollapsed) && (
-                <div className="flex items-center justify-between w-full">
-                  <span>Kids Wealth Leads</span>
-                  <span className="bg-emerald-500 text-white text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
-                    SMS Track
-                  </span>
-                </div>
-              )}
             </button>
 
             {/* MENU ITEM: Security & Tools */}
@@ -5399,13 +5376,6 @@ export default function AdminDashboard({
                 </div>
               </div>
             </div>
-          )}
-
-          {/* ========================================================================= */}
-          {/* VIEW H-2: KIDS FUTURE WEALTH & LEADS AUDIT                                */}
-          {/* ========================================================================= */}
-          {activeMenu === 'kids-investments' && (
-            <AdminKidsInvestmentsView />
           )}
 
           {/* ========================================================================= */}

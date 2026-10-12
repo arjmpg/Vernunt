@@ -66,7 +66,6 @@ interface LandingLoginGatewayProps {
   onOpenContactUs?: () => void;
   onOpenKidStories?: () => void;
   onOpenEvents?: () => void;
-  onOpenKidsInvestments?: () => void;
   onOpenStore?: () => void;
   onOpenDaycare?: () => void;
   onOpenGroups?: () => void;
@@ -93,7 +92,6 @@ export default function LandingLoginGateway({
   onOpenContactUs,
   onOpenKidStories,
   onOpenEvents,
-  onOpenKidsInvestments,
   onOpenStore,
   onOpenDaycare,
   onOpenGroups,
@@ -171,15 +169,6 @@ export default function LandingLoginGateway({
   const homeBanners = banners.filter(b => b.active && (b.placement === 'home' || !b.placement));
   
   const defaultHomeBanners = [
-    {
-      title: "We Bring Low Cost Properties for Your Kid's Future! Verified Sites & Plots",
-      subtitle: "Smart future wealth planning: Curated verified plots & sites, mutual funds SIP, and gold/silver monthly schemes with transparent EMI calculations.",
-      imageUrl: "https://images.unsplash.com/photo-1500382017468-9049fed747ef?auto=format&fit=crop&q=80&w=1200",
-      tag: "Kids Future Wealth",
-      badgeText: "Low Cost Properties",
-      linkUrl: "#",
-      ctaText: "Explore Kids Investments ↗"
-    },
     {
       title: "Bengaluru & Mumbai Monsoon Play Festival 2026: Outdoor Games & Pottery!",
       subtitle: "Join neighborhood friends in safe, parent-monitored community parks and creative playgroups.",
@@ -944,13 +933,6 @@ export default function LandingLoginGateway({
 
             {/* Quick Trust Pills */}
             <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1 text-slate-700">
-              <button
-                type="button"
-                onClick={onOpenKidsInvestments}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-full text-xs font-bold text-emerald-800 shadow-2xs transition cursor-pointer"
-              >
-                💰 Kids Investments &amp; Low Cost Properties
-              </button>
               <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white/90 border border-amber-200/80 rounded-full text-xs font-bold shadow-2xs">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 100% Aadhaar Verified Safety
@@ -980,12 +962,12 @@ export default function LandingLoginGateway({
               What would you like to explore today?
             </h2>
             <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto leading-relaxed">
-              Select an option below to shop, browse activities, read stories, plan investments, or connect with verified nearby families.
+              Select an option below to shop, browse activities, read stories, or connect with verified nearby families.
             </p>
           </div>
 
           {/* Feature Grid with High Contrast Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 text-left pt-1">
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-left pt-1">
             
             {/* 1. Connect with Nearby Kids/Parents (Asks for Login/Registration) */}
             <button
@@ -1022,7 +1004,7 @@ export default function LandingLoginGateway({
             <button
               id="feature-btn-store"
               type="button"
-              onClick={() => onOpenStore ? onOpenStore() : onOpenKidsInvestments && onOpenKidsInvestments()}
+              onClick={() => onOpenStore && onOpenStore()}
               className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-amber-200 hover:border-amber-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-amber-100"
             >
               <div className="space-y-2">
@@ -1049,38 +1031,7 @@ export default function LandingLoginGateway({
               </div>
             </button>
 
-            {/* 3. Kids Investments & Low Cost Plots */}
-            <button
-              id="feature-btn-kids-investments"
-              type="button"
-              onClick={() => onOpenKidsInvestments && onOpenKidsInvestments()}
-              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-emerald-100"
-            >
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
-                    <Coins className="w-5 h-5" />
-                  </div>
-                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-200">
-                    Future Wealth
-                  </span>
-                </div>
-                <div>
-                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-emerald-600 transition leading-snug">
-                    Kids Investments &amp; Plots
-                  </h3>
-                  <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                    Low-cost verified family plots, child mutual funds SIP, Sukanya Samriddhi &amp; gold.
-                  </p>
-                </div>
-              </div>
-              <div className="pt-2.5 mt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] font-extrabold text-emerald-600 group-hover:text-emerald-700">
-                <span>View Investments 💰</span>
-                <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
-              </div>
-            </button>
-
-            {/* 4. Activities, Classes & Events */}
+            {/* 3. Activities, Classes & Events */}
             <button
               id="feature-btn-events"
               type="button"
@@ -1363,15 +1314,11 @@ export default function LandingLoginGateway({
                     const slide = activeSlides[currentSlideIndex];
                     if (slide.linkUrl && slide.linkUrl !== '#') {
                       window.open(slide.linkUrl, '_blank');
-                    } else if (slide.tag === 'Kids Future Wealth' || slide.ctaText?.includes('Investments')) {
-                      if (onOpenKidsInvestments) onOpenKidsInvestments();
-                    } else if (currentSlideIndex === 0 && onOpenKidsInvestments) {
-                      onOpenKidsInvestments();
-                    } else if (currentSlideIndex === 1 && onOpenEvents) {
+                    } else if (currentSlideIndex === 0 && onOpenEvents) {
                       onOpenEvents();
-                    } else if (currentSlideIndex === 2 && onOpenKidStories) {
+                    } else if (currentSlideIndex === 1 && onOpenKidStories) {
                       onOpenKidStories();
-                    } else if (currentSlideIndex === 3) {
+                    } else if (currentSlideIndex === 2) {
                       onStartSignUp('Daycare Center');
                     } else if (onOpenEvents) {
                       onOpenEvents();
@@ -2666,38 +2613,6 @@ export default function LandingLoginGateway({
                   </div>
                 </button>
 
-                {/* 6. Kids Wealth & Investment Planners */}
-                <button
-                  id="cat-select-wealth"
-                  type="button"
-                  onClick={() => {
-                    setShowSpecialistCategoriesModal(false);
-                    if (onOpenSpecialists) onOpenSpecialists('Kids Wealth & Investment Planners');
-                  }}
-                  className="p-3.5 rounded-2xl border-2 border-indigo-200 hover:border-indigo-400 bg-indigo-50/50 hover:bg-white hover:shadow-md transition-all duration-150 text-left flex items-start gap-3 cursor-pointer group active:scale-98 shadow-2xs"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-white border border-indigo-200 flex items-center justify-center text-xl shrink-0 shadow-2xs group-hover:scale-105 transition">
-                    💰
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900 group-hover:text-indigo-700 transition leading-snug">
-                        Kids Wealth &amp; Investment Planners
-                      </h4>
-                    </div>
-                    <p className="text-[11px] text-slate-500 mt-1 leading-snug line-clamp-2">
-                      AMFI certified advisors for minor mutual fund portfolios, education SIP &amp; wealth.
-                    </p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-700">
-                        Future Wealth
-                      </span>
-                      <span className="text-[11px] font-bold text-indigo-600 group-hover:translate-x-0.5 transition inline-flex items-center gap-0.5">
-                        Consult <span>→</span>
-                      </span>
-                    </div>
-                  </div>
-                </button>
               </div>
             </div>
 

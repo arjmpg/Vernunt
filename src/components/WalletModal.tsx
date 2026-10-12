@@ -133,6 +133,8 @@ export default function WalletModal({
       await launchCashfreeCheckout({
         paymentSessionId: orderData.paymentSessionId,
         orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
+        amount: finalAmount,
         onSuccess: async (details) => {
           try {
             const verifyRes = await fetch('/api/cashfree/verify-payment', {

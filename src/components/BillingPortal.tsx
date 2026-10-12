@@ -248,6 +248,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
       await launchCashfreeCheckout({
         paymentSessionId: orderData.paymentSessionId,
         orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
         amount: plan.price,
         onSuccess: async (details) => {
           try {

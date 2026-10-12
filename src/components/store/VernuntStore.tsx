@@ -895,6 +895,8 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       await launchCashfreeCheckout({
         paymentSessionId: orderData.paymentSessionId,
         orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
+        amount: remainingOnlinePayable,
         onSuccess: async (details) => {
           // Verify on backend before confirming order
           try {

@@ -7,9 +7,6 @@ import {
   Globe, RefreshCw, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp,
   ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, ArrowLeft, ArrowRight
 } from 'lucide-react';
-import { MutualFundAdvisor } from '../types/investment.ts';
-import { INITIAL_MUTUAL_FUND_ADVISORS } from '../data/kidsInvestmentData.ts';
-import MutualFundAdvisorDashboard from './investments/MutualFundAdvisorDashboard.tsx';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import PediatricianPortfolioModal from './PediatricianPortfolioModal.tsx';
@@ -124,69 +121,8 @@ export default function SpecialistsTab({
   const [showAdminClaimsModal, setShowAdminClaimsModal] = useState<boolean>(false);
   const isSuperAdmin = isAuthorizedSystemAdmin(currentProfile?.email, currentProfile?.userRole);
 
-  // Mutual Fund & Kids Wealth Advisors state
-  const [showAdvisorDashboard, setShowAdvisorDashboard] = useState<boolean>(false);
-  const [advisors, setAdvisors] = useState<MutualFundAdvisor[]>(() => {
-    try {
-      const saved = localStorage.getItem('vernunt_custom_advisors');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {
-      console.debug('Error loading advisors in SpecialistsTab', e);
-    }
-    return INITIAL_MUTUAL_FUND_ADVISORS;
-  });
-
-  const handleAddAdvisor = (adv: MutualFundAdvisor) => {
-    setAdvisors(prev => {
-      const updated = [adv, ...prev];
-      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleUpdateAdvisor = (adv: MutualFundAdvisor) => {
-    setAdvisors(prev => {
-      const updated = prev.map(a => a.id === adv.id ? adv : a);
-      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  const handleDeleteAdvisor = (advId: string) => {
-    setAdvisors(prev => {
-      const updated = prev.filter(a => a.id !== advId);
-      localStorage.setItem('vernunt_custom_advisors', JSON.stringify(updated));
-      return updated;
-    });
-  };
-
-  // Combine clinical specialists with Certified AMFI Kids Wealth & Mutual Fund Advisors
-  const combinedSpecialistsList = useMemo(() => {
-    const advisorSpecs: SpecialistProfile[] = advisors.map(adv => ({
-      id: adv.id,
-      name: adv.name,
-      title: `${adv.agencyName || 'Certified'} • AMFI Registered Mutual Fund Advisor`,
-      category: 'Kids Wealth & Investment Planners',
-      rating: adv.rating || 4.9,
-      reviewsCount: adv.reviewsCount || 128,
-      experienceYears: adv.experienceYears || 10,
-      bio: adv.bio || 'AMFI Certified Mutual Fund Distributor specializing in Child Future Planning and Minor Demat structuring.',
-      location: `${adv.city}, ${adv.state}`,
-      photoUrl: adv.photoUrl || 'https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&q=80&w=400',
-      sessionFee: adv.feeType === 'Free Initial Consultation' ? 0 : 499,
-      availableSlots: ['10:00 AM', '02:00 PM', '05:00 PM', '07:00 PM'],
-      specialties: adv.specialization?.length ? adv.specialization : ['Child Education Corpus', 'Equity SIP', 'AMFI Certified Portfolio'],
-      languages: adv.languages?.length ? adv.languages : ['English', 'Hindi'],
-      qualifications: `ARN: ${adv.arnNumber}${adv.sebiRegNumber ? ` • SEBI: ${adv.sebiRegNumber}` : ''}`,
-      hospitalAffiliation: adv.agencyName || 'Mutual Fund Advisory Practice',
-      clinicAddress: `${adv.city}, ${adv.state}`,
-      phone: adv.phone,
-      email: adv.email,
-      isVerified: adv.verificationStatus === 'AMFI_VERIFIED'
-    }));
-
-    return [...specialistsList, ...advisorSpecs];
-  }, [specialistsList, advisors]);
+  // Combine clinical specialists list
+  const combinedSpecialistsList = specialistsList;
 
   // Automatically attempt to locate user GPS on initial load for nearest distance sorting
   useEffect(() => {
@@ -517,20 +453,6 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       tags: ['Swimming', 'Gymnastics', 'Football Training', 'Motor Skills']
     },
     { 
-      key: 'Kids Wealth & Investment Planners', 
-      label: 'Kids Wealth & MF Planners', 
-      shortLabel: 'Wealth & MF',
-      icon: TrendingUp, 
-      color: 'text-indigo-600', 
-      bgColor: 'bg-indigo-50',
-      borderColor: 'border-indigo-200',
-      gradient: 'from-indigo-500/10 to-indigo-500/5',
-      accentColor: 'bg-indigo-600',
-      badgeBg: 'bg-indigo-100 text-indigo-800',
-      subtitle: 'AMFI certified advisors for minor Demats, college education funds & goal SIPs',
-      tags: ['Child Education Fund', 'Minor Demat', 'Equity SIP', 'AMFI Verified']
-    },
-    { 
       key: 'All', 
       label: 'All Verified Specialists', 
       shortLabel: 'All Specialists',
@@ -758,6 +680,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       await launchCashfreeCheckout({
         paymentSessionId: orderData.paymentSessionId,
         orderId: orderData.orderId,
+        isProd: orderData.isProd ?? (orderData.environment === 'production'),
+        amount: plan.price,
         onSuccess: async () => {
           try {
             await fetch('/api/cashfree/verify-payment', {
@@ -1225,7 +1149,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 Consult Verified Specialists Across India
               </h2>
               <p id="specs-main-subtitle" className="text-sm text-slate-600 leading-relaxed">
-                Connect with verified pediatricians, child therapists, gynecologists, nutritionists, sports mentors, and certified wealth planners. Choose a category below to explore authentic clinical portfolios.
+                Connect with verified pediatricians, child therapists, gynecologists, nutritionists, and sports mentors. Choose a category below to explore authentic clinical portfolios.
               </p>
 
               {/* Quick Search across all doctors */}
@@ -2478,16 +2402,6 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           onClaimApproved={handleClaimApproved}
         />
       )}
-
-      {/* Mutual Fund Advisor Dashboard & Credentials Manager */}
-      <MutualFundAdvisorDashboard
-        isOpen={showAdvisorDashboard}
-        onClose={() => setShowAdvisorDashboard(false)}
-        advisors={advisors}
-        onAddAdvisor={handleAddAdvisor}
-        onUpdateAdvisor={handleUpdateAdvisor}
-        onDeleteAdvisor={handleDeleteAdvisor}
-      />
 
     </div>
   );

@@ -73,6 +73,7 @@ export interface LaunchCashfreeCheckoutOptions {
 function renderInDomCashfreeSimulator({
   orderId,
   paymentSessionId,
+  isProd = false,
   amount,
   currency = 'INR',
   onSuccess,
@@ -81,6 +82,7 @@ function renderInDomCashfreeSimulator({
 }: {
   orderId: string;
   paymentSessionId: string;
+  isProd?: boolean;
   amount?: number;
   currency?: string;
   onSuccess: (paymentDetails: any) => void;
@@ -107,7 +109,9 @@ function renderInDomCashfreeSimulator({
           <div>
             <div class="flex items-center gap-2">
               <span class="text-xs font-black uppercase tracking-wider text-amber-400">Cashfree Payments</span>
-              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">Sandbox Gateway</span>
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded-full ${isProd ? 'bg-emerald-500/30 text-emerald-200 border border-emerald-400/30' : 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/30'}">
+                ${isProd ? 'Production Gateway' : 'Sandbox Gateway'}
+              </span>
             </div>
             <h3 class="text-sm sm:text-base font-black text-white mt-0.5">Secure Checkout</h3>
           </div>
@@ -252,6 +256,7 @@ export async function launchCashfreeCheckout({
     renderInDomCashfreeSimulator({
       orderId,
       paymentSessionId: paymentSessionId || `session_sim_${Date.now()}`,
+      isProd,
       amount,
       currency,
       onSuccess,
@@ -283,6 +288,7 @@ export async function launchCashfreeCheckout({
           renderInDomCashfreeSimulator({
             orderId,
             paymentSessionId,
+            isProd,
             amount,
             currency,
             onSuccess,
@@ -303,6 +309,7 @@ export async function launchCashfreeCheckout({
         renderInDomCashfreeSimulator({
           orderId,
           paymentSessionId,
+          isProd,
           amount,
           currency,
           onSuccess,
@@ -320,6 +327,7 @@ export async function launchCashfreeCheckout({
   renderInDomCashfreeSimulator({
     orderId,
     paymentSessionId,
+    isProd,
     amount,
     currency,
     onSuccess,

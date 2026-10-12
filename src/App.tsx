@@ -93,7 +93,6 @@ const GoogleSearchConsoleAndMerchantModal = React.lazy(() => import('./component
 import PushNotificationModal from './components/notifications/PushNotificationModal.tsx';
 import ForegroundPushToast from './components/notifications/ForegroundPushToast.tsx';
 import { registerServiceWorkerForFCM } from './utils/fcmMessaging.ts';
-const KidsInvestmentsTab = React.lazy(() => import('./components/investments/KidsInvestmentsTab.tsx'));
 import WalletModal from './components/WalletModal.tsx';
 import { getStoredWallet } from './utils/walletStorage.ts';
 import { UserWallet } from './types.ts';
@@ -244,15 +243,6 @@ const TAB_DEFINITIONS: TabDefinition[] = [
 
   // 4. Family Finance & Perks
   { 
-    id: 'kids_investments', 
-    label: '💰 Kids Investment & Wealth', 
-    shortLabel: 'Kids Investments', 
-    icon: Coins, 
-    category: 'finance',
-    description: 'Minor mutual funds, education SIPs, digital gold & compounding assets for kids',
-    badge: 'Wealth'
-  },
-  { 
     id: 'store', 
     label: '🛍️ Vernunt Store', 
     shortLabel: 'Store', 
@@ -329,7 +319,6 @@ export const DEFAULT_TABS_CONFIG: { [key: string]: 'header' | 'side' } = {
   store: 'side',
   kid_stories: 'side',
   knowledge: 'side',
-  kids_investments: 'side',
   billing: 'side',
   planner: 'side',
   referrals: 'side',
@@ -434,7 +423,7 @@ export default function App() {
     childAge: 5,
     gender: 'Other',
     location: 'Bangalore, India',
-    interests: ['Outdoor Play', 'Learning', 'Kids Future Wealth'],
+    interests: ['Outdoor Play', 'Learning', 'Creative Arts'],
     bio: 'Exploring Vernunt Parent Community & Child Future Hub',
     isVerified: false,
     verificationStatus: 'Unverified',
@@ -452,14 +441,6 @@ export default function App() {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (
-          params.get('tab') === 'kids_investments' ||
-          params.get('tab') === 'investments' ||
-          params.get('tab') === 'investment' ||
-          window.location.pathname.startsWith('/investments')
-        ) {
-          return 'dashboard';
-        }
         if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
           return 'dashboard';
         }
@@ -494,7 +475,7 @@ export default function App() {
     return initialSession ? 'dashboard' : 'landing';
   });
   const [activeTab, setActiveTab] = useState<
-    'radar' | 'kids_investments' | 'daycare' | 'chat' | 'planner' | 'events' | 
+    'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 
     'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 
     'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories' | 
     'groups' | 'community' | 'pages' | 'tracker'
@@ -502,14 +483,6 @@ export default function App() {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (
-          params.get('tab') === 'kids_investments' ||
-          params.get('tab') === 'investments' ||
-          params.get('tab') === 'investment' ||
-          window.location.pathname.startsWith('/investments')
-        ) {
-          return 'kids_investments';
-        }
         if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
           return 'store';
         }
@@ -659,13 +632,12 @@ export default function App() {
   }, []);
 
   // Bottom Navigation Tabs (BookMyShow Style with small text and icons):
-  // "And mention playmate, store, events, kids investments, specialists, baby sitting and day cares in bottom"
+  // Playmate, Store, Events, Specialists, Baby Sitting & Day Cares in bottom
   const bottomNavTabs = useMemo(() => {
     return [
       { id: 'radar', label: 'Playmate', icon: Navigation },
       { id: 'store', label: 'Store', icon: ShoppingBag },
       { id: 'events', label: 'Events', icon: Sparkles },
-      { id: 'kids_investments', label: 'Kids Investments', icon: Coins },
       { id: 'specialists', label: 'Specialists', icon: Users },
       { id: 'daycare', label: 'Baby Sitting & Day Cares', icon: Baby },
     ];
@@ -992,7 +964,7 @@ export default function App() {
         setUserProfile(null);
         setUserRole('Parent');
         
-        // Preserve 'dashboard' mode if arriving via deep link (events, stories, investments, specialists, store)
+        // Preserve 'dashboard' mode if arriving via deep link (events, stories, specialists, store)
         const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
         const hasDeepLink = params && (
           params.get('tab') === 'events' ||
@@ -1002,8 +974,6 @@ export default function App() {
           params.get('tab') === 'kid_stories' ||
           params.get('tab') === 'stories' ||
           !!params.get('story') ||
-          params.get('tab') === 'kids_investments' ||
-          params.get('tab') === 'investments' ||
           params.get('tab') === 'store' ||
           params.get('tab') === 'specialists' ||
           !!params.get('specialist') ||
@@ -3609,12 +3579,6 @@ export default function App() {
               setIsGuestViewingKnowledge(false);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onOpenKidsInvestments={() => {
-              setAppMode('dashboard');
-              setActiveTab('kids_investments');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
             onOpenStore={() => {
               setAppMode('dashboard');
               setActiveTab('store');
@@ -3946,7 +3910,7 @@ export default function App() {
                     To safeguard neighborhood children and maintain 100% Aadhaar safety, real-time playmates proximity radar and connect requests require guardian sign-in.
                   </p>
                   <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 max-w-md mx-auto">
-                    ✨ All other features — Kids Wealth Investments &amp; Plots, Verified Specialists, Playfest Events, 1000+ Guides, Stories Flipbooks, and Daycares — are 100% open for guests!
+                    ✨ All other features — Verified Specialists, Playfest Events, 1000+ Guides, Stories Flipbooks, and Daycares — are 100% open for guests!
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
@@ -3959,13 +3923,6 @@ export default function App() {
                     className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
                   >
                     Sign In / Register Guardian ↗
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('kids_investments')}
-                    className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shadow-md transition cursor-pointer"
-                  >
-                    💰 Explore Kids Investments &amp; Plots
                   </button>
                   <button
                     type="button"
@@ -4050,14 +4007,6 @@ export default function App() {
             )}
 
             <Suspense fallback={<TabLoadingFallback />}>
-              {/* Tab: Kids Investment & Wealth Planning (Plots, Mutual Funds, Gold/Silver) */}
-              {activeTab === 'kids_investments' && (
-              <KidsInvestmentsTab 
-                currentProfile={userProfile} 
-                onNavigateToTab={(targetTab) => setActiveTab(targetTab as any)}
-              />
-            )}
-
             {/* Tab: Peanut-Style Vernunt Groups & Circles */}
             {activeTab === 'groups' && (
               <VernuntGroupsHub 
@@ -5735,7 +5684,7 @@ export default function App() {
         }}
       />
 
-      {/* BookMyShow Style Fixed Bottom Navigation Bar (Playmate, Store, Events, Kids Investments, Specialists, Baby Sitting & Day Cares) */}
+      {/* BookMyShow Style Fixed Bottom Navigation Bar (Playmate, Store, Events, Specialists, Baby Sitting & Day Cares) */}
       {appMode === 'dashboard' && (
         <nav
           id="bottom-navigation-bar"
