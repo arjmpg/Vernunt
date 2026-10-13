@@ -26,9 +26,11 @@ import {
   Users,
   Lock,
   Phone,
-  Calendar
+  Calendar,
+  Eye,
+  EyeOff
 } from 'lucide-react';
-import { RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../utils/firebase.ts';
 import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts';
 import VernuntLogo from './VernuntLogo.tsx';
@@ -168,6 +170,14 @@ export default function RegistrationHub({
     type: 'success' as 'info' | 'error' | 'success' 
   });
   const [expectedEmailOtpCode, setExpectedEmailOtpCode] = useState('');
+
+  // --- PASSWORD & SECURITY CREDENTIALS STATES ---
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSubmittingForm, setIsSubmittingForm] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(true);
 
   // Automatically request phone verification OTP if arriving with a 10-digit number that isn't verified yet
   useEffect(() => {

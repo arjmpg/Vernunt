@@ -348,17 +348,7 @@ export default function DigiLockerVerificationBox({
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2">
-              <button
-                type="button"
-                onClick={handleQuickDemoVerify}
-                disabled={isLoading}
-                className="text-[10.5px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/10 hover:bg-amber-500/20 px-3 py-2 rounded-xl border border-amber-400/30 transition flex items-center gap-1.5 cursor-pointer w-full sm:w-auto justify-center"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                <span>⚡ Instant DigiLocker Pull</span>
-              </button>
-
+            <div className="flex justify-end pt-2">
               <button
                 type="button"
                 onClick={handleSendOtp}
@@ -397,20 +387,6 @@ export default function DigiLockerVerificationBox({
               <p className="text-[11px] text-emerald-200/90">
                 A one-time verification code has been dispatched via UIDAI authentication gateway.
               </p>
-              {devHintOtp && (
-                <div className="pt-1 flex items-center gap-2">
-                  <span className="text-[10px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded-md font-mono font-bold">
-                    Demo OTP Hint: {devHintOtp}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setOtp(devHintOtp)}
-                    className="text-[10px] text-cyan-300 underline cursor-pointer hover:text-white"
-                  >
-                    Auto-Fill
-                  </button>
-                </div>
-              )}
             </div>
 
             <div className="space-y-2">

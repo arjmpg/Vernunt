@@ -919,20 +919,6 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
             )}
           </div>
 
-          {/* Quick 1-Click Fast Verification for testing */}
-          {(!phoneVerified || !emailVerified) && (
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[10px] text-slate-400">Testing shortcut:</span>
-              <button
-                type="button"
-                onClick={handleQuickVerifyAll}
-                className="text-[10px] text-rose-700 hover:text-rose-800 font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
-              >
-                ⚡ 1-Click Fast Verify All
-              </button>
-            </div>
-          )}
-
           {/* Privacy Note */}
           <div className="flex items-center gap-2 text-[10px] text-slate-500 pt-1">
             <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />

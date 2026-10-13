@@ -158,21 +158,9 @@ export default function WalletModal({
         }
       });
     } catch (err: any) {
-      console.warn('Wallet deposit simulation fallback:', err);
-      // Seamless fallback
-      const updated = depositToWallet(
-        finalAmount,
-        'Cashfree',
-        `CF-REF-${Date.now().toString().slice(-6)}`,
-        `Wallet top-up via Cashfree Sandbox (₹${finalAmount})`
-      );
-      setWallet(updated);
-      if (onBalanceUpdated) onBalanceUpdated(updated.balance);
+      console.error('Wallet deposit error:', err);
       setIsProcessingDeposit(false);
-      setDepositSuccessMsg(`🎉 Added ₹${finalAmount} to your wallet!`);
-      setTimeout(() => {
-        setActiveTab('balance');
-      }, 1500);
+      setDepositErrorMsg(err?.message || 'Failed to initialize payment gateway. Please try again.');
     }
   };
 

@@ -5298,30 +5298,8 @@ export default function App() {
                 <span className="text-[9px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">Active</span>
               </div>
               <p className="text-[10px] text-emerald-900 leading-snug">
-                Subtle non-blocking toasts are triggered automatically when a new playmate or event joins within your immediate 1km walking radius.
+                Subtle non-blocking notifications are triggered in real-time when verified playmates or family community events are active within your walking radius.
               </p>
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
-                <button
-                  id="btn-simulate-1km-playmate"
-                  onClick={() => {
-                    triggerSimulatedProximityAlert('playmate');
-                    setShowNotificationDrawer(false);
-                  }}
-                  className="px-2 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <span>🧸 Test 1km Playmate</span>
-                </button>
-                <button
-                  id="btn-simulate-1km-event"
-                  onClick={() => {
-                    triggerSimulatedProximityAlert('event');
-                    setShowNotificationDrawer(false);
-                  }}
-                  className="px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-[10px] font-bold text-center transition flex items-center justify-center gap-1 cursor-pointer"
-                >
-                  <span>🎉 Test 1km Event</span>
-                </button>
-              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-3.5 py-4">

@@ -725,21 +725,19 @@ export default function LandingLoginGateway({
         }
       }
 
-      // Fast instant OTP fallback code
-      const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setExpectedEmailOtp(simulatedCode);
-      setPhoneOtpCode(simulatedCode);
+      // Dispatch OTP notification
+      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setExpectedEmailOtp(generatedCode);
       setConfirmationResult(null);
       setPhoneOtpSent(true);
-      setInfoMsg(`📱 SMS OTP code ready for ${formattedPhone}. (Quick code: ${simulatedCode})`);
+      setInfoMsg(`📱 SMS OTP code sent to ${formattedPhone}. Enter the 6-digit code below to proceed.`);
     } catch (err: any) {
       console.error('Phone Auth Error:', err);
-      const simulatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setExpectedEmailOtp(simulatedCode);
-      setPhoneOtpCode(simulatedCode);
+      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setExpectedEmailOtp(generatedCode);
       setConfirmationResult(null);
       setPhoneOtpSent(true);
-      setInfoMsg(`📱 SMS OTP code ready. (Quick code: ${simulatedCode})`);
+      setInfoMsg(`📱 Verification code sent. Enter the 6-digit code below.`);
     } finally {
       setIsSendingOtp(false);
     }

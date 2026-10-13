@@ -812,36 +812,6 @@ export default function ActivityFeedWidget({
           })
         )}
       </div>
-
-      {/* Simulation / Testing Action Bar */}
-      {onTriggerSimulatedAlert && (
-        <div className="p-3 bg-slate-100/80 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-1.5 text-slate-500 text-[11px] font-bold">
-            <Sparkles className="w-3.5 h-3.5 text-orange-500" />
-            <span>Test Real-Time Categories:</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <button
-              id="btn-sim-test-playmate-feed"
-              type="button"
-              onClick={() => onTriggerSimulatedAlert('playmate')}
-              className="px-2 py-1 bg-white hover:bg-rose-50 text-rose-800 border border-rose-200 rounded-lg text-[10px] font-extrabold transition cursor-pointer shadow-2xs"
-            >
-              + Test Playmate Blip
-            </button>
-
-            <button
-              id="btn-sim-test-event-feed"
-              type="button"
-              onClick={() => onTriggerSimulatedAlert('event')}
-              className="px-2 py-1 bg-white hover:bg-amber-50 text-amber-900 border border-amber-200 rounded-lg text-[10px] font-extrabold transition cursor-pointer shadow-2xs"
-            >
-              + Test Event Alert
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -237,7 +237,7 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
       notes: payload.notes,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      environment: 'simulated'
+      environment: 'production'
     };
     paymentLedger.set(orderId, freeRecord);
 
@@ -254,122 +254,116 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
 
   const config = getCashfreeConfig();
 
-  // 2. Real Cashfree API integration (Sandbox or Production)
-  if (config.isConfigured) {
-    try {
-      const response = await fetch(`${config.apiEndpoint}/orders`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-client-id': config.appId,
-          'x-client-secret': config.secretKey,
-          'x-api-version': config.apiVersion
-        },
-        body: JSON.stringify({
-          order_id: orderId,
-          order_amount: roundedAmount,
-          order_currency: currency,
-          customer_details: {
-            customer_id: customerId,
-            customer_email: customerEmail,
-            customer_phone: customerPhone,
-            customer_name: customerName
-          },
-          order_meta: {
-            return_url: payload.returnUrl || `https://app.vernunt.com/?order_id=${orderId}&status={order_status}`,
-            notify_url: 'https://app.vernunt.com/api/cashfree/webhook'
-          },
-          order_note: `${payload.itemTitle || payload.orderType} on Vernunt Playdates`,
-          order_tags: {
-            type: payload.orderType,
-            itemId: payload.itemId || 'general'
-          }
-        })
-      });
+  if (!config.isConfigured) {
+    console.error('[Cashfree Configuration Missing]', { appId: config.appId ? 'PRESENT' : 'MISSING' });
+    return {
+      success: false,
+      free: false,
+      orderId,
+      amount: roundedAmount,
+      currency,
+      isProd: true,
+      error: 'Cashfree Payment Gateway credentials are not configured on server.',
+      message: 'Cashfree credentials missing.'
+    };
+  }
 
-      const cfData = await response.json();
-
-      if (!response.ok) {
-        console.error('[Cashfree API Error]', cfData);
-        throw new Error(cfData.message || 'Cashfree payment session establishment failed.');
-      }
-
-      const record: CashfreePaymentRecord = {
-        orderId,
-        cfOrderId: cfData.cf_order_id,
-        paymentSessionId: cfData.payment_session_id,
-        amount: roundedAmount,
-        currency,
-        customer: {
+  // 2. Real Cashfree API integration (Production or Sandbox)
+  try {
+    const response = await fetch(`${config.apiEndpoint}/orders`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-client-id': config.appId,
+        'x-client-secret': config.secretKey,
+        'x-api-version': config.apiVersion
+      },
+      body: JSON.stringify({
+        order_id: orderId,
+        order_amount: roundedAmount,
+        order_currency: currency,
+        customer_details: {
           customer_id: customerId,
-          customer_phone: customerPhone,
           customer_email: customerEmail,
+          customer_phone: customerPhone,
           customer_name: customerName
         },
-        orderType: payload.orderType,
-        itemId: payload.itemId,
-        itemTitle: payload.itemTitle,
-        status: 'PENDING',
-        notes: payload.notes,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        environment: config.isProd ? 'production' : 'sandbox'
-      };
-      paymentLedger.set(orderId, record);
+        order_meta: {
+          return_url: payload.returnUrl || `https://app.vernunt.com/?order_id=${orderId}&status={order_status}`,
+          notify_url: 'https://app.vernunt.com/api/cashfree/webhook'
+        },
+        order_note: `${payload.itemTitle || payload.orderType} on Vernunt Playdates`,
+        order_tags: {
+          type: payload.orderType,
+          itemId: payload.itemId || 'general'
+        }
+      })
+    });
 
+    const cfData = await response.json();
+
+    if (!response.ok) {
+      console.error('[Cashfree API Error]', cfData);
       return {
-        success: true,
+        success: false,
         free: false,
         orderId,
-        cfOrderId: cfData.cf_order_id,
-        paymentSessionId: cfData.payment_session_id,
         amount: roundedAmount,
         currency,
         isProd: config.isProd,
-        environment: config.isProd ? 'production' : 'sandbox',
-        message: 'Cashfree payment session established successfully.'
+        error: cfData.message || 'Cashfree payment session establishment failed.',
+        message: cfData.message || 'Payment initiation rejected by Cashfree gateway.'
       };
-    } catch (cfErr: any) {
-      console.warn('[Cashfree Live Request Fallback]', cfErr?.message || cfErr);
-      // Fallback to sandbox simulator mode if network/credentials failed during development preview
     }
+
+    const record: CashfreePaymentRecord = {
+      orderId,
+      cfOrderId: cfData.cf_order_id,
+      paymentSessionId: cfData.payment_session_id,
+      amount: roundedAmount,
+      currency,
+      customer: {
+        customer_id: customerId,
+        customer_phone: customerPhone,
+        customer_email: customerEmail,
+        customer_name: customerName
+      },
+      orderType: payload.orderType,
+      itemId: payload.itemId,
+      itemTitle: payload.itemTitle,
+      status: 'PENDING',
+      notes: payload.notes,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      environment: config.isProd ? 'production' : 'sandbox'
+    };
+    paymentLedger.set(orderId, record);
+
+    return {
+      success: true,
+      free: false,
+      orderId,
+      cfOrderId: cfData.cf_order_id,
+      paymentSessionId: cfData.payment_session_id,
+      amount: roundedAmount,
+      currency,
+      isProd: config.isProd,
+      environment: config.isProd ? 'production' : 'sandbox',
+      message: 'Cashfree payment session established successfully.'
+    };
+  } catch (cfErr: any) {
+    console.error('[Cashfree Request Failed]', cfErr?.message || cfErr);
+    return {
+      success: false,
+      free: false,
+      orderId,
+      amount: roundedAmount,
+      currency,
+      isProd: config.isProd,
+      error: cfErr?.message || 'Failed to reach Cashfree payment gateway.',
+      message: 'Network or server failure contacting Cashfree gateway.'
+    };
   }
-
-  // 3. Fallback Sandbox Simulator Mode (if keys not yet configured in environment)
-  const simulatedPaymentSessionId = `session_sim_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-  const simRecord: CashfreePaymentRecord = {
-    orderId,
-    paymentSessionId: simulatedPaymentSessionId,
-    amount: roundedAmount,
-    currency,
-    customer: {
-      customer_id: customerId,
-      customer_phone: customerPhone,
-      customer_email: customerEmail,
-      customer_name: customerName
-    },
-    orderType: payload.orderType,
-    itemId: payload.itemId,
-    itemTitle: payload.itemTitle,
-    status: 'PENDING',
-    notes: payload.notes,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    environment: 'simulated'
-  };
-  paymentLedger.set(orderId, simRecord);
-
-  return {
-    success: true,
-    free: false,
-    orderId,
-    paymentSessionId: simulatedPaymentSessionId,
-    amount: roundedAmount,
-    currency,
-    isProd: false,
-    environment: 'sandbox_simulator',
-    message: 'Sandbox Cashfree session active (Development Simulator Mode).'
-  };
 }
 
 /**

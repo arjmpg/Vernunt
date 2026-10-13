@@ -247,35 +247,8 @@ export default function EventsTab({
       const saved = localStorage.getItem('vernunt_user_event_tickets');
       if (saved) {
         setMyTickets(JSON.parse(saved));
-      } else if (eventsList.length > 0) {
-        // Provide 1 initial demo pass for instant testing
-        const demoPass: Booking = {
-          id: 'booking-demo-01',
-          itemId: eventsList[0].id,
-          itemTitle: eventsList[0].title,
-          type: 'EventTicket',
-          buyerName: userProfile?.parentName || 'Priya Sharma',
-          buyerEmail: userProfile?.email || 'priya@vernunt.com',
-          buyerPhone: '+91 98765 43210',
-          amountPaid: eventsList[0].ticketPrice || 199,
-          commissionPercentage: 10,
-          commissionEarned: 20,
-          hostEarned: 179,
-          dateStr: eventsList[0].date,
-          timeSelected: eventsList[0].time,
-          razorpayPaymentId: 'pay_demo_pass_123',
-          status: 'Paid',
-          ticketNumber: `VERN-EVT-7721-${Math.floor(100 + Math.random() * 900)}`,
-          ticketTierName: 'VIP Family Pass',
-          childName: userProfile?.childName || 'Aarav',
-          childAge: userProfile?.childAge || 5,
-          eventVenue: eventsList[0].location,
-          checkedIn: false,
-          quantity: 1,
-          createdAt: new Date().toISOString()
-        };
-        setMyTickets([demoPass]);
-        localStorage.setItem('vernunt_user_event_tickets', JSON.stringify([demoPass]));
+      } else {
+        setMyTickets([]);
       }
     } catch (err) {
       console.error('Error loading tickets:', err);

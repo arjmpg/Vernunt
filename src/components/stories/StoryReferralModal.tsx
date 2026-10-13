@@ -133,17 +133,6 @@ ${shareUrl}`;
                   <div className="text-[11px] text-slate-600">Share your invite link with any parent friend or school WhatsApp group</div>
                 </div>
               </div>
-
-              <div className="shrink-0">
-                <button
-                  type="button"
-                  onClick={handleSimulateRefereeSignUp}
-                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[11px] rounded-xl shadow-xs transition cursor-pointer"
-                  title="Test referee sign-up immediately"
-                >
-                  ⚡ Simulate Referee Sign-Up (Demo)
-                </button>
-              </div>
             </div>
           )}
 
