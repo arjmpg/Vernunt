@@ -87,7 +87,7 @@ export function generateSynchronizedContactsList(
       id: `synced_${item.source || 'phone'}_${idx}_${Date.now()}`,
       name: item.name,
       phone: item.phone,
-      email: item.email,
+      email: item.email || '',
       source: item.source || 'phone',
       relationship: item.relationship || 'Friend',
       visibility: visibility,

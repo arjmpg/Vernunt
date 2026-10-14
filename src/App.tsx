@@ -2530,207 +2530,226 @@ export default function App() {
     setIsLoading(true);
     setLoadingTitle('Saving verified guardian profile...');
 
-    // Ensure Firebase Auth session exists so Firestore security rules allow persistent write
-    if (!auth.currentUser) {
-      try {
-        const { signInAnonymously } = await import('firebase/auth');
-        await signInAnonymously(auth);
-      } catch (anonErr) {
-        console.warn('Anonymous auth session note:', anonErr);
-      }
-    }
-    
-    const uid = auth.currentUser?.uid || newProfile.id || `user-${Date.now()}`;
-    const autoReferralCode = `REF-${(newProfile.parentName || 'PARENT').split(' ')[0].toUpperCase()}-${uid.slice(0, 4).toUpperCase()}`;
-    const sessionReferral = sessionStorage.getItem('vernunt_referral_code') || undefined;
-    const activeAffiliateCode = sessionStorage.getItem('vernunt_active_affiliate_ref') || localStorage.getItem('vernunt_active_affiliate_ref') || undefined;
-
-    // Clean undefined fields for Firestore safety
-    const cleanObject = (obj: any): any => {
-      const out: any = {};
-      Object.keys(obj).forEach(key => {
-        if (obj[key] !== undefined) {
-          if (typeof obj[key] === 'object' && obj[key] !== null && !Array.isArray(obj[key])) {
-            out[key] = cleanObject(obj[key]);
-          } else {
-            out[key] = obj[key];
-          }
-        }
-      });
-      return out;
-    };
-
-    const profileWithId: ChildProfile = { 
-      ...newProfile, 
-      id: uid, 
-      email: auth.currentUser?.email || newProfile.email || undefined,
-      referralCode: autoReferralCode,
-      contactViewCredits: newProfile.contactViewCredits || 0,
-      referralCount: newProfile.referralCount || 0,
-      // Default affiliate status enabled for all registered parents / organizers
-      affiliateStatus: 'active',
-      affiliateTier: 'Silver',
-      affiliateCommissionRate: 15,
-      affiliateCode: autoReferralCode
-    };
-
-    if (activeAffiliateCode) {
-      profileWithId.affiliateReferredBy = activeAffiliateCode;
-    }
-
-    const storyReferralUsed = typeof window !== 'undefined' ? localStorage.getItem('vernunt_story_referral_used') : null;
-    if (sessionReferral || storyReferralUsed) {
-      profileWithId.referredByCode = sessionReferral || storyReferralUsed || '';
-      // Newly referred parent receives +1 view credit immediately
-      profileWithId.contactViewCredits = (profileWithId.contactViewCredits || 0) + 1;
-      // Unlock lifetime story writing & radar search for the referer!
-      unlockKidStoryLifetimeReferral();
-    }
-
-    const cleanedData = cleanObject(profileWithId);
-
-    // Save locally immediately
     try {
-      localStorage.setItem('vernunt_cached_profile_' + uid, JSON.stringify(profileWithId));
-      localStorage.setItem('vernunt_active_user_id', uid);
-
-      // Register contact in ultra-fast local lookup cache
-      const rawContacts = localStorage.getItem('vernunt_known_contacts');
-      const knownSet = new Set<string>(rawContacts ? JSON.parse(rawContacts) : []);
-      if (profileWithId.phoneNumber) {
-        const cleanP = profileWithId.phoneNumber.replace(/\D/g, '').slice(-10);
-        if (cleanP) {
-          knownSet.add(cleanP);
-          knownSet.add('+91' + cleanP);
+      // Ensure Firebase Auth session exists so Firestore security rules allow persistent write
+      if (!auth.currentUser) {
+        try {
+          const { signInAnonymously } = await import('firebase/auth');
+          await signInAnonymously(auth);
+        } catch (anonErr) {
+          console.warn('Anonymous auth session note:', anonErr);
         }
       }
-      if (profileWithId.email) {
-        knownSet.add(profileWithId.email.trim().toLowerCase());
-      }
-      localStorage.setItem('vernunt_known_contacts', JSON.stringify(Array.from(knownSet).slice(-500)));
-    } catch (e) {
-      console.warn('Local storage write note:', e);
-    }
+      
+      const uid = auth.currentUser?.uid || newProfile.id || `user-${Date.now()}`;
+      const autoReferralCode = `REF-${(newProfile.parentName || 'PARENT').split(' ')[0].toUpperCase()}-${uid.slice(0, 4).toUpperCase()}`;
+      const sessionReferral = sessionStorage.getItem('vernunt_referral_code') || undefined;
+      const activeAffiliateCode = sessionStorage.getItem('vernunt_active_affiliate_ref') || localStorage.getItem('vernunt_active_affiliate_ref') || undefined;
 
-    // CRITICAL: Always persist newly signed-up user profile directly to Firestore cloud database
-    try {
-      await setDoc(doc(db, 'users', uid), cleanedData);
-      console.log('✅ User registration successfully persisted to Firestore:', uid);
-    } catch (err) {
-      console.warn("Firestore write error during registration, proceeding with local verified session:", err);
-    }
-
-    // Credit the affiliate partner or general referrer if code present
-    const attributionCode = activeAffiliateCode || sessionReferral;
-    if (attributionCode) {
-      try {
-        const { collection, query, where, getDocs, updateDoc, increment } = await import('firebase/firestore');
-        const usersRef = collection(db, 'users');
-        const q = query(usersRef, where('referralCode', '==', attributionCode));
-        const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          const referrerDoc = querySnapshot.docs[0];
-          await updateDoc(doc(db, 'users', referrerDoc.id), {
-            contactViewCredits: increment(1),
-            referralCount: increment(1),
-            affiliateTotalCustomersReferred: increment(1)
+      // Clean undefined fields recursively for Firestore safety (including objects within arrays)
+      const cleanObject = (obj: any): any => {
+        if (obj === null || obj === undefined) return null;
+        if (Array.isArray(obj)) {
+          return obj
+            .filter(item => item !== undefined)
+            .map(item => (typeof item === 'object' && item !== null ? cleanObject(item) : item));
+        }
+        if (typeof obj === 'object') {
+          const out: any = {};
+          Object.keys(obj).forEach(key => {
+            if (obj[key] !== undefined) {
+              out[key] = cleanObject(obj[key]);
+            }
           });
-          console.log("🎁 Successfully credited referrer profile ID:", referrerDoc.id);
+          return out;
         }
-      } catch (refErr) {
-        console.error("Failed to update credit for referrer:", refErr);
-      }
-    }
-
-    // Always succeed and navigate to dashboard smoothly
-    setUserProfile(profileWithId);
-    const savedRole = profileWithId.userRole || 'Parent';
-    setUserRole(savedRole);
-    setAppMode('dashboard');
-    
-    // If user registered as Daycare Center or opted into Daycare / Babysitter hosting, sync to daycarePlayhomes
-    if (savedRole === 'Daycare Center' || (profileWithId as any).isDaycareHost) {
-      const daycareProfile: DaycarePlayhomeProfile = {
-        id: `daycare-${uid}`,
-        name: profileWithId.companyName || profileWithId.parentName || 'Verified Daycare Center',
-        type: (profileWithId as any).daycareType || (savedRole === 'Daycare Center' ? 'DaycareCenter' : 'ParentHome'),
-        hostName: profileWithId.parentName || 'Center Director',
-        contactPhone: profileWithId.phoneNumber || '',
-        contactEmail: profileWithId.email || '',
-        hourlyRate: (profileWithId as any).hourlyRate ?? 180,
-        halfDayRate: (profileWithId as any).halfDayRate,
-        fullDayRate: (profileWithId as any).fullDayRate,
-        monthlyRate: (profileWithId as any).monthlyRate,
-        address: profileWithId.location?.address || 'Local Neighborhood',
-        distanceKm: 0.4,
-        lat: profileWithId.location?.lat || 19.0760,
-        lng: profileWithId.location?.lng || 72.8777,
-        capacity: (profileWithId as any).capacity || 15,
-        availableSlotsCount: (profileWithId as any).capacity || 8,
-        rating: 5.0,
-        reviewsCount: 1,
-        verified: true,
-        licenseNumber: profileWithId.companyRegNumber || (profileWithId as any).licenseNumber,
-        staffToChildRatio: (profileWithId as any).staffToChildRatio || '1:4',
-        cctvLiveStreamAvailable: (profileWithId as any).cctvLiveStreamAvailable ?? true,
-        operatingHours: (profileWithId as any).operatingHours || '08:00 AM - 07:30 PM',
-        operatingDays: (profileWithId as any).operatingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-        ageGroupsServed: (profileWithId as any).ageGroupsServed || ['Infants (6m - 18m)', 'Toddlers (18m - 3y)', 'Pre-K (3y - 6y)'],
-        amenities: (profileWithId as any).amenities || [
-          'Live CCTV Access for Parents',
-          'Air Conditioned Child-Safe Rooms',
-          'Sterilized Infant Nap Cribs',
-          'Pediatric First-Aid On-site',
-          'Nutritious Pure Vegetarian Meals',
-          'Enclosed Outdoor Play Zone'
-        ],
-        emergencyMedicalTieUp: (profileWithId as any).emergencyMedicalTieUp || 'Apollo Cradle Hospital (0.8 km)',
-        photos: (profileWithId as any).facilityPhotos || [
-          profileWithId.photoUrl || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600'
-        ],
-        description: profileWithId.bio || 'Certified premium daycare and playhome with strict child safety protocols and live camera streaming.',
-        documents: (profileWithId as any).verificationDocs || [
-          { name: 'Government Trade / Educational License', url: profileWithId.companyDocUrl || '#', verified: true },
-          { name: 'Director Aadhaar Verification', url: profileWithId.aadhaarDocUrl || '#', verified: true }
-        ],
-        instantBooking: true,
-        minimumNoticeHours: 1
+        return obj;
       };
 
-      setDaycarePlayhomes(prev => {
-        const filtered = prev.filter(d => d.id !== daycareProfile.id);
-        const updated = [daycareProfile, ...filtered];
-        try {
-          localStorage.setItem('vernunt_daycare_playhomes', JSON.stringify(updated));
-        } catch (e) {
-          console.debug('Daycare storage sync note:', e);
-        }
-        return updated;
-      });
-    }
+      const profileWithId: ChildProfile = { 
+        ...newProfile, 
+        id: uid, 
+        email: auth.currentUser?.email || newProfile.email || undefined,
+        referralCode: autoReferralCode,
+        contactViewCredits: newProfile.contactViewCredits || 0,
+        referralCount: newProfile.referralCount || 0,
+        // Default affiliate status enabled for all registered parents / organizers
+        affiliateStatus: 'active',
+        affiliateTier: 'Silver',
+        affiliateCommissionRate: 15,
+        affiliateCode: autoReferralCode
+      };
 
-    if (savedRole === 'Event Organizer') {
-      if (options?.openCreateWizard) {
-        setActiveTab('events');
-        setOpenEventWizardOnMount(true);
-      } else {
-        setActiveTab('events');
+      if (activeAffiliateCode) {
+        profileWithId.affiliateReferredBy = activeAffiliateCode;
       }
-    } else if (savedRole === 'Portfolio Professional') {
-      setActiveTab('portfolio');
-    } else if (savedRole === 'Daycare Center') {
-      setActiveTab('daycare');
-    } else {
-      setActiveTab('radar');
-    }
 
-    try {
-      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
-    } catch (e) {
-      // ignore
-    }
+      const storyReferralUsed = typeof window !== 'undefined' ? localStorage.getItem('vernunt_story_referral_used') : null;
+      if (sessionReferral || storyReferralUsed) {
+        profileWithId.referredByCode = sessionReferral || storyReferralUsed || '';
+        // Newly referred parent receives +1 view credit immediately
+        profileWithId.contactViewCredits = (profileWithId.contactViewCredits || 0) + 1;
+        // Unlock lifetime story writing & radar search for the referer!
+        unlockKidStoryLifetimeReferral();
+      }
 
-    setIsLoading(false);
+      const savedRole = profileWithId.userRole || 'Parent';
+
+      // Always persist authenticated session state locally first so session persists across reloads
+      persistAuthSession(profileWithId, savedRole);
+
+      const cleanedData = cleanObject(profileWithId);
+
+      // Save locally immediately
+      try {
+        localStorage.setItem('vernunt_cached_profile_' + uid, JSON.stringify(profileWithId));
+        localStorage.setItem('vernunt_active_user_id', uid);
+
+        // Register contact in ultra-fast local lookup cache
+        const rawContacts = localStorage.getItem('vernunt_known_contacts');
+        const knownSet = new Set<string>(rawContacts ? JSON.parse(rawContacts) : []);
+        if (profileWithId.phoneNumber) {
+          const cleanP = profileWithId.phoneNumber.replace(/\D/g, '').slice(-10);
+          if (cleanP) {
+            knownSet.add(cleanP);
+            knownSet.add('+91' + cleanP);
+          }
+        }
+        if (profileWithId.email) {
+          knownSet.add(profileWithId.email.trim().toLowerCase());
+        }
+        localStorage.setItem('vernunt_known_contacts', JSON.stringify(Array.from(knownSet).slice(-500)));
+      } catch (e) {
+        console.warn('Local storage write note:', e);
+      }
+
+      // CRITICAL: Always persist newly signed-up user profile directly to Firestore cloud database
+      try {
+        await setDoc(doc(db, 'users', uid), cleanedData, { merge: true });
+        console.log('✅ User registration successfully persisted to Firestore:', uid);
+      } catch (err) {
+        console.warn("Firestore write error during registration, proceeding with local verified session:", err);
+      }
+
+      // Credit the affiliate partner or general referrer if code present
+      const attributionCode = activeAffiliateCode || sessionReferral;
+      if (attributionCode) {
+        try {
+          const { collection, query, where, getDocs, updateDoc, increment } = await import('firebase/firestore');
+          const usersRef = collection(db, 'users');
+          const q = query(usersRef, where('referralCode', '==', attributionCode));
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const referrerDoc = querySnapshot.docs[0];
+            await updateDoc(doc(db, 'users', referrerDoc.id), {
+              contactViewCredits: increment(1),
+              referralCount: increment(1),
+              affiliateTotalCustomersReferred: increment(1)
+            });
+            console.log("🎁 Successfully credited referrer profile ID:", referrerDoc.id);
+          }
+        } catch (refErr) {
+          console.error("Failed to update credit for referrer:", refErr);
+        }
+      }
+
+      // Always succeed and navigate to dashboard smoothly
+      setUserProfile(profileWithId);
+      setUserRole(savedRole);
+      setAppMode('dashboard');
+      
+      // If user registered as Daycare Center or opted into Daycare / Babysitter hosting, sync to daycarePlayhomes
+      if (savedRole === 'Daycare Center' || (profileWithId as any).isDaycareHost) {
+        const daycareProfile: DaycarePlayhomeProfile = {
+          id: `daycare-${uid}`,
+          name: profileWithId.companyName || profileWithId.parentName || 'Verified Daycare Center',
+          type: (profileWithId as any).daycareType || (savedRole === 'Daycare Center' ? 'DaycareCenter' : 'ParentHome'),
+          hostName: profileWithId.parentName || 'Center Director',
+          contactPhone: profileWithId.phoneNumber || '',
+          contactEmail: profileWithId.email || '',
+          hourlyRate: (profileWithId as any).hourlyRate ?? 180,
+          halfDayRate: (profileWithId as any).halfDayRate,
+          fullDayRate: (profileWithId as any).fullDayRate,
+          monthlyRate: (profileWithId as any).monthlyRate,
+          address: profileWithId.location?.address || 'Local Neighborhood',
+          distanceKm: 0.4,
+          lat: profileWithId.location?.lat || 19.0760,
+          lng: profileWithId.location?.lng || 72.8777,
+          capacity: (profileWithId as any).capacity || 15,
+          availableSlotsCount: (profileWithId as any).capacity || 8,
+          rating: 5.0,
+          reviewsCount: 1,
+          verified: true,
+          licenseNumber: profileWithId.companyRegNumber || (profileWithId as any).licenseNumber,
+          staffToChildRatio: (profileWithId as any).staffToChildRatio || '1:4',
+          cctvLiveStreamAvailable: (profileWithId as any).cctvLiveStreamAvailable ?? true,
+          operatingHours: (profileWithId as any).operatingHours || '08:00 AM - 07:30 PM',
+          operatingDays: (profileWithId as any).operatingDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          ageGroupsServed: (profileWithId as any).ageGroupsServed || ['Infants (6m - 18m)', 'Toddlers (18m - 3y)', 'Pre-K (3y - 6y)'],
+          amenities: (profileWithId as any).amenities || [
+            'Live CCTV Access for Parents',
+            'Air Conditioned Child-Safe Rooms',
+            'Sterilized Infant Nap Cribs',
+            'Pediatric First-Aid On-site',
+            'Nutritious Pure Vegetarian Meals',
+            'Enclosed Outdoor Play Zone'
+          ],
+          emergencyMedicalTieUp: (profileWithId as any).emergencyMedicalTieUp || 'Apollo Cradle Hospital (0.8 km)',
+          photos: (profileWithId as any).facilityPhotos || [
+            profileWithId.photoUrl || 'https://images.unsplash.com/photo-1576765608535-5f04d1e3f289?auto=format&fit=crop&q=80&w=600'
+          ],
+          description: profileWithId.bio || 'Certified premium daycare and playhome with strict child safety protocols and live camera streaming.',
+          documents: (profileWithId as any).verificationDocs || [
+            { name: 'Government Trade / Educational License', url: profileWithId.companyDocUrl || '#', verified: true },
+            { name: 'Director Aadhaar Verification', url: profileWithId.aadhaarDocUrl || '#', verified: true }
+          ],
+          instantBooking: true,
+          minimumNoticeHours: 1
+        };
+
+        setDaycarePlayhomes(prev => {
+          const filtered = prev.filter(d => d.id !== daycareProfile.id);
+          const updated = [daycareProfile, ...filtered];
+          try {
+            localStorage.setItem('vernunt_daycare_playhomes', JSON.stringify(updated));
+          } catch (e) {
+            console.debug('Daycare storage sync note:', e);
+          }
+          return updated;
+        });
+      }
+
+      if (savedRole === 'Event Organizer') {
+        if (options?.openCreateWizard) {
+          setActiveTab('events');
+          setOpenEventWizardOnMount(true);
+        } else {
+          setActiveTab('events');
+        }
+      } else if (savedRole === 'Portfolio Professional') {
+        setActiveTab('portfolio');
+      } else if (savedRole === 'Daycare Center') {
+        setActiveTab('daycare');
+      } else {
+        setActiveTab('radar');
+      }
+
+      try {
+        confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+      } catch (e) {
+        // ignore
+      }
+    } catch (regError) {
+      console.error("Critical error completing registration:", regError);
+      // Fallback: still transition user to dashboard with the completed profile
+      const fallbackRole = newProfile.userRole || 'Parent';
+      setUserProfile(newProfile);
+      setUserRole(fallbackRole);
+      setAppMode('dashboard');
+      persistAuthSession(newProfile, fallbackRole);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogOut = async () => {
@@ -3003,10 +3022,7 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAppMode('auth');
-                    setAuthMode('login');
-                  }}
+                  onClick={() => setAppMode('landing')}
                   className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer"
                 >
                   Sign In
@@ -3399,20 +3415,14 @@ export default function App() {
               {/* Sign In & Join for Guests */}
               <button
                 type="button"
-                onClick={() => {
-                  setAppMode('auth');
-                  setAuthMode('login');
-                }}
+                onClick={() => setAppMode('landing')}
                 className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl hover:bg-slate-100 transition cursor-pointer shrink-0"
               >
                 Sign In
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setAppMode('auth');
-                  setAuthMode('register');
-                }}
+                onClick={() => handleStartSignUp('Parent')}
                 className="text-xs font-black bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl shadow-xs transition cursor-pointer shrink-0"
               >
                 Join Free
@@ -4120,8 +4130,7 @@ export default function App() {
                   setUserProfile(profileObj);
                 }}
                 onOpenLogin={() => {
-                  setAppMode('auth');
-                  setAuthMode('login');
+                  setAppMode('landing');
                 }}
               />
             )}

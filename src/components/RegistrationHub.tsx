@@ -1651,13 +1651,13 @@ export default function RegistrationHub({
           setChildAge(5);
         }
         if (!parentsIncome || !parentsIncome.trim()) {
-          setParentsIncome('₹15L - ₹25L Lakhs');
+          setParentsIncome('12 to 20 lakhs');
         }
         if (!religion || !religion.trim()) {
-          setReligion('All Communities Welcome');
+          setReligion('Other / Prefer not to state');
         }
         if (!caste || !caste.trim()) {
-          setCaste('All Communities / General');
+          setCaste('General');
         }
       }
     } else if (preferredRole === 'Influencer') {
@@ -1831,7 +1831,9 @@ export default function RegistrationHub({
       return;
     }
 
-    // Capture User IP and Latitude & Longitude (Security Telemetry - Admin Only)
+    setIsSubmittingForm(true);
+
+    // Capture User IP and Latitude & Longitude (Security Telemetry - Admin Only, non-blocking fast resolution)
     let telemetry = {
       ipAddress: '127.0.0.1',
       capturedLat: 12.9716,
@@ -1840,9 +1842,12 @@ export default function RegistrationHub({
       capturedAt: new Date().toISOString()
     };
     try {
-      telemetry = await captureUserTelemetry();
+      telemetry = await Promise.race([
+        captureUserTelemetry(),
+        new Promise<any>((_, reject) => setTimeout(() => reject('timeout'), 600))
+      ]);
     } catch (tErr) {
-      console.warn('Telemetry capture note:', tErr);
+      console.warn('Telemetry fast capture note:', tErr);
     }
 
     // Generate simulated coordinates roughly centered on Bangalore or user coordinates
@@ -1891,9 +1896,9 @@ export default function RegistrationHub({
         faceVerificationScore,
         faceVerificationTimestamp: new Date().toISOString(),
         ageUnit,
-        parentsIncome: parentsIncome.trim(),
-        caste: caste === 'Other / Community Not Listed' && customCaste.trim() ? customCaste.trim() : caste.trim(),
-        religion: religion.trim(),
+        parentsIncome: (parentsIncome && parentsIncome.trim()) ? parentsIncome.trim() : '12 to 20 lakhs',
+        caste: (caste && caste.trim()) ? (caste === 'Other / Community Not Listed' && customCaste.trim() ? customCaste.trim() : caste.trim()) : 'General',
+        religion: (religion && religion.trim()) ? religion.trim() : 'Other / Prefer not to state',
         generalAvailability: generalAvailability.length > 0 ? generalAvailability : ['Weekdays After School', 'Weekends (Sat & Sun)'],
         childPrivacySetting: childPrivacySetting || 'full',
         parentProfession: parentProfession.trim() || 'Professional',
@@ -2293,12 +2298,17 @@ export default function RegistrationHub({
     }
 
     if (preferredRole === 'Event Organizer') {
+      setIsSubmittingForm(false);
       setCompletedEventOrganizerProfile(finalProfile);
       setShowEventPostRegistrationModal(true);
       return;
     }
 
-    onCompleteSignup(finalProfile);
+    try {
+      onCompleteSignup(finalProfile);
+    } finally {
+      setIsSubmittingForm(false);
+    }
   };
 
   return (
@@ -5488,13 +5498,24 @@ export default function RegistrationHub({
             <button
               id="btn-submit"
               type="button"
+              disabled={isSubmittingForm}
               onClick={(e) => {
                 e.preventDefault();
                 handleSubmit(e);
               }}
-              className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 transition text-xs ml-auto active:scale-95 cursor-pointer"
+              className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold rounded-xl shadow-md hover:shadow-lg flex items-center gap-2 transition text-xs ml-auto active:scale-95 cursor-pointer disabled:opacity-60"
             >
-              Complete Registration <Check className="w-4 h-4" />
+              {isSubmittingForm ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Saving Profile...</span>
+                </>
+              ) : (
+                <>
+                  <span>Complete Registration</span>
+                  <Check className="w-4 h-4" />
+                </>
+              )}
             </button>
           )}
         </div>

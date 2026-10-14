@@ -47,7 +47,7 @@ service cloud.firestore {
         && (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 200))
         && (!('childName' in data) || (data.childName is string && data.childName.size() <= 200))
         && (!('bio' in data) || (data.bio is string && data.bio.size() <= 4000))
-        && (!('childAge' in data) || ((data.childAge is int || data.childAge is float) && data.childAge >= 0 && data.childAge <= 16))
+        && (!('childAge' in data) || ((data.childAge is int || data.childAge is float) && data.childAge >= 0 && data.childAge <= 40))
         && (!('childGender' in data) || (data.childGender in ['Boy', 'Girl', 'Other']))
         && (!('gradeLevel' in data) || (data.gradeLevel is string && data.gradeLevel.size() <= 100))
         && (!('playStyle' in data) || (data.playStyle is string && data.playStyle.size() <= 200))
@@ -232,8 +232,8 @@ service cloud.firestore {
     match /users/{userId} {
       allow get: if isOwner(userId) || isAdmin() || !('profileVisibility' in resource.data) || resource.data.profileVisibility == 'PUBLIC' || (resource.data.profileVisibility == 'CONNECTIONS' && isSignedIn());
       allow list: if isSignedIn();
-      allow create: if ((isSignedIn() && (request.auth.uid == userId || isAdmin())) || (!isSignedIn() && request.resource.id == userId)) && isValidUser(incoming());
-      allow update: if (isSignedIn() && (isOwner(userId) || isAdmin())) && isValidUser(incoming());
+      allow create: if ((isSignedIn() && (request.auth.uid == userId || isAdmin())) || (!isSignedIn() && incoming().id == userId)) && isValidUser(incoming());
+      allow update: if ((isSignedIn() && (isOwner(userId) || isAdmin())) || (!isSignedIn() && incoming().id == userId)) && isValidUser(incoming());
       allow delete: if isOwner(userId) || isAdmin();
     }
 

@@ -56,9 +56,9 @@ export async function captureUserTelemetry(): Promise<CapturedTelemetry> {
     try {
       const gpsPos = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 7000,
-          maximumAge: 60000
+          enableHighAccuracy: false,
+          timeout: 1200,
+          maximumAge: 300000
         });
       });
       if (gpsPos && gpsPos.coords) {
