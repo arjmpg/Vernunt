@@ -19,11 +19,11 @@ import {
   ShieldAlert,
   Store,
   MessageSquare,
-  Cookie
 } from 'lucide-react';
 import VernuntLogo from './VernuntLogo.tsx';
+import { VERNUNT_SLA_DEFINITIONS } from '../data/slaAgreements.ts';
 
-export type LegalPolicyTab = 'terms' | 'privacy' | 'cookie' | 'safety' | 'shipping' | 'refund' | 'disclaimer' | 'grievance' | 'child-safety' | 'seller-terms' | 'groups-privacy';
+export type LegalPolicyTab = 'terms' | 'privacy' | 'cookie' | 'safety' | 'shipping' | 'refund' | 'disclaimer' | 'grievance' | 'child-safety' | 'seller-terms' | 'groups-privacy' | 'b2b-sla';
 
 interface LegalPolicyModalProps {
   isOpen?: boolean;
@@ -251,6 +251,19 @@ export default function LegalPolicyModal({
           >
             <MessageSquare className={`w-3.5 h-3.5 ${activeTab === 'groups-privacy' ? 'text-amber-600' : 'text-slate-400'}`} />
             <span>Groups &amp; Chat Safe Harbor</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('b2b-sla')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 cursor-pointer ${
+              activeTab === 'b2b-sla'
+                ? 'bg-indigo-600 text-white shadow-xs font-extrabold'
+                : 'text-indigo-900 bg-indigo-50/70 hover:bg-indigo-100/80 border border-indigo-200'
+            }`}
+          >
+            <Scale className={`w-3.5 h-3.5 ${activeTab === 'b2b-sla' ? 'text-amber-300' : 'text-indigo-600'}`} />
+            <span>B2B &amp; Portfolio SLAs</span>
           </button>
         </div>
 
@@ -822,6 +835,62 @@ export default function LegalPolicyModal({
                     Vernunt does not organize, supervise, staff, monitor, or insure group meetups arranged by parents (e.g., park stroller walks, playgroups, cycling trips). Attendees participate entirely at their own risk and waive all claims against Vernunt.
                   </p>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* TAB 12: B2B & PORTFOLIO SERVICE LEVEL AGREEMENTS (SLAS)   */}
+          {/* ========================================================= */}
+          {activeTab === 'b2b-sla' && (
+            <div className="space-y-6 animate-fadeIn">
+              <div className="bg-indigo-50/90 border-2 border-indigo-200 rounded-2xl p-4 sm:p-5 space-y-2 text-indigo-950 shadow-xs">
+                <div className="flex items-center gap-2 font-black text-xs uppercase tracking-wider text-indigo-900">
+                  <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span>Binding Service Level Agreements (SLAs) for B2B Partners &amp; Professional Portfolios</span>
+                </div>
+                <p className="text-xs text-indigo-900/90 leading-relaxed">
+                  Every daycare center, ticketed workshop organizer, healthcare specialist, in-home sitter, and verified marketplace seller on Vernunt must adhere to strict contractual response latencies, child safety ratios, and statutory guarantees.
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {Object.values(VERNUNT_SLA_DEFINITIONS).map((sla) => (
+                  <div key={sla.id} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-3">
+                    <div className="flex items-start justify-between gap-3 flex-wrap border-b border-slate-100 pb-2.5">
+                      <div>
+                        <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+                          {sla.roleTitle}
+                        </span>
+                        <h4 className="font-extrabold text-slate-900 text-sm font-serif mt-1">{sla.officialName}</h4>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {sla.version} &bull; {sla.effectiveDate}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 leading-relaxed">{sla.overview}</p>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                      {sla.metrics.map((m, idx) => (
+                        <div key={idx} className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1">
+                          <div className="flex justify-between items-center text-xs">
+                            <span className="font-bold text-slate-800">{m.metric}</span>
+                            <span className="font-mono text-[11px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                              {m.target}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 leading-snug">{m.description}</p>
+                          <p className="text-[10px] text-rose-600 font-medium">Breach: {m.consequence}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="pt-2 text-[10.5px] text-slate-400 font-mono">
+                      Statutory Compliance: {sla.statutoryBacking}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

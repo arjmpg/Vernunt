@@ -5,7 +5,8 @@ import {
   SlidersHorizontal, BookOpen, Scissors, Stethoscope, Utensils, Flame, Check, 
   CreditCard, Share2, Send, Copy, Building2, GraduationCap, Phone, ExternalLink, 
   Globe, RefreshCw, Navigation, CheckCircle, ShieldAlert, Trophy, TrendingUp,
-  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, ArrowLeft, ArrowRight
+  ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Search, X, Filter, ArrowLeft, ArrowRight,
+  Scale, FileText
 } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
@@ -13,6 +14,7 @@ import PediatricianPortfolioModal from './PediatricianPortfolioModal.tsx';
 import { DoctorCard } from './DoctorCard.tsx';
 import ClaimSpecialistModal from './ClaimSpecialistModal.tsx';
 import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
+import ServiceLevelAgreementModal from './legal/ServiceLevelAgreementModal.tsx';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare, attributeAffiliateBooking } from '../utils/affiliate.ts';
@@ -288,6 +290,8 @@ export default function SpecialistsTab({
   const [regTitle, setRegTitle] = useState('');
   const [regCategory, setRegCategory] = useState<string>('Pediatrician');
   const [regPhoto, setRegPhoto] = useState('');
+  const [regSlaAccepted, setRegSlaAccepted] = useState(false);
+  const [showSlaModal, setShowSlaModal] = useState(false);
   
   // Custom Dynamic Specialist categories load
   const [customSpecCats, setCustomSpecCats] = useState<any[]>([]);
@@ -513,6 +517,11 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       return;
     }
 
+    if (!regSlaAccepted) {
+      setRegError('Please review and accept the Child Specialist & Healthcare Portfolio SLA before launching your portfolio.');
+      return;
+    }
+
     const initialPhoto = regPhoto || (regCategory === 'Nutritionist' 
       ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces'
       : regCategory === 'Pediatrician'
@@ -543,7 +552,13 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       languages: ['English', 'Hindi'],
       commissionPercentage: calculatedCommission, // Dynamic variable matching user listing model config
       phone: regPhone,
-      email: regEmail
+      email: regEmail,
+      
+      // Professional Child Specialist Portfolio SLA
+      slaAccepted: true,
+      slaAcceptedAt: new Date().toISOString(),
+      slaType: 'Specialist Portfolio SLA',
+      slaVersion: '2026-v2.1'
     };
 
     onAddNewSpecialist(newSpec);
@@ -2251,6 +2266,80 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 </p>
               </div>
 
+              {/* Mandatory Professional Portfolio SLA Card */}
+              <div className="p-4 bg-gradient-to-r from-purple-50/90 via-slate-50 to-indigo-50/90 border-2 border-purple-200 rounded-2xl space-y-3 shadow-2xs text-left">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Scale className="w-4 h-4 text-amber-300" />
+                    </div>
+                    <div>
+                      <h5 className="font-extrabold text-xs sm:text-sm text-purple-950">
+                        Professional Portfolio Service Level Agreement (SLA)
+                      </h5>
+                      <p className="text-[10px] text-purple-700 font-bold uppercase tracking-wider">
+                        DPDP Act Health Privacy &bull; Appointment Queue Punctuality Mandate
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowSlaModal(true)}
+                    className="px-3 py-1.5 bg-white hover:bg-purple-50 border border-purple-300 text-purple-800 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer ml-auto"
+                  >
+                    <FileText className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Review Full Specialist SLA</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10.5px]">
+                  <div className="p-2 bg-white rounded-xl border border-purple-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-purple-900 block">&lt; 15 Minutes</span>
+                    <span className="text-slate-500 text-[9.5px]">Max Queue Wait</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-purple-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">&lt; 2 Hours</span>
+                    <span className="text-slate-500 text-[9.5px]">Summary Notes Upload</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-purple-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">100% DPDP Act</span>
+                    <span className="text-slate-500 text-[9.5px]">Encrypted Records</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-purple-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-purple-900 block">Active NMC/RCI</span>
+                    <span className="text-slate-500 text-[9.5px]">License Validity</span>
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-purple-200">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      id="specialist-sla-checkbox"
+                      checked={regSlaAccepted}
+                      onChange={(e) => setRegSlaAccepted(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 cursor-pointer shrink-0"
+                    />
+                    <span className="text-xs font-bold text-slate-800 leading-snug">
+                      I agree to adhere to the{' '}
+                      <button
+                        type="button"
+                        onClick={(ev) => {
+                          ev.preventDefault();
+                          ev.stopPropagation();
+                          setShowSlaModal(true);
+                        }}
+                        className="text-purple-700 underline font-black hover:text-purple-900 cursor-pointer"
+                      >
+                        Vernunt Professional Child Portfolio &amp; Healthcare SLA
+                      </button>
+                      . I warrant valid medical/board registration, patient record confidentiality, and punctuality standards. <span className="text-rose-500">*</span>
+                    </span>
+                  </label>
+                </div>
+              </div>
+
               <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-3">
                 <button
                   type="button"
@@ -2402,6 +2491,16 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           onClaimApproved={handleClaimApproved}
         />
       )}
+
+      {/* Interactive Service Level Agreement (SLA) Modal */}
+      <ServiceLevelAgreementModal
+        isOpen={showSlaModal}
+        roleOrType="specialist"
+        onClose={() => setShowSlaModal(false)}
+        onAccept={() => setRegSlaAccepted(true)}
+        isAccepted={regSlaAccepted}
+        showAcceptButton={true}
+      />
 
     </div>
   );

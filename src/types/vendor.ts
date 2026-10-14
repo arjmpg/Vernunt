@@ -63,6 +63,11 @@ export interface VendorProfile {
     enabled: boolean;
     message: string;
   };
+  // B2B Marketplace Service Level Agreement (SLA) Compliance
+  slaAccepted?: boolean;
+  slaAcceptedAt?: string;
+  slaType?: string;
+  slaVersion?: string;
 }
 
 export type WithdrawalStatus = 'pending' | 'approved' | 'processed' | 'rejected';

@@ -15,6 +15,7 @@ import {
 } from '../../data/storeVendors.ts';
 import { getStoredProducts, saveStoredProducts, getStoredOrders, saveStoredOrders } from '../../data/storeProducts.ts';
 import { ShiprocketShippingDesk } from './ShiprocketShippingDesk.tsx';
+import ServiceLevelAgreementModal from '../legal/ServiceLevelAgreementModal.tsx';
 
 interface VendorDashboardProps {
   onBackToStore?: () => void;
@@ -51,6 +52,8 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   const [isAddProductModalOpen, setIsAddProductModalOpen] = useState(false);
   const [isWithdrawalModalOpen, setIsWithdrawalModalOpen] = useState(false);
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const [slaAccepted, setSlaAccepted] = useState(false);
+  const [showSlaModal, setShowSlaModal] = useState(false);
   const [isEditProductModalOpen, setIsEditProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<StoreProduct | null>(null);
   const [selectedPackingSlipOrder, setSelectedPackingSlipOrder] = useState<StoreOrder | null>(null);
@@ -257,6 +260,11 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
     e.preventDefault();
     if (!regForm.storeName || !regForm.email) return;
 
+    if (!slaAccepted) {
+      alert('Please review and accept the mandatory B2B Marketplace & Logistics Service Level Agreement (SLA) to complete registration.');
+      return;
+    }
+
     const newVendor: VendorProfile = {
       id: 'vend-' + Date.now(),
       slug: regForm.storeName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -295,7 +303,11 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
       totalEarnings: 0,
       totalOrders: 0,
       supportEmail: regForm.email,
-      supportPhone: regForm.phone
+      supportPhone: regForm.phone,
+      slaAccepted: true,
+      slaAcceptedAt: new Date().toISOString(),
+      slaType: 'B2B Marketplace & Logistics SLA',
+      slaVersion: '2026-v2.1'
     };
 
     const updatedVendors = [...vendors, newVendor];
@@ -1522,6 +1534,34 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                 </div>
               </div>
 
+              {/* B2B Marketplace & Logistics SLA Agreement */}
+              <div className="p-3 bg-teal-50/70 border border-teal-200/80 rounded-xl">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={slaAccepted}
+                    onChange={(e) => setSlaAccepted(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 text-teal-600 rounded-sm border-teal-300 focus:ring-teal-500"
+                  />
+                  <div className="text-xs text-slate-700 leading-snug">
+                    <span className="font-semibold text-slate-900">
+                      I agree to the Vernunt B2B Marketplace &amp; Logistics Service Level Agreement (SLA)
+                    </span>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Includes 24-48 hr dispatch timeline, zero counterfeit policy, mandatory BIS/FSSAI safety standards, and 14-day defect remedies.
+                    </p>
+                  </div>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowSlaModal(true)}
+                  className="mt-2 text-xs font-semibold text-teal-700 hover:text-teal-800 underline flex items-center gap-1 pl-6.5"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  View Complete Marketplace SLA Document
+                </button>
+              </div>
+
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -1532,7 +1572,8 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-sm transition"
+                  disabled={!slaAccepted}
+                  className="px-6 py-2 bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold shadow-sm transition"
                 >
                   Submit Seller Application
                 </button>
@@ -1540,6 +1581,19 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {showSlaModal && (
+        <ServiceLevelAgreementModal
+          isOpen={showSlaModal}
+          onClose={() => setShowSlaModal(false)}
+          defaultRole="Marketplace Seller"
+          onAccept={() => {
+            setSlaAccepted(true);
+            setShowSlaModal(false);
+          }}
+          isAccepted={slaAccepted}
+        />
       )}
 
       {/* ========================================================================= */}

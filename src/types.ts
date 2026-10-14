@@ -307,6 +307,12 @@ export interface ChildProfile {
   affiliateCoupons?: string[]; // Coupons assigned specifically to this affiliate
   affiliateCampaigns?: AffiliateCampaign[];
   affiliateParentId?: string; // Multi-tier sub-affiliate parent
+
+  // B2B & Portfolio Service Level Agreement (SLA) Compliance Record
+  slaAccepted?: boolean;
+  slaAcceptedAt?: string;
+  slaType?: string;
+  slaVersion?: string;
 }
 
 export interface AffiliateCampaign {
@@ -661,6 +667,10 @@ export interface SpecialistProfile {
   claimStatus?: 'unclaimed' | 'pending' | 'approved' | 'rejected';
   claimRegistrationNumber?: string;
   claimIdDocUrl?: string;
+  slaAccepted?: boolean;
+  slaAcceptedAt?: string;
+  slaType?: string;
+  slaVersion?: string;
 }
 
 export interface SpecialistClaimRequest {
@@ -678,6 +688,10 @@ export interface SpecialistClaimRequest {
   idCardDocUrl: string;
   idCardDocSize?: number;
   declarationAccepted: boolean;
+  slaAccepted?: boolean;
+  slaAcceptedAt?: string;
+  slaType?: string;
+  slaVersion?: string;
   status: 'pending' | 'approved' | 'rejected';
   submittedAt: string;
   reviewedAt?: string;
@@ -807,6 +821,12 @@ export interface DaycarePlayhomeProfile {
   outdoorPlayArea?: boolean;
   medicalTieUp?: string; // e.g. "Cloudnine Pediatric Hospital (500m)"
   mealOptions?: string[]; // e.g. ["Organic Purees", "Vegetarian Home-Cooked", "Snacks & Milk"]
+  
+  // B2B Service Level Agreement (SLA) Compliance
+  slaAccepted?: boolean;
+  slaAcceptedAt?: string;
+  slaType?: string;
+  slaVersion?: string;
   
   reviews?: {
     id: string;

@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { SpecialistProfile, SpecialistClaimRequest } from '../types.ts';
 import { 
   X, ShieldCheck, Upload, CheckCircle2, FileText, 
-  AlertCircle, Building2, User, Phone, Mail, Award, Lock
+  AlertCircle, Building2, User, Phone, Mail, Award, Lock, Scale
 } from 'lucide-react';
 import { submitSpecialistClaim } from '../utils/specialistClaims.ts';
+import ServiceLevelAgreementModal from './legal/ServiceLevelAgreementModal.tsx';
 
 interface ClaimSpecialistModalProps {
   specialist: SpecialistProfile | null;
@@ -28,6 +29,8 @@ export default function ClaimSpecialistModal({
   const [idCardDocName, setIdCardDocName] = useState('');
   const [idCardDocUrl, setIdCardDocUrl] = useState('');
   const [declarationAccepted, setDeclarationAccepted] = useState(false);
+  const [slaAccepted, setSlaAccepted] = useState(false);
+  const [showSlaModal, setShowSlaModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
@@ -82,6 +85,10 @@ export default function ClaimSpecialistModal({
       setErrorMessage('Please accept the verification declaration checkbox to proceed.');
       return;
     }
+    if (!slaAccepted) {
+      setErrorMessage('Please review and accept the Child Specialist & Healthcare Portfolio SLA before submitting.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -99,6 +106,10 @@ export default function ClaimSpecialistModal({
         idCardDocName,
         idCardDocUrl,
         declarationAccepted,
+        slaAccepted: true,
+        slaAcceptedAt: new Date().toISOString(),
+        slaType: 'Specialist Portfolio SLA',
+        slaVersion: '2026-v2.1',
         status: 'pending',
         submittedAt: new Date().toISOString()
       };
@@ -350,6 +361,46 @@ export default function ClaimSpecialistModal({
                 </label>
               </div>
 
+              {/* Specialist Portfolio Service Level Agreement Checkbox & Modal */}
+              <div className="p-3 bg-purple-50/70 border border-purple-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 font-bold text-xs text-purple-900">
+                    <Scale className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Specialist Portfolio Healthcare SLA</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSlaModal(true)}
+                    className="text-[10px] text-purple-700 underline font-bold hover:text-purple-900 flex items-center gap-1"
+                  >
+                    <FileText className="w-3 h-3" /> Review Full SLA
+                  </button>
+                </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={slaAccepted}
+                    onChange={(e) => setSlaAccepted(e.target.checked)}
+                    className="mt-0.5 rounded text-purple-600 focus:ring-purple-500 h-4 w-4 border-purple-300"
+                  />
+                  <span className="text-[10.5px] text-purple-950 leading-snug">
+                    I solemnly agree to adhere to the{' '}
+                    <button
+                      type="button"
+                      onClick={(ev) => {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        setShowSlaModal(true);
+                      }}
+                      className="text-purple-700 underline font-bold hover:text-purple-900"
+                    >
+                      Vernunt Professional Child Portfolio &amp; Healthcare SLA
+                    </button>
+                    , guaranteeing consultation punctuality (&lt;15 min wait), prompt digital summaries (&lt;2h), and DPDP Act patient privacy. <span className="text-rose-500">*</span>
+                  </span>
+                </label>
+              </div>
+
               {/* Submit Button */}
               <div className="pt-3 flex items-center gap-3">
                 <button
@@ -372,6 +423,16 @@ export default function ClaimSpecialistModal({
           )}
         </div>
       </div>
+
+      {/* Specialist SLA Modal */}
+      <ServiceLevelAgreementModal
+        isOpen={showSlaModal}
+        roleOrType="specialist"
+        onClose={() => setShowSlaModal(false)}
+        onAccept={() => setSlaAccepted(true)}
+        isAccepted={slaAccepted}
+        showAcceptButton={true}
+      />
     </div>
   );
 }

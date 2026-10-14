@@ -64,7 +64,11 @@ service cloud.firestore {
         && (!('aadhaarNumber' in data) || (data.aadhaarNumber is string && data.aadhaarNumber.size() <= 50))
         && (!('aadhaarVerified' in data) || (data.aadhaarVerified is bool))
         && (!('attendedEventsCount' in data) || (data.attendedEventsCount is int))
-        && (!('checkedInEvents' in data) || (data.checkedInEvents is list));
+        && (!('checkedInEvents' in data) || (data.checkedInEvents is list))
+        && (!('slaAccepted' in data) || (data.slaAccepted is bool))
+        && (!('slaAcceptedAt' in data) || (data.slaAcceptedAt is string && data.slaAcceptedAt.size() <= 60))
+        && (!('slaType' in data) || (data.slaType is string && data.slaType.size() <= 100))
+        && (!('slaVersion' in data) || (data.slaVersion is string && data.slaVersion.size() <= 50));
     }
 
     // Entity validator: Security Logs

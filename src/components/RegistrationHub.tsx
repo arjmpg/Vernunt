@@ -28,7 +28,8 @@ import {
   Phone,
   Calendar,
   Eye,
-  EyeOff
+  EyeOff,
+  Scale
 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../utils/firebase.ts';
@@ -36,6 +37,7 @@ import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts'
 import VernuntLogo from './VernuntLogo.tsx';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
 import AadhaarUploadField from './AadhaarUploadField.tsx';
+import ServiceLevelAgreementModal from './legal/ServiceLevelAgreementModal.tsx';
 import { captureUserTelemetry } from '../utils/telemetry.ts';
 import { generateSynchronizedContactsList } from '../utils/contactsSync.ts';
 import { sendAdminKycPendingNotification } from '../utils/notifications.ts';
@@ -133,6 +135,10 @@ export default function RegistrationHub({
   const [preferredRole, setPreferredRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>(
     (initialRole as any) || 'Parent'
   );
+
+  // Mandatory B2B Service Level Agreement (SLA) Acceptance States
+  const [slaAccepted, setSlaAccepted] = useState<boolean>(false);
+  const [showSlaModal, setShowSlaModal] = useState<boolean>(false);
 
   const maxSteps = (preferredRole === 'Parent' || preferredRole === 'Influencer') ? 2 : 3;
 
@@ -1774,6 +1780,11 @@ export default function RegistrationHub({
       }
     }
 
+    // Mandatory B2B / Portfolio Service Level Agreement (SLA) validation on final step
+    if (step === maxSteps && preferredRole !== 'Parent' && !slaAccepted) {
+      newErrors.slaAccepted = `Please review and accept the mandatory ${preferredRole} Service Level Agreement (SLA) to complete registration.`;
+    }
+
     setErrors(newErrors);
     return { isValid: Object.keys(newErrors).length === 0, errors: newErrors };
   };
@@ -1956,7 +1967,13 @@ export default function RegistrationHub({
         hourlyRate: isParentHostingDaycare ? parentDaycareHourlyRate : undefined,
         halfDayRate: isParentHostingDaycare ? parentDaycareHalfDayRate : undefined,
         fullDayRate: isParentHostingDaycare ? parentDaycareFullDayRate : undefined,
-        capacity: isParentHostingDaycare ? parentDaycareCapacity : undefined
+        capacity: isParentHostingDaycare ? parentDaycareCapacity : undefined,
+
+        // B2B / Creator Ambassador Service Level Agreement (SLA)
+        slaAccepted: Boolean(slaAccepted),
+        slaAcceptedAt: slaAccepted ? new Date().toISOString() : undefined,
+        slaType: preferredRole === 'Influencer' ? 'Creator Ambassador SLA' : (isParentHostingDaycare ? 'Daycare Operator SLA' : undefined),
+        slaVersion: slaAccepted ? '2026-v2.1' : undefined
       };
     } else if (preferredRole === 'Daycare Center') {
       finalProfile = {
@@ -2043,7 +2060,13 @@ export default function RegistrationHub({
           ...(licenseDocName ? [{ name: 'Government Trade / Educational License', url: licenseDocUrl || '#', verified: true }] : []),
           ...(fireSafetyDocName ? [{ name: 'Fire & Safety Clearance Certificate', url: fireSafetyDocUrl || '#', verified: true }] : []),
           ...(addressProofDocName ? [{ name: 'Center Facility Address Proof', url: addressProofDocUrl || '#', verified: true }] : [])
-        ]
+        ],
+
+        // B2B Daycare Operator Service Level Agreement (SLA)
+        slaAccepted: Boolean(slaAccepted),
+        slaAcceptedAt: new Date().toISOString(),
+        slaType: 'Daycare Operator SLA',
+        slaVersion: '2026-v2.1'
       } as any;
     } else if (preferredRole === 'Event Organizer') {
       const isCorp = hostingEntityType === 'Company';
@@ -2119,7 +2142,13 @@ export default function RegistrationHub({
         companyDocName: isCorp ? companyDocName : undefined,
         companyDocUrl: isCorp ? (companyDocUrl || undefined) : undefined,
         addressProofDocName: isCorp ? addressProofDocName : undefined,
-        addressProofDocUrl: isCorp ? (addressProofDocUrl || undefined) : undefined
+        addressProofDocUrl: isCorp ? (addressProofDocUrl || undefined) : undefined,
+
+        // B2B Event Organizer & Workshop Host Service Level Agreement (SLA)
+        slaAccepted: Boolean(slaAccepted),
+        slaAcceptedAt: new Date().toISOString(),
+        slaType: 'Event Organizer SLA',
+        slaVersion: '2026-v2.1'
       };
     } else {
       // Portfolio Professional Specialist
@@ -2198,7 +2227,13 @@ export default function RegistrationHub({
         companyDocName: isClinic ? companyDocName : undefined,
         companyDocUrl: isClinic ? (companyDocUrl || undefined) : undefined,
         addressProofDocName: isClinic ? addressProofDocName : undefined,
-        addressProofDocUrl: isClinic ? (addressProofDocUrl || undefined) : undefined
+        addressProofDocUrl: isClinic ? (addressProofDocUrl || undefined) : undefined,
+
+        // B2B Specialist & Healthcare Professional Portfolio SLA
+        slaAccepted: Boolean(slaAccepted),
+        slaAcceptedAt: new Date().toISOString(),
+        slaType: 'Specialist Portfolio SLA',
+        slaVersion: '2026-v2.1'
       };
     }
 
@@ -5265,6 +5300,165 @@ export default function RegistrationHub({
         )}
 
         {/* ============================================================== */}
+        {/* MANDATORY B2B / PORTFOLIO SERVICE LEVEL AGREEMENT (SLA) BOX     */}
+        {/* ============================================================== */}
+        {step === maxSteps && preferredRole !== 'Parent' && (
+          <div id="reg-sla-container" className="my-5 p-4.5 sm:p-5 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-blue-50/90 border-2 border-indigo-200/90 rounded-2xl space-y-3.5 shadow-xs text-left">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Scale className="w-4 h-4 text-amber-300" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs sm:text-sm text-slate-900">
+                    Mandatory B2B Service Level Agreement (SLA)
+                  </h4>
+                  <p className="text-[10.5px] text-indigo-700 font-bold uppercase tracking-wider">
+                    {preferredRole === 'Daycare Center' && 'Daycare Child Health, Care Ratios & Emergency Escalation SLA'}
+                    {preferredRole === 'Event Organizer' && 'Event Host Gate Scanning, Refund & Chaperone Ratio SLA'}
+                    {preferredRole === 'Portfolio Professional' && 'Specialist Punctuality, DPDP Health Privacy & Council Validity SLA'}
+                    {preferredRole === 'Influencer' && 'Creator Ambassador Ethical Content & Child Dignity SLA'}
+                  </p>
+                </div>
+              </div>
+              
+              <button
+                type="button"
+                onClick={() => setShowSlaModal(true)}
+                className="px-3 py-1.5 bg-white hover:bg-indigo-50 border border-indigo-300 text-indigo-700 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer ml-auto"
+              >
+                <FileText className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Review Full SLA Document</span>
+              </button>
+            </div>
+
+            {/* Quick Metrics Chips */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10.5px]">
+              {preferredRole === 'Daycare Center' && (
+                <>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">1:4 / 1:8 / 1:12</span>
+                    <span className="text-slate-500 text-[9.5px]">Caregiver Ratio</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">&lt; 5 Minutes</span>
+                    <span className="text-slate-500 text-[9.5px]">Emergency Parent Call</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">&lt; 15 Minutes</span>
+                    <span className="text-slate-500 text-[9.5px]">Hospital Transport</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">100% Verified</span>
+                    <span className="text-slate-500 text-[9.5px]">Zero-Unverified Release</span>
+                  </div>
+                </>
+              )}
+              {preferredRole === 'Event Organizer' && (
+                <>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">&lt; 3 Seconds</span>
+                    <span className="text-slate-500 text-[9.5px]">QR Gate Scan Latency</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">&ge; 48 Hours</span>
+                    <span className="text-slate-500 text-[9.5px]">Reschedule Notice</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">100% Refund</span>
+                    <span className="text-slate-500 text-[9.5px]">Cancellations (&lt;48h)</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">1:10 Coach</span>
+                    <span className="text-slate-500 text-[9.5px]">Child Safety Ratio</span>
+                  </div>
+                </>
+              )}
+              {preferredRole === 'Portfolio Professional' && (
+                <>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">&lt; 15 Minutes</span>
+                    <span className="text-slate-500 text-[9.5px]">Max Queue Wait Time</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">&lt; 2 Hours</span>
+                    <span className="text-slate-500 text-[9.5px]">Summary Notes Upload</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">100% DPDP Act</span>
+                    <span className="text-slate-500 text-[9.5px]">Encrypted Records</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">Active NMC/RCI</span>
+                    <span className="text-slate-500 text-[9.5px]">Medical Board Validity</span>
+                  </div>
+                </>
+              )}
+              {preferredRole === 'Influencer' && (
+                <>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">Child Dignity</span>
+                    <span className="text-slate-500 text-[9.5px]">Safety Protocol</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-emerald-700 block">ASCI Compliant</span>
+                    <span className="text-slate-500 text-[9.5px]">Clear Disclosures</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">&lt; 5 Days</span>
+                    <span className="text-slate-500 text-[9.5px]">Event Turnaround</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                    <span className="font-mono font-bold text-indigo-900 block">Zero Platform Cut</span>
+                    <span className="text-slate-500 text-[9.5px]">VIP Ambassador</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* SLA Acceptance Checkbox */}
+            <div className="pt-2 border-t border-indigo-200/80">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="reg-b2b-sla-checkbox"
+                  checked={slaAccepted}
+                  onChange={(e) => {
+                    setSlaAccepted(e.target.checked);
+                    if (errors.slaAccepted) {
+                      const updated = { ...errors };
+                      delete updated.slaAccepted;
+                      setErrors(updated);
+                    }
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer shrink-0"
+                />
+                <span className="text-xs font-bold text-slate-800 leading-snug">
+                  I represent that I am an authorized signatory of this entity and solemnly agree to adhere to the{' '}
+                  <button
+                    type="button"
+                    onClick={(ev) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      setShowSlaModal(true);
+                    }}
+                    className="text-indigo-600 underline font-black hover:text-indigo-800 cursor-pointer"
+                  >
+                    Vernunt {preferredRole} Service Level Agreement (SLA)
+                  </button>
+                  . I understand that breach of emergency response times, safety ratios, or child protection standards entails platform penalties and legal deregistration. <span className="text-rose-500">*</span>
+                </span>
+              </label>
+              {errors.slaAccepted && (
+                <p className="text-xs font-bold text-rose-600 mt-1 pl-6.5">
+                  {errors.slaAccepted}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ============================================================== */}
         {/* COMMON FOOTER NAVIGATION MODULE                                 */}
         {/* ============================================================== */}
         <div id="reg-footer-buttons" className="pt-6 border-t border-slate-100 flex items-center justify-between">
@@ -5382,6 +5576,23 @@ export default function RegistrationHub({
           </div>
         </div>
       )}
+
+      {/* Interactive Service Level Agreement (SLA) Modal */}
+      <ServiceLevelAgreementModal
+        isOpen={showSlaModal}
+        roleOrType={preferredRole}
+        onClose={() => setShowSlaModal(false)}
+        onAccept={() => {
+          setSlaAccepted(true);
+          if (errors.slaAccepted) {
+            const updated = { ...errors };
+            delete updated.slaAccepted;
+            setErrors(updated);
+          }
+        }}
+        isAccepted={slaAccepted}
+        showAcceptButton={true}
+      />
     </div>
   );
 }

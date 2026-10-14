@@ -3,10 +3,12 @@ import { DaycarePlayhomeProfile, ChildProfile, CareProviderType } from '../types
 import { 
   X, ShieldCheck, MapPin, DollarSign, Clock, Baby, 
   Home, Check, Sparkles, Plus, Trash2, Camera, Info, Eye,
-  Navigation, UserCheck, HeartHandshake, Briefcase, Zap
+  Navigation, UserCheck, HeartHandshake, Briefcase, Zap,
+  Scale, FileText, AlertTriangle
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import AadhaarUploadField, { DocUploadData } from './AadhaarUploadField.tsx';
+import ServiceLevelAgreementModal from './legal/ServiceLevelAgreementModal.tsx';
 
 interface CareProviderRegistrationModalProps {
   currentUserProfile: ChildProfile | null;
@@ -106,6 +108,11 @@ export default function CareProviderRegistrationModal({
       'Full Day (9 AM - 7 PM)'
     ]
   );
+  
+  // Care Provider Service Level Agreement (SLA) States
+  const [slaAccepted, setSlaAccepted] = useState<boolean>(Boolean(existingProfile?.slaAccepted));
+  const [showSlaModal, setShowSlaModal] = useState<boolean>(false);
+  const [slaError, setSlaError] = useState<string>('');
   const [newSlotInput, setNewSlotInput] = useState<string>('');
 
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>(
@@ -183,6 +190,12 @@ export default function CareProviderRegistrationModal({
       return;
     }
 
+    if (!slaAccepted) {
+      setSlaError('Please review and accept the Caregiver & In-Home Sitter Service Level Agreement (SLA) before publishing your listing.');
+      return;
+    }
+    setSlaError('');
+
     const careServiceModes: ('host_at_my_home' | 'visit_parents_home')[] = [];
     if (canHostAtHome) careServiceModes.push('host_at_my_home');
     if (canVisitParentHome) careServiceModes.push('visit_parents_home');
@@ -237,6 +250,13 @@ export default function CareProviderRegistrationModal({
       instantBooking: true,
       parentKidNames: currentUserProfile?.childName ? `Parent of ${currentUserProfile.childName} (${currentUserProfile.childAge}y)` : undefined,
       emergencyContact: phone,
+      
+      // Caregiver & In-Home Sitter Service Level Agreement (SLA)
+      slaAccepted: true,
+      slaAcceptedAt: existingProfile?.slaAcceptedAt || new Date().toISOString(),
+      slaType: 'Caregiver & Sitter SLA',
+      slaVersion: '2026-v2.1',
+
       reviews: existingProfile?.reviews || [
         {
           id: 'rev-init',
@@ -750,6 +770,89 @@ export default function CareProviderRegistrationModal({
             </div>
           </div>
 
+          {/* Mandatory Caregiver & In-Home Sitter Service Level Agreement (SLA) */}
+          <div className="p-4 bg-gradient-to-r from-emerald-50/90 via-slate-50 to-teal-50/90 border-2 border-emerald-300 rounded-2xl space-y-3 shadow-2xs text-left">
+            <div className="flex items-start justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Scale className="w-4 h-4 text-amber-200" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-xs sm:text-sm text-emerald-950">
+                    Caregiver Safety &amp; Service Level Agreement (SLA)
+                  </h4>
+                  <p className="text-[10px] text-emerald-700 font-bold uppercase tracking-wider">
+                    Statutory Child Protection &bull; 100% Active Eyes-On Supervision Mandate
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSlaModal(true)}
+                className="px-3 py-1.5 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer ml-auto"
+              >
+                <FileText className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Review Full Sitter SLA</span>
+              </button>
+            </div>
+
+            {/* Quick Sitter Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10.5px]">
+              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-center shadow-2xs">
+                <span className="font-mono font-bold text-emerald-800 block">&ge; 98% On-Time</span>
+                <span className="text-slate-500 text-[9.5px]">Punctual Arrival</span>
+              </div>
+              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-center shadow-2xs">
+                <span className="font-mono font-bold text-indigo-900 block">100% Supervision</span>
+                <span className="text-slate-500 text-[9.5px]">No Unattended Play</span>
+              </div>
+              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-center shadow-2xs">
+                <span className="font-mono font-bold text-rose-700 block">&lt; 3 Minutes</span>
+                <span className="text-slate-500 text-[9.5px]">Emergency Notice</span>
+              </div>
+              <div className="p-2 bg-white rounded-xl border border-emerald-200 text-center shadow-2xs">
+                <span className="font-mono font-bold text-emerald-800 block">100% Verified</span>
+                <span className="text-slate-500 text-[9.5px]">Safe Handover Only</span>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-emerald-200">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="caregiver-sla-checkbox"
+                  checked={slaAccepted}
+                  onChange={(e) => {
+                    setSlaAccepted(e.target.checked);
+                    if (e.target.checked) setSlaError('');
+                  }}
+                  className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer shrink-0"
+                />
+                <span className="text-xs font-bold text-slate-800 leading-snug">
+                  I solemnly agree to adhere to the{' '}
+                  <button
+                    type="button"
+                    onClick={(ev) => {
+                      ev.preventDefault();
+                      ev.stopPropagation();
+                      setShowSlaModal(true);
+                    }}
+                    className="text-emerald-700 underline font-black hover:text-emerald-900 cursor-pointer"
+                  >
+                    Vernunt Caregiver &amp; Sitter Service Level Agreement (SLA)
+                  </button>
+                  . I will never invite unauthorized visitors, never abandon supervision, and immediately report health emergencies. <span className="text-rose-500">*</span>
+                </span>
+              </label>
+              {slaError && (
+                <p className="text-xs font-bold text-rose-600 mt-1 pl-6.5">
+                  {slaError}
+                </p>
+              )}
+            </div>
+          </div>
+
           {/* Submit Action */}
           <div className="pt-3 border-t border-slate-100 flex items-center gap-3">
             <button
@@ -771,6 +874,19 @@ export default function CareProviderRegistrationModal({
         </form>
 
       </div>
+
+      {/* Sitter SLA Modal */}
+      <ServiceLevelAgreementModal
+        isOpen={showSlaModal}
+        roleOrType="caregiver"
+        onClose={() => setShowSlaModal(false)}
+        onAccept={() => {
+          setSlaAccepted(true);
+          setSlaError('');
+        }}
+        isAccepted={slaAccepted}
+        showAcceptButton={true}
+      />
     </div>
   );
 }

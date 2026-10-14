@@ -11,7 +11,7 @@ import {
   ShoppingCart, ShoppingBag, HelpCircle, MoreHorizontal, ExternalLink, Settings,
   CreditCard, Key, Server, CheckSquare, Square, Filter, ChevronLeft,
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
-  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins
+  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins, Scale
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, auth } from '../utils/firebase.ts';
 import { doc, setDoc, updateDoc, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
@@ -5882,6 +5882,42 @@ export default function AdminDashboard({
                 </div>
               </div>
             )}
+
+            {/* Service Level Agreement (SLA) Compliance & Audit */}
+            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-indigo-950 text-xs">
+                  <Scale className="w-4 h-4 text-indigo-600" />
+                  <span>Service Level Agreement (SLA) Compliance</span>
+                </div>
+                {selectedUser.slaAccepted ? (
+                  <span className="bg-emerald-100 text-emerald-800 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3 text-emerald-600" />
+                    <span>SLA Signed Active</span>
+                  </span>
+                ) : (
+                  <span className="bg-slate-100 text-slate-600 font-bold text-[9.5px] px-2 py-0.5 rounded-full uppercase">
+                    Pending / Consumer Tier
+                  </span>
+                )}
+              </div>
+              <div className="bg-white p-3 border border-indigo-100 rounded-xs text-xs space-y-1">
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>Agreement Type:</span>
+                  <span className="font-bold text-slate-800">{selectedUser.slaType || (selectedUser.userRole ? `${selectedUser.userRole} Standard Terms` : 'Platform Terms')}</span>
+                </div>
+                <div className="flex justify-between text-slate-600 text-[11px]">
+                  <span>SLA Version:</span>
+                  <span className="font-mono text-slate-800 font-bold">{selectedUser.slaVersion || '2026-v2.1'}</span>
+                </div>
+                {selectedUser.slaAcceptedAt && (
+                  <div className="flex justify-between text-slate-600 text-[11px]">
+                    <span>Accepted Timestamp:</span>
+                    <span className="font-mono text-slate-800">{new Date(selectedUser.slaAcceptedAt).toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Current & Permanent Address & Proof Records (Strictly Admin Only) */}
             <div className="p-3.5 bg-amber-50/70 border border-amber-200 rounded-xs space-y-2.5">
