@@ -16,6 +16,8 @@ import {
 import CareBookingModal from './CareBookingModal.tsx';
 import CareProviderRegistrationModal from './CareProviderRegistrationModal.tsx';
 import CareHandshakeModal from './CareHandshakeModal.tsx';
+import CareAvailabilityCalendarModal from './care/CareAvailabilityCalendarModal.tsx';
+import UnifiedCareCalendarView from './care/UnifiedCareCalendarView.tsx';
 import confetti from 'canvas-confetti';
 
 interface DaycareSittingTabProps {
@@ -27,6 +29,7 @@ interface DaycareSittingTabProps {
   onUpdateBookingStatus: (bookingId: string, newStatus: CareBookingStatus, logNote?: string) => void;
   onOpenChatWithUser?: (opponentId: string) => void;
   onOpenUserProfile?: (user: ChildProfile) => void;
+  initialSubView?: 'find' | 'calendar' | 'my-bookings' | 'host';
 }
 
 export default function DaycareSittingTab({
@@ -37,10 +40,11 @@ export default function DaycareSittingTab({
   onAddCareBooking,
   onUpdateBookingStatus,
   onOpenChatWithUser,
-  onOpenUserProfile
+  onOpenUserProfile,
+  initialSubView = 'find'
 }: DaycareSittingTabProps) {
-  // Navigation & Sub-views
-  const [activeSubView, setActiveSubView] = useState<'find' | 'my-bookings' | 'host'>('find');
+  // Navigation & Sub-views: find sitters, view availability calendar by date, track active care bookings, host
+  const [activeSubView, setActiveSubView] = useState<'find' | 'calendar' | 'my-bookings' | 'host'>(initialSubView);
   
   // Search & Time Filter State
   const [selectedDate, setSelectedDate] = useState<string>(
@@ -61,6 +65,13 @@ export default function DaycareSittingTab({
   
   // Modals
   const [bookingModalProvider, setBookingModalProvider] = useState<DaycarePlayhomeProfile | null>(null);
+  const [calendarModalProvider, setCalendarModalProvider] = useState<DaycarePlayhomeProfile | null>(null);
+  const [bookingPrefill, setBookingPrefill] = useState<{
+    date?: string;
+    startTime?: string;
+    durationHours?: number;
+    serviceMode?: 'host_at_my_home' | 'visit_parents_home';
+  } | null>(null);
   const [isRegisteringProvider, setIsRegisteringProvider] = useState<boolean>(false);
   const [selectedBookingForHandshake, setSelectedBookingForHandshake] = useState<CareBookingRequest | null>(null);
   const [viewingProfileDetails, setViewingProfileDetails] = useState<DaycarePlayhomeProfile | null>(null);
@@ -204,6 +215,19 @@ export default function DaycareSittingTab({
 
             <button
               type="button"
+              onClick={() => setActiveSubView('calendar')}
+              className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
+                activeSubView === 'calendar'
+                  ? 'bg-white text-slate-900 shadow-md ring-2 ring-white/50'
+                  : 'bg-white/20 text-white hover:bg-white/30 backdrop-blur-xs'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5 text-amber-200" />
+              <span>Availability Calendar (By Date)</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveSubView('my-bookings')}
               className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 ${
                 activeSubView === 'my-bookings'
@@ -263,7 +287,24 @@ export default function DaycareSittingTab({
         </div>
       )}
 
-      {/* 2. SUB-VIEW: ACTIVE BOOKINGS & LIVE TRACKER */}
+      {/* 2. SUB-VIEW: INTERACTIVE AVAILABILITY CALENDAR (BY DATE & TIME) */}
+      {activeSubView === 'calendar' && (
+        <UnifiedCareCalendarView
+          daycarePlayhomes={daycarePlayhomes}
+          careBookings={careBookings}
+          currentUserProfile={currentUserProfile}
+          onBookProvider={(provider, date, startTime, duration) => {
+            setBookingPrefill({ date, startTime, durationHours: duration });
+            setBookingModalProvider(provider);
+          }}
+          onOpenProviderCalendar={(provider) => {
+            setCalendarModalProvider(provider);
+          }}
+          onOpenChatWithUser={onOpenChatWithUser}
+        />
+      )}
+
+      {/* 3. SUB-VIEW: ACTIVE BOOKINGS & LIVE TRACKER */}
       {activeSubView === 'my-bookings' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -840,7 +881,20 @@ export default function DaycareSittingTab({
 
                             <button
                               type="button"
-                              onClick={() => setBookingModalProvider(profile)}
+                              onClick={() => setCalendarModalProvider(profile)}
+                              className="px-3 py-2.5 rounded-xl border border-rose-300 bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold text-xs transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                              title="View Availability Calendar"
+                            >
+                              <Calendar className="w-3.5 h-3.5 text-rose-600" />
+                              <span className="hidden sm:inline">Calendar</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setBookingPrefill(null);
+                                setBookingModalProvider(profile);
+                              }}
                               className="flex-1 py-2.5 bg-gradient-to-r from-rose-600 to-orange-600 hover:from-rose-700 hover:to-orange-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition transform active:scale-98 cursor-pointer flex items-center justify-center gap-1.5"
                             >
                               <span>Book Care / Sitter</span>
@@ -866,13 +920,38 @@ export default function DaycareSittingTab({
         <CareBookingModal
           provider={bookingModalProvider}
           currentUserProfile={currentUserProfile}
-          initialDate={selectedDate}
-          initialStartTime={selectedStartTime}
-          initialDurationHours={selectedDurationHours}
-          onClose={() => setBookingModalProvider(null)}
+          initialDate={bookingPrefill?.date || selectedDate}
+          initialStartTime={bookingPrefill?.startTime || selectedStartTime}
+          initialDurationHours={bookingPrefill?.durationHours || selectedDurationHours}
+          onOpenFullCalendar={() => {
+            const currentProvider = bookingModalProvider;
+            setBookingModalProvider(null);
+            setCalendarModalProvider(currentProvider);
+          }}
+          onClose={() => {
+            setBookingModalProvider(null);
+            setBookingPrefill(null);
+          }}
           onSubmitBooking={(newBooking) => {
             onAddCareBooking(newBooking);
+            setBookingModalProvider(null);
+            setBookingPrefill(null);
             setActiveSubView('my-bookings');
+          }}
+        />
+      )}
+
+      {/* 2. Care Availability Calendar Modal */}
+      {calendarModalProvider && (
+        <CareAvailabilityCalendarModal
+          provider={calendarModalProvider}
+          careBookings={careBookings}
+          currentUserProfile={currentUserProfile}
+          onClose={() => setCalendarModalProvider(null)}
+          onSelectSlotToBook={(provider, date, startTime, duration, mode) => {
+            setCalendarModalProvider(null);
+            setBookingPrefill({ date, startTime, durationHours: duration, serviceMode: mode });
+            setBookingModalProvider(provider);
           }}
         />
       )}

@@ -1,5 +1,6 @@
-import { VendorProfile, VendorWithdrawal, VendorInquiry, VendorAnnouncement } from '../types/vendor.ts';
-import { StoreSettings, DEFAULT_STORE_SETTINGS } from '../types/store.ts';
+import type { VendorProfile, VendorWithdrawal, VendorInquiry, VendorAnnouncement } from '../types/vendor.ts';
+import type { StoreSettings } from '../types/store.ts';
+import { DEFAULT_STORE_SETTINGS } from '../types/store.ts';
 
 export const INITIAL_VENDORS: VendorProfile[] = [
   {
@@ -50,7 +51,41 @@ export const INITIAL_VENDORS: VendorProfile[] = [
     vacationMode: {
       enabled: false,
       message: 'Store is currently accepting all standard express dispatches.'
-    }
+    },
+    businessType: 'LLP',
+    contactPerson: 'Dr. Sunita Deshmukh',
+    pickupAddress: {
+      street: '42 Woodcraft Estate, Phase 2, Kothrud',
+      city: 'Pune',
+      state: 'Maharashtra',
+      pincode: '411038',
+      country: 'India'
+    },
+    primaryServiceablePincodes: ['411038', '411001', '411004', '411014', '411028', '400001', '400050', '560001', '560100', '560102', '110001', '500001', '600001'],
+    serviceablePincodes: ['411038', '411001', '411004', '411014', '411028', '400001', '400050', '400076', '560001', '560034', '560100', '560102', '110001', '110016', '110020', '500001', '500081', '600001', '600028', '700001', '380001'],
+    defaultShippingFee: 49,
+    freeShippingThreshold: 499,
+    expressShippingFee: 99,
+    pincodeShippingOverrides: {
+      '411038': 29, // Local Pune warehouse rate
+      '411001': 29,
+      '411004': 29,
+      '400001': 49,
+      '560102': 49
+    },
+    shippingRules: [
+      { id: 'sr-1', label: 'Pune Same-Day Dispatch', pincodes: ['411038', '411001', '411004'], shippingFee: 29, deliveryDays: 1 },
+      { id: 'sr-2', label: 'Metro Priority Express', pincodes: ['400001', '560001', '560102', '110001'], shippingFee: 49, deliveryDays: 2 }
+    ],
+    verificationDocuments: {
+      gstDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80',
+      panDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80',
+      bisDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80'
+    },
+    slaAccepted: true,
+    slaAcceptedAt: '2026-01-12T10:30:00.000Z',
+    slaType: 'B2B Marketplace & Logistics SLA',
+    slaVersion: '2026-v2.1'
   },
   {
     id: 'vend-brainy-stem',
@@ -85,14 +120,44 @@ export const INITIAL_VENDORS: VendorProfile[] = [
       upiId: 'brainyblocks@icici'
     },
     commissionType: 'percentage',
-    commissionRate: 8, // VIP discounted commission rate
+    commissionRate: 8,
     balance: 8900,
     totalSales: 67500,
     totalEarnings: 62100,
     totalOrders: 42,
     returnPolicy: '10 Days Replacement for any technical or electronic malfunction.',
     supportPhone: '+91 97112 88401',
-    supportEmail: 'care@brainyblocks.co.in'
+    supportEmail: 'care@brainyblocks.co.in',
+    businessType: 'Private Limited',
+    contactPerson: 'Vikramaditya Iyer',
+    pickupAddress: {
+      street: 'Plot 18, Phase 1, Electronic City',
+      city: 'Bengaluru',
+      state: 'Karnataka',
+      pincode: '560100',
+      country: 'India'
+    },
+    primaryServiceablePincodes: ['560100', '560102', '560034', '560001', '560068', '560076', '500001', '600001', '400001', '110001'],
+    serviceablePincodes: ['560001', '560002', '560034', '560100', '560102', '560103', '560068', '560076', '500001', '500032', '500081', '600001', '600018', '600028', '682001', '682017', '400001', '110001'],
+    defaultShippingFee: 39,
+    freeShippingThreshold: 599,
+    expressShippingFee: 79,
+    pincodeShippingOverrides: {
+      '560100': 19,
+      '560102': 19,
+      '560034': 19
+    },
+    shippingRules: [
+      { id: 'sr-bb-1', label: 'Bengaluru Instant/Next Day', pincodes: ['560100', '560102', '560034'], shippingFee: 19, deliveryDays: 1 }
+    ],
+    verificationDocuments: {
+      gstDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80',
+      panDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80'
+    },
+    slaAccepted: true,
+    slaAcceptedAt: '2026-02-05T14:15:00.000Z',
+    slaType: 'B2B Marketplace & Logistics SLA',
+    slaVersion: '2026-v2.1'
   },
   {
     id: 'vend-kiddysafe',
@@ -132,7 +197,34 @@ export const INITIAL_VENDORS: VendorProfile[] = [
     totalEarnings: 28080,
     totalOrders: 27,
     supportPhone: '+91 98910 22340',
-    supportEmail: 'support@kiddysafe.com'
+    supportEmail: 'support@kiddysafe.com',
+    businessType: 'Partnership',
+    contactPerson: 'Neha Singhania',
+    pickupAddress: {
+      street: 'C-58, Sector 62, Logistics Hub',
+      city: 'Noida',
+      state: 'Uttar Pradesh',
+      pincode: '201309',
+      country: 'India'
+    },
+    primaryServiceablePincodes: ['201309', '201301', '110001', '110016', '110020', '122001', '560102'],
+    serviceablePincodes: ['110001', '110016', '110020', '110024', '110092', '201301', '201309', '122001', '122002', '560001', '560102', '400001', '400050'],
+    defaultShippingFee: 49,
+    freeShippingThreshold: 499,
+    expressShippingFee: 89,
+    pincodeShippingOverrides: {
+      '201309': 25,
+      '110001': 29,
+      '110016': 29
+    },
+    verificationDocuments: {
+      gstDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80',
+      panDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80'
+    },
+    slaAccepted: true,
+    slaAcceptedAt: '2026-02-20T11:00:00.000Z',
+    slaType: 'B2B Marketplace & Logistics SLA',
+    slaVersion: '2026-v2.1'
   },
   {
     id: 'vend-littlesprouts',
@@ -172,7 +264,33 @@ export const INITIAL_VENDORS: VendorProfile[] = [
     totalEarnings: 0,
     totalOrders: 0,
     supportPhone: '+91 94471 90231',
-    supportEmail: 'care@littlesprouts.org'
+    supportEmail: 'care@littlesprouts.org',
+    businessType: 'Individual Artisan',
+    contactPerson: 'Rashmi Menon',
+    pickupAddress: {
+      street: 'Door 14/204, Kaloor Kadavanthra Road',
+      city: 'Kochi',
+      state: 'Kerala',
+      pincode: '682017',
+      country: 'India'
+    },
+    primaryServiceablePincodes: ['682017', '682001', '682016', '560001', '560102'],
+    serviceablePincodes: ['682001', '682016', '682017', '682020', '695001', '560001', '560102', '600001'],
+    defaultShippingFee: 49,
+    freeShippingThreshold: 399,
+    expressShippingFee: 89,
+    pincodeShippingOverrides: {
+      '682017': 20,
+      '682001': 20
+    },
+    verificationDocuments: {
+      gstDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80',
+      panDoc: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&q=80'
+    },
+    slaAccepted: true,
+    slaAcceptedAt: '2026-02-27T09:20:00.000Z',
+    slaType: 'B2B Marketplace & Logistics SLA',
+    slaVersion: '2026-v2.1'
   }
 ];
 

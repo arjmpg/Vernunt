@@ -63,11 +63,50 @@ export interface VendorProfile {
     enabled: boolean;
     message: string;
   };
+  businessType?: 'Proprietorship' | 'Partnership' | 'Private Limited' | 'LLP' | 'Individual Artisan';
+  contactPerson?: string;
+  pickupAddress?: VendorAddress;
+  primaryServiceablePincodes?: string[];
+  serviceablePincodes?: string[]; // Master serviceable pincodes for vendor
+  defaultShippingFee?: number; // Base shipping charge (₹)
+  freeShippingThreshold?: number; // Free shipping above ₹X
+  expressShippingFee?: number; // Express shipping charge (₹)
+  pincodeShippingOverrides?: Record<string, number>; // Specific pincode => custom shipping charge (₹)
+  shippingRules?: Array<{
+    id: string;
+    label: string;
+    pincodes: string[];
+    shippingFee: number;
+    deliveryDays: number;
+  }>;
+  verificationDocuments?: {
+    gstDoc?: string;
+    panDoc?: string;
+    fssaiDoc?: string;
+    bisDoc?: string;
+    cancelledCheque?: string;
+  };
   // B2B Marketplace Service Level Agreement (SLA) Compliance
   slaAccepted?: boolean;
   slaAcceptedAt?: string;
   slaType?: string;
   slaVersion?: string;
+}
+
+export interface VendorDashboardStats {
+  totalProducts: number;
+  activeProducts: number;
+  pendingProducts: number;
+  totalOrders: number;
+  newOrders: number;
+  awaitingShipmentOrders: number;
+  shippedOrders: number;
+  deliveredOrders: number;
+  cancelledOrders: number;
+  totalSales: number;
+  shippingChargesCollected: number;
+  availableInventory: number;
+  pincodeCoverageCount: number;
 }
 
 export type WithdrawalStatus = 'pending' | 'approved' | 'processed' | 'rejected';

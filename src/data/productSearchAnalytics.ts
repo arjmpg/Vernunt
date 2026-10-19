@@ -1,6 +1,6 @@
-import { ProductSearchLogEntry, MatchedProductSnippet, ProductSearchSummaryStat } from '../types/searchAnalytics.ts';
+import type { ProductSearchLogEntry, MatchedProductSnippet, ProductSearchSummaryStat } from '../types/searchAnalytics.ts';
 import { getStoredProducts } from './storeProducts.ts';
-import { StoreProduct } from '../types/store.ts';
+import type { StoreProduct } from '../types/store.ts';
 
 export const RETENTION_DAYS = 45;
 export const RETENTION_MS = RETENTION_DAYS * 24 * 60 * 60 * 1000;

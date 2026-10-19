@@ -68,6 +68,7 @@ export interface StoreProduct {
   reviews: ProductReview[];
   qaList: ProductQA[];
   isFeatured: boolean;
+  isHighlighted?: boolean;
   isBestSeller?: boolean;
   isNewArrival?: boolean;
   isDigital?: boolean;
@@ -84,6 +85,11 @@ export interface StoreProduct {
   vendorName?: string;
   vendorSlug?: string;
   approvalStatus?: 'approved' | 'pending' | 'rejected' | 'draft';
+  isActive?: boolean;
+  isAllIndiaDelivery?: boolean;
+  serviceablePincodes?: string[];
+  pincodeShippingRates?: Record<string, number>;
+  defaultShippingFee?: number;
 }
 
 export interface CartItem {

@@ -146,6 +146,11 @@ export default function CareProviderRegistrationModal({
     'Outdoor Garden Walk'
   ];
 
+  const [blockedDates, setBlockedDates] = useState<string[]>(
+    existingProfile?.calendarSchedule?.blockedDates || []
+  );
+  const [newBlockedDateInput, setNewBlockedDateInput] = useState<string>('');
+
   const handleToggleAgeGroup = (group: string) => {
     setSelectedAgeGroups(prev => 
       prev.includes(group) ? prev.filter(g => g !== group) : [...prev, group]
@@ -154,8 +159,19 @@ export default function CareProviderRegistrationModal({
 
   const handleToggleDay = (day: string) => {
     setSelectedDays(prev => 
-      prev.includes(day) ? prev.filter(d => g !== day) : [...prev, day]
+      prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]
     );
+  };
+
+  const handleAddBlockedDate = () => {
+    if (newBlockedDateInput && !blockedDates.includes(newBlockedDateInput)) {
+      setBlockedDates(prev => [...prev, newBlockedDateInput].sort());
+      setNewBlockedDateInput('');
+    }
+  };
+
+  const handleRemoveBlockedDate = (dateToRemove: string) => {
+    setBlockedDates(prev => prev.filter(d => d !== dateToRemove));
   };
 
   const handleToggleAmenity = (amenity: string) => {
@@ -232,6 +248,17 @@ export default function CareProviderRegistrationModal({
       acceptedAgeGroups: selectedAgeGroups.length > 0 ? selectedAgeGroups : ['1 - 3 yrs', '3 - 6 yrs'],
       availableDays: selectedDays.length > 0 ? selectedDays : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
       availableTimeSlots: availableSlots.length > 0 ? availableSlots : ['09:00 AM - 01:00 PM', '02:00 PM - 06:30 PM'],
+      calendarSchedule: {
+        operatingDays: selectedDays,
+        blockedDates: blockedDates,
+        defaultDailySlots: availableSlots.map((s, idx) => ({
+          id: `slot-${idx}`,
+          label: s,
+          startTime: s.split(' - ')[0] || '09:00 AM',
+          endTime: s.split(' - ')[1] || '01:00 PM',
+          maxCapacity: canHostAtHome ? (Number(maxCapacity) || 3) : 1
+        }))
+      },
       amenities: selectedAmenities,
       photos: existingProfile?.photos || [
         'https://images.unsplash.com/photo-1587654780291-39c9404d746b?auto=format&fit=crop&q=80&w=800',
@@ -735,6 +762,61 @@ export default function CareProviderRegistrationModal({
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1 shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" /> Add Slot
+              </button>
+            </div>
+          </div>
+
+          {/* Calendar Blocked Dates / Planned Leaves */}
+          <div className="space-y-2 p-4 bg-slate-50 rounded-2xl border border-slate-200">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-black uppercase tracking-wider text-slate-800">
+                Blocked Dates / Planned Leaves (Unavailable on Calendar)
+              </label>
+              <span className="text-[10px] text-slate-500 font-bold">
+                {blockedDates.length} blocked dates
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              Parents checking your availability calendar will see these dates marked as unavailable / on leave.
+            </p>
+
+            <div className="flex flex-wrap gap-2 mb-2">
+              {blockedDates.length === 0 ? (
+                <span className="text-[11px] text-slate-400 italic">No blocked dates. All selected working days are open.</span>
+              ) : (
+                blockedDates.map((dateStr) => (
+                  <span
+                    key={dateStr}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-300 text-rose-900 text-xs font-bold rounded-full"
+                  >
+                    <span>🚫 {dateStr}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveBlockedDate(dateStr)}
+                      className="hover:text-rose-700 ml-1 text-rose-400 cursor-pointer font-bold"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="date"
+                value={newBlockedDateInput}
+                min={new Date().toISOString().split('T')[0]}
+                onChange={(e) => setNewBlockedDateInput(e.target.value)}
+                className="px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-rose-600"
+              />
+              <button
+                type="button"
+                onClick={handleAddBlockedDate}
+                disabled={!newBlockedDateInput}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold text-xs rounded-xl shadow-xs transition cursor-pointer flex items-center gap-1"
+              >
+                <Plus className="w-3.5 h-3.5" /> Block Date
               </button>
             </div>
           </div>

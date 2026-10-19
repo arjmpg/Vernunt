@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { DaycarePlayhomeProfile, ChildProfile, CareBookingRequest } from '../types.ts';
 import { 
   X, Calendar, Clock, MapPin, ShieldCheck, Shield, Heart, 
@@ -16,6 +16,7 @@ interface CareBookingModalProps {
   initialDate?: string;
   initialStartTime?: string;
   initialDurationHours?: number;
+  onOpenFullCalendar?: () => void;
 }
 
 export default function CareBookingModal({
@@ -25,7 +26,8 @@ export default function CareBookingModal({
   onSubmitBooking,
   initialDate,
   initialStartTime,
-  initialDurationHours = 2
+  initialDurationHours = 2,
+  onOpenFullCalendar
 }: CareBookingModalProps) {
   // Service mode options supported by provider
   const availableModes = provider.careServiceModes || ['host_at_my_home'];
@@ -120,6 +122,83 @@ export default function CareBookingModal({
   };
 
   const endTimeStr = getEndTimeStr(startTime, durationHours);
+
+  // Check availability for selected date
+  const selectedDateAvailability = useMemo(() => {
+    if (!selectedDate) return { isAvailable: true, reason: '' };
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    const dayNameShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dateObj.getDay()];
+    const allowedDays = (provider.availableDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).map(s => s.slice(0, 3).toLowerCase());
+
+    const isBlocked = (provider.calendarSchedule?.blockedDates || []).includes(selectedDate);
+    if (isBlocked) {
+      return { isAvailable: false, reason: 'Caregiver is on planned leave on this date.' };
+    }
+
+    if (!allowedDays.includes(dayNameShort.toLowerCase())) {
+      return { isAvailable: false, reason: `${provider.hostName} is usually off on ${dayNameShort}days.` };
+    }
+
+    return { isAvailable: true, reason: 'Available' };
+  }, [selectedDate, provider.availableDays, provider.calendarSchedule, provider.hostName]);
+
+  // Available 7-day strip: from selectedDate, show the next 7 days (offset 0 to 6)
+  const upcomingWeekDays = useMemo(() => {
+    const list = [];
+    
+    // Parse anchor date from selectedDate
+    let anchor: Date;
+    if (selectedDate && selectedDate.includes('-')) {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      anchor = new Date(y, m - 1, d);
+    } else {
+      anchor = new Date();
+    }
+
+    const todayDate = new Date();
+    const todayStr = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
+
+    const allowedDays = (provider.availableDays || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']).map(s => s.slice(0, 3).toLowerCase());
+    const blocked = new Set(provider.calendarSchedule?.blockedDates || []);
+    const monthShorts = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    // Generate next 7 days starting from selectedDate (offset 0 to 6)
+    for (let offset = 0; offset < 7; offset++) {
+      const d = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + offset);
+      const yStr = d.getFullYear();
+      const mStr = String(d.getMonth() + 1).padStart(2, '0');
+      const dStr = String(d.getDate()).padStart(2, '0');
+      const dateStr = `${yStr}-${mStr}-${dStr}`;
+      const dayShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
+      const monthShort = monthShorts[d.getMonth()];
+
+      const isPast = dateStr < todayStr;
+      const isWorking = allowedDays.includes(dayShort.toLowerCase()) && !blocked.has(dateStr);
+      const isSelected = dateStr === selectedDate;
+      const isToday = dateStr === todayStr;
+
+      list.push({
+        dateStr,
+        dayNum: d.getDate(),
+        dayShort,
+        monthShort,
+        isWorking,
+        isPast,
+        isSelected,
+        isToday,
+        offset
+      });
+    }
+    return list;
+  }, [selectedDate, provider.availableDays, provider.calendarSchedule]);
+
+  const formattedSelectedDate = useMemo(() => {
+    if (!selectedDate || !selectedDate.includes('-')) return '';
+    const [y, m, d] = selectedDate.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }, [selectedDate]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -408,28 +487,46 @@ export default function CareBookingModal({
                 </div>
               )}
 
-              {/* 1. Date & Time Selection */}
+              {/* 1. Date & Time Selection with Calendar Availability */}
               <div className="space-y-3">
-                <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Calendar className="w-4 h-4 text-rose-600" />
-                  <span>1. Select Date &amp; Start Time</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-rose-600" />
+                    <span>1. Select Date &amp; Start Time</span>
+                  </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {onOpenFullCalendar && (
+                    <button
+                      type="button"
+                      onClick={onOpenFullCalendar}
+                      className="text-xs font-extrabold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>View Full Month Calendar</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Date</label>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center justify-between">
+                      <span>Pick Specific Date</span>
+                      {selectedDate && (
+                        <span className="text-[10px] text-rose-600 font-extrabold">{formattedSelectedDate}</span>
+                      )}
+                    </label>
                     <input
                       type="date"
                       value={selectedDate}
                       min={new Date().toISOString().split('T')[0]}
                       onChange={(e) => setSelectedDate(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-rose-600"
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-rose-600 focus:ring-2 focus:ring-rose-200"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-600 mb-1">Start Time</label>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Start Time</label>
                     <select
                       value={startTime}
                       onChange={(e) => setStartTime(e.target.value)}
@@ -441,6 +538,79 @@ export default function CareBookingModal({
                     </select>
                   </div>
                 </div>
+
+                {/* 7-Day Availability Strip: Next 7 Days from Selected Date */}
+                <div className="space-y-1.5 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                  <div className="flex items-center justify-between text-[11px] text-slate-700 font-bold">
+                    <span>
+                      Upcoming Available Days (Next 7 Days from {formattedSelectedDate || selectedDate}):
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-extrabold flex items-center gap-1.5">
+                      <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" /> Open</span>
+                      <span className="flex items-center gap-0.5"><span className="w-2 h-2 rounded-full bg-slate-300 inline-block" /> Off</span>
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-7 gap-1">
+                    {upcomingWeekDays.map((item) => {
+                      const isSelected = selectedDate === item.dateStr;
+                      return (
+                        <button
+                          key={item.dateStr}
+                          type="button"
+                          disabled={item.isPast}
+                          onClick={() => {
+                            if (!item.isPast) {
+                              setSelectedDate(item.dateStr);
+                            }
+                          }}
+                          className={`p-1.5 rounded-xl border text-center transition cursor-pointer flex flex-col items-center justify-between relative ${
+                            item.isPast
+                              ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-40'
+                              : isSelected
+                              ? 'bg-rose-600 text-white border-rose-600 shadow-md font-black ring-2 ring-rose-300'
+                              : item.isWorking
+                              ? 'bg-white hover:bg-emerald-50 text-slate-800 border-emerald-300 hover:border-emerald-500'
+                              : 'bg-slate-100 text-slate-400 border-slate-200 hover:border-slate-300'
+                          }`}
+                          title={`${item.dayShort}, ${item.monthShort} ${item.dayNum}${item.isPast ? ' (Past date)' : item.isWorking ? ' (Open)' : ' (Off)'}`}
+                        >
+                          <span className={`text-[9px] uppercase font-bold tracking-tight ${
+                            isSelected ? 'text-white' : item.isPast ? 'text-slate-300' : 'text-slate-500'
+                          }`}>
+                            {item.dayShort}
+                          </span>
+                          <span className="text-xs font-black leading-tight my-0.5">
+                            {item.dayNum}
+                          </span>
+                          <span className={`text-[8px] font-semibold leading-none ${
+                            isSelected ? 'text-rose-100' : item.isPast ? 'text-slate-300' : 'text-slate-400'
+                          }`}>
+                            {item.monthShort}
+                          </span>
+                          <span className={`w-1.5 h-1.5 rounded-full mt-1 ${
+                            item.isPast
+                              ? 'bg-slate-200'
+                              : isSelected
+                              ? 'bg-white'
+                              : item.isWorking
+                              ? 'bg-emerald-500'
+                              : 'bg-slate-300'
+                          }`} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Off-Day or Blocked Alert */}
+                {!selectedDateAvailability.isAvailable && (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center gap-2 text-xs text-amber-900 font-bold animate-in fade-in">
+                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      Notice: {selectedDateAvailability.reason} You can still send a special request or pick another green day above.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* 2. Duration Selector */}

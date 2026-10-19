@@ -643,6 +643,28 @@ export default function AdminDashboard({
       await setDoc(userRef, updatePayload, { merge: true });
       setSelectedUser(updatePayload);
       
+      // Update local state immediately so table updates without reload
+      setServerUsers(prev => {
+        const idx = prev.findIndex(u => u.id === selectedUser.id);
+        if (idx >= 0) {
+          const copy = [...prev];
+          copy[idx] = updatePayload;
+          return copy;
+        }
+        return [updatePayload, ...prev];
+      });
+
+      // Synchronize with backend server store
+      fetch('/api/users/kyc-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: selectedUser.id,
+          verificationStatus: targetVerification,
+          aadhaarVerified: targetAadhaarVerified
+        })
+      }).catch(e => console.debug('Backend review sync note:', e));
+      
       if (isNewlyVerified) {
         await sendApprovalNotification(updatePayload);
       } else {
@@ -667,6 +689,11 @@ export default function AdminDashboard({
             verificationStatus: VerificationStatus.VERIFIED,
             aadhaarVerified: true
           });
+          fetch('/api/users/kyc-review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: id, verificationStatus: 'VERIFIED', aadhaarVerified: true })
+          }).catch(() => {});
         } else if (bulkAction === 'block') {
           await updateDoc(userRef, {
             isBlocked: true,
@@ -678,6 +705,9 @@ export default function AdminDashboard({
             isLocked: false
           });
         }
+      }
+      if (bulkAction === 'verify') {
+        setServerUsers(prev => prev.map(item => selectedUserIds.includes(item.id) ? { ...item, verificationStatus: VerificationStatus.VERIFIED, aadhaarVerified: true } : item));
       }
       showNotification('success', `Bulk action "${bulkAction}" applied to ${selectedUserIds.length} user(s).`);
       setSelectedUserIds([]);
@@ -1176,10 +1206,111 @@ export default function AdminDashboard({
     return { dateStr, timeStr, relativeStr, isRecent };
   };
 
-  // Filtered Users computation
-  const allUsers = userProfile ? [userProfile, ...playmates.filter(p => p.id !== userProfile.id)] : playmates;
-  const verifiedCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.VERIFIED).length;
-  const pendingCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.PENDING).length;
+  // Backend Server Users & KYC Submissions State
+  // Backend Server & Real-time Cloud Users & KYC Submissions State
+  const [serverUsers, setServerUsers] = useState<ChildProfile[]>([]);
+  const [firestoreUsers, setFirestoreUsers] = useState<ChildProfile[]>([]);
+  const [isRefreshingUsers, setIsRefreshingUsers] = useState<boolean>(false);
+
+  // Helper to filter out dummy demo profiles
+  const isDemoOrGuest = React.useCallback((id?: string) => {
+    if (!id) return false;
+    return id === 'playground-user' || id === 'guest-explorer' || id.startsWith('demo-') || id.startsWith('guest-');
+  }, []);
+
+  // 1. Real-time Firestore Cloud Sync for all registered users & pending KYC applicants
+  useEffect(() => {
+    try {
+      const unsub = onSnapshot(collection(db, 'users'), (snapshot) => {
+        const list: ChildProfile[] = [];
+        snapshot.forEach((snapDoc) => {
+          list.push({ ...snapDoc.data() as ChildProfile, id: snapDoc.id });
+        });
+        setFirestoreUsers(list);
+      }, (err) => {
+        console.debug('[Admin] Firestore users onSnapshot note:', err);
+      });
+      return () => unsub();
+    } catch (e) {
+      console.debug('[Admin] Firestore listener init note:', e);
+    }
+  }, []);
+
+  const fetchServerUsers = React.useCallback(async () => {
+    setIsRefreshingUsers(true);
+    try {
+      const res = await fetch('/api/users');
+      const data = await res.json();
+      if (data?.success && Array.isArray(data.users)) {
+        setServerUsers(data.users);
+      }
+    } catch (err) {
+      console.debug('[Admin] Error fetching server users:', err);
+    } finally {
+      setIsRefreshingUsers(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchServerUsers();
+    const interval = setInterval(() => {
+      fetchServerUsers();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [fetchServerUsers]);
+
+  // Helper to accurately classify any pending KYC applicant
+  const isPendingKycUser = React.useCallback((u: ChildProfile) => {
+    if (!u || isDemoOrGuest(u.id)) return false;
+    const status = (u.verificationStatus || '').toString().toUpperCase();
+    if (status === 'PENDING') return true;
+    if (status === 'UNVERIFIED' || !u.aadhaarVerified) {
+      if (
+        u.kycSubmitted || 
+        !!u.aadhaarDocName || 
+        !!u.aadhaarDocUrl || 
+        !!u.idDocumentName || 
+        !!(u as any).addressProofDocName || 
+        !!(u as any).companyDocName || 
+        !!(u as any).licenseDocName ||
+        (u.userRole && u.userRole !== 'Admin')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [isDemoOrGuest]);
+
+  // Filtered Users computation: Merges live Firestore users, backend storage, playmates, and current admin session
+  const allUsers = React.useMemo(() => {
+    const map = new Map<string, ChildProfile>();
+    // 1. Live Firestore Cloud Users
+    for (const fu of firestoreUsers) {
+      if (fu.id && !isDemoOrGuest(fu.id)) {
+        map.set(fu.id, fu);
+      }
+    }
+    // 2. Backend server users (/api/users)
+    for (const su of serverUsers) {
+      if (su.id && !isDemoOrGuest(su.id)) {
+        map.set(su.id, { ...(map.get(su.id) || {}), ...su });
+      }
+    }
+    // 3. Playmates list passed down
+    for (const p of playmates) {
+      if (p.id && !isDemoOrGuest(p.id) && !map.has(p.id)) {
+        map.set(p.id, p);
+      }
+    }
+    // 4. Current Admin session
+    if (userProfile && !isDemoOrGuest(userProfile.id)) {
+      map.set(userProfile.id, { ...(map.get(userProfile.id) || {}), ...userProfile });
+    }
+    return Array.from(map.values());
+  }, [firestoreUsers, serverUsers, playmates, userProfile, isDemoOrGuest]);
+
+  const verifiedCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.VERIFIED || u.verificationStatus === 'VERIFIED').length;
+  const pendingCount = allUsers.filter(isPendingKycUser).length;
   const organizerCount = allUsers.filter(u => u.userRole === 'Event Organizer').length;
   const specialistCount = allUsers.filter(u => u.userRole === 'Portfolio Professional').length;
   const influencerCount = allUsers.filter(u => u.userRole === 'Influencer').length;
@@ -1205,8 +1336,8 @@ export default function AdminDashboard({
       }
     }
 
-    if (activeSubTab === 'verified') return matchesSearch && u.verificationStatus === VerificationStatus.VERIFIED;
-    if (activeSubTab === 'pending') return matchesSearch && u.verificationStatus === VerificationStatus.PENDING;
+    if (activeSubTab === 'verified') return matchesSearch && (u.verificationStatus === VerificationStatus.VERIFIED || u.verificationStatus === 'VERIFIED');
+    if (activeSubTab === 'pending') return matchesSearch && isPendingKycUser(u);
     if (activeSubTab === 'organizers') return matchesSearch && u.userRole === 'Event Organizer';
     if (activeSubTab === 'specialists') return matchesSearch && u.userRole === 'Portfolio Professional';
     if (activeSubTab === 'admins') return matchesSearch && u.userRole === 'Admin';
@@ -2182,6 +2313,232 @@ export default function AdminDashboard({
                 </div>
               )}
 
+              {/* Real-Time KYC & Aadhaar Verification Queue Widget */}
+              <div id="admin-kyc-queue-panel" className="bg-white border-2 border-amber-300 rounded-xs shadow-xs overflow-hidden">
+                <div className="bg-gradient-to-r from-amber-500/10 via-orange-500/10 to-transparent px-4 py-3 border-b border-amber-200 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xs bg-amber-500 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                      <ShieldCheck className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-bold text-sm text-[#1d2327]">
+                          ⚡ Real-Time KYC Verification Queue
+                        </h3>
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                          pendingCount > 0 ? 'bg-red-600 text-white animate-pulse' : 'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {pendingCount} Pending Review
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[#646970]">
+                        Review Aadhaar credentials, address proofs, and government licenses uploaded by applicants
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fetchServerUsers()}
+                      disabled={isRefreshingUsers}
+                      className="px-2.5 py-1 bg-white hover:bg-slate-50 border border-[#8c8f94] text-[#2c3338] rounded-xs text-xs font-semibold cursor-pointer flex items-center gap-1 shadow-2xs"
+                      title="Sync latest KYC submissions from server and Firestore"
+                    >
+                      <RefreshCw className={`w-3 h-3 ${isRefreshingUsers ? 'animate-spin text-amber-600' : ''}`} />
+                      <span>{isRefreshingUsers ? 'Syncing...' : '↻ Refresh Queue'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setActiveMenu('users'); setActiveSubTab('pending'); }}
+                      className="px-3 py-1 bg-[#2271b1] hover:bg-[#135e96] text-white rounded-xs text-xs font-bold cursor-pointer shadow-2xs"
+                    >
+                      Full Users Table →
+                    </button>
+                  </div>
+                </div>
+
+                {pendingCount === 0 ? (
+                  <div className="p-6 text-center space-y-2">
+                    <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 mx-auto flex items-center justify-center font-bold">
+                      ✓
+                    </div>
+                    <h4 className="font-bold text-xs text-slate-800">All KYC Applications Are Reviewed &amp; Approved!</h4>
+                    <p className="text-[11px] text-[#646970] max-w-md mx-auto">
+                      There are currently 0 unverified applicants waiting in the review queue. When parents, instructors, daycares, or specialists upload Aadhaar cards or address proofs, they appear here automatically.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-[#f6f7f7] border-b border-[#c3c4c7] text-[#50575e] text-[11px]">
+                          <th className="py-2.5 px-3">Applicant Profile</th>
+                          <th className="py-2.5 px-3">Role</th>
+                          <th className="py-2.5 px-3">Contact (Phone &amp; Email)</th>
+                          <th className="py-2.5 px-3">Residential Locality</th>
+                          <th className="py-2.5 px-3">Submitted Documents</th>
+                          <th className="py-2.5 px-3 text-right">Instant Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#f0f0f1]">
+                        {allUsers.filter(isPendingKycUser).map((u) => {
+                          return (
+                            <tr key={u.id} className="hover:bg-amber-50/40 transition">
+                              <td className="py-3 px-3">
+                                <div className="flex items-start gap-2.5">
+                                  <img
+                                    src={u.photoUrl || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=200'}
+                                    alt={u.parentName}
+                                    className="w-9 h-9 rounded-xs object-cover bg-slate-100 shrink-0 border border-[#c3c4c7]"
+                                    referrerPolicy="no-referrer"
+                                  />
+                                  <div>
+                                    <span className="font-bold text-[#1d2327] block text-xs">
+                                      {u.parentName || u.companyName}
+                                    </span>
+                                    <span className="text-[10.5px] text-[#50575e] block">
+                                      {u.childName && u.childName !== 'N/A' ? `Child: ${u.childName} (${u.childAge || 5}y)` : (u.companyName || 'Independent Host')}
+                                    </span>
+                                    <span className="text-[9.5px] text-[#8c8f94] font-mono block">ID: {u.id}</span>
+                                  </div>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <span className={`inline-block px-2 py-0.5 rounded-xs font-bold text-[10px] uppercase ${
+                                  u.userRole === 'Event Organizer' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                                  u.userRole === 'Portfolio Professional' ? 'bg-orange-100 text-orange-800 border border-orange-200' :
+                                  u.userRole === 'Daycare Center' ? 'bg-purple-100 text-purple-800 border border-purple-200' :
+                                  u.userRole === 'Influencer' ? 'bg-pink-100 text-pink-800 border border-pink-200' :
+                                  'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                }`}>
+                                  {u.userRole || 'Parent'}
+                                </span>
+                              </td>
+
+                              <td className="py-3 px-3 font-mono text-[11px] text-[#1d2327]">
+                                <div className="font-bold flex items-center gap-1">
+                                  <span>📞</span> <span>+91 {u.phoneNumber ? u.phoneNumber.replace('+91', '').trim() : 'N/A'}</span>
+                                </div>
+                                <div className="text-[10px] text-[#646970] font-sans truncate max-w-[180px]">
+                                  {u.email || 'No email provided'}
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 text-[#50575e] text-[11px] max-w-[200px]">
+                                <div className="flex items-start gap-1">
+                                  <MapPin className="w-3.5 h-3.5 text-orange-500 shrink-0 mt-0.5" />
+                                  <span className="line-clamp-2">{(u as any).currentAddress || u.location?.address || 'Indiranagar, Bangalore'}</span>
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3">
+                                <div className="flex flex-col gap-1 text-[10.5px]">
+                                  {u.aadhaarDocUrl ? (
+                                    <a
+                                      href={u.aadhaarDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-xs font-bold transition w-fit"
+                                    >
+                                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                                      <span>📄 Aadhaar Card</span>
+                                    </a>
+                                  ) : u.aadhaarDocName ? (
+                                    <span className="inline-flex items-center gap-1 text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-xs font-semibold w-fit">
+                                      📄 {u.aadhaarDocName}
+                                    </span>
+                                  ) : null}
+
+                                  {(u as any).addressProofDocUrl ? (
+                                    <a
+                                      href={(u as any).addressProofDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-xs font-bold transition w-fit"
+                                    >
+                                      <Eye className="w-3 h-3 text-amber-600" />
+                                      <span>📍 Address Proof</span>
+                                    </a>
+                                  ) : (u as any).addressProofDocName ? (
+                                    <span className="inline-flex items-center gap-1 text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-xs text-[10px] w-fit">
+                                      📍 {(u as any).addressProofDocName}
+                                    </span>
+                                  ) : null}
+
+                                  {u.idDocUrl && (
+                                    <a
+                                      href={u.idDocUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-300 px-2 py-0.5 rounded-xs font-bold transition w-fit"
+                                    >
+                                      <Eye className="w-3 h-3 text-purple-600" />
+                                      <span>📁 ID Document</span>
+                                    </a>
+                                  )}
+                                </div>
+                              </td>
+
+                              <td className="py-3 px-3 text-right">
+                                <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        const userRef = doc(db, 'users', u.id);
+                                        await setDoc(userRef, {
+                                          verificationStatus: VerificationStatus.VERIFIED,
+                                          aadhaarVerified: true,
+                                          facialAuditRequired: false,
+                                          faceVerificationStatus: 'verified'
+                                        }, { merge: true }).catch(() => {});
+
+                                        setServerUsers(prev => prev.map(item => item.id === u.id ? {
+                                          ...item,
+                                          verificationStatus: VerificationStatus.VERIFIED,
+                                          aadhaarVerified: true,
+                                          facialAuditRequired: false,
+                                          faceVerificationStatus: 'verified'
+                                        } : item));
+
+                                        await fetch('/api/users/kyc-review', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ userId: u.id, verificationStatus: 'VERIFIED', aadhaarVerified: true })
+                                        }).catch(() => {});
+
+                                        await sendApprovalNotification(u);
+                                        showNotification('success', `✓ Approved KYC & verified profile for ${u.parentName}!`);
+                                      } catch (err: any) {
+                                        showNotification('error', err.message || 'Error updating verification');
+                                      }
+                                    }}
+                                    className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xs text-xs flex items-center gap-1 transition shadow-2xs cursor-pointer active:scale-95"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    <span>Approve &amp; Verify</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectUser(u)}
+                                    className="px-2.5 py-1 bg-white hover:bg-slate-100 border border-[#8c8f94] text-[#2271b1] font-bold rounded-xs text-xs cursor-pointer shadow-2xs"
+                                  >
+                                    Inspect File
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
               {/* Dashboard Postboxes Grid (2-Column Layout) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 
@@ -2440,6 +2797,15 @@ export default function AdminDashboard({
                   >
                     Pending KYC <span className="text-[#d63638] font-bold">({pendingCount})</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => fetchServerUsers()}
+                    disabled={isRefreshingUsers}
+                    title="Refresh all submitted KYC documents from server and cloud"
+                    className="ml-1 text-[10px] text-[#2271b1] hover:text-[#135e96] bg-slate-100 hover:bg-slate-200 px-1.5 py-0.5 rounded-xs cursor-pointer inline-flex items-center gap-0.5"
+                  >
+                    <span>{isRefreshingUsers ? '↻ Syncing...' : '↻ Refresh'}</span>
+                  </button>
                   <span className="mx-1 text-[#dcdcde]">|</span>
                 </li>
                 <li>
@@ -2694,13 +3060,26 @@ export default function AdminDashboard({
                                       onClick={async () => {
                                         try {
                                           const userRef = doc(db, 'users', u.id);
-                                          await updateDoc(userRef, {
+                                          await setDoc(userRef, {
                                             verificationStatus: VerificationStatus.VERIFIED,
                                             aadhaarVerified: true,
                                             facialAuditRequired: false,
                                             faceVerificationStatus: 'verified'
-                                          });
+                                          }, { merge: true });
+                                          setServerUsers(prev => prev.map(item => item.id === u.id ? {
+                                            ...item,
+                                            verificationStatus: VerificationStatus.VERIFIED,
+                                            aadhaarVerified: true,
+                                            facialAuditRequired: false,
+                                            faceVerificationStatus: 'verified'
+                                          } : item));
+                                          fetch('/api/users/kyc-review', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ userId: u.id, verificationStatus: 'VERIFIED', aadhaarVerified: true })
+                                          }).catch(() => {});
                                           await sendApprovalNotification(u);
+                                          showNotification('success', `Approved KYC & verified account for ${u.parentName}`);
                                         } catch (err: any) {
                                           showNotification('error', err.message);
                                         }

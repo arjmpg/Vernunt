@@ -51,6 +51,7 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [productSearch, setProductSearch] = useState<string>('');
   const [productCategoryFilter, setProductCategoryFilter] = useState<string>('all');
+  const [productShowcaseFilter, setProductShowcaseFilter] = useState<'all' | 'featured' | 'highlighted' | 'deals'>('all');
   const [vendorSearch, setVendorSearch] = useState<string>('');
   const [categorySearch, setCategorySearch] = useState<string>('');
   const [attributeSearch, setAttributeSearch] = useState<string>('');
@@ -330,7 +331,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
         rating: 5.0,
         reviewCount: 1,
         badges: productFormData.badges || ['BIS Certified', '100% Non-Toxic'],
-        isFeatured: true,
+        isFeatured: productFormData.isFeatured ?? true,
+        isHighlighted: Boolean(productFormData.isHighlighted),
         isBestSeller: Boolean(productFormData.isBestSeller),
         onSale: Boolean(productFormData.onSale),
         discountPercentage: productFormData.regularPrice && productFormData.price ? Math.round(((productFormData.regularPrice - productFormData.price) / productFormData.regularPrice) * 100) : 15,
@@ -522,6 +524,9 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
   const filteredProducts = useMemo(() => {
     return products.filter(p => {
       if (productCategoryFilter !== 'all' && !p.category.toLowerCase().includes(productCategoryFilter.toLowerCase())) return false;
+      if (productShowcaseFilter === 'featured' && !p.isFeatured) return false;
+      if (productShowcaseFilter === 'highlighted' && !p.isHighlighted) return false;
+      if (productShowcaseFilter === 'deals' && (!p.discountPercentage || p.discountPercentage < 20)) return false;
       if (productSearch.trim()) {
         const q = productSearch.toLowerCase();
         const matchTitle = p.name.toLowerCase().includes(q);
@@ -531,7 +536,29 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
       }
       return true;
     });
-  }, [products, productSearch, productCategoryFilter]);
+  }, [products, productSearch, productCategoryFilter, productShowcaseFilter]);
+
+  const handleToggleProductFeatured = (productId: string) => {
+    const updated = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, isFeatured: !p.isFeatured };
+      }
+      return p;
+    });
+    setProducts(updated);
+    saveStoredProducts(updated);
+  };
+
+  const handleToggleProductHighlighted = (productId: string) => {
+    const updated = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, isHighlighted: !p.isHighlighted };
+      }
+      return p;
+    });
+    setProducts(updated);
+    saveStoredProducts(updated);
+  };
 
   const filteredCategories = useMemo(() => {
     return categories.filter(c => {
@@ -851,18 +878,34 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                 className="w-full bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-hidden focus:border-teal-500 font-medium"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 font-semibold">Category:</span>
-              <select
-                value={productCategoryFilter}
-                onChange={(e) => setProductCategoryFilter(e.target.value)}
-                className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-hidden font-medium"
-              >
-                <option value="all">All Departments ({products.length})</option>
-                {STORE_CATEGORIES.map(c => (
-                  <option key={c.id} value={c.name}>{c.name}</option>
-                ))}
-              </select>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-semibold">Department:</span>
+                <select
+                  value={productCategoryFilter}
+                  onChange={(e) => setProductCategoryFilter(e.target.value)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-hidden font-medium"
+                >
+                  <option value="all">All Departments ({products.length})</option>
+                  {STORE_CATEGORIES.map(c => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-slate-500 font-semibold">Carousel View:</span>
+                <select
+                  value={productShowcaseFilter}
+                  onChange={(e) => setProductShowcaseFilter(e.target.value as any)}
+                  className="bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs outline-hidden font-bold text-slate-800"
+                >
+                  <option value="all">All Items</option>
+                  <option value="featured">✨ Featured Products</option>
+                  <option value="highlighted">⭐ Highlighted Products</option>
+                  <option value="deals">🔥 Top Deals (≥20% OFF)</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -877,6 +920,7 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                     <th className="py-3 px-4">Price / MRP</th>
                     <th className="py-3 px-4">Stock Status</th>
                     <th className="py-3 px-4">GST Rate</th>
+                    <th className="py-3 px-4">Showcase Badges</th>
                     <th className="py-3 px-4 text-right">Quick Actions</th>
                   </tr>
                 </thead>
@@ -932,6 +976,36 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                       </td>
                       <td className="py-3 px-4 font-mono font-semibold text-slate-700">
                         {prod.gstRate || 12}% GST
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="flex flex-col gap-1 items-start">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleProductFeatured(prod.id)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
+                              prod.isFeatured
+                                ? 'bg-purple-100 text-purple-800 border border-purple-300 shadow-2xs hover:bg-purple-200'
+                                : 'bg-slate-100 text-slate-400 border border-slate-200 hover:text-slate-700'
+                            }`}
+                            title="Click to toggle Featured status on store carousel"
+                          >
+                            <span>✨</span>
+                            <span>{prod.isFeatured ? 'Featured' : 'Not Featured'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleProductHighlighted(prod.id)}
+                            className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase transition cursor-pointer flex items-center gap-1 ${
+                              prod.isHighlighted
+                                ? 'bg-indigo-100 text-indigo-800 border border-indigo-300 shadow-2xs hover:bg-indigo-200'
+                                : 'bg-slate-100 text-slate-400 border border-slate-200 hover:text-slate-700'
+                            }`}
+                            title="Click to toggle Highlighted / Spotlight status on store carousel"
+                          >
+                            <span>⭐</span>
+                            <span>{prod.isHighlighted ? 'Highlighted' : 'Not Highlighted'}</span>
+                          </button>
+                        </div>
                       </td>
                       <td className="py-3 px-4 text-right space-x-2">
                         <button
@@ -1751,6 +1825,27 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                <label className="flex items-center gap-2 text-xs font-bold text-purple-900 bg-purple-50 p-2.5 rounded-lg border border-purple-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={productFormData.isFeatured || false}
+                    onChange={(e) => setProductFormData({ ...productFormData, isFeatured: e.target.checked })}
+                    className="rounded text-purple-600 w-4 h-4 cursor-pointer"
+                  />
+                  <span>✨ Featured (Showcase Carousel)</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs font-bold text-indigo-900 bg-indigo-50 p-2.5 rounded-lg border border-indigo-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={productFormData.isHighlighted || false}
+                    onChange={(e) => setProductFormData({ ...productFormData, isHighlighted: e.target.checked })}
+                    className="rounded text-indigo-600 w-4 h-4 cursor-pointer"
+                  />
+                  <span>⭐ Highlighted / Spotlight Product</span>
+                </label>
               </div>
 
               <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">

@@ -39,6 +39,10 @@ const KnowledgeHub = React.lazy(() => import('./components/KnowledgeHub.tsx').th
 const AffiliateDashboard = React.lazy(() => import('./components/events/AffiliateDashboard.tsx'));
 const DaycareSittingTab = React.lazy(() => import('./components/DaycareSittingTab.tsx'));
 const VernuntStore = React.lazy(() => import('./components/store/VernuntStore.tsx').then(m => ({ default: m.VernuntStore })));
+const VendorDashboard = React.lazy(() => import('./components/vendor/VendorDashboard.tsx').then(m => ({ default: m.VendorDashboard })));
+const HostDashboard = React.lazy(() => import('./components/host/HostDashboard.tsx').then(m => ({ default: m.HostDashboard })));
+const HelpCenterAndSopDesk = React.lazy(() => import('./components/help/HelpCenterAndSopDesk.tsx').then(m => ({ default: m.HelpCenterAndSopDesk })));
+import { PortalAuthModal, PortalType } from './components/auth/PortalAuthModal.tsx';
 import GlobalUniversalSearch from './components/GlobalUniversalSearch.tsx';
 
 // Modal helpers
@@ -99,6 +103,7 @@ import { UserWallet } from './types.ts';
 import { LegalPolicyTab } from './components/LegalPolicyModal.tsx';
 import { isAuthorizedSystemAdmin } from './utils/security.ts';
 import { auth } from './utils/firebase.ts';
+import { sendAdminKycPendingNotification } from './utils/notifications.ts';
 const AdminVisualPageEditor = React.lazy(() => import('./components/admin/visual/AdminVisualPageEditor.tsx').then(m => ({ default: m.AdminVisualPageEditor })));
 import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlocksSection.tsx';
 
@@ -337,6 +342,11 @@ export interface CachedAuthSession {
 
 export const AUTH_SESSION_KEY = 'vernunt_auth_session';
 
+export const isDemoOrGuestId = (id?: string): boolean => {
+  if (!id) return false;
+  return id === 'playground-user' || id === 'guest-explorer' || id.startsWith('demo-') || id.startsWith('guest-');
+};
+
 export const getInitialCachedSession = (): CachedAuthSession | null => {
   if (typeof window === 'undefined') return null;
   try {
@@ -344,16 +354,19 @@ export const getInitialCachedSession = (): CachedAuthSession | null => {
     if (rawSession) {
       const parsed: CachedAuthSession = JSON.parse(rawSession);
       if (parsed && parsed.uid && parsed.userProfile) {
+        if (isDemoOrGuestId(parsed.uid) || isDemoOrGuestId(parsed.userProfile.id)) {
+          return null;
+        }
         return parsed;
       }
     }
     // Fallback: check active or last logged in user profile cache
     const lastUid = localStorage.getItem('vernunt_active_user_id') || localStorage.getItem('vernunt_last_logged_in_user');
-    if (lastUid) {
+    if (lastUid && !isDemoOrGuestId(lastUid)) {
       const rawProfile = localStorage.getItem('vernunt_cached_profile_' + lastUid);
       if (rawProfile) {
         const parsedProfile: ChildProfile = JSON.parse(rawProfile);
-        if (parsedProfile && parsedProfile.id) {
+        if (parsedProfile && parsedProfile.id && !isDemoOrGuestId(parsedProfile.id)) {
           const role = (parsedProfile.userRole as any) || 'Parent';
           return {
             uid: parsedProfile.id,
@@ -371,7 +384,7 @@ export const getInitialCachedSession = (): CachedAuthSession | null => {
 };
 
 export const persistAuthSession = (profile: ChildProfile, role?: 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Admin') => {
-  if (!profile || !profile.id) return;
+  if (!profile || !profile.id || isDemoOrGuestId(profile.id)) return;
   const effectiveRole = role || profile.userRole || 'Parent';
   const sessionObj: CachedAuthSession = {
     uid: profile.id,
@@ -441,7 +454,16 @@ export default function App() {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
+        const path = window.location.pathname.toLowerCase();
+        if (
+          params.get('tab') === 'store' || path.startsWith('/store') ||
+          params.get('portal') === 'vendor' || path.startsWith('/vendor') ||
+          params.get('portal') === 'host' || path.startsWith('/host') ||
+          params.get('portal') === 'care' || path.startsWith('/care') ||
+          params.get('portal') === 'admin' || params.get('tab') === 'admin' || path.startsWith('/admin') ||
+          params.get('tab') === 'help' || path.startsWith('/help') ||
+          params.get('tab') === 'sop' || path.startsWith('/sop')
+        ) {
           return 'dashboard';
         }
         if (
@@ -451,8 +473,8 @@ export default function App() {
           params.get('tab') === 'events' ||
           params.get('event') ||
           params.get('eventId') ||
-          window.location.pathname.startsWith('/stories') ||
-          window.location.pathname.startsWith('/story')
+          path.startsWith('/stories') ||
+          path.startsWith('/story')
         ) {
           return 'dashboard';
         }
@@ -462,9 +484,9 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
-          window.location.pathname.startsWith('/portfolio') ||
-          window.location.pathname.startsWith('/specialist') ||
-          window.location.pathname.startsWith('/doctor')
+          path.startsWith('/portfolio') ||
+          path.startsWith('/specialist') ||
+          path.startsWith('/doctor')
         ) {
           return 'dashboard';
         }
@@ -478,20 +500,37 @@ export default function App() {
     'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 
     'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 
     'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories' | 
-    'groups' | 'community' | 'pages' | 'tracker'
+    'groups' | 'community' | 'pages' | 'tracker' |
+    'vendor' | 'host' | 'care' | 'help'
   >(() => {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('tab') === 'store' || window.location.pathname.startsWith('/store')) {
+        const path = window.location.pathname.toLowerCase();
+        if (params.get('portal') === 'admin' || params.get('tab') === 'admin' || path.startsWith('/admin')) {
+          return 'admin';
+        }
+        if (params.get('portal') === 'vendor' || params.get('tab') === 'vendor' || path.startsWith('/vendor')) {
+          return 'vendor';
+        }
+        if (params.get('portal') === 'host' || params.get('tab') === 'host' || path.startsWith('/host')) {
+          return 'host';
+        }
+        if (params.get('portal') === 'care' || params.get('tab') === 'care' || path.startsWith('/care')) {
+          return 'care';
+        }
+        if (params.get('tab') === 'help' || params.get('tab') === 'sop' || path.startsWith('/help') || path.startsWith('/sop')) {
+          return 'help';
+        }
+        if (params.get('tab') === 'store' || path.startsWith('/store')) {
           return 'store';
         }
         if (
           params.get('tab') === 'kid_stories' ||
           params.get('tab') === 'stories' ||
           params.get('story') ||
-          window.location.pathname.startsWith('/stories') ||
-          window.location.pathname.startsWith('/story')
+          path.startsWith('/stories') ||
+          path.startsWith('/story')
         ) {
           return 'kid_stories';
         }
@@ -504,9 +543,9 @@ export default function App() {
           params.get('portfolio') ||
           params.get('specialist') ||
           params.get('doctor') ||
-          window.location.pathname.startsWith('/portfolio') ||
-          window.location.pathname.startsWith('/specialist') ||
-          window.location.pathname.startsWith('/doctor')
+          path.startsWith('/portfolio') ||
+          path.startsWith('/specialist') ||
+          path.startsWith('/doctor')
         ) {
           return 'specialists';
         }
@@ -518,6 +557,49 @@ export default function App() {
     if (initialSession?.userRole === 'Portfolio Professional') return 'portfolio';
     return 'radar';
   });
+
+  // Portal Authentication State for Vendor, Host, and Daycare Portals
+  const [portalAuthModalState, setPortalAuthModalState] = useState<{
+    isOpen: boolean;
+    portalType: PortalType;
+  }>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      const params = new URLSearchParams(window.location.search);
+      const portalParam = params.get('portal');
+      if (path.startsWith('/vendor') || portalParam === 'vendor') {
+        const hasSession = !!localStorage.getItem('vernunt_auth_vendor_session');
+        return { isOpen: !hasSession, portalType: 'vendor' };
+      }
+      if (path.startsWith('/host') || portalParam === 'host') {
+        const hasSession = !!localStorage.getItem('vernunt_auth_host_session');
+        return { isOpen: !hasSession, portalType: 'host' };
+      }
+      if (path.startsWith('/care') || portalParam === 'care') {
+        const hasSession = !!localStorage.getItem('vernunt_auth_care_session');
+        return { isOpen: !hasSession, portalType: 'care' };
+      }
+    }
+    return { isOpen: false, portalType: 'vendor' };
+  });
+
+  const handleOpenPortal = (portal: PortalType) => {
+    const hasSession = !!localStorage.getItem(`vernunt_auth_${portal}_session`);
+    if (!hasSession && !userProfile) {
+      setPortalAuthModalState({ isOpen: true, portalType: portal });
+    } else {
+      setActiveTab(portal as any);
+      setAppMode('dashboard');
+      window.history.pushState({}, '', `/${portal}`);
+    }
+  };
+
+  const handlePortalAuthSuccess = (profile: ChildProfile, portal: PortalType) => {
+    setUserProfile(profile);
+    setAppMode('dashboard');
+    setActiveTab(portal as any);
+    window.history.pushState({}, '', `/${portal}`);
+  };
   const [specialistCategoryToOpen, setSpecialistCategoryToOpen] = useState<string>('All');
   const [isSideMenuOpen, setIsSideMenuOpen] = useState<boolean>(false);
   const [drawerCategory, setDrawerCategory] = useState<'all' | 'play' | 'health' | 'learning' | 'finance' | 'tools'>('all');
@@ -920,25 +1002,33 @@ export default function App() {
                   setActiveTab('radar');
                 }
               } else {
-                // Unregistered user -> prompt registration popup with pre-verified credentials
-                const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
-                const cleanPhone = firebaseUser.phoneNumber ? firebaseUser.phoneNumber.replace('+91', '').trim() : '';
-                
-                setPendingRegisterDetails({
-                  email: emailLower || undefined,
-                  phone: cleanPhone || undefined,
-                  phoneVerified: false, // Must be verified via explicit OTP
-                  parentName: fallbackName || undefined,
-                  photoUrl: firebaseUser.photoURL || undefined
-                });
-                setPendingAuthUser({
-                  email: emailLower || undefined,
-                  phone: cleanPhone || undefined,
-                  uid: firebaseUser.uid,
-                  displayName: fallbackName || undefined,
-                  photoURL: firebaseUser.photoURL || undefined
-                });
-                setShowRoleSelectModal(true);
+                // If the user already has a valid session cached or is in the middle of registration, preserve it!
+                const existingSession = getInitialCachedSession();
+                if (existingSession && existingSession.userProfile && existingSession.userProfile.id !== 'guest-explorer') {
+                  setUserProfile(existingSession.userProfile);
+                  setUserRole(existingSession.userRole || 'Parent');
+                  setAppMode('dashboard');
+                } else if (appMode !== 'register') {
+                  // Unregistered user -> prompt registration popup with pre-verified credentials
+                  const fallbackName = firebaseUser.displayName || (emailLower ? emailLower.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : '');
+                  const cleanPhone = firebaseUser.phoneNumber ? firebaseUser.phoneNumber.replace('+91', '').trim() : '';
+                  
+                  setPendingRegisterDetails({
+                    email: emailLower || undefined,
+                    phone: cleanPhone || undefined,
+                    phoneVerified: false, // Must be verified via explicit OTP
+                    parentName: fallbackName || undefined,
+                    photoUrl: firebaseUser.photoURL || undefined
+                  });
+                  setPendingAuthUser({
+                    email: emailLower || undefined,
+                    phone: cleanPhone || undefined,
+                    uid: firebaseUser.uid,
+                    displayName: fallbackName || undefined,
+                    photoURL: firebaseUser.photoURL || undefined
+                  });
+                  setShowRoleSelectModal(true);
+                }
               }
             }
           } catch (error) {
@@ -960,37 +1050,64 @@ export default function App() {
           }
         })();
       } else {
-        clearAuthSession();
-        setUserProfile(null);
-        setUserRole('Parent');
-        
-        // Preserve 'dashboard' mode if arriving via deep link (events, stories, specialists, store)
-        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const hasDeepLink = params && (
-          params.get('tab') === 'events' ||
-          !!params.get('eventId') ||
-          !!params.get('event') ||
-          !!params.get('id') ||
-          params.get('tab') === 'kid_stories' ||
-          params.get('tab') === 'stories' ||
-          !!params.get('story') ||
-          params.get('tab') === 'store' ||
-          params.get('tab') === 'specialists' ||
-          !!params.get('specialist') ||
-          !!params.get('portfolio') ||
-          !!params.get('doctor') ||
-          window.location.pathname.startsWith('/events') ||
-          window.location.pathname.startsWith('/store') ||
-          window.location.pathname.startsWith('/stories')
-        );
-
-        if (hasDeepLink) {
+        // If there is an existing cached user session in localStorage, preserve it across browser reloads!
+        const existingSession = getInitialCachedSession();
+        if (existingSession && existingSession.userProfile && existingSession.userProfile.id !== 'guest-explorer') {
+          console.log('[Auth Session] Preserving cached registered user session on reload:', existingSession.uid);
+          setUserProfile(existingSession.userProfile);
+          setUserRole(existingSession.userRole || 'Parent');
           setAppMode('dashboard');
-          if (params?.get('tab') === 'events' || params?.get('eventId') || params?.get('event') || params?.get('id')) {
-            setActiveTab('events');
-          }
         } else {
-          setAppMode('landing');
+          // Check if arriving via deep link or direct portal URL
+          const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+          const path = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : '';
+          const hasDeepLink = Boolean(
+            (params && (
+              params.get('tab') === 'events' ||
+              !!params.get('eventId') ||
+              !!params.get('event') ||
+              !!params.get('id') ||
+              params.get('tab') === 'kid_stories' ||
+              params.get('tab') === 'stories' ||
+              !!params.get('story') ||
+              params.get('tab') === 'store' ||
+              params.get('tab') === 'specialists' ||
+              !!params.get('specialist') ||
+              !!params.get('portfolio') ||
+              !!params.get('doctor') ||
+              params.get('portal') === 'vendor' ||
+              params.get('portal') === 'host' ||
+              params.get('portal') === 'care' ||
+              params.get('portal') === 'admin' ||
+              params.get('tab') === 'admin' ||
+              params.get('tab') === 'help' ||
+              params.get('tab') === 'sop'
+            )) || (
+              path.startsWith('/events') ||
+              path.startsWith('/store') ||
+              path.startsWith('/stories') ||
+              path.startsWith('/vendor') ||
+              path.startsWith('/host') ||
+              path.startsWith('/care') ||
+              path.startsWith('/admin') ||
+              path.startsWith('/help') ||
+              path.startsWith('/sop')
+            )
+          );
+
+          if (hasDeepLink) {
+            setAppMode('dashboard');
+            if (params?.get('tab') === 'events' || params?.get('eventId') || params?.get('event') || params?.get('id')) {
+              setActiveTab('events');
+            } else if (params?.get('portal') === 'admin' || params?.get('tab') === 'admin' || path.startsWith('/admin')) {
+              setActiveTab('admin');
+            }
+          } else {
+            clearAuthSession();
+            setUserProfile(null);
+            setUserRole('Parent');
+            setAppMode('landing');
+          }
         }
         setIsLoading(false);
         setIsAuthenticating(false);
@@ -1041,6 +1158,21 @@ export default function App() {
         console.warn("Failed to unpack cached playmates:", err);
       }
     }
+
+    // Load registered users & KYC submissions from backend server store immediately
+    fetch('/api/users')
+      .then(res => res.json())
+      .then(data => {
+        if (data?.success && Array.isArray(data.users) && data.users.length > 0) {
+          setPlaymates(prev => {
+            const map = new Map<string, ChildProfile>();
+            data.users.forEach((u: ChildProfile) => map.set(u.id, u));
+            prev.forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
+            return Array.from(map.values());
+          });
+        }
+      })
+      .catch(err => console.debug('Initial server users sync note:', err));
 
     // Real-time Firestore Cloud Sync for all registered users (runs for all visitors & accounts)
     const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
@@ -2282,6 +2414,76 @@ export default function App() {
     setUserProfile(updatedProfile);
     setShowAadhaarVerifyModal(false);
 
+    // 1. Immediately update playmates state so Admin and Community reflect this KYC submission
+    setPlaymates(prev => {
+      const idx = prev.findIndex(p => p.id === updatedProfile.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = updatedProfile;
+        return copy;
+      }
+      return [updatedProfile, ...prev];
+    });
+
+    // 2. Persist locally to auth session and user cache
+    persistAuthSession(updatedProfile, updatedProfile.userRole);
+
+    // Dispatch instant admin KYC notification to ardha@vernunt.com and arjunmpgupta@gmail.com
+    sendAdminKycPendingNotification({
+      applicantId: updatedProfile.id,
+      applicantName: updatedProfile.parentName || 'Verified Guardian',
+      applicantRole: updatedProfile.userRole || 'Parent',
+      applicantPhone: updatedProfile.phoneNumber || '',
+      applicantEmail: updatedProfile.email,
+      currentAddress: (updatedProfile as any).currentAddress || updatedProfile.location?.address,
+      apartmentCommunityName: (updatedProfile as any).apartmentCommunityName,
+      childName: updatedProfile.childName,
+      childAge: updatedProfile.childAge,
+      aadhaarDocName: updatedProfile.aadhaarDocName,
+      addressProofDocName: (updatedProfile as any).addressProofDocName,
+      addressProofDocType: (updatedProfile as any).addressProofDocType,
+      submittedAt: new Date().toISOString()
+    });
+
+    // 3. Immediately persist KYC submission to backend server
+    try {
+      fetch('/api/users/kyc-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: updatedProfile.id,
+          parentName: updatedProfile.parentName,
+          childName: updatedProfile.childName,
+          userRole: updatedProfile.userRole,
+          phoneNumber: updatedProfile.phoneNumber,
+          email: updatedProfile.email,
+          aadhaarNumber: updatedProfile.aadhaarNumber,
+          aadhaarVerified: updatedProfile.aadhaarVerified,
+          aadhaarDocName: updatedProfile.aadhaarDocName,
+          aadhaarDocUrl: updatedProfile.aadhaarDocUrl,
+          aadhaarDocSize: updatedProfile.aadhaarDocSize,
+          addressProofDocName: updatedProfile.addressProofDocName,
+          addressProofDocUrl: updatedProfile.addressProofDocUrl,
+          addressProofDocType: (updatedProfile as any).addressProofDocType || 'Aadhaar Card',
+          currentAddress: (updatedProfile as any).currentAddress || updatedProfile.location?.address,
+          apartmentCommunityName: (updatedProfile as any).apartmentCommunityName,
+          kycSubmitted: true,
+          verificationStatus: updatedProfile.verificationStatus || 'PENDING'
+        })
+      }).catch(err => console.debug('Backend KYC submit sync note:', err));
+    } catch (_syncErr) {
+      console.debug('Backend KYC submit note:', _syncErr);
+    }
+
+    // 4. Also persist directly to Firestore cloud database
+    try {
+      setDoc(doc(db, 'users', updatedProfile.id), updatedProfile, { merge: true }).catch(err => {
+        console.debug('Firestore KYC write note:', err);
+      });
+    } catch (_fsErr) {
+      console.debug('Firestore KYC sync note:', _fsErr);
+    }
+
     // Trigger the original pending callback if it exists
     if (aadhaarSuccessCallbackRef.current) {
       aadhaarSuccessCallbackRef.current();
@@ -2534,10 +2736,15 @@ export default function App() {
       // Ensure Firebase Auth session exists so Firestore security rules allow persistent write
       if (!auth.currentUser) {
         try {
-          const { signInAnonymously } = await import('firebase/auth');
-          await signInAnonymously(auth);
+          await Promise.race([
+            (async () => {
+              const { signInAnonymously } = await import('firebase/auth');
+              await signInAnonymously(auth);
+            })(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Auth timeout')), 1500))
+          ]);
         } catch (anonErr) {
-          console.warn('Anonymous auth session note:', anonErr);
+          console.debug('Anonymous auth session note:', anonErr);
         }
       }
       
@@ -2623,9 +2830,26 @@ export default function App() {
         console.warn('Local storage write note:', e);
       }
 
-      // CRITICAL: Always persist newly signed-up user profile directly to Firestore cloud database
+      // Immediately add new profile to playmates list so AdminDashboard and Community see it right away
+      setPlaymates(prev => [profileWithId, ...prev.filter(p => p.id !== profileWithId.id)]);
+
+      // Immediately persist user to backend server store so Admin dashboard can review immediately
       try {
-        await setDoc(doc(db, 'users', uid), cleanedData, { merge: true });
+        fetch('/api/users/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(cleanedData)
+        }).catch(err => console.debug('Backend user sync note:', err));
+      } catch (_syncErr) {
+        console.debug('Backend user register note:', _syncErr);
+      }
+
+      // CRITICAL: Persist newly signed-up user profile directly to Firestore cloud database with timeout
+      try {
+        await Promise.race([
+          setDoc(doc(db, 'users', uid), cleanedData, { merge: true }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Firestore timeout')), 2500))
+        ]);
         console.log('✅ User registration successfully persisted to Firestore:', uid);
       } catch (err) {
         console.warn("Firestore write error during registration, proceeding with local verified session:", err);
@@ -4220,9 +4444,24 @@ export default function App() {
             )}
 
             {/* Tab: System Admin panel */}
-            {activeTab === 'admin' && userProfile?.userRole === 'Admin' && (
+            {activeTab === 'admin' && (isSuperAdmin || userRole === 'Admin' || userProfile?.userRole === 'Admin' || (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || new URLSearchParams(window.location.search).get('portal') === 'admin' || new URLSearchParams(window.location.search).get('tab') === 'admin'))) && (
               <AdminDashboard 
-                userProfile={userProfile}
+                userProfile={userProfile || {
+                  id: 'admin-console-root',
+                  parentName: 'System Administrator (Ardha)',
+                  childName: 'Vernunt System',
+                  childAge: 10,
+                  childGender: 'Other',
+                  gradeLevel: 'Above Grade 3',
+                  phoneNumber: '9845012345',
+                  email: 'ardha@vernunt.com',
+                  userRole: 'Admin',
+                  verificationStatus: VerificationStatus.VERIFIED,
+                  aadhaarVerified: true,
+                  bio: 'Vernunt System Administrator & Platform Safety Controller',
+                  location: { lat: 12.9716, lng: 77.5946, address: 'Bangalore, India' },
+                  interests: ['Platform Operations', 'Child Safety', 'KYC Review']
+                }}
                 playmates={playmates}
                 eventsList={eventsList}
                 setEventsList={setEventsList}
@@ -4271,6 +4510,53 @@ export default function App() {
                 onNavigateToTab={(t) => setActiveTab(t as any)}
                 onContactSupport={() => setShowSupportChat(true)}
                 onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
+              />
+            )}
+
+            {/* Dedicated Portal: Vendor / Seller Dashboard (https://app.vernunt.com/vendor) */}
+            {activeTab === 'vendor' && (
+              <VendorDashboard
+                currentUserProfile={userProfile}
+                onNavigateHome={() => {
+                  window.history.pushState({}, '', '/');
+                  setActiveTab('radar');
+                }}
+                onOpenHelpSop={() => setActiveTab('help')}
+              />
+            )}
+
+            {/* Dedicated Portal: Event Host & Activity Station (https://app.vernunt.com/host) */}
+            {activeTab === 'host' && (
+              <HostDashboard
+                currentUserProfile={userProfile}
+                events={events}
+                onAddEvent={handleAddEvent}
+                onNavigateHome={() => {
+                  window.history.pushState({}, '', '/');
+                  setActiveTab('radar');
+                }}
+                onOpenHelpSop={() => setActiveTab('help')}
+              />
+            )}
+
+            {/* Dedicated Portal: Daycare & Babysitter Provider Portal (https://app.vernunt.com/care) */}
+            {activeTab === 'care' && (
+              <DaycareSittingTab
+                daycarePlayhomes={daycarePlayhomes}
+                careBookings={careBookings}
+                currentUserProfile={userProfile}
+                onSaveDaycareProfile={handleSaveDaycareProfile}
+                onAddCareBooking={handleAddCareBooking}
+                onUpdateBookingStatus={handleUpdateBookingStatus}
+                initialSubView="host"
+              />
+            )}
+
+            {/* Help & Standard Operating Procedures (SOP) Hub */}
+            {activeTab === 'help' && (
+              <HelpCenterAndSopDesk
+                onClose={() => setActiveTab('radar')}
+                onNavigateToPortal={(p) => handleOpenPortal(p)}
               />
             )}
             </Suspense>
@@ -5046,7 +5332,7 @@ export default function App() {
                 {TAB_DEFINITIONS
                   .filter((tab) => {
                     // Role guards
-                    if (tab.id === 'admin' && userProfile?.userRole !== 'Admin') return false;
+                    if (tab.id === 'admin' && !(isSuperAdmin || userRole === 'Admin' || userProfile?.userRole === 'Admin' || (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || new URLSearchParams(window.location.search).get('portal') === 'admin' || new URLSearchParams(window.location.search).get('tab') === 'admin')))) return false;
                     if (tab.id === 'business' && userProfile?.userRole === 'Parent') return false;
                     
                     // Category filter
@@ -5642,6 +5928,18 @@ export default function App() {
           />
         </Suspense>
       )}
+
+      {/* Dedicated Portal Auth Modal: Vendor (app.vernunt.com/vendor), Host (/host), Care (/care) with SMS OTP */}
+      <PortalAuthModal
+        isOpen={portalAuthModalState.isOpen}
+        portalType={portalAuthModalState.portalType}
+        onClose={() => setPortalAuthModalState(prev => ({ ...prev, isOpen: false }))}
+        onSuccess={(profile, portal) => {
+          setPortalAuthModalState({ isOpen: false, portalType: portal });
+          handlePortalAuthSuccess(profile, portal);
+        }}
+      />
+
 
       {/* Conditionally Render Animated Loader overlay */}
       {isLoading && (

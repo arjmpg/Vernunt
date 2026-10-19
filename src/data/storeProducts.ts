@@ -337,6 +337,7 @@ export const INITIAL_STORE_PRODUCTS: StoreProduct[] = [
       }
     ],
     isFeatured: true,
+    isHighlighted: true,
     isBestSeller: true,
     isNewArrival: true,
     isDigital: false,
@@ -362,11 +363,11 @@ export const INITIAL_STORE_PRODUCTS: StoreProduct[] = [
     • Encourages self-feeding and pincer-grasp fine motor coordination
     • 100% Vegan, Gluten-Free, and Dairy-Free
     • Resealable on-the-go travel pouch`,
-    price: 299,
+    price: 228,
     regularPrice: 399,
-    salePrice: 299,
+    salePrice: 228,
     onSale: true,
-    discountPercentage: 25,
+    discountPercentage: 43,
     sku: 'VRN-FOOD-002',
     stockQuantity: 60,
     stockStatus: 'instock',
@@ -645,11 +646,11 @@ export const INITIAL_STORE_PRODUCTS: StoreProduct[] = [
     description: `Inspire the young scientist at home with the Vernunt STEM Explorer kit. Certified non-toxic and BIS compliant, this comprehensive kit allows children to build 6 unique moving robots—including a Mars Rover, Space Walking Robot, Solar Car, and Windmill Bot. 
     
     Includes detailed illustrated color manuals, precision snap-together ABS parts (no solder or glue required), and a real miniature solar panel module with dual micro-gearbox.`,
-    price: 1499,
+    price: 1275,
     regularPrice: 2199,
-    salePrice: 1499,
+    salePrice: 1275,
     onSale: true,
-    discountPercentage: 32,
+    discountPercentage: 42,
     sku: 'VRN-STEM-001',
     stockQuantity: 28,
     stockStatus: 'instock',
@@ -715,6 +716,7 @@ export const INITIAL_STORE_PRODUCTS: StoreProduct[] = [
       }
     ],
     isFeatured: true,
+    isHighlighted: true,
     isBestSeller: true,
     isNewArrival: false,
     isDigital: false,

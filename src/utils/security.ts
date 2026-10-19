@@ -14,11 +14,10 @@ export const AUTHORIZED_ROOT_ADMIN_EMAILS = [
  * Checks whether the current user is a cryptographically verified system admin
  */
 export function isAuthorizedSystemAdmin(email?: string | null, userRole?: string | null): boolean {
+  if (userRole === 'Admin') return true;
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  const isEmailMatch = AUTHORIZED_ROOT_ADMIN_EMAILS.includes(normalized);
-  if (isEmailMatch) return true;
-  return userRole === 'Admin';
+  return AUTHORIZED_ROOT_ADMIN_EMAILS.includes(normalized);
 }
 
 /**

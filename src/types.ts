@@ -828,6 +828,26 @@ export interface DaycarePlayhomeProfile {
   slaType?: string;
   slaVersion?: string;
   
+  // Host Availability & Booking Calendar specifications
+  calendarSchedule?: {
+    operatingDays?: string[]; // e.g. ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+    defaultDailySlots?: {
+      id: string;
+      label: string; // "Morning Care", "Afternoon Session", "Evening Sitter", "Full Day"
+      startTime: string; // "09:00 AM"
+      endTime: string; // "01:00 PM"
+      maxCapacity?: number;
+      serviceModes?: ('host_at_my_home' | 'visit_parents_home')[];
+    }[];
+    blockedDates?: string[]; // e.g. ["2026-10-24", "2026-10-25"] (vacations, personal leave)
+    customDateAvailability?: {
+      date: string; // "YYYY-MM-DD"
+      isAvailable: boolean;
+      slots?: string[];
+      note?: string; // e.g. "Diwali Special Weekend Care", "Limited Evening Hours"
+    }[];
+  };
+  
   reviews?: {
     id: string;
     parentName: string;

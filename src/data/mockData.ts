@@ -463,6 +463,15 @@ export const MOCK_DAYCARES: DaycarePlayhomeProfile[] = [
     acceptedAgeGroups: ['6m - 2 yrs', '2 - 5 yrs', '5 - 8 yrs'],
     availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     availableTimeSlots: ['08:30 AM - 01:00 PM', '02:00 PM - 06:30 PM', 'Full Day (8:30 AM - 7 PM)'],
+    calendarSchedule: {
+      operatingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      blockedDates: ['2026-10-25', '2026-11-01'],
+      defaultDailySlots: [
+        { id: 'slot-1', label: 'Morning Montessori Care', startTime: '08:30 AM', endTime: '01:00 PM', maxCapacity: 6 },
+        { id: 'slot-2', label: 'Afternoon Play & Rest', startTime: '02:00 PM', endTime: '06:30 PM', maxCapacity: 6 },
+        { id: 'slot-3', label: 'Full Day Care', startTime: '08:30 AM', endTime: '07:00 PM', maxCapacity: 4 }
+      ]
+    },
     amenities: [
       'AMI Montessori Sensorial Materials',
       'Childproofed Padded Floors & Air Purifier',
@@ -528,6 +537,14 @@ export const MOCK_DAYCARES: DaycarePlayhomeProfile[] = [
     acceptedAgeGroups: ['1 - 3 yrs', '3 - 6 yrs', '6 - 10 yrs'],
     availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
     availableTimeSlots: ['09:00 AM - 01:00 PM', '03:30 PM - 07:30 PM', 'Full Day (9 AM - 7 PM)'],
+    calendarSchedule: {
+      operatingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      blockedDates: ['2026-10-28'],
+      defaultDailySlots: [
+        { id: 'slot-1', label: 'Morning Society Playgroup', startTime: '09:00 AM', endTime: '01:00 PM', maxCapacity: 3 },
+        { id: 'slot-2', label: 'Evening Homework & Play', startTime: '03:30 PM', endTime: '07:30 PM', maxCapacity: 3 }
+      ]
+    },
     amenities: [
       'Gated Society Security & Park Access',
       'Fresh Ragi Malt & Wholesome Khichdi',
@@ -586,6 +603,14 @@ export const MOCK_DAYCARES: DaycarePlayhomeProfile[] = [
     acceptedAgeGroups: ['2 - 5 yrs'],
     availableDays: ['Mon', 'Wed', 'Fri', 'Sat'],
     availableTimeSlots: ['10:00 AM - 01:00 PM', '04:00 PM - 07:00 PM'],
+    calendarSchedule: {
+      operatingDays: ['Mon', 'Wed', 'Fri', 'Sat'],
+      blockedDates: ['2026-10-31'],
+      defaultDailySlots: [
+        { id: 'slot-1', label: 'Morning Playmate Co-Op', startTime: '10:00 AM', endTime: '01:00 PM', maxCapacity: 2 },
+        { id: 'slot-2', label: 'Evening Balcony Play', startTime: '04:00 PM', endTime: '07:00 PM', maxCapacity: 2 }
+      ]
+    },
     amenities: [
       '100% FREE Neighbor Reciprocal Exchange',
       'Enclosed Balcony Play Lawn',
@@ -644,6 +669,15 @@ export const MOCK_DAYCARES: DaycarePlayhomeProfile[] = [
     acceptedAgeGroups: ['6m - 2 yrs', '2 - 5 yrs', '5 - 10 yrs'],
     availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
     availableTimeSlots: ['08:00 AM - 01:00 PM', '02:00 PM - 06:30 PM', 'Full Day (8 AM - 7:30 PM)'],
+    calendarSchedule: {
+      operatingDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      blockedDates: ['2026-11-05'],
+      defaultDailySlots: [
+        { id: 'slot-1', label: 'Morning Toddler Creche', startTime: '08:00 AM', endTime: '01:00 PM', maxCapacity: 8 },
+        { id: 'slot-2', label: 'Afternoon Play & Nap', startTime: '02:00 PM', endTime: '06:30 PM', maxCapacity: 8 },
+        { id: 'slot-3', label: 'Full Day Immersion', startTime: '08:00 AM', endTime: '07:30 PM', maxCapacity: 6 }
+      ]
+    },
     amenities: [
       '24/7 HD CCTV Parent Streaming',
       'Pediatric First Aid & Registered Nurse Assistance',

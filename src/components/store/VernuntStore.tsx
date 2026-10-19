@@ -25,6 +25,10 @@ import {
   getStoredVendors, saveStoredVendors,
   getStoredStoreSettings
 } from '../../data/storeVendors.ts';
+import { 
+  checkProductDeliverability, validateCartForDelivery, cleanPincode, 
+  DeliverabilityCheckResult, CartDeliverabilityResult 
+} from '../../utils/pincodeChecker.ts';
 import { StoreInvoiceModal } from './StoreInvoiceModal.tsx';
 import { VendorStorePage } from '../vendor/VendorStorePage.tsx';
 import { VendorDashboard } from '../vendor/VendorDashboard.tsx';
@@ -41,6 +45,9 @@ import { generateProductJsonLd } from '../../utils/googleMerchantFeed.ts';
 import { GoogleSearchConsoleAndMerchantModal } from '../seo/GoogleSearchConsoleAndMerchantModal.tsx';
 import { PageCustomBlocksSection } from '../admin/visual/PageCustomBlocksSection.tsx';
 import { launchCashfreeCheckout } from '../../utils/cashfreeClient.ts';
+import { ProductCarouselSection } from './ProductCarouselSection.tsx';
+import { FloatingBasketBar } from './FloatingBasketBar.tsx';
+import { AdminShowcaseManagerModal } from './AdminShowcaseManagerModal.tsx';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
@@ -207,7 +214,142 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [sortBy, setSortBy] = useState<'featured' | 'bestselling' | 'price-low' | 'price-high' | 'rating'>('featured');
   const [filterOnlyInStock, setFilterOnlyInStock] = useState<boolean>(false);
   const [filterOnlyDeals, setFilterOnlyDeals] = useState<boolean>(false);
+  const [filterOnlyFeatured, setFilterOnlyFeatured] = useState<boolean>(false);
+  const [filterOnlyHighlighted, setFilterOnlyHighlighted] = useState<boolean>(false);
   const [filterCertifiedSafe, setFilterCertifiedSafe] = useState<boolean>(false);
+  const [storeLayoutMode, setStoreLayoutMode] = useState<'showcase' | 'grid' | 'categories'>('showcase');
+  const [categoryViewMode, setCategoryViewMode] = useState<'carousel' | 'grid'>('carousel');
+  const [categoryCarouselSubcategories, setCategoryCarouselSubcategories] = useState<Record<string, string>>({});
+
+  // Admin Showcase & Carousel Management State
+  const isAdminUser = userProfile?.userRole === 'Admin' || userProfile?.userRole === 'Specialist' || (userProfile as any)?.isAdmin === true;
+  const [adminEditMode, setAdminEditMode] = useState<boolean>(false);
+  const isEffectiveAdmin = isAdminUser || adminEditMode;
+  const [showAdminShowcaseModal, setShowAdminShowcaseModal] = useState<boolean>(false);
+
+  // Easy Shipping Quick-Check State
+  const [quickPinInput, setQuickPinInput] = useState<string>('560102');
+  const [quickPinResult, setQuickPinResult] = useState<string>('⚡ Delivery by Tomorrow 2 PM · BlueDart Express · Free Shipping on ₹499+');
+
+  // Toggle Featured & Highlighted handlers with instant sync & storage
+  const handleToggleProductFeatured = (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, isFeatured: !p.isFeatured };
+      }
+      return p;
+    });
+    setProducts(updated);
+    saveStoredProducts(updated);
+    window.dispatchEvent(new CustomEvent('vernunt_products_updated', { detail: updated }));
+    if (selectedProduct && selectedProduct.id === productId) {
+      setSelectedProduct(prev => prev ? { ...prev, isFeatured: !prev.isFeatured } : null);
+    }
+  };
+
+  const handleToggleProductHighlighted = (productId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const updated = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, isHighlighted: !p.isHighlighted };
+      }
+      return p;
+    });
+    setProducts(updated);
+    saveStoredProducts(updated);
+    window.dispatchEvent(new CustomEvent('vernunt_products_updated', { detail: updated }));
+    if (selectedProduct && selectedProduct.id === productId) {
+      setSelectedProduct(prev => prev ? { ...prev, isHighlighted: !prev.isHighlighted } : null);
+    }
+  };
+
+  const handleBatchUpdateProducts = (updatedProducts: StoreProduct[]) => {
+    setProducts(updatedProducts);
+    saveStoredProducts(updatedProducts);
+    window.dispatchEvent(new CustomEvent('vernunt_products_updated', { detail: updatedProducts }));
+  };
+
+  // Accurate Product Discount Percentage helper
+  const getProductDiscountPct = (p: StoreProduct): number => {
+    if (p.discountPercentage && p.discountPercentage > 0) return p.discountPercentage;
+    if (p.regularPrice > p.price) {
+      return Math.round(((p.regularPrice - p.price) / p.regularPrice) * 100);
+    }
+    return 0;
+  };
+
+  // Helper to test if product belongs to a category
+  const isProductInCat = (p: StoreProduct, cat: StoreCategory): boolean => {
+    const catName = cat.name.toLowerCase();
+    const catId = cat.id.toLowerCase();
+    const pCat = p.category.toLowerCase();
+    if (pCat === catName || pCat.includes(catId) || pCat === catId) return true;
+    if (catId === 'kids-clothing' && (pCat.includes('clothing') || pCat.includes('apparel'))) return true;
+    if (catId === 'kids-jewellery' && (pCat.includes('jewel') || pCat.includes('jewelry'))) return true;
+    if (catId === 'baby-care' && (pCat.includes('care') || pCat.includes('diaper') || pCat.includes('lotion') || pCat.includes('soap'))) return true;
+    if (catId === 'kids-food' && (pCat.includes('food') || pCat.includes('nutrition'))) return true;
+    if (catId === 'montessori-stem' && (pCat.includes('stem') || pCat.includes('montessori') || pCat.includes('toy'))) return true;
+    return false;
+  };
+
+  // Carousel Collections (Featured, Highest Discounts, Highlighted)
+  const featuredProducts = useMemo(() => {
+    const list = products.filter(p => p.isFeatured && p.stockStatus !== 'outofstock');
+    if (list.length >= 4) return list;
+    const extra = products.filter(p => !list.some(f => f.id === p.id)).sort((a, b) => b.rating - a.rating);
+    return [...list, ...extra].slice(0, 14);
+  }, [products]);
+
+  const topDiscountProducts = useMemo(() => {
+    return [...products]
+      .filter(p => getProductDiscountPct(p) > 0)
+      .sort((a, b) => getProductDiscountPct(b) - getProductDiscountPct(a))
+      .slice(0, 16);
+  }, [products]);
+
+  const highlightedProducts = useMemo(() => {
+    const list = products.filter(p => p.isHighlighted || p.isBestSeller);
+    if (list.length >= 4) return list;
+    const extra = products.filter(p => !list.some(h => h.id === p.id)).sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0));
+    return [...list, ...extra].slice(0, 14);
+  }, [products]);
+
+  // Category specific carousel slices
+  const categoryFeaturedProducts = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const cat = categories.find(c => c.id === selectedCategory);
+    if (!cat) return [];
+    const inCat = products.filter(p => isProductInCat(p, cat));
+    const featured = inCat.filter(p => p.isFeatured);
+    return featured.length > 0 ? featured : inCat.slice(0, 8);
+  }, [products, selectedCategory, categories]);
+
+  const categoryDiscountProducts = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const cat = categories.find(c => c.id === selectedCategory);
+    if (!cat) return [];
+    const inCat = products.filter(p => isProductInCat(p, cat));
+    return [...inCat]
+      .filter(p => getProductDiscountPct(p) > 0)
+      .sort((a, b) => getProductDiscountPct(b) - getProductDiscountPct(a));
+  }, [products, selectedCategory, categories]);
+
+  const categoryHighlightedProducts = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const cat = categories.find(c => c.id === selectedCategory);
+    if (!cat) return [];
+    const inCat = products.filter(p => isProductInCat(p, cat));
+    const high = inCat.filter(p => p.isHighlighted || p.isBestSeller);
+    return high.length > 0 ? high : inCat.slice(0, 8);
+  }, [products, selectedCategory, categories]);
+
+  const categoryAllProducts = useMemo(() => {
+    if (selectedCategory === 'all') return [];
+    const cat = categories.find(c => c.id === selectedCategory);
+    if (!cat) return [];
+    return products.filter(p => isProductInCat(p, cat));
+  }, [products, selectedCategory, categories]);
 
   // Selected Product for Detail Modal
   const [selectedProduct, setSelectedProduct] = useState<StoreProduct | null>(null);
@@ -216,6 +358,8 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [detailQuantity, setDetailQuantity] = useState<number>(1);
   const [pincodeCheck, setPincodeCheck] = useState<string>('560102');
   const [pincodeResult, setPincodeResult] = useState<string | null>('🚚 Express Delivery Available (Tomorrow by 2 PM)');
+  const [pincodeCheckResult, setPincodeCheckResult] = useState<DeliverabilityCheckResult | null>(null);
+  const [isProductDeliverable, setIsProductDeliverable] = useState<boolean>(true);
 
   // Dynamic Google Search & Google Merchant Center Schema.org Product JSON-LD Injection
   useEffect(() => {
@@ -277,6 +421,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     isDefault: true
   });
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express' | 'instant'>('express');
+  
+  // Real-time Cart Deliverability Validation against Multi-Vendor Pincode Rules
+  const cartDeliverability = useMemo(() => {
+    return validateCartForDelivery(cart, shippingAddress.pincode, vendors);
+  }, [cart, shippingAddress.pincode, vendors]);
+
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Razorpay');
   const [orderToCancel, setOrderToCancel] = useState<StoreOrder | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
@@ -551,28 +701,46 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     showToast(`Discount applied: ${found.code} 🎉`);
   };
 
-  // Check Pin code via Shiprocket
+  // Check Pin code via Multi-Vendor Deliverability & Shiprocket Logistics
   const handleCheckPincode = async () => {
-    const cleanPin = pincodeCheck.trim().replace(/\D/g, '');
+    const cleanPin = cleanPincode(pincodeCheck);
     if (cleanPin.length !== 6) {
       setPincodeResult('⚠️ Please enter a valid 6-digit Indian PIN code.');
+      setIsProductDeliverable(false);
+      setPincodeCheckResult(null);
       setPincodeServiceability(null);
       return;
     }
+
+    if (!selectedProduct) return;
+
     setIsCheckingPincode(true);
-    setPincodeResult('Checking Shiprocket courier serviceability...');
+    setPincodeResult('Checking vendor delivery zones & courier serviceability...');
+
     try {
-      const weight = selectedProduct?.weightGrams ? selectedProduct.weightGrams / 1000 : 0.5;
-      const result = await ShiprocketClient.checkServiceability('560102', cleanPin, weight, 1);
-      setPincodeServiceability(result);
-      if (result.success && result.available_courier_companies?.length > 0) {
-        const topCourier = result.available_courier_companies[0];
-        setPincodeResult(`⚡ Serviceable via ${topCourier.courier_name} (${topCourier.etd}) • COD Available`);
+      const vendor = vendors.find(v => v.id === selectedProduct.vendorId || v.storeName === selectedProduct.brand);
+      const deliverability = checkProductDeliverability(selectedProduct, cleanPin, vendor);
+
+      setPincodeCheckResult(deliverability);
+      setIsProductDeliverable(deliverability.isDeliverable);
+      setPincodeResult(deliverability.message);
+
+      if (deliverability.isDeliverable) {
+        // Optional live Shiprocket courier ETA check
+        const weight = selectedProduct?.weightGrams ? selectedProduct.weightGrams / 1000 : 0.5;
+        const originPin = vendor?.pickupAddress?.pincode || vendor?.address?.pincode || '560102';
+        try {
+          const result = await ShiprocketClient.checkServiceability(originPin, cleanPin, weight, 1);
+          setPincodeServiceability(result);
+        } catch {
+          // Soft ignore Shiprocket fallback
+        }
       } else {
-        setPincodeResult(`🚚 Standard Express Dispatch Available to PIN ${cleanPin}`);
+        setPincodeServiceability(null);
       }
-    } catch (e) {
-      setPincodeResult(`🚚 Standard 2-3 Days Express Dispatch to PIN ${cleanPin}`);
+    } catch {
+      setPincodeResult(`🚚 Standard Express Dispatch Available to PIN ${cleanPin}`);
+      setIsProductDeliverable(true);
     } finally {
       setIsCheckingPincode(false);
     }
@@ -1021,6 +1189,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       // Deals
       if (filterOnlyDeals && (!p.onSale || (p.discountPercentage || 0) < 20)) return false;
 
+      // Featured
+      if (filterOnlyFeatured && !p.isFeatured) return false;
+
+      // Highlighted
+      if (filterOnlyHighlighted && !p.isHighlighted && !p.isBestSeller) return false;
+
       // Safe / Organic
       if (filterCertifiedSafe && !p.badges.some(b => b.includes('Safe') || b.includes('BIS') || b.includes('Organic') || b.includes('Non-Toxic') || b.includes('BPA') || b.includes('FSSAI') || b.includes('Preservative-Free'))) {
         return false;
@@ -1034,7 +1208,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       if (sortBy === 'bestselling') return (b.reviewCount || 0) - (a.reviewCount || 0);
       return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
     });
-  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe]);
+  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe, filterOnlyFeatured, filterOnlyHighlighted]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" id="vernunt-store-container">
@@ -1200,8 +1374,298 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
             {/* Visual CMS Admin Custom Blocks for Store Page */}
             <PageCustomBlocksSection pageId="store" isAdmin={userProfile?.userRole === 'Admin'} />
 
-            {/* CATEGORY-FIRST MODE: When selectedCategory is 'all' and no active search query */}
-            {selectedCategory === 'all' && !searchQuery ? (
+            {/* View Mode Bar & Trust Highlights */}
+            {/* View Mode Bar & Admin Quick Controls */}
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs">
+              <div className="flex items-center gap-1.5 bg-slate-100/90 p-1 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStoreLayoutMode('showcase');
+                    setSelectedCategory('all');
+                    setSelectedSubcategory('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    storeLayoutMode === 'showcase' && selectedCategory === 'all' && !searchQuery
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>🎡 Showcase Carousels</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStoreLayoutMode('grid');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    storeLayoutMode === 'grid' || selectedCategory !== 'all' || searchQuery
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>⊞ Catalog Grid</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStoreLayoutMode('categories');
+                    setSelectedCategory('all');
+                  }}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                    storeLayoutMode === 'categories' && selectedCategory === 'all' && !searchQuery
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <span>📁 Departments</span>
+                </button>
+              </div>
+
+              {/* Admin Showcase Controls & Quick Edit Toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminShowcaseModal(true)}
+                  className="px-3 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-black flex items-center gap-1.5 transition cursor-pointer shadow-2xs"
+                  title="Open Admin Showcase Manager to feature or highlight products"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                  <span>Admin Showcase Manager</span>
+                  <span className="text-[10px] bg-purple-200 text-purple-950 font-mono px-1.5 py-0.2 rounded-full font-bold">
+                    {products.filter(p => p.isFeatured).length}★
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminEditMode(prev => !prev)}
+                  className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition cursor-pointer ${
+                    isEffectiveAdmin
+                      ? 'bg-amber-50 text-amber-900 border-amber-300 shadow-2xs'
+                      : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                  title="Toggle on-card admin buttons to feature or highlight products in 1 click"
+                >
+                  <span>{isEffectiveAdmin ? '⚙️ Quick-Edit ON' : '⚙️ Admin Edit'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Minimal & Product-Focused Easy Shipping & Pincode Bar */}
+            <div className="bg-slate-900 text-white rounded-2xl p-3 sm:px-5 flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-800">
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <span className="flex items-center gap-1.5 font-bold text-amber-300">
+                  <Zap className="w-4 h-4 text-amber-400 fill-amber-400 shrink-0" />
+                  <span>⚡ Express 1-2 Day Dispatch</span>
+                </span>
+                <span className="text-slate-600 hidden sm:inline">|</span>
+                <span className="text-slate-300 flex items-center gap-1">
+                  <Truck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Free Express Delivery on Orders &gt; ₹499</span>
+                </span>
+                <span className="text-slate-600 hidden sm:inline">|</span>
+                <span className="text-slate-300 flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                  <span>100% Non-Toxic Child Safe</span>
+                </span>
+              </div>
+
+              {/* Quick Pincode Checker */}
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400 text-[11px] hidden sm:inline">Deliver to PIN:</span>
+                <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={quickPinInput}
+                    onChange={(e) => setQuickPinInput(e.target.value.replace(/\D/g, ''))}
+                    placeholder="PIN code"
+                    className="w-16 px-2 py-1 text-xs font-mono font-bold bg-transparent text-white outline-hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (quickPinInput.length === 6) {
+                        setQuickPinResult(`⚡ Deliver to ${quickPinInput}: Tomorrow by 2 PM · BlueDart Express · COD Available`);
+                      } else {
+                        setQuickPinResult('Please enter a valid 6-digit PIN code.');
+                      }
+                    }}
+                    className="px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-md text-[11px] transition cursor-pointer"
+                  >
+                    Check
+                  </button>
+                </div>
+                <span className="text-[11px] text-amber-300 font-semibold truncate max-w-[260px] hidden md:inline">
+                  {quickPinResult}
+                </span>
+              </div>
+            </div>
+
+            {/* When in Showcase mode (selectedCategory === 'all' && !searchQuery && storeLayoutMode === 'showcase') */}
+            {selectedCategory === 'all' && !searchQuery && storeLayoutMode === 'showcase' ? (
+              <div className="space-y-8 animate-fade-in">
+                {/* 1. Featured Products Carousel */}
+                <ProductCarouselSection
+                  icon={<Sparkles className="w-5 h-5 text-purple-600" />}
+                  title="Featured Products"
+                  badgeText="Handpicked For Kids"
+                  products={featuredProducts}
+                  cart={cart}
+                  wishlist={wishlist}
+                  onOpenProduct={handleOpenProduct}
+                  onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  onToggleWishlist={handleToggleWishlist}
+                  onSeeAll={() => {
+                    setFilterOnlyFeatured(true);
+                    setFilterOnlyDeals(false);
+                    setFilterOnlyHighlighted(false);
+                    setStoreLayoutMode('grid');
+                  }}
+                  badgeType="featured"
+                  isAdmin={isEffectiveAdmin}
+                  onToggleFeatured={handleToggleProductFeatured}
+                  onToggleHighlighted={handleToggleProductHighlighted}
+                />
+
+                {/* 2. Top Deals & Discounts Carousel (Sorted strictly by Highest Discount!) */}
+                <ProductCarouselSection
+                  icon={<span className="text-xl">🔥</span>}
+                  title="Top Deals & Discounts"
+                  badgeText="Highest Savings"
+                  products={topDiscountProducts}
+                  cart={cart}
+                  wishlist={wishlist}
+                  onOpenProduct={handleOpenProduct}
+                  onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  onToggleWishlist={handleToggleWishlist}
+                  onSeeAll={() => {
+                    setFilterOnlyDeals(true);
+                    setFilterOnlyFeatured(false);
+                    setFilterOnlyHighlighted(false);
+                    setSortBy('price-low');
+                    setStoreLayoutMode('grid');
+                  }}
+                  badgeType="discount"
+                  isAdmin={isEffectiveAdmin}
+                  onToggleFeatured={handleToggleProductFeatured}
+                  onToggleHighlighted={handleToggleProductHighlighted}
+                />
+
+                {/* 3. Highlighted & Spotlight Products Carousel */}
+                <ProductCarouselSection
+                  icon={<Star className="w-5 h-5 text-amber-500 fill-amber-500" />}
+                  title="Highlighted Products"
+                  badgeText="Parent Favorites"
+                  products={highlightedProducts}
+                  cart={cart}
+                  wishlist={wishlist}
+                  onOpenProduct={handleOpenProduct}
+                  onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  onToggleWishlist={handleToggleWishlist}
+                  onSeeAll={() => {
+                    setFilterOnlyHighlighted(true);
+                    setFilterOnlyFeatured(false);
+                    setFilterOnlyDeals(false);
+                    setStoreLayoutMode('grid');
+                  }}
+                  badgeType="highlighted"
+                  isAdmin={isEffectiveAdmin}
+                  onToggleFeatured={handleToggleProductFeatured}
+                  onToggleHighlighted={handleToggleProductHighlighted}
+                />
+
+                {/* 4. Carousels for Each Category Department with Subcategories */}
+                <div className="pt-4 border-t border-slate-200/80 space-y-8">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="font-black text-base sm:text-lg text-slate-900 flex items-center gap-2">
+                        <span>🏷️ Explore By Category</span>
+                      </h4>
+                      <p className="text-xs text-slate-500">Horizontal quick-browse through all developmental departments and subcategories</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setStoreLayoutMode('categories')}
+                      className="text-xs font-bold text-rose-700 hover:underline cursor-pointer"
+                    >
+                      View All Departments →
+                    </button>
+                  </div>
+
+                  {categories.filter(c => c.id !== 'all').map(cat => {
+                    const catProds = products.filter(p => isProductInCat(p, cat));
+                    if (catProds.length === 0) return null;
+                    const activeSub = categoryCarouselSubcategories[cat.id] || 'all';
+                    const filteredBySub = activeSub === 'all'
+                      ? catProds
+                      : catProds.filter(p => 
+                          (p.subcategory && p.subcategory.toLowerCase() === activeSub.toLowerCase()) || 
+                          (p.tags && p.tags.some(t => t.toLowerCase() === activeSub.toLowerCase()))
+                        );
+                    return (
+                      <ProductCarouselSection
+                        key={cat.id}
+                        icon={<span>{cat.icon || '📦'}</span>}
+                        title={cat.name}
+                        badgeText={cat.ageRange ? `Ages ${cat.ageRange}` : undefined}
+                        products={filteredBySub.length > 0 ? filteredBySub : catProds}
+                        cart={cart}
+                        wishlist={wishlist}
+                        onOpenProduct={handleOpenProduct}
+                        onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onToggleWishlist={handleToggleWishlist}
+                        onSeeAll={() => {
+                          setSelectedCategory(cat.id);
+                          setSelectedSubcategory(activeSub);
+                          setCategoryViewMode('carousel');
+                          setStoreLayoutMode('grid');
+                        }}
+                        subcategories={cat.subcategories}
+                        selectedSubcategory={activeSub}
+                        onSelectSubcategory={(sub) => {
+                          setCategoryCarouselSubcategories(prev => ({ ...prev, [cat.id]: sub }));
+                        }}
+                        badgeType="auto"
+                        isAdmin={isEffectiveAdmin}
+                        onToggleFeatured={handleToggleProductFeatured}
+                        onToggleHighlighted={handleToggleProductHighlighted}
+                      />
+                    );
+                  })}
+                </div>
+
+                {/* 5. All Products Quick-Browse Carousel */}
+                <div className="pt-4 border-t border-slate-200/80">
+                  <ProductCarouselSection
+                    icon={<span className="text-xl">📦</span>}
+                    title="All Catalog Products"
+                    badgeText="Quick Browse"
+                    products={products}
+                    cart={cart}
+                    wishlist={wishlist}
+                    onOpenProduct={handleOpenProduct}
+                    onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onToggleWishlist={handleToggleWishlist}
+                    onSeeAll={() => {
+                      setSelectedCategory('all');
+                      setSelectedSubcategory('all');
+                      setStoreLayoutMode('grid');
+                    }}
+                    badgeType="auto"
+                    isAdmin={isEffectiveAdmin}
+                    onToggleFeatured={handleToggleProductFeatured}
+                    onToggleHighlighted={handleToggleProductHighlighted}
+                  />
+                </div>
+              </div>
+            ) : selectedCategory === 'all' && !searchQuery && storeLayoutMode === 'categories' ? (
               <div className="space-y-6 animate-fade-in">
                 {/* Section Header */}
                 <div className="flex items-center justify-between">
@@ -1213,31 +1677,24 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => setSelectedCategory('stem-toys')}
-                    className="text-xs text-rose-700 hover:underline font-bold hidden sm:inline"
+                    onClick={() => setStoreLayoutMode('showcase')}
+                    className="text-xs text-rose-700 hover:underline font-bold hidden sm:inline cursor-pointer"
                   >
-                    View Featured →
+                    View Carousels →
                   </button>
                 </div>
 
                 {/* All Categories Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                   {categories.filter(c => c.id !== 'all').map(cat => {
-                    const catProducts = products.filter(p => 
-                      p.category.toLowerCase() === cat.name.toLowerCase() || 
-                      p.category.toLowerCase().includes(cat.id.toLowerCase()) ||
-                      p.category.toLowerCase() === cat.id.toLowerCase() ||
-                      (cat.id === 'kids-clothing' && (p.category.toLowerCase().includes('clothing') || p.category.toLowerCase().includes('apparel'))) ||
-                      (cat.id === 'kids-jewellery' && (p.category.toLowerCase().includes('jewel') || p.category.toLowerCase().includes('jewelry'))) ||
-                      (cat.id === 'baby-care' && (p.category.toLowerCase().includes('care') || p.category.toLowerCase().includes('diaper') || p.category.toLowerCase().includes('lotion') || p.category.toLowerCase().includes('soap'))) ||
-                      (cat.id === 'kids-food' && (p.category.toLowerCase().includes('food') || p.category.toLowerCase().includes('nutrition')))
-                    );
+                    const catProducts = products.filter(p => isProductInCat(p, cat));
                     return (
                       <div
                         key={cat.id}
                         onClick={() => {
                           setSelectedCategory(cat.id);
                           setSelectedSubcategory('all');
+                          setStoreLayoutMode('grid');
                         }}
                         className="bg-white rounded-2xl border border-slate-200 hover:border-rose-400 hover:shadow-lg transition-all duration-200 p-5 flex flex-col justify-between group cursor-pointer relative overflow-hidden"
                       >
@@ -1276,6 +1733,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                                     e.stopPropagation();
                                     setSelectedCategory(cat.id);
                                     setSelectedSubcategory(sub);
+                                    setStoreLayoutMode('grid');
                                   }}
                                   className="text-[10px] bg-slate-100 hover:bg-rose-100 hover:text-rose-800 text-slate-700 font-bold px-2 py-0.5 rounded-md transition cursor-pointer"
                                 >
@@ -1548,15 +2006,53 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   </div>
                 </div>
 
-            {/* Products Grid */}
+            {/* Products Layout: Carousel Showcase vs Grid View */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs text-slate-500 font-bold">
-                  Showing <strong className="text-slate-800">{filteredProducts.length}</strong> products
-                </span>
-                <span className="text-[11px] text-emerald-700 font-semibold flex items-center gap-1">
-                  <Truck className="w-3 h-3" /> Free Express Delivery on orders above ₹499
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-3 mb-4 bg-white p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-800">Display View:</span>
+                  <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setCategoryViewMode('carousel')}
+                      className={`px-3 py-1 rounded-md text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                        categoryViewMode === 'carousel'
+                          ? 'bg-rose-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>🎠 Carousel View</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCategoryViewMode('grid')}
+                      className={`px-3 py-1 rounded-md text-xs font-black transition flex items-center gap-1.5 cursor-pointer ${
+                        categoryViewMode === 'grid'
+                          ? 'bg-rose-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>⊞ Grid View ({filteredProducts.length})</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  <span className="text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                    <Truck className="w-3 h-3" /> Free Express Delivery &gt; ₹499
+                  </span>
+                  {isEffectiveAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminShowcaseModal(true)}
+                      className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                      title="Manage featured and highlighted products in this category"
+                    >
+                      <Sparkles className="w-3 h-3 text-purple-600" />
+                      <span>Admin Showcase</span>
+                    </button>
+                  )}
+                </div>
               </div>
 
               {filteredProducts.length === 0 ? (
@@ -1582,6 +2078,154 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     Clear All Filters
                   </button>
                 </div>
+              ) : categoryViewMode === 'carousel' && !searchQuery ? (
+                /* CATEGORY CAROUSEL SHOWCASE */
+                <div className="space-y-6">
+                  {/* 1. Featured Products in this Category */}
+                  {categoryFeaturedProducts.length > 0 && (
+                    <ProductCarouselSection
+                      icon={<Sparkles className="w-5 h-5 text-amber-500 fill-amber-500" />}
+                      title={`Featured ${categories.find(c => c.id === selectedCategory)?.name || 'Products'}`}
+                      badgeText="Curated & Verified"
+                      products={categoryFeaturedProducts}
+                      cart={cart}
+                      wishlist={wishlist}
+                      onOpenProduct={handleOpenProduct}
+                      onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onToggleWishlist={handleToggleWishlist}
+                      onSeeAll={() => setCategoryViewMode('grid')}
+                      badgeType="featured"
+                      isAdmin={isEffectiveAdmin}
+                      onToggleFeatured={handleToggleProductFeatured}
+                      onToggleHighlighted={handleToggleProductHighlighted}
+                    />
+                  )}
+
+                  {/* 2. Top Discounts in this Category (Sorted by highest discount percentage) */}
+                  {categoryDiscountProducts.length > 0 && (
+                    <ProductCarouselSection
+                      icon={<Zap className="w-5 h-5 text-rose-600 fill-rose-600" />}
+                      title="Top Discounts & Steal Deals"
+                      badgeText="Sorted by Highest Savings"
+                      products={categoryDiscountProducts}
+                      cart={cart}
+                      wishlist={wishlist}
+                      onOpenProduct={handleOpenProduct}
+                      onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onToggleWishlist={handleToggleWishlist}
+                      onSeeAll={() => {
+                        setFilterOnlyDeals(true);
+                        setCategoryViewMode('grid');
+                      }}
+                      badgeType="discount"
+                      isAdmin={isEffectiveAdmin}
+                      onToggleFeatured={handleToggleProductFeatured}
+                      onToggleHighlighted={handleToggleProductHighlighted}
+                    />
+                  )}
+
+                  {/* 3. Highlighted & Parent Favorites in this Category */}
+                  {categoryHighlightedProducts.length > 0 && (
+                    <ProductCarouselSection
+                      icon={<Star className="w-5 h-5 text-amber-500 fill-amber-500" />}
+                      title="Highlighted & Parent Favorites"
+                      badgeText="Community Recommended"
+                      products={categoryHighlightedProducts}
+                      cart={cart}
+                      wishlist={wishlist}
+                      onOpenProduct={handleOpenProduct}
+                      onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onToggleWishlist={handleToggleWishlist}
+                      onSeeAll={() => setCategoryViewMode('grid')}
+                      badgeType="highlighted"
+                      isAdmin={isEffectiveAdmin}
+                      onToggleFeatured={handleToggleProductFeatured}
+                      onToggleHighlighted={handleToggleProductHighlighted}
+                    />
+                  )}
+
+                  {/* 4. Subcategory Carousels (e.g. Boy / Girl or subcategories of the category) */}
+                  {(() => {
+                    const activeCatObj = categories.find(c => c.id === selectedCategory);
+                    if (!activeCatObj?.subcategories || activeCatObj.subcategories.length === 0) return null;
+                    return (
+                      <div className="pt-4 border-t border-slate-200/80 space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-black text-sm sm:text-base text-slate-800 flex items-center gap-2">
+                            <span>📑 Subcategory Collections</span>
+                          </h4>
+                          <span className="text-xs text-slate-500">Horizontal quick-browse by collection</span>
+                        </div>
+                        {activeCatObj.subcategories.map(sub => {
+                          const subProducts = categoryAllProducts.filter(p => 
+                            (p.subcategory && p.subcategory.toLowerCase() === sub.toLowerCase()) ||
+                            (p.tags && p.tags.some(t => t.toLowerCase() === sub.toLowerCase()))
+                          );
+                          if (subProducts.length === 0) return null;
+                          return (
+                            <ProductCarouselSection
+                              key={sub}
+                              icon={<span>{sub === 'Boy' ? '👦' : sub === 'Girl' ? '👧' : '🏷️'}</span>}
+                              title={`${sub} Collection`}
+                              badgeText={`${subProducts.length} items`}
+                              products={subProducts}
+                              cart={cart}
+                              wishlist={wishlist}
+                              onOpenProduct={handleOpenProduct}
+                              onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                              onUpdateQuantity={handleUpdateQuantity}
+                              onToggleWishlist={handleToggleWishlist}
+                              onSeeAll={() => {
+                                setSelectedSubcategory(sub);
+                                setCategoryViewMode('grid');
+                              }}
+                              badgeType="auto"
+                              isAdmin={isEffectiveAdmin}
+                              onToggleFeatured={handleToggleProductFeatured}
+                              onToggleHighlighted={handleToggleProductHighlighted}
+                            />
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+
+                  {/* 5. All Category Products Quick-Browse Carousel */}
+                  <div className="pt-4 border-t border-slate-200/80">
+                    <ProductCarouselSection
+                      icon={<span>📦</span>}
+                      title={`All ${categories.find(c => c.id === selectedCategory)?.name || 'Category'} Products`}
+                      badgeText={`${categoryAllProducts.length} Items`}
+                      products={categoryAllProducts}
+                      cart={cart}
+                      wishlist={wishlist}
+                      onOpenProduct={handleOpenProduct}
+                      onAddToCart={(p) => handleAddToCart(p, 1, {}, true)}
+                      onUpdateQuantity={handleUpdateQuantity}
+                      onToggleWishlist={handleToggleWishlist}
+                      onSeeAll={() => setCategoryViewMode('grid')}
+                      badgeType="auto"
+                      isAdmin={isEffectiveAdmin}
+                      onToggleFeatured={handleToggleProductFeatured}
+                      onToggleHighlighted={handleToggleProductHighlighted}
+                    />
+                  </div>
+
+                  {/* Bottom switch to grid button */}
+                  <div className="pt-4 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setCategoryViewMode('grid')}
+                      className="px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-800 border border-slate-200 shadow-2xs text-xs font-black transition cursor-pointer inline-flex items-center gap-2"
+                    >
+                      <span>Switch to Full Grid View ({filteredProducts.length} Products)</span>
+                      <span>→</span>
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-5">
                   {filteredProducts.map(product => {
@@ -1600,9 +2244,40 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                           />
+
+                          {/* Admin Quick Toggles */}
+                          {isEffectiveAdmin && (
+                            <div className="absolute top-2.5 left-2.5 z-20 flex items-center gap-1 bg-slate-900/85 backdrop-blur-xs p-1 rounded-lg border border-slate-700 shadow-md">
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleProductFeatured(product.id, e)}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition cursor-pointer ${
+                                  product.isFeatured 
+                                    ? 'bg-amber-400 text-slate-950 font-black shadow-xs' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                                }`}
+                                title={product.isFeatured ? 'Featured: Click to unmark' : 'Click to mark as Featured'}
+                              >
+                                <Sparkles className="w-3.5 h-3.5" />
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleProductHighlighted(product.id, e)}
+                                className={`w-6 h-6 rounded-md flex items-center justify-center transition cursor-pointer ${
+                                  product.isHighlighted 
+                                    ? 'bg-rose-500 text-white font-black shadow-xs' 
+                                    : 'text-slate-300 hover:text-white hover:bg-slate-800'
+                                }`}
+                                title={product.isHighlighted ? 'Highlighted: Click to unmark' : 'Click to mark as Highlighted'}
+                              >
+                                <Star className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
                           
                           {/* Badges */}
-                          <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 items-start">
+                          <div className={`absolute ${isEffectiveAdmin ? 'top-12 left-2.5' : 'top-2.5 left-2.5'} flex flex-col gap-1 items-start`}>
                             {product.onSale && (
                               <span className="bg-rose-600 text-white text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs">
                                 {product.discountPercentage}% OFF
@@ -2462,6 +3137,47 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     </span>
                   </div>
 
+                  {/* Admin Live Showcase Controls in Product Modal */}
+                  {isEffectiveAdmin && (
+                    <div className="bg-purple-50/90 p-3.5 rounded-xl border border-purple-200 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase text-purple-950 tracking-wider flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-purple-700" /> Admin Showcase Controls
+                        </span>
+                        <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md">
+                          Live Storefront Status
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleProductFeatured(selectedProduct.id)}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                            selectedProduct.isFeatured
+                              ? 'bg-amber-400 text-slate-950 border-amber-500 shadow-2xs font-black'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50'
+                          }`}
+                        >
+                          <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                          <span>{selectedProduct.isFeatured ? '★ Featured Product' : '+ Mark as Featured'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleToggleProductHighlighted(selectedProduct.id)}
+                          className={`py-2 px-3 rounded-lg text-xs font-bold border flex items-center justify-center gap-1.5 transition cursor-pointer ${
+                            selectedProduct.isHighlighted
+                              ? 'bg-rose-600 text-white border-rose-700 shadow-2xs font-black'
+                              : 'bg-white text-slate-700 border-slate-300 hover:bg-rose-50'
+                          }`}
+                        >
+                          <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                          <span>{selectedProduct.isHighlighted ? '⭐ Highlighted Product' : '+ Mark Highlighted'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Attributes & Variations Selector */}
                   {selectedProduct.attributes && selectedProduct.attributes.map(attr => (
                     <div key={attr.name} className="space-y-1.5">
@@ -2511,14 +3227,24 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
                       <button
                         type="button"
+                        disabled={!isProductDeliverable}
                         onClick={() => {
+                          if (!isProductDeliverable) return;
                           handleAddToCart(selectedProduct, detailQuantity, selectedAttributes, true);
                           setSelectedProduct(null);
                         }}
-                        className="flex-1 py-2.5 px-4 bg-rose-700 hover:bg-rose-800 text-white font-black text-xs rounded-xl shadow-md transition active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                        className={`flex-1 py-2.5 px-4 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 ${
+                          isProductDeliverable
+                            ? 'bg-rose-700 hover:bg-rose-800 text-white cursor-pointer active:scale-95'
+                            : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                        }`}
                       >
                         <ShoppingBag className="w-4 h-4" />
-                        <span>Add to Cart • ₹{(selectedProduct.price * detailQuantity).toLocaleString('en-IN')}</span>
+                        <span>
+                          {isProductDeliverable
+                            ? `Add to Cart • ₹${(selectedProduct.price * detailQuantity).toLocaleString('en-IN')}`
+                            : `Not Deliverable to PIN ${cleanPincode(pincodeCheck)}`}
+                        </span>
                       </button>
 
                       <button
@@ -2531,14 +3257,18 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       </button>
                     </div>
 
-                    {/* PIN Code Delivery Estimator (Powered by Shipping Network) */}
+                    {/* PIN Code Delivery Estimator (Powered by Multi-Vendor Pincode Logistics) */}
                     <div className="bg-slate-50/90 p-3.5 rounded-2xl border border-indigo-100/80 text-xs space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
-                          <Truck className="w-3.5 h-3.5 text-indigo-600" /> Shipping Delivery Check:
+                          <Truck className="w-3.5 h-3.5 text-indigo-600" /> Pincode Deliverability &amp; Shipping Check:
                         </span>
-                        <span className="text-[9.5px] uppercase font-black tracking-wider text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
-                          ⚡ Verified Shipping
+                        <span className={`text-[9.5px] uppercase font-black tracking-wider px-2 py-0.5 rounded-full border ${
+                          isProductDeliverable 
+                            ? 'text-emerald-700 bg-emerald-50 border-emerald-200' 
+                            : 'text-rose-700 bg-rose-50 border-rose-200'
+                        }`}>
+                          {isProductDeliverable ? '✓ Serviceable Location' : '✗ Unserviceable Area'}
                         </span>
                       </div>
                       <div className="flex gap-2">
@@ -2568,22 +3298,35 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       </div>
 
                       {pincodeResult && (
-                        <div className="p-2.5 bg-white rounded-xl border border-slate-200 space-y-1">
-                          <p className="text-[11px] font-bold text-indigo-900 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <div className={`p-2.5 rounded-xl border space-y-1.5 ${
+                          isProductDeliverable 
+                            ? 'bg-white border-slate-200' 
+                            : 'bg-rose-50 border-rose-200'
+                        }`}>
+                          <p className={`text-[11px] font-bold flex items-center gap-1.5 ${
+                            isProductDeliverable ? 'text-indigo-900' : 'text-rose-800'
+                          }`}>
+                            {isProductDeliverable ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                            ) : (
+                              <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                            )}
                             {pincodeResult}
                           </p>
-                          {pincodeServiceability && pincodeServiceability.available_courier_companies?.length > 0 && (
+                          {!isProductDeliverable && (
+                            <p className="text-[10.5px] text-rose-700">
+                              This vendor ({selectedProduct.vendorName || selectedProduct.brand}) does not deliver this product to PIN {cleanPincode(pincodeCheck)}. Purchase is disabled for this postal code.
+                            </p>
+                          )}
+                          {isProductDeliverable && pincodeCheckResult && (
                             <div className="grid grid-cols-2 gap-1.5 pt-1 border-t border-slate-100 text-[10px] text-slate-600">
                               <div>
-                                <span className="text-slate-400 block">Couriers:</span>
-                                <strong className="text-slate-800">
-                                  {pincodeServiceability.available_courier_companies.slice(0, 2).map(c => c.courier_name).join(', ')}
-                                </strong>
+                                <span className="text-slate-400 block">Courier:</span>
+                                <strong className="text-slate-800">{pincodeCheckResult.courierPartner}</strong>
                               </div>
                               <div>
-                                <span className="text-slate-400 block">Dispatch:</span>
-                                <strong className="text-emerald-700">Same-Day from Hub</strong>
+                                <span className="text-slate-400 block">Est. Delivery:</span>
+                                <strong className="text-emerald-700">{pincodeCheckResult.deliveryDateText}</strong>
                               </div>
                             </div>
                           )}
@@ -3219,12 +3962,34 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     </div>
                   </div>
 
+                  {/* Multi-Vendor Deliverability Alert Banner */}
+                  {!cartDeliverability.isValid && (
+                    <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl text-xs text-rose-900 space-y-1 animate-fadeIn">
+                      <div className="flex items-center gap-1.5 font-bold text-rose-800">
+                        <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                        <span>Delivery Location Alert for PIN {cleanPincode(shippingAddress.pincode)}</span>
+                      </div>
+                      <p className="text-[11px] text-rose-700 leading-relaxed">
+                        {cartDeliverability.errorSummary}
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     type="button"
+                    disabled={!cartDeliverability.isValid}
                     onClick={() => setCheckoutStep(2)}
-                    className="w-full py-3 bg-slate-900 hover:bg-rose-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                    className={`w-full py-3 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 ${
+                      cartDeliverability.isValid
+                        ? 'bg-slate-900 hover:bg-rose-700 text-white cursor-pointer'
+                        : 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-80'
+                    }`}
                   >
-                    <span>Proceed to Delivery Speed</span>
+                    <span>
+                      {cartDeliverability.isValid
+                        ? 'Proceed to Delivery Speed'
+                        : `Items Not Deliverable to PIN ${cleanPincode(shippingAddress.pincode)}`}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -3243,6 +4008,31 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       Verified Shipping
                     </span>
                   </div>
+
+                  {/* Multi-Vendor Seller Shipping Breakdown */}
+                  {Object.keys(cartDeliverability.vendorGroups).length > 0 && (
+                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
+                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
+                        Seller-Wise Shipping &amp; Logistics Breakdown:
+                      </span>
+                      <div className="space-y-1">
+                        {Object.values(cartDeliverability.vendorGroups).map(g => (
+                          <div key={g.vendorId} className="flex justify-between items-center text-slate-700">
+                            <span className="font-medium">
+                              🏪 <strong>{g.vendorName}</strong> ({g.items.length} {g.items.length === 1 ? 'item' : 'items'}):
+                            </span>
+                            <span className="font-mono font-bold">
+                              {g.isFreeDelivery ? (
+                                <span className="text-emerald-700">FREE Delivery</span>
+                              ) : (
+                                `₹${g.shippingFee}`
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     {[
@@ -3695,6 +4485,24 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           initialTab="merchant"
         />
       )}
+
+      {/* Mobile Sticky Floating Basket Bar (Matching Reference Screenshot) */}
+      <FloatingBasketBar
+        cart={cart}
+        onOpenCart={() => setIsCartOpen(true)}
+      />
+
+      {/* Admin Showcase & Carousel Manager Modal */}
+      <AdminShowcaseManagerModal
+        isOpen={showAdminShowcaseModal}
+        onClose={() => setShowAdminShowcaseModal(false)}
+        products={products}
+        categories={categories}
+        onToggleFeatured={handleToggleProductFeatured}
+        onToggleHighlighted={handleToggleProductHighlighted}
+        onBatchUpdate={handleBatchUpdateProducts}
+      />
+
     </div>
   );
 };
