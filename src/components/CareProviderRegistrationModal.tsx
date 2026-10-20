@@ -235,8 +235,8 @@ export default function CareProviderRegistrationModal({
       fullDayRate: canHostAtHome ? (Number(fullDayRate) || 0) : undefined,
       bio: bio.trim(),
       location: {
-        lat: currentUserProfile?.location.lat || 19.0760,
-        lng: currentUserProfile?.location.lng || 72.8777,
+        lat: currentUserProfile?.location?.lat || 19.0760,
+        lng: currentUserProfile?.location?.lng || 72.8777,
         address: address.trim(),
         distance: 0.1 // Home / closest
       },

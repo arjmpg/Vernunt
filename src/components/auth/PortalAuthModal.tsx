@@ -27,7 +27,6 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
   const [businessName, setBusinessName] = useState<string>('');
   const [otpStep, setOtpStep] = useState<boolean>(false);
   const [otpValue, setOtpValue] = useState<string>('');
-  const [devOtp, setDevOtp] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -110,20 +109,13 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
       const data = await res.json();
       if (data.success) {
         setOtpStep(true);
-        setDevOtp(data.devOtp || '123456');
         setCountdown(60);
       } else {
-        // Fallback for offline/mock sandbox
         setOtpStep(true);
-        const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-        setDevOtp(fallbackCode);
         setCountdown(60);
       }
     } catch {
-      // Offline fallback
       setOtpStep(true);
-      const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setDevOtp(fallbackCode);
       setCountdown(60);
     } finally {
       setIsSending(false);
@@ -156,7 +148,7 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
       });
       const data = await res.json();
 
-      if (data.success || entered === devOtp || entered === '123456') {
+      if (data.success) {
         confetti({ particleCount: 60, spread: 70, origin: { y: 0.6 } });
 
         // Synthesize or update verified session profile
@@ -389,24 +381,7 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
                 </p>
               </div>
 
-              {/* Dev Quick-Fill Preview Code Badge */}
-              {devOtp && (
-                <div 
-                  onClick={() => setOtpValue(devOtp)}
-                  className="bg-amber-50 border border-amber-200 rounded-xl p-2.5 text-center cursor-pointer hover:bg-amber-100 transition"
-                  title="Click to auto-fill verification code"
-                >
-                  <span className="text-[10px] font-bold text-amber-800 block uppercase tracking-wider">
-                    ⚡ Instant SMS Sandbox Code
-                  </span>
-                  <span className="text-base font-black font-mono text-amber-950 tracking-widest">
-                    {devOtp}
-                  </span>
-                  <span className="text-[10px] text-amber-700 block mt-0.5 underline">
-                    Tap to auto-fill code
-                  </span>
-                </div>
-              )}
+
 
               <div>
                 <input

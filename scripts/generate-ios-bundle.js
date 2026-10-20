@@ -3,7 +3,12 @@ import path from 'path';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const { ZipArchive } = require('archiver');
+let archiverModule = null;
+try {
+  archiverModule = require('archiver');
+} catch (e) {
+  // archiver not installed or optional
+}
 
 const cwd = process.cwd();
 const publicDir = path.join(cwd, 'public');
@@ -79,9 +84,17 @@ async function generateIosZip() {
     console.log('ℹ️ iOS source directory not present, skipping zip generation.');
     return;
   }
+  if (!archiverModule) {
+    console.log('ℹ️ archiver module not present, skipping optional iOS zip generation.');
+    return;
+  }
   return new Promise((resolve) => {
     const output = fs.createWriteStream(zipOutPath);
-    const archive = new ZipArchive();
+    const archive = typeof archiverModule === 'function' ? archiverModule('zip', { zlib: { level: 9 } }) : (archiverModule.ZipArchive ? new archiverModule.ZipArchive() : null);
+    if (!archive) {
+      resolve();
+      return;
+    }
 
     output.on('close', () => {
       console.log(`✅ Generated public/vernunt-ios-project.zip (${archive.pointer()} total bytes)`);

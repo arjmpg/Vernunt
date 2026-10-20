@@ -1087,7 +1087,7 @@ export default function EventDynamicQrPassModal({
       }
     } catch (err: any) {
       console.warn('Camera access unavailable or restricted:', err);
-      setCameraError('Camera stream restricted in sandbox preview. Live simulated scanner reticle is active.');
+      setCameraError('Camera stream access restricted or not granted. Interactive manual code entry & simulated scanner active.');
       setCameraActive(true);
     }
   };

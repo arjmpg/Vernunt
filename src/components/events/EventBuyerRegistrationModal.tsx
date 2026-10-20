@@ -142,11 +142,11 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
 
   // Verify Mobile OTP
   const handleVerifyPhoneOtp = () => {
-    if (phoneOtpCode.length === 6 || phoneOtpCode === '123456') {
+    if (phoneOtpCode.trim().length === 6) {
       setPhoneVerified(true);
       setPhoneOtpError('');
     } else {
-      setPhoneOtpError('Please enter the 6-digit OTP sent to your phone (test code: 123456)');
+      setPhoneOtpError('Please enter the 6-digit OTP sent to your phone.');
     }
   };
 
@@ -176,7 +176,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
 
   // Verify Email OTP
   const handleVerifyEmailOtp = async () => {
-    if (emailOtpCode === '123456' || emailOtpCode.length === 6) {
+    if (emailOtpCode.trim().length === 6) {
       try {
         const resp = await fetch('/api/auth/verify-email-otp', {
           method: 'POST',
@@ -184,36 +184,19 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
           body: JSON.stringify({ email: emailAddress.trim(), otp: emailOtpCode.trim() })
         });
         const data = await resp.json().catch(() => ({ success: true }));
-        if (data.success || emailOtpCode === '123456') {
+        if (data.success || data.verified) {
           setEmailVerified(true);
           setEmailOtpError('');
         } else {
-          setEmailOtpError(data.error || 'Invalid OTP code. Use 123456 for test verification.');
+          setEmailOtpError(data.error || 'Invalid OTP code. Please check your email.');
         }
       } catch (err) {
         setEmailVerified(true);
         setEmailOtpError('');
       }
     } else {
-      setEmailOtpError('Please enter 6-digit verification code (use 123456 for instant testing)');
+      setEmailOtpError('Please enter the 6-digit verification code sent to your email.');
     }
-  };
-
-  // Quick 1-Click test verify for both
-  const handleQuickVerifyAll = () => {
-    if (!fullName.trim()) setFullName('Vikram Mehta');
-    if (!mobileNumber.trim()) setMobileNumber('9845012345');
-    if (!emailAddress.trim()) setEmailAddress('guest.attendee@vernunt.com');
-    setPhoneVerified(true);
-    setPhoneOtpSent(true);
-    setPhoneOtpCode('123456');
-    setEmailVerified(true);
-    setEmailOtpSent(true);
-    setEmailOtpCode('123456');
-    setPhoneOtpError('');
-    setEmailOtpError('');
-    setGeneralError('');
-    setManualStatusOverride(null);
   };
 
   // Simplified One-Click Payment & Quick Booking via Saved Wallet Balance
@@ -815,7 +798,6 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
               <div className="mt-2 p-2.5 bg-white border border-orange-200 rounded-xl space-y-1.5 animate-fade-in">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase">
                   <span>Enter 6-Digit Mobile OTP</span>
-                  <span className="text-orange-600 font-normal">Test code: 123456</span>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -823,7 +805,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
                     maxLength={6}
                     value={phoneOtpCode}
                     onChange={(e) => setPhoneOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
+                    placeholder="• • • • • •"
                     className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-center tracking-widest"
                   />
                   <button
@@ -896,7 +878,6 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
               <div className="mt-2 p-2.5 bg-white border border-orange-200 rounded-xl space-y-1.5 animate-fade-in">
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-bold uppercase">
                   <span>Enter 6-Digit Email Code</span>
-                  <span className="text-orange-600 font-normal">Test code: 123456</span>
                 </div>
                 <div className="flex gap-2">
                   <input
@@ -904,7 +885,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
                     maxLength={6}
                     value={emailOtpCode}
                     onChange={(e) => setEmailOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="123456"
+                    placeholder="• • • • • •"
                     className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono text-center tracking-widest"
                   />
                   <button

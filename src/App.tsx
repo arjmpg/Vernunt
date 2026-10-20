@@ -1178,7 +1178,18 @@ export default function App() {
     const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
       const list: ChildProfile[] = [];
       snapshot.forEach((snapDoc) => {
-        list.push(snapDoc.data() as ChildProfile);
+        const docData = snapDoc.data() as ChildProfile;
+        const lat = typeof docData.location?.lat === 'number' ? docData.location.lat : (typeof (docData as any).lat === 'number' ? (docData as any).lat : 12.9716);
+        const lng = typeof docData.location?.lng === 'number' ? docData.location.lng : (typeof (docData as any).lng === 'number' ? (docData as any).lng : 77.5946);
+        const normalizedProfile: ChildProfile = {
+          ...docData,
+          location: {
+            lat,
+            lng,
+            address: docData.location?.address || docData.area || docData.city || 'Bengaluru, Karnataka'
+          }
+        };
+        list.push(normalizedProfile);
       });
 
       // Exclude self from matched playmates
@@ -3055,7 +3066,9 @@ export default function App() {
       if (p.isBlocked) continue;
 
       // 1. Distance filter (in kilometers)
-      const distanceKm = getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
+      const pLat = p.location?.lat ?? (typeof (p as any).lat === 'number' ? (p as any).lat : 12.9716);
+      const pLng = p.location?.lng ?? (typeof (p as any).lng === 'number' ? (p as any).lng : 77.5946);
+      const distanceKm = getHaversineDistance(userLat, userLng, pLat, pLng);
       if (distanceKm > deferredMaxDistanceKm) continue;
 
       // 2. Play style filter

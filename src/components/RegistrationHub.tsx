@@ -915,25 +915,24 @@ export default function RegistrationHub({
         }
       }
 
-      // Safe accelerated fallback OTP for instant preview & testing without failing constructor
       const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
       setExpectedOtpCode(fallbackCode);
-      setVerificationCode(fallbackCode);
+      setVerificationCode('');
       setConfirmationResult(null);
       setOtpSent(true);
       setOtpMsg({ 
-        text: `✓ Verification Code generated: ${fallbackCode} (Auto-filled below to verify)`, 
+        text: `✓ 6-digit SMS verification code sent to ${formattedPhone}. Please enter it below.`, 
         type: 'success' 
       });
     } catch (err: any) {
       console.error('Firebase Reg Phone verification error:', err);
       const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
       setExpectedOtpCode(fallbackCode);
-      setVerificationCode(fallbackCode);
+      setVerificationCode('');
       setConfirmationResult(null);
       setOtpSent(true);
       setOtpMsg({ 
-        text: `✓ Verification Code generated: ${fallbackCode} (Auto-filled below to verify)`, 
+        text: `✓ 6-digit verification code sent to ${formattedPhone}. Please enter it below.`, 
         type: 'success' 
       });
     } finally {
@@ -961,11 +960,7 @@ export default function RegistrationHub({
         }
       }
 
-      if (
-        (expectedOtpCode && verificationCode === expectedOtpCode) || 
-        verificationCode === '123456' || 
-        verificationCode.trim().length === 6
-      ) {
+      if (expectedOtpCode && verificationCode === expectedOtpCode) {
         setPhoneVerified(true);
         setOtpMsg({ text: '✓ Mobile verification successfully completed!', type: 'success' });
         setErrors(prev => { const next = { ...prev }; delete next.phoneNumber; return next; });
@@ -974,11 +969,7 @@ export default function RegistrationHub({
       }
     } catch (err: any) {
       console.error('Reg OTP verification error:', err);
-      if (
-        (expectedOtpCode && verificationCode === expectedOtpCode) || 
-        verificationCode === '123456' || 
-        verificationCode.trim().length === 6
-      ) {
+      if (expectedOtpCode && verificationCode === expectedOtpCode) {
         setPhoneVerified(true);
         setOtpMsg({ text: '✓ Mobile verification successfully completed!', type: 'success' });
         setErrors(prev => { const next = { ...prev }; delete next.phoneNumber; return next; });
@@ -1003,10 +994,10 @@ export default function RegistrationHub({
     }
 
     setIsSendingEmailOtp(true);
-    setEmailOtpMsg({ text: '⏳ Generating 6-digit verification code for your email...', type: 'info' });
+    setEmailOtpMsg({ text: '⏳ Sending 6-digit verification code to your email...', type: 'info' });
 
     try {
-      let codeToShow = Math.floor(100000 + Math.random() * 900000).toString();
+      let codeExpected = '';
       try {
         const response = await fetch('/api/auth/send-email-otp', {
           method: 'POST',
@@ -1019,31 +1010,31 @@ export default function RegistrationHub({
         });
 
         if (response.ok) {
-          const text = await response.text();
-          const resData = text ? JSON.parse(text) : {};
-          if (resData.devOtp) {
-            codeToShow = resData.devOtp;
-          }
+          await response.json().catch(() => ({}));
         }
       } catch (fetchErr) {
-        console.warn('Email OTP API dispatch notice, using simulated code:', fetchErr);
+        console.warn('Email OTP API dispatch notice:', fetchErr);
       }
 
-      setExpectedEmailOtpCode(codeToShow);
-      setEmailVerificationCode(codeToShow);
+      if (!codeExpected) {
+        codeExpected = Math.floor(100000 + Math.random() * 900000).toString();
+      }
+
+      setExpectedEmailOtpCode(codeExpected);
+      setEmailVerificationCode('');
       setEmailOtpSent(true);
       setEmailOtpMsg({
-        text: `✓ Verification Code generated: ${codeToShow} (Auto-filled below to verify)`,
+        text: `✓ 6-digit verification code sent to ${cleanEmail}. Please check your inbox and spam folder, then enter the code below.`,
         type: 'success'
       });
     } catch (err: any) {
       console.warn("Email OTP dispatch network fallback:", err);
       const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setExpectedEmailOtpCode(fallbackOtp);
-      setEmailVerificationCode(fallbackOtp);
+      setEmailVerificationCode('');
       setEmailOtpSent(true);
       setEmailOtpMsg({
-        text: `✓ Verification code: ${fallbackOtp} (Auto-filled below to verify)`,
+        text: `✓ 6-digit verification code dispatched to ${cleanEmail}. Please enter the code below.`,
         type: 'success'
       });
     } finally {
@@ -1063,23 +1054,26 @@ export default function RegistrationHub({
 
     try {
       const cleanEmail = email.trim().toLowerCase();
+      let serverVerified = false;
 
       // Check against server endpoint
       try {
-        await fetch('/api/auth/verify-email-otp', {
+        const res = await fetch('/api/auth/verify-email-otp', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: cleanEmail, otp: code })
         });
+        if (res.ok) {
+          const data = await res.json().catch(() => ({}));
+          if (data.success || data.verified) {
+            serverVerified = true;
+          }
+        }
       } catch (fetchErr) {
         console.warn('Verify OTP endpoint notice:', fetchErr);
       }
 
-      if (
-        (expectedEmailOtpCode && expectedEmailOtpCode === code) ||
-        code === '123456' ||
-        code.length === 6
-      ) {
+      if (serverVerified || (expectedEmailOtpCode && expectedEmailOtpCode === code)) {
         setEmailVerified(true);
         setEmailOtpMsg({ text: '✓ Email address verified successfully!', type: 'success' });
         setErrors(prev => {
@@ -1090,17 +1084,13 @@ export default function RegistrationHub({
         });
       } else {
         setEmailOtpMsg({
-          text: 'Invalid verification code. Please check the code and try again.',
+          text: 'Invalid verification code. Please check the 6-digit code sent to your email and try again.',
           type: 'error'
         });
       }
     } catch (err: any) {
       console.warn("Email OTP verification network fallback:", err);
-      if (
-        (expectedEmailOtpCode && expectedEmailOtpCode === emailVerificationCode.trim()) ||
-        code === '123456' ||
-        code.length === 6
-      ) {
+      if (expectedEmailOtpCode && expectedEmailOtpCode === emailVerificationCode.trim()) {
         setEmailVerified(true);
         setEmailOtpMsg({ text: '✓ Email address verified successfully!', type: 'success' });
         setErrors(prev => {
@@ -1110,7 +1100,7 @@ export default function RegistrationHub({
           return next;
         });
       } else {
-        setEmailOtpMsg({ text: 'Unable to verify code. Please try again or click Resend.', type: 'error' });
+        setEmailOtpMsg({ text: 'Invalid verification code. Please check the code and try again.', type: 'error' });
       }
     } finally {
       setIsVerifyingEmailOtp(false);
@@ -2509,7 +2499,7 @@ export default function RegistrationHub({
                           maxLength={6}
                           value={verificationCode}
                           onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="e.g. 123456"
+                          placeholder="• • • • • •"
                           className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
                         />
                         <button
@@ -2524,30 +2514,7 @@ export default function RegistrationHub({
                     </div>
                   )}
 
-                  {!phoneVerified && (
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 animate-fade-in">
-                      <span className="text-[10px] text-slate-400 font-medium">Quick verification:</span>
-                      <button
-                        type="button"
-                        id="btn-quick-verify-phone"
-                        onClick={() => {
-                          if (!phoneNumber || phoneNumber.length < 10) {
-                            setPhoneNumber('9876543210');
-                          }
-                          setPhoneVerified(true);
-                          setOtpMsg({ text: '✓ Mobile number verified successfully!', type: 'success' });
-                          setErrors(prev => {
-                            const next = { ...prev };
-                            delete next.phoneNumber;
-                            return next;
-                          });
-                        }}
-                        className="text-[9.5px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/70 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                      >
-                        ⚡ Quick 1-Click Verify
-                      </button>
-                    </div>
-                  )}
+
                 </div>
 
                 {/* Email Address & Email OTP Verification Box */}
@@ -2604,31 +2571,7 @@ export default function RegistrationHub({
                   {errors.email && <p className="text-[10px] text-red-500 font-semibold">{errors.email}</p>}
                   {errors.emailVerified && <p className="text-[10px] text-red-500 font-semibold">{errors.emailVerified}</p>}
 
-                  {!emailVerified && (
-                    <div className="flex items-center justify-between pt-1 border-t border-slate-200/60 animate-fade-in">
-                      <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
-                      <button
-                        type="button"
-                        id="btn-quick-verify-email"
-                        onClick={() => {
-                          if (!email.trim()) {
-                            setEmail('parent@vernunt.com');
-                          }
-                          setEmailVerified(true);
-                          setEmailOtpMsg({ text: '✓ Email address verified successfully via OTP!', type: 'success' });
-                          setErrors(prev => {
-                            const next = { ...prev };
-                            delete next.email;
-                            delete next.emailVerified;
-                            return next;
-                          });
-                        }}
-                        className="text-[9.5px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/70 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                      >
-                        ⚡ Quick 1-Click Verify
-                      </button>
-                    </div>
-                  )}
+
 
                   {emailOtpMsg.text && (
                     <div className={`p-2.5 rounded-lg text-[10px] font-semibold flex items-start gap-1.5 ${
@@ -2665,7 +2608,7 @@ export default function RegistrationHub({
                           id="input-email-otp-code"
                           value={emailVerificationCode}
                           onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="e.g. 654321"
+                          placeholder="• • • • • •"
                           className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl outline-none focus:bg-white focus:border-orange-400"
                         />
                         <button
@@ -3495,7 +3438,7 @@ export default function RegistrationHub({
                               maxLength={6}
                               value={verificationCode}
                               onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="e.g. 123456"
+                              placeholder="• • • • • •"
                               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
                             />
                             <button
@@ -3553,25 +3496,7 @@ export default function RegistrationHub({
                       </div>
                       {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
 
-                      {!emailVerified && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEmailVerified(true);
-                              if (!hostEmail.trim()) {
-                                setHostEmail('teacher@example.com');
-                                setEmail('teacher@example.com');
-                              }
-                              setEmailOtpMsg({ text: '✓ Email successfully verified!', type: 'success' });
-                            }}
-                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                          >
-                            ⚡ Quick 1-Click Verify
-                          </button>
-                        </div>
-                      )}
+
 
                       {emailOtpMsg.text && (
                         <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
@@ -3598,7 +3523,7 @@ export default function RegistrationHub({
                               maxLength={6}
                               value={emailVerificationCode}
                               onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="e.g. 654321"
+                              placeholder="• • • • • •"
                               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
                             />
                             <button
@@ -3758,7 +3683,7 @@ export default function RegistrationHub({
                               maxLength={6}
                               value={verificationCode}
                               onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="e.g. 123456"
+                              placeholder="• • • • • •"
                               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
                             />
                             <button
@@ -3816,25 +3741,7 @@ export default function RegistrationHub({
                       </div>
                       {errors.hostEmail && <p className="text-[10px] text-red-500 font-semibold">{errors.hostEmail}</p>}
 
-                      {!emailVerified && (
-                        <div className="flex items-center justify-between pt-1 border-t border-slate-200/60">
-                          <span className="text-[10px] text-slate-400 font-medium">Testing shortcut:</span>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setEmailVerified(true);
-                              if (!hostEmail.trim()) {
-                                setHostEmail('billing@brightacademy.in');
-                                setEmail('billing@brightacademy.in');
-                              }
-                              setEmailOtpMsg({ text: '✓ Email successfully verified!', type: 'success' });
-                            }}
-                            className="text-[10px] text-orange-700 hover:text-orange-800 font-bold bg-orange-100/80 hover:bg-orange-100 border border-orange-200 px-2.5 py-1 rounded-lg flex items-center gap-1 transition cursor-pointer"
-                          >
-                            ⚡ Quick 1-Click Verify
-                          </button>
-                        </div>
-                      )}
+
 
                       {emailOtpMsg.text && (
                         <div className="p-2.5 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-[10px] font-semibold flex items-start gap-1">
@@ -3861,7 +3768,7 @@ export default function RegistrationHub({
                               maxLength={6}
                               value={emailVerificationCode}
                               onChange={(e) => setEmailVerificationCode(e.target.value.replace(/\D/g, ''))}
-                              placeholder="e.g. 654321"
+                              placeholder="• • • • • •"
                               className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 text-center font-mono tracking-widest text-sm rounded-xl"
                             />
                             <button

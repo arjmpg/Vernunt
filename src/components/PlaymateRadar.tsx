@@ -79,13 +79,15 @@ export default function PlaymateRadar({
   const visibleNodes = React.useMemo(() => {
     const subset = playmates.slice(0, 35);
     return subset.map((p, index) => {
-      const dLat = (p.location.lat - centerLat) * 800;
-      const dLng = (p.location.lng - centerLng) * 800;
+      const pLat = p.location?.lat ?? (typeof (p as any).lat === 'number' ? (p as any).lat : 12.9716);
+      const pLng = p.location?.lng ?? (typeof (p as any).lng === 'number' ? (p as any).lng : 77.5946);
+      const dLat = (pLat - centerLat) * 800;
+      const dLng = (pLng - centerLng) * 800;
       const rawDistKm = getHaversineDistance(
         centerLat,
         centerLng,
-        p.location.lat,
-        p.location.lng
+        pLat,
+        pLng
       );
       const proxBadge = getProximityBadge(rawDistKm);
       const baseDist = Math.sqrt(dLat * dLat + dLng * dLng);

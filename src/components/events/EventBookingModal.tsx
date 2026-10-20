@@ -1053,17 +1053,10 @@ export default function EventBookingModal({
                   type="text"
                   maxLength={6}
                   value={otpValue}
-                  onChange={(e) => setOtpValue(e.target.value)}
-                  placeholder="Enter OTP (e.g. 123456)"
+                  onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, ''))}
+                  placeholder="Enter 6-Digit OTP"
                   className="w-full text-center tracking-widest text-lg font-mono font-bold p-3 rounded-xl border border-slate-300 focus:ring-2 focus:ring-orange-500 focus:outline-none"
                 />
-                <button
-                  type="button"
-                  onClick={() => setOtpValue('123456')}
-                  className="text-xs text-orange-600 font-semibold hover:underline block text-center mx-auto"
-                >
-                  Auto-fill Test OTP (123456)
-                </button>
               </div>
 
               <button

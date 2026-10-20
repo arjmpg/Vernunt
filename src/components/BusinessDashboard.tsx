@@ -138,7 +138,7 @@ export default function BusinessDashboard({
     'Can Edit Specialist Fees',
     'Can Approve Portfolios',
     'Receive Commission Waive',
-    'Full Sandbox Access'
+    'Full Platform Access'
   ];
 
   useEffect(() => {
@@ -970,7 +970,7 @@ export default function BusinessDashboard({
                             {/* Show active system capabilities */}
                             <div className="pt-1 flex flex-wrap gap-1">
                               {(p.userRole === 'Admin' 
-                                ? ['Full Sandbox Access', 'Can Propose Event', 'Can Moderate Chats', 'Can Approve Portfolios']
+                                ? ['Full Platform Access', 'Can Propose Event', 'Can Moderate Chats', 'Can Approve Portfolios']
                                 : p.userRole === 'Event Organizer'
                                 ? ['Can Propose Event', 'Can Moderate Chats']
                                 : p.userRole === 'Portfolio Professional'

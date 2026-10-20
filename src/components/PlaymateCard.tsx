@@ -89,7 +89,9 @@ export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile, c
   // 2. Geographic Proximity Score (Max 25 points)
   const uLat = currentUserLat || (p1.location && p1.location.lat) || 12.9716;
   const uLng = currentUserLng || (p1.location && p1.location.lng) || 77.5946;
-  const distKm = getHaversineDistance(uLat, uLng, p2.location.lat, p2.location.lng);
+  const p2Lat = p2.location?.lat ?? (typeof (p2 as any).lat === 'number' ? (p2 as any).lat : 12.9716);
+  const p2Lng = p2.location?.lng ?? (typeof (p2 as any).lng === 'number' ? (p2 as any).lng : 77.5946);
+  const distKm = getHaversineDistance(uLat, uLng, p2Lat, p2Lng);
   let proximityScore = 10;
   if (distKm <= 1.5) {
     proximityScore = 25; // Same building or immediate walking circle
@@ -214,7 +216,9 @@ export default function PlaymateCard({
   const isProfileUnlocked = isViewerKycVerified && (isConnected || !!currentUserProfile?.subscriptionActive);
   const uLat = currentUserLat || 12.9716;
   const uLng = currentUserLng || 77.5946;
-  const distKm = getHaversineDistance(uLat, uLng, profile.location.lat, profile.location.lng);
+  const profLat = profile.location?.lat ?? (typeof (profile as any).lat === 'number' ? (profile as any).lat : 12.9716);
+  const profLng = profile.location?.lng ?? (typeof (profile as any).lng === 'number' ? (profile as any).lng : 77.5946);
+  const distKm = getHaversineDistance(uLat, uLng, profLat, profLng);
   const proxBadge = getProximityBadge(distKm);
 
   const parentPhoto = profile.parentPhotoUrl || profile.photoUrl;
@@ -638,7 +642,7 @@ export default function PlaymateCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                openDeviceNavigation(profile.location.lat, profile.location.lng, `${profile.childName}'s Play Area`);
+                openDeviceNavigation(profile.location?.lat ?? 12.9716, profile.location?.lng ?? 77.5946, `${profile.childName}'s Play Area`);
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-[11px] font-black shadow-xs transition active:scale-95 cursor-pointer"
               title="Open device's map app with pinned playmate location and walking directions"

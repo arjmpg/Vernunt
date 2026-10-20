@@ -120,8 +120,7 @@ async function startServer() {
         success: true,
         message: `✓ 6-digit verification code sent to ${normalizedEmail}. Please check your inbox or spam folder.`,
         email: normalizedEmail,
-        otpExpiresInSeconds: 600,
-        devOtp: otpCode // Provided for seamless sandbox/preview access
+        otpExpiresInSeconds: 600
       });
     } catch (err: any) {
       console.error("[Email OTP Send Error]:", err);
@@ -228,7 +227,6 @@ async function startServer() {
         success: true,
         phone: cleanPhone,
         otpExpiresInSeconds: 600,
-        devOtp: otpCode,
         message: `✓ 6-digit SMS OTP dispatched to ${cleanPhone}. Valid for 10 minutes.`
       });
     } catch (err: any) {

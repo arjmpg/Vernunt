@@ -79,7 +79,7 @@ export function PlaymateDetailModal({
             <button
               id="btn-modal-start-navigation"
               type="button"
-              onClick={() => openDeviceNavigation(profile.location.lat, profile.location.lng, `${profile.childName}'s Play Area`)}
+              onClick={() => openDeviceNavigation(profile.location?.lat ?? 12.9716, profile.location?.lng ?? 77.5946, `${profile.childName}'s Play Area`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-xs cursor-pointer active:scale-95"
               title="Open device map with pinned location and navigation"
             >

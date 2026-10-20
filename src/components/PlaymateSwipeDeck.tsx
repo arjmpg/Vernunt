@@ -113,9 +113,10 @@ export function PlaymateSwipeDeck({
 
   // Calculate stats for current profile
   const matchResult = currentProfile ? calculateMatchScore(userProfile, currentProfile, userLat, userLng) : null;
-  const matchScore = matchResult ? matchResult.score : 85;
+  const currentLat = currentProfile?.location?.lat ?? (typeof (currentProfile as any)?.lat === 'number' ? (currentProfile as any).lat : 12.9716);
+  const currentLng = currentProfile?.location?.lng ?? (typeof (currentProfile as any)?.lng === 'number' ? (currentProfile as any).lng : 77.5946);
   const distance = currentProfile 
-    ? getHaversineDistance(userLat, userLng, currentProfile.location.lat, currentProfile.location.lng)
+    ? getHaversineDistance(userLat, userLng, currentLat, currentLng)
     : 0;
   const proxBadge = getProximityBadge(distance);
 
@@ -370,7 +371,7 @@ export function PlaymateSwipeDeck({
                     onClick={(e) => {
                       e.stopPropagation();
                       if (currentProfile) {
-                        openDeviceNavigation(currentProfile.location.lat, currentProfile.location.lng, `${currentProfile.childName}'s Play Area`);
+                        openDeviceNavigation(currentProfile.location?.lat ?? 12.9716, currentProfile.location?.lng ?? 77.5946, `${currentProfile.childName}'s Play Area`);
                       }
                     }}
                     className={`inline-flex items-center gap-1.5 backdrop-blur-md text-white text-[11px] font-bold px-3 py-1.5 rounded-full border shadow-md transition hover:scale-105 active:scale-95 cursor-pointer ${
@@ -528,7 +529,7 @@ export function PlaymateSwipeDeck({
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        openDeviceNavigation(currentProfile.location.lat, currentProfile.location.lng, `${currentProfile.childName}'s Play Area`);
+                        openDeviceNavigation(currentProfile.location?.lat ?? 12.9716, currentProfile.location?.lng ?? 77.5946, `${currentProfile.childName}'s Play Area`);
                       }}
                       className="inline-flex items-center gap-1.5 text-xs font-black text-white bg-emerald-600/90 hover:bg-emerald-600 backdrop-blur-md px-3 py-1.5 rounded-xl border border-emerald-400/40 transition cursor-pointer active:scale-95 shadow-xs"
                       title="Open device's map app with pinned playmate location and walking directions"

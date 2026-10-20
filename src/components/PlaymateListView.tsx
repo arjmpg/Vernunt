@@ -112,8 +112,9 @@ export function PlaymateListView({
           const isSent = interestsSent.includes(p.id);
           const isReceived = interestsReceived.includes(p.id);
           const isViewerVerified = userProfile?.userRole === 'Admin' || (userProfile?.verificationStatus === VerificationStatus.VERIFIED && !!userProfile?.aadhaarVerified);
-          const isPhotoUnlocked = isConnected || isViewerVerified;
-          const dKm = (p as any)._cachedDistance ?? getHaversineDistance(userLat, userLng, p.location.lat, p.location.lng);
+          const pLat = p.location?.lat ?? (typeof (p as any).lat === 'number' ? (p as any).lat : 12.9716);
+          const pLng = p.location?.lng ?? (typeof (p as any).lng === 'number' ? (p as any).lng : 77.5946);
+          const dKm = (p as any)._cachedDistance ?? getHaversineDistance(userLat, userLng, pLat, pLng);
           const proxBadge = getProximityBadge(dKm);
           const matchResult = calculateMatchScore(userProfile, p);
 
@@ -229,7 +230,7 @@ export function PlaymateListView({
                     title="Start Navigation: Open device's map app with pinned location"
                     onClick={(e) => {
                       e.stopPropagation();
-                      openDeviceNavigation(p.location.lat, p.location.lng, `${p.childName}'s Play Area`);
+                      openDeviceNavigation(p.location?.lat ?? 12.9716, p.location?.lng ?? 77.5946, `${p.childName}'s Play Area`);
                     }}
                     className="p-2 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition border border-emerald-200/70 cursor-pointer flex items-center gap-1"
                     aria-label="Start Navigation"

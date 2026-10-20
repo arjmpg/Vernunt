@@ -2488,11 +2488,13 @@ export default function AdminDashboard({
                                     onClick={async () => {
                                       try {
                                         const userRef = doc(db, 'users', u.id);
+                                        const safeLocation = u.location?.lat ? u.location : { lat: 12.9716, lng: 77.5946, address: u.area || u.city || 'Bengaluru, Karnataka' };
                                         await setDoc(userRef, {
                                           verificationStatus: VerificationStatus.VERIFIED,
                                           aadhaarVerified: true,
                                           facialAuditRequired: false,
-                                          faceVerificationStatus: 'verified'
+                                          faceVerificationStatus: 'verified',
+                                          location: safeLocation
                                         }, { merge: true }).catch(() => {});
 
                                         setServerUsers(prev => prev.map(item => item.id === u.id ? {
@@ -3060,11 +3062,13 @@ export default function AdminDashboard({
                                       onClick={async () => {
                                         try {
                                           const userRef = doc(db, 'users', u.id);
+                                          const safeLocation = u.location?.lat ? u.location : { lat: 12.9716, lng: 77.5946, address: u.area || u.city || 'Bengaluru, Karnataka' };
                                           await setDoc(userRef, {
                                             verificationStatus: VerificationStatus.VERIFIED,
                                             aadhaarVerified: true,
                                             facialAuditRequired: false,
-                                            faceVerificationStatus: 'verified'
+                                            faceVerificationStatus: 'verified',
+                                            location: safeLocation
                                           }, { merge: true });
                                           setServerUsers(prev => prev.map(item => item.id === u.id ? {
                                             ...item,

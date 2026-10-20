@@ -608,8 +608,8 @@ export function VernuntGroupsHub({
       setOtpError('Please enter a valid 10-digit mobile number.');
       return;
     }
-    if (!otpCode.trim() || (otpCode.trim().length !== 6 && otpCode.trim() !== '123456')) {
-      setOtpError('Please enter the 6-digit OTP code (use test code: 123456).');
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setOtpError('Please enter the 6-digit OTP code sent to your mobile.');
       return;
     }
 
@@ -2335,9 +2335,6 @@ export function VernuntGroupsHub({
                     <label className="text-xs font-bold text-slate-700">
                       Enter 6-Digit OTP <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[10px] text-orange-600 font-semibold bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
-                      Test Code: 123456
-                    </span>
                   </div>
 
                   <input
@@ -2348,12 +2345,12 @@ export function VernuntGroupsHub({
                       setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6));
                       setOtpError('');
                     }}
-                    placeholder="123456"
+                    placeholder="• • • • • •"
                     className="w-full text-center text-lg font-mono tracking-widest font-black py-2.5 px-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 bg-white"
                   />
                 </div>
 
-                {/* Resend & 1-Click test shortcut */}
+                {/* Resend */}
                 <div className="flex items-center justify-between text-xs pt-1">
                   {otpResendTimer > 0 ? (
                     <span className="text-[11px] text-slate-400">
@@ -2369,17 +2366,6 @@ export function VernuntGroupsHub({
                       Resend OTP
                     </button>
                   )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpCode('123456');
-                      setOtpError('');
-                    }}
-                    className="text-[10px] text-rose-700 font-bold bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition cursor-pointer"
-                  >
-                    ⚡ Auto-Fill 123456
-                  </button>
                 </div>
 
                 <button

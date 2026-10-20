@@ -219,7 +219,7 @@ export default function EmergencySOSModal({ onClose, userProfile }: EmergencySOS
           });
           addTerminalLog('✅ [Workspace Bot] Secure distress alert synchronised on Google Chat.');
         } catch (botErr: any) {
-          addTerminalLog(`⚠️ [Workspace Bot] Google Chat warning stream relayed onto browser sandbox buffers.`);
+          addTerminalLog(`⚠️ [Workspace Bot] Google Chat warning stream relayed onto browser event buffers.`);
         }
       }, 2500);
     }

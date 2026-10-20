@@ -326,11 +326,18 @@ export default function LandingLoginGateway({
     setErrorMsg('');
     setInfoMsg('');
 
-    // Generate fast simulated email verification code with zero delay
+    try {
+      fetch('/api/auth/send-email-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, role: 'Parent' })
+      }).catch(() => {});
+    } catch {}
+
     const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
     setExpectedEmailOtp(generatedCode);
     setEmailOtpSent(true);
-    setInfoMsg(`📧 One-Time Password sent to ${cleanEmail}. (Dev quick code: ${generatedCode})`);
+    setInfoMsg(`📧 6-digit verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`);
   };
 
   const handleResetPassword = async () => {
@@ -364,7 +371,7 @@ export default function LandingLoginGateway({
       return;
     }
 
-    if (emailOtpCode === expectedEmailOtp || emailOtpCode === '123456') {
+    if (emailOtpCode.trim() === expectedEmailOtp) {
       setLoading(true);
       setErrorMsg('');
       setSuccessMsg('Email validated! Logging in...');
@@ -766,13 +773,13 @@ export default function LandingLoginGateway({
           await confirmationResult.confirm(phoneOtpCode);
           isVerified = true;
         } catch (confirmErr: any) {
-          if (expectedEmailOtp && (phoneOtpCode === expectedEmailOtp || phoneOtpCode === '123456')) {
+          if (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) {
             isVerified = true;
           } else {
             throw confirmErr;
           }
         }
-      } else if (expectedEmailOtp && (phoneOtpCode === expectedEmailOtp || phoneOtpCode === '123456')) {
+      } else if (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) {
         isVerified = true;
       } else {
         throw new Error('Invalid verification code entered.');
@@ -837,13 +844,13 @@ export default function LandingLoginGateway({
           await confirmationResult.confirm(phoneOtpCode);
           isVerified = true;
         } catch (confirmErr: any) {
-          if (phoneOtpCode.length === 6 || (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) || phoneOtpCode === '123456') {
+          if (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) {
             isVerified = true;
           } else {
             throw confirmErr;
           }
         }
-      } else if (phoneOtpCode.length === 6 || (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) || phoneOtpCode === '123456') {
+      } else if (expectedEmailOtp && phoneOtpCode === expectedEmailOtp) {
         isVerified = true;
       } else {
         throw new Error('Invalid verification code entered.');
@@ -1890,7 +1897,7 @@ export default function LandingLoginGateway({
                             onKeyDown={(e) => {
                               if (e.key === 'Enter') handleVerifyUnregisteredPhoneOtp();
                             }}
-                            placeholder="Enter 6-digit OTP (e.g. 123456)"
+                            placeholder="• • • • • •"
                             className="flex-1 px-4 py-2.5 bg-white border border-slate-300 text-center font-mono tracking-widest text-sm rounded-xl outline-none focus:ring-2 focus:ring-orange-200 font-bold"
                           />
                           <button
