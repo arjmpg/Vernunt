@@ -66,7 +66,7 @@ export const PrivacyAndDataModal: React.FC<PrivacyAndDataModalProps> = ({
       body: JSON.stringify({
         userId: userProfile?.id || 'guest',
         childProfileId: userProfile?.id,
-        consentType: 'GUARDIAN_AUTHORITY',
+        consentType: 'PARENT_AUTHORITY',
         policyVersion: '2.4.0',
         status: visibility === 'PRIVATE' ? 'RESTRICTED' : 'GRANTED'
       })

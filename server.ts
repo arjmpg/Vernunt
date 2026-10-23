@@ -8,6 +8,7 @@ import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
 import { registerPrivacyComplianceRoutes } from "./server/privacyComplianceService.ts";
 import { registerCashfreeRoutes } from "./server/cashfreeService.ts";
 import { registerMarketplaceRoutes } from "./server/marketplaceService.ts";
+import { registerEmailRoutes, sendEmailMessage } from "./server/emailService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
@@ -64,6 +65,9 @@ async function startServer() {
   // Multi-Vendor Marketplace Engine: Vendor Profiles, Products, Pincode Logistics & Orders
   registerMarketplaceRoutes(app);
 
+  // Unified Email OTP & App-wide Notification Engine with Firebase Firestore & Nodemailer
+  registerEmailRoutes(app, getFirebaseAdmin);
+
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {
     let clientIp = (
@@ -87,116 +91,9 @@ async function startServer() {
     });
   });
 
-  // =========================================================================
-  // EMAIL OTP AUTHENTICATION & VERIFICATION ENGINE (FIREBASE AUTH COMPATIBLE)
-  // =========================================================================
-  const emailOtpStore = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
+  // Note: Email OTP Authentication & App-wide Notification Routes are registered
+  // via registerEmailRoutes(app, getFirebaseAdmin) in ./server/emailService.ts.
 
-  // Endpoint to send a 6-digit OTP to user email
-  app.post("/api/auth/send-email-otp", (req, res) => {
-    try {
-      const { email, userName, role } = req.body || {};
-      if (!email || typeof email !== 'string' || !email.includes('@')) {
-        return res.status(400).json({
-          success: false,
-          error: "Please provide a valid email address."
-        });
-      }
-
-      const normalizedEmail = email.trim().toLowerCase();
-      // Generate secure 6-digit OTP code
-      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes validity
-
-      emailOtpStore.set(normalizedEmail, {
-        otp: otpCode,
-        expiresAt,
-        attempts: 0
-      });
-
-      console.log(`[Email OTP] Generated verification OTP for ${normalizedEmail} (${role || 'Parent'}): [${otpCode}] (Valid for 10 mins)`);
-
-      return res.json({
-        success: true,
-        message: `✓ 6-digit verification code sent to ${normalizedEmail}. Please check your inbox or spam folder.`,
-        email: normalizedEmail,
-        otpExpiresInSeconds: 600
-      });
-    } catch (err: any) {
-      console.error("[Email OTP Send Error]:", err);
-      return res.status(500).json({
-        success: false,
-        error: `Failed to dispatch email verification OTP: ${err.message || err}`
-      });
-    }
-  });
-
-  // Endpoint to verify the 6-digit email OTP
-  app.post("/api/auth/verify-email-otp", (req, res) => {
-    try {
-      const { email, otp } = req.body || {};
-      if (!email || !otp) {
-        return res.status(400).json({
-          success: false,
-          error: "Email address and 6-digit verification code are required."
-        });
-      }
-
-      const normalizedEmail = email.trim().toLowerCase();
-      const userEnteredOtp = otp.toString().trim();
-      const stored = emailOtpStore.get(normalizedEmail);
-
-      if (!stored) {
-        // If expired or not found, allow verification if length is 6 digits or return standard message
-        return res.status(400).json({
-          success: false,
-          error: "No active OTP request found for this email, or code has expired. Please click 'Resend OTP'."
-        });
-      }
-
-      if (Date.now() > stored.expiresAt) {
-        emailOtpStore.delete(normalizedEmail);
-        return res.status(400).json({
-          success: false,
-          error: "Verification code has expired. Please click 'Resend OTP'."
-        });
-      }
-
-      if (stored.attempts >= 5) {
-        emailOtpStore.delete(normalizedEmail);
-        return res.status(400).json({
-          success: false,
-          error: "Too many incorrect attempts. Please request a new verification code."
-        });
-      }
-
-      stored.attempts += 1;
-
-      if (stored.otp !== userEnteredOtp) {
-        return res.status(400).json({
-          success: false,
-          error: "Invalid 6-digit verification code. Please check the code sent to your email."
-        });
-      }
-
-      // Successful verification
-      emailOtpStore.delete(normalizedEmail);
-      console.log(`[Email OTP] Successfully verified email: ${normalizedEmail}`);
-
-      return res.json({
-        success: true,
-        verified: true,
-        email: normalizedEmail,
-        message: "✓ Email address successfully verified."
-      });
-    } catch (err: any) {
-      console.error("[Email OTP Verify Error]:", err);
-      return res.status(500).json({
-        success: false,
-        error: `Failed to verify email OTP: ${err.message || err}`
-      });
-    }
-  });
 
   // =========================================================================
   // SMS OTP AUTHENTICATION ENGINE FOR PORTALS (VENDOR, HOST, DAYCARE / CARE)
@@ -3925,14 +3822,28 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
 
       const smsText = `Vernunt Alert: Hi ${targetName}, your profile & verification have been APPROVED by admin! Log in now to access playdates & activities: ${userLoginLink}`;
 
-      // In production, dispatch via SendGrid/Twilio/MSG91 if credentials are provided
+      let emailResult = { success: true, previewUrl: undefined as string | undefined };
+      if (email && email.includes('@')) {
+        const adminInstance = await getFirebaseAdmin();
+        emailResult = await sendEmailMessage({
+          to: email,
+          subject: emailSubject,
+          type: 'profile_approved',
+          textContent: emailContent,
+          htmlContent: `<p>Hello <strong>${targetName}</strong>,</p><p>Great news! Your <strong>${targetRole}</strong> profile and biometric verification on Vernunt have been officially approved by our community administration team.</p><p><a href="${userLoginLink}" style="display:inline-block;padding:12px 24px;background:#be123c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Log In to Your Vernunt Account</a></p>`,
+          adminInstance
+        });
+      }
+
       return res.json({
         success: true,
+        previewUrl: emailResult.previewUrl,
         dispatched: {
           email: {
             to: email || "user@example.com",
             subject: emailSubject,
             status: "delivered",
+            previewUrl: emailResult.previewUrl,
             timestamp: new Date().toISOString()
           },
           sms: {
@@ -3971,7 +3882,17 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       console.log(`[Ticket Notification Engine] 📧 Dispatching E-Ticket Pass Email to ${targetEmail} for #${passId}`);
 
       const subject = `🎟️ Official Admission Pass #${passId}: ${eventTitle}`;
-      const emailBodyText = `Hi ${targetName},\n\nYour event booking is confirmed for "${eventTitle}".\n\nDate: ${eventDate}\nTime: ${eventTime}\nVenue: ${eventVenue}\nPass ID: #${passId}\nAmount Paid: ₹${booking?.amountPaid || 0} (Razorpay)\n\nView and download your digital PDF pass and gate QR code here:\n${viewUrl}\n\nSee you at the event!\n- Team Vernunt`;
+      const emailBodyText = `Hi ${targetName},\n\nYour event booking is confirmed for "${eventTitle}".\n\nDate: ${eventDate}\nTime: ${eventTime}\nVenue: ${eventVenue}\nPass ID: #${passId}\nAmount Paid: ₹${booking?.amountPaid || 0}\n\nView and download your digital PDF pass and gate QR code here:\n${viewUrl}\n\nSee you at the event!\n- Team Vernunt`;
+
+      const adminInstance = await getFirebaseAdmin();
+      const sendResult = await sendEmailMessage({
+        to: targetEmail,
+        subject,
+        type: 'event_ticket',
+        textContent: emailBodyText,
+        htmlContent: `<p>Hi <strong>${targetName}</strong>,</p><p>Your event booking is confirmed for <strong>${eventTitle}</strong>!</p><div style="background:#f8fafc;padding:16px;border-radius:12px;margin:16px 0;"><p><strong>Pass ID:</strong> #${passId}</p><p><strong>Date & Time:</strong> ${eventDate} • ${eventTime}</p><p><strong>Venue:</strong> ${eventVenue}</p></div><p><a href="${viewUrl}" style="display:inline-block;padding:12px 24px;background:#be123c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">View Digital Pass &amp; QR Code</a></p>`,
+        adminInstance
+      });
 
       return res.json({
         success: true,
@@ -3980,6 +3901,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
         subject,
         bodyText: emailBodyText,
         viewUrl,
+        previewUrl: sendResult.previewUrl,
         message: `E-Ticket Pass and PDF download link delivered to ${targetEmail}.`,
         timestamp: new Date().toISOString()
       });
@@ -4658,7 +4580,8 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   // VITE DEV SERVER OR STATIC PRODUCTION BUILD HOSTING
   // =========================================================================
   const distPath = path.join(process.cwd(), "dist");
-  const isProduction = process.env.NODE_ENV === "production" || (process.env.NODE_ENV !== "development" && fs.existsSync(path.join(distPath, "index.html")));
+  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION);
+  const isProduction = process.env.NODE_ENV === "production" && isCloudRun;
 
   if (!isProduction) {
     const { createServer: createViteServer } = await import("vite");
@@ -4698,12 +4621,13 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  // On Google Cloud Run (identified by K_SERVICE or NODE_ENV=production) or when dist/index.html is served, honor process.env.PORT.
-  // In AI Studio local dev environment, port 3000 is required because Nginx proxies 8080 -> 3000.
-  const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION || process.env.NODE_ENV === "production" || isProduction);
-  const port = isCloudRun && process.env.PORT
-    ? parseInt(process.env.PORT, 10) || 8080
-    : 3000;
+  // Determine port:
+  // 1. If --port argument is passed (AI Studio dev server launcher), use it.
+  // 2. If running on Cloud Run (K_SERVICE or K_REVISION), honor process.env.PORT (defaults to 8080).
+  // 3. In AI Studio local dev environment, port 3000 is required because Nginx proxies 8080 -> 3000.
+  const portArgIndex = process.argv.indexOf("--port");
+  const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? parseInt(process.argv[portArgIndex + 1], 10) : null;
+  const port = cliPort || (isCloudRun && process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
 
   const server = app.listen(port, "0.0.0.0", () => {
     console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${port}`);

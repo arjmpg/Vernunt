@@ -731,7 +731,7 @@ export const GoogleSearchConsoleAndMerchantModal: React.FC<GoogleSearchConsoleAn
                   </h4>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  In strict compliance with the <strong>Digital Personal Data Protection (DPDP) Act 2023</strong> of India and the <strong>Children's Online Privacy Protection Act (COPPA)</strong>, sensitive child and guardian information is never indexed or shared with search engines.
+                  In strict compliance with the <strong>Digital Personal Data Protection (DPDP) Act 2023</strong> of India and the <strong>Children's Online Privacy Protection Act (COPPA)</strong>, sensitive child and parent information is never indexed or shared with search engines.
                 </p>
               </div>
 

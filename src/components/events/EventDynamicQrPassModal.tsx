@@ -994,7 +994,7 @@ export default function EventDynamicQrPassModal({
         id: matchedBooking.id,
         ticketNumber: matchedBooking.ticketNumber || `VERN-EVT-${matchedBooking.id.slice(-4)}`,
         attendeeName: matchedBooking.childName || matchedBooking.buyerName || 'Attendee',
-        parentName: matchedBooking.buyerName || userProfile?.parentName || 'Parent Guardian',
+        parentName: matchedBooking.buyerName || userProfile?.parentName || 'Parent',
         phone: matchedBooking.buyerPhone || userProfile?.phone || '+91 98201 44821',
         tier: matchedBooking.tierName || 'Confirmed Admission Ticket',
         status: 'checked-in',
@@ -1382,7 +1382,7 @@ export default function EventDynamicQrPassModal({
       'Index',
       'Ticket Number',
       'Attendee Name',
-      'Parent / Guardian',
+      'Parent',
       'Phone Number',
       'Pass Tier',
       'Status',
@@ -1925,7 +1925,7 @@ export default function EventDynamicQrPassModal({
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Parent / Guardian</label>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Parent</label>
                       <input
                         type="text"
                         value={parentName}

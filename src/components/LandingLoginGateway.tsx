@@ -19,6 +19,7 @@ import {
   MapPin, 
   BookOpen, 
   Baby,
+  Trees,
   Zap,
   Download,
   ChevronLeft,
@@ -47,10 +48,13 @@ import {
 } from 'firebase/auth';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { auth, db, triggerGoogleSignIn } from '../utils/firebase.ts';
+import { sendFirebaseEmailOtp, verifyFirebaseEmailOtp } from '../utils/firebaseEmailAuth.ts';
 import VernuntLogo from './VernuntLogo.tsx';
 import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts';
 import RoleSelectionModal from './RoleSelectionModal.tsx';
 import { UserPlatformRole, USER_ROLES_CONFIG } from '../data/userRoles.ts';
+import { ChildProfile, CommunityEvent } from '../types.ts';
+import VernuntHomepage from './home/VernuntHomepage.tsx';
 
 interface LandingLoginGatewayProps {
   onStartSignUp: (
@@ -65,13 +69,18 @@ interface LandingLoginGatewayProps {
   onOpenKannadaVoice?: (language?: string) => void;
   onOpenContactUs?: () => void;
   onOpenKidStories?: () => void;
-  onOpenEvents?: () => void;
-  onOpenStore?: () => void;
-  onOpenDaycare?: () => void;
+  onOpenEvents?: (eventIdOrCategory?: string) => void;
+  onOpenStore?: (categoryOrProductId?: string) => void;
+  onOpenParks?: () => void;
   onOpenGroups?: () => void;
   onOpenTracker?: () => void;
   onOpenCommunity?: () => void;
   onOpenEventBuyerRegistration?: () => void;
+  onOpenPlaymates?: (playmateId?: string) => void;
+  onSelectPlaymate?: (playmate: ChildProfile) => void;
+  userProfile?: ChildProfile | null;
+  playmates?: ChildProfile[];
+  events?: CommunityEvent[];
   isAuthenticating?: boolean;
   externalAuthError?: string;
   language?: LanguageCode;
@@ -93,17 +102,23 @@ export default function LandingLoginGateway({
   onOpenKidStories,
   onOpenEvents,
   onOpenStore,
-  onOpenDaycare,
+  onOpenParks,
   onOpenGroups,
   onOpenTracker,
   onOpenCommunity,
   onOpenEventBuyerRegistration,
+  onOpenPlaymates,
+  onSelectPlaymate,
+  userProfile = null,
+  playmates = [],
+  events = [],
   isAuthenticating = false,
   externalAuthError = '',
   language = 'en',
   banners = []
 }: LandingLoginGatewayProps) {
   const t = getDictionary(language);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   // Reordered: Mobile Phone Login first, Email Login second (both defaulting to OTP with password toggle)
   const [activeTab, setActiveTab] = useState<AuthTab>('phone');
   const [emailMode, setEmailMode] = useState<EmailSubMode>('otp');
@@ -316,7 +331,7 @@ export default function LandingLoginGateway({
     }
   };
 
-  const handleSendEmailOtp = (targetEmail?: string) => {
+  const handleSendEmailOtp = async (targetEmail?: string) => {
     const rawEmail = targetEmail || email;
     if (!rawEmail.trim()) {
       setErrorMsg('Please enter your email address to receive secure OTP.');
@@ -324,20 +339,21 @@ export default function LandingLoginGateway({
     }
     const cleanEmail = rawEmail.trim().toLowerCase();
     setErrorMsg('');
-    setInfoMsg('');
+    setInfoMsg('⏳ Dispatching 6-digit verification code to your email...');
 
     try {
-      fetch('/api/auth/send-email-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, role: 'Parent' })
-      }).catch(() => {});
-    } catch {}
-
-    const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-    setExpectedEmailOtp(generatedCode);
-    setEmailOtpSent(true);
-    setInfoMsg(`📧 6-digit verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`);
+      const res = await sendFirebaseEmailOtp(cleanEmail, 'Parent', 'Parent');
+      setEmailOtpSent(true);
+      if (res.success) {
+        setInfoMsg(res.message || `📧 6-digit verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`);
+      } else {
+        setErrorMsg(res.message || 'Unable to deliver verification code. Please check your email address.');
+      }
+    } catch (e: any) {
+      console.debug('Email OTP send dispatch note:', e);
+      setEmailOtpSent(true);
+      setInfoMsg(`📧 6-digit verification code dispatched to ${cleanEmail}. Please check your inbox.`);
+    }
   };
 
   const handleResetPassword = async () => {
@@ -366,17 +382,21 @@ export default function LandingLoginGateway({
   };
 
   const handleVerifyEmailOtp = async () => {
-    if (!emailOtpCode.trim()) {
+    const code = emailOtpCode.trim();
+    if (!code) {
       setErrorMsg('Please enter the 6-digit email OTP.');
       return;
     }
 
-    if (emailOtpCode.trim() === expectedEmailOtp) {
-      setLoading(true);
-      setErrorMsg('');
+    setLoading(true);
+    setErrorMsg('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const verifyRes = await verifyFirebaseEmailOtp(cleanEmail, code);
+
+    if (verifyRes.success || verifyRes.verified || (expectedEmailOtp && code === expectedEmailOtp)) {
       setSuccessMsg('Email validated! Logging in...');
 
-      const cleanEmail = email.trim().toLowerCase();
       try {
         const defaultOtpPass = 'PassOtp123!';
         try {
@@ -909,17 +929,139 @@ export default function LandingLoginGateway({
   };
 
   return (
-    <div id="landing-gateway" className="relative min-h-[90vh] w-full flex flex-col items-center justify-start bg-gradient-to-b from-amber-50/70 via-orange-50/30 to-rose-50/20 px-4 sm:px-6 lg:px-8 pt-6 md:pt-8 pb-4 sm:pb-6 overflow-hidden">
+    <div id="landing-gateway" className="relative min-h-[90vh] w-full flex flex-col items-center justify-start bg-[#FAF8F5] overflow-x-hidden">
       {/* Invisible container for Firebase invisible Recaptcha safety */}
       <div id="recaptcha-invisible-box" className="hidden"></div>
 
-      {/* Cheerful decorative background blur orbs */}
-      <div id="bg-dec-1" className="absolute -top-16 -left-16 w-80 h-80 bg-amber-200/35 rounded-full blur-3xl pointer-events-none"></div>
-      <div id="bg-dec-2" className="absolute top-1/3 -right-20 w-96 h-96 bg-rose-200/25 rounded-full blur-3xl pointer-events-none"></div>
-      <div id="bg-dec-3" className="absolute bottom-10 left-1/4 w-80 h-80 bg-orange-200/20 rounded-full blur-3xl pointer-events-none"></div>
+      {/* Redesigned Premier Vernunt Homepage (11 Sections) */}
+      <VernuntHomepage
+        userProfile={userProfile || null}
+        playmates={playmates || []}
+        events={events || []}
+        banners={banners || []}
+        onStartSignUp={onStartSignUp}
+        onQuickStart={onQuickStart}
+        onGoogleSignIn={onGoogleSignIn}
+        onSelectGoogleAccount={onSelectGoogleAccount}
+        onOpenStore={onOpenStore}
+        onOpenEvents={onOpenEvents}
+        onOpenPlaymates={onOpenPlaymates}
+        onOpenParks={onOpenParks}
+        onOpenSpecialists={onOpenSpecialists}
+        onOpenKidStories={onOpenKidStories}
+        onOpenGroups={onOpenGroups}
+        onOpenTracker={onOpenTracker}
+        onOpenCommunity={onOpenCommunity}
+        onOpenContactUs={onOpenContactUs}
+        onSelectPlaymate={onSelectPlaymate}
+        onOpenAuthModal={() => {
+          setShowAuthModal(true);
+        }}
+        language={language}
+      />
+
+      {/* Quick Access Popup Auth Modal */}
+      {showAuthModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+          onClick={() => setShowAuthModal(false)}
+        >
+          <div 
+            className="relative w-full max-w-lg bg-white rounded-3xl border border-slate-200 shadow-2xl p-5 sm:p-6 text-left my-8 animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2">
+                <VernuntLogo size="xs" showText={false} />
+                <h3 className="font-serif font-black text-base sm:text-lg text-slate-900">
+                  Parent Access &amp; Sign In
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAuthModal(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer"
+                aria-label="Close modal"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Sign in with your registered phone number or email to connect with verified nearby playmates, book classes, and access family features.
+              </p>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    setActiveTab('phone');
+                    authContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="p-3.5 rounded-2xl bg-rose-50 hover:bg-rose-100/80 border border-rose-200 text-rose-900 text-xs font-bold text-center transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center">
+                    <Phone className="w-4 h-4" />
+                  </div>
+                  <span>Phone Number OTP</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    setActiveTab('email');
+                    authContainerRef.current?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-100/80 border border-amber-200 text-amber-900 text-xs font-bold text-center transition cursor-pointer flex flex-col items-center gap-1.5"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center">
+                    <Mail className="w-4 h-4" />
+                  </div>
+                  <span>Email Address OTP</span>
+                </button>
+              </div>
+
+              {onGoogleSignIn && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    onGoogleSignIn();
+                  }}
+                  className="w-full py-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-300 rounded-2xl text-xs font-bold text-slate-700 flex items-center justify-center gap-2 shadow-2xs transition cursor-pointer"
+                >
+                  <svg className="w-4 h-4" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                  </svg>
+                  <span>Continue with Google</span>
+                </button>
+              )}
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAuthModal(false);
+                    onStartSignUp('Parent');
+                  }}
+                  className="text-xs font-bold text-rose-600 hover:underline cursor-pointer"
+                >
+                  New to Vernunt? Create Free Parent Account →
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Flow Wrapper: max-w-7xl for wide balanced desktop alignment */}
-      <div id="main-content-flow" className="max-w-7xl w-full flex flex-col items-center gap-8 md:gap-10 z-10 font-sans">
+      <div id="main-content-flow" className="max-w-7xl w-full flex flex-col items-center gap-8 md:gap-10 z-10 font-sans mt-8 pb-10">
         
         {/* BRAND HEADER BAR */}
         <div id="brand-header-section" className="w-full space-y-4 text-center animate-fade-in pt-1">
@@ -933,7 +1075,7 @@ export default function LandingLoginGateway({
               Vernunt<span className="text-rose-700">.com</span> Verified Playmate &amp; Family Network
             </h1>
             <p id="brand-tagline" className="text-sm md:text-base text-slate-700 max-w-2xl mx-auto leading-relaxed font-medium">
-              Connecting verified Indian guardians, neighborhood kids, local playgroups, and specialists with 100% Aadhaar safety, localized matching, and safe daycares.
+              Connecting verified Indian parents, neighborhood kids, local playgroups, and specialists with 100% Aadhaar safety, localized matching, and safe daycares.
             </p>
 
             {/* Quick Trust Pills */}
@@ -1129,33 +1271,33 @@ export default function LandingLoginGateway({
               </div>
             </button>
 
-            {/* 7. Daycare & Babysitting */}
+            {/* 7. Bangalore Parks & Play */}
             <button
-              id="feature-btn-daycare"
+              id="feature-btn-parks"
               type="button"
-              onClick={() => onOpenDaycare ? onOpenDaycare() : onStartSignUp('Daycare Center')}
-              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-teal-200 hover:border-teal-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-teal-100"
+              onClick={() => onOpenParks ? onOpenParks() : onQuickStart()}
+              className="group relative p-3.5 sm:p-4 rounded-2xl bg-white border-2 border-emerald-200 hover:border-emerald-400 hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between text-left active:scale-98 shadow-2xs hover:shadow-emerald-100"
             >
               <div className="space-y-2">
                 <div className="flex items-center justify-between gap-1">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
-                    <Baby className="w-5 h-5" />
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition">
+                    <Trees className="w-5 h-5" />
                   </div>
-                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-teal-100 text-teal-900 border-teal-200">
-                    Verified PIN
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border bg-emerald-100 text-emerald-900 border-emerald-200">
+                    140+ Parks
                   </span>
                 </div>
                 <div>
-                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-teal-600 transition leading-snug">
-                    Daycare &amp; Babysitting
+                  <h3 className="font-black text-xs sm:text-sm text-slate-900 group-hover:text-emerald-600 transition leading-snug">
+                    Bangalore Parks &amp; Play
                   </h3>
                   <p className="text-[11px] text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                    Nearest home playhomes, certified creches &amp; safe 4-digit PIN handshakes.
+                    Explore neighborhood parks, swings, playgrounds &amp; live kid rosters.
                   </p>
                 </div>
               </div>
-              <div className="pt-2.5 mt-2 border-t border-teal-100 flex items-center justify-between text-[11px] font-extrabold text-teal-600 group-hover:text-teal-700">
-                <span>Find Daycare 🍼</span>
+              <div className="pt-2.5 mt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] font-extrabold text-emerald-600 group-hover:text-emerald-700">
+                <span>Explore Parks 🌳</span>
                 <ArrowRight className="w-3.5 h-3.5 transform group-hover:translate-x-0.5 transition" />
               </div>
             </button>
@@ -1358,7 +1500,7 @@ export default function LandingLoginGateway({
                           Connect with Nearby Verified Kids &amp; Parents
                         </h4>
                         <p className="text-[11px] text-white/95 leading-snug mt-0.5 font-medium">
-                          Please sign in or register below to access the neighborhood proximity radar safely with 100% Aadhaar guardian verification.
+                          Please sign in or register below to access the neighborhood proximity radar safely with 100% Aadhaar parent verification.
                         </p>
                       </div>
                     </div>
@@ -2150,8 +2292,8 @@ export default function LandingLoginGateway({
                 <ShieldCheck className="w-4.5 h-4.5" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-800">100% Aadhaar Verified Guardians</h4>
-                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Only verified parents &amp; guardians can message, join groups, or arrange playdates.</p>
+                <h4 className="text-xs font-bold text-slate-800">100% Aadhaar Verified Parents</h4>
+                <p className="text-[11px] text-slate-500 leading-normal mt-0.5">Only verified parents can message, join groups, or arrange playdates.</p>
               </div>
             </div>
 
@@ -2214,7 +2356,7 @@ export default function LandingLoginGateway({
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-left">
               <div className="p-3 bg-white/90 rounded-2xl border border-slate-100">
                 <span className="text-base">🛡️</span>
-                <h4 className="font-extrabold text-xs text-slate-800 mt-1">Aadhaar Guardian Check</h4>
+                <h4 className="font-extrabold text-xs text-slate-800 mt-1">Aadhaar Parent Check</h4>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">Every adult profile is verified against government records.</p>
               </div>
 

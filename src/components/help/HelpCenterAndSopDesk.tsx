@@ -196,7 +196,7 @@ export const HelpCenterAndSopDesk: React.FC<HelpCenterAndSopDeskProps> = ({
           heading: '1. Digital Personal Data Protection (DPDP) Act 2023 Compliance',
           steps: [
             'Zero Advertising & Zero Third-Party Tracking: Vernunt does not sell parental or child behavioral data.',
-            'Parental Consent: All child profiles require verified parent/guardian consent.',
+            'Parental Consent: All child profiles require verified Parent consent.',
             'Right to Erasure: Parents can export or delete their entire account and family records at any time from Profile Privacy Settings.'
           ]
         },

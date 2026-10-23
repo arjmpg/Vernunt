@@ -1,4 +1,5 @@
-import type { StoreProduct, CartItem } from '../types/store.ts';
+import type { StoreProduct, CartItem, DimensionalShippingRules } from '../types/store.ts';
+import { DEFAULT_DIMENSIONAL_SHIPPING_RULES } from '../types/store.ts';
 import type { VendorProfile } from '../types/vendor.ts';
 
 // Major Regional Indian PIN code clusters
@@ -89,6 +90,194 @@ export function getEstimatedDeliveryDate(days: number): string {
     month: 'short',
     day: 'numeric'
   });
+}
+
+export interface CartShippingCalculation {
+  totalDeadWeightGrams: number;
+  totalDeadWeightKg: number;
+  packageDimensions: { length: number; width: number; height: number };
+  volumetricWeightGrams: number;
+  volumetricWeightKg: number;
+  chargeableWeightGrams: number;
+  chargeableWeightKg: number;
+  pincode: string;
+  zoneName: string;
+  zoneDescription: string;
+  baseCharge: number;
+  weightCharge: number;
+  oversizeCharge: number;
+  totalShippingFee: number;
+  isFreeShipping: boolean;
+  freeShippingThreshold: number;
+  isCustomPincodeRate: boolean;
+}
+
+export const STORAGE_KEY_SHIPPING_RULES = 'vernunt_dimensional_shipping_rules_v2';
+
+export function getStoredShippingRules(): DimensionalShippingRules {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_SHIPPING_RULES);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      return { ...DEFAULT_DIMENSIONAL_SHIPPING_RULES, ...parsed };
+    }
+  } catch (e) {
+    console.debug('Failed to parse stored shipping rules:', e);
+  }
+  return DEFAULT_DIMENSIONAL_SHIPPING_RULES;
+}
+
+export function saveStoredShippingRules(rules: DimensionalShippingRules): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_SHIPPING_RULES, JSON.stringify(rules));
+  } catch (e) {
+    console.error('Failed to save shipping rules:', e);
+  }
+}
+
+/**
+ * Calculates dynamic shipping charges based on actual product weight,
+ * volumetric package dimensions (L × B × H), and customer destination PIN code.
+ */
+export function calculateCartDimensionalShipping(
+  cart: CartItem[],
+  pincode: string,
+  rulesOverride?: DimensionalShippingRules,
+  cartSubtotalOverride?: number
+): CartShippingCalculation {
+  const rules = rulesOverride || getStoredShippingRules();
+  const cleanPin = cleanPincode(pincode);
+
+  // 1. Calculate Total Dead Weight from products
+  let totalDeadWeightGrams = 0;
+  let maxLength = 0;
+  let maxWidth = 0;
+  let totalHeight = 0;
+  let totalSubtotal = cartSubtotalOverride ?? 0;
+
+  cart.forEach(item => {
+    const qty = item.quantity || 1;
+    const prod = item.product;
+    const weightPerUnit = prod?.weightGrams && prod.weightGrams > 0 ? prod.weightGrams : 450;
+    totalDeadWeightGrams += (weightPerUnit * qty);
+
+    const l = prod?.dimensionsCm?.length || 20;
+    const w = prod?.dimensionsCm?.width || 15;
+    const h = prod?.dimensionsCm?.height || 8;
+
+    maxLength = Math.max(maxLength, l);
+    maxWidth = Math.max(maxWidth, w);
+    totalHeight += (h * qty);
+
+    if (cartSubtotalOverride === undefined) {
+      totalSubtotal += (item.totalPrice || (item.unitPrice * qty));
+    }
+  });
+
+  if (maxLength === 0) maxLength = 20;
+  if (maxWidth === 0) maxWidth = 15;
+  if (totalHeight === 0) totalHeight = 10;
+  if (totalDeadWeightGrams === 0) totalDeadWeightGrams = 500;
+
+  // 2. Volumetric Weight (cm³ / 5000 = kg)
+  const divisor = rules.volumetricDivisor || 5000;
+  const volWeightKg = (maxLength * maxWidth * totalHeight) / divisor;
+  const volumetricWeightGrams = Math.round(volWeightKg * 1000);
+
+  // 3. Chargeable Weight is max of dead weight vs volumetric
+  const chargeableWeightGrams = Math.max(totalDeadWeightGrams, volumetricWeightGrams);
+  const chargeableWeightKg = Number((chargeableWeightGrams / 1000).toFixed(2));
+
+  // 4. Determine Zone and Base Charge from PIN Code
+  let baseCharge = rules.baseRateNational;
+  let zoneName = 'National Zone';
+  let zoneDescription = 'Rest of India Standard Surface';
+  let isCustomPincodeRate = false;
+
+  if (rules.customPincodeRates && cleanPin && rules.customPincodeRates[cleanPin] !== undefined) {
+    baseCharge = rules.customPincodeRates[cleanPin];
+    zoneName = `Custom PIN (${cleanPin})`;
+    zoneDescription = `Special Admin Configured Rate for PIN ${cleanPin}`;
+    isCustomPincodeRate = true;
+  } else if (cleanPin.startsWith('560')) {
+    baseCharge = rules.baseRateLocal;
+    zoneName = 'Local Bengaluru Hub';
+    zoneDescription = 'Local Hub Delivery (Within 24 Hours)';
+  } else if (
+    cleanPin.startsWith('57') || cleanPin.startsWith('58') || // Karnataka
+    (Number(cleanPin.slice(0, 2)) >= 60 && Number(cleanPin.slice(0, 2)) <= 64) || // Tamil Nadu
+    (Number(cleanPin.slice(0, 2)) >= 50 && Number(cleanPin.slice(0, 2)) <= 53) || // Telangana / AP
+    (Number(cleanPin.slice(0, 2)) >= 67 && Number(cleanPin.slice(0, 2)) <= 69)    // Kerala
+  ) {
+    baseCharge = rules.baseRateRegional;
+    zoneName = 'South India Regional';
+    zoneDescription = 'Regional Priority Surface & Air';
+  } else if (
+    cleanPin.startsWith('110') || // Delhi
+    cleanPin.startsWith('400') || // Mumbai
+    cleanPin.startsWith('700') || // Kolkata
+    cleanPin.startsWith('411') || // Pune
+    cleanPin.startsWith('380')    // Ahmedabad
+  ) {
+    baseCharge = rules.baseRateMetro;
+    zoneName = 'Tier-1 Metro Network';
+    zoneDescription = 'Priority Metro Air Dispatch';
+  } else if (
+    cleanPin.startsWith('79') || cleanPin.startsWith('19') || cleanPin.startsWith('18') || cleanPin.startsWith('737')
+  ) {
+    baseCharge = rules.baseRateSpecial;
+    zoneName = 'Remote / Hills / NE Zone';
+    zoneDescription = 'Special Terrain Logistics';
+  } else {
+    baseCharge = rules.baseRateNational;
+    zoneName = 'National Interstate';
+    zoneDescription = 'Standard All-India Express Transport';
+  }
+
+  // 5. Incremental Weight Charge
+  let weightCharge = 0;
+  const baseWeightGrams = rules.baseWeightGrams || 500;
+  const stepGrams = rules.additionalWeightStepGrams || 500;
+  const stepRate = rules.additionalRatePerStep || 25;
+
+  if (chargeableWeightGrams > baseWeightGrams) {
+    const extraGrams = chargeableWeightGrams - baseWeightGrams;
+    const steps = Math.ceil(extraGrams / stepGrams);
+    weightCharge = steps * stepRate;
+  }
+
+  // 6. Oversize Dimension Surcharge
+  let oversizeCharge = 0;
+  const oversizeThreshold = rules.oversizeLengthThresholdCm || 40;
+  if (maxLength > oversizeThreshold || maxWidth > oversizeThreshold || totalHeight > oversizeThreshold) {
+    oversizeCharge = rules.oversizeSurcharge || 30;
+  }
+
+  // 7. Free Shipping Check
+  const freeThreshold = rules.freeShippingThreshold || 499;
+  const isFreeShipping = totalSubtotal >= freeThreshold;
+  const rawTotal = baseCharge + weightCharge + oversizeCharge;
+  const totalShippingFee = isFreeShipping ? 0 : rawTotal;
+
+  return {
+    totalDeadWeightGrams,
+    totalDeadWeightKg: Number((totalDeadWeightGrams / 1000).toFixed(2)),
+    packageDimensions: { length: maxLength, width: maxWidth, height: totalHeight },
+    volumetricWeightGrams,
+    volumetricWeightKg: Number((volumetricWeightGrams / 1000).toFixed(2)),
+    chargeableWeightGrams,
+    chargeableWeightKg,
+    pincode: cleanPin || '560102',
+    zoneName,
+    zoneDescription,
+    baseCharge,
+    weightCharge,
+    oversizeCharge,
+    totalShippingFee,
+    isFreeShipping,
+    freeShippingThreshold: freeThreshold,
+    isCustomPincodeRate
+  };
 }
 
 /**

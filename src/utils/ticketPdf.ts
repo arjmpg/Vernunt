@@ -187,7 +187,7 @@ export async function generateTicketPdfDoc({ booking, event, qrCodeDataUrl }: Ti
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(100, 116, 139);
   doc.text('ATTENDING CHILD:', margin + 12, currentY + 7);
-  doc.text('PARENT / GUARDIAN:', margin + (contentWidth / 2), currentY + 7);
+  doc.text('Parent:', margin + (contentWidth / 2), currentY + 7);
 
   doc.setFontSize(9.5);
   doc.setTextColor(15, 23, 42);

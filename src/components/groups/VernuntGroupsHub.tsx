@@ -879,7 +879,7 @@ export function VernuntGroupsHub({
       genderRestriction: newGroupGender,
       creatorId: currentUserId,
       creatorName: currentUserName,
-      creatorRole: userProfile?.childName ? `${userProfile.childName}'s Parent` : 'Vernunt Guardian',
+      creatorRole: userProfile?.childName ? `${userProfile.childName}'s Parent` : 'Vernunt Parent',
       creatorGender: currentUserGender,
       createdAt: 'Today',
       rules: newGroupRules,

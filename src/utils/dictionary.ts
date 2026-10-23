@@ -44,7 +44,8 @@ export interface Dictionary {
   
   // Registration Hub
   registerFamilyProfile: string;
-  parentGuardianName: string;
+  parentName: string;
+  parentParentName?: string;
   childName: string;
   primaryCityNeighborhood: string;
   verifyMobileNumber: string;
@@ -89,7 +90,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'Explore Vernunt',
     customSignUp: 'Register your profile',
     registerFamilyProfile: 'Register Family Profile',
-    parentGuardianName: 'Parent or Guardian Name',
+    parentName: 'Parents Full Name',
+    parentParentName: 'Parents Full Name',
     childName: 'Child Name',
     primaryCityNeighborhood: 'Primary City or Neighborhood',
     verifyMobileNumber: 'Verify Your Mobile Number (SMS OTP)',
@@ -132,7 +134,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'ऐप एक्सप्लोर करें',
     customSignUp: 'अपना प्रोफाइल पंजीकृत करें',
     registerFamilyProfile: 'पारिवारिक प्रोफाइल पंजीकृत करें',
-    parentGuardianName: 'अभिभावक का नाम',
+    parentName: 'माता-पिता का नाम',
+    parentParentName: 'माता-पिता का नाम',
     childName: 'बच्चे का नाम',
     primaryCityNeighborhood: 'प्राथमिक शहर या इलाका',
     verifyMobileNumber: 'अपना मोबाइल नंबर सत्यापित करें (एसएमएस ओटीपी)',
@@ -175,7 +178,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'ವರ್ನಂಟ್ ಅನ್ವೇಷಿಸಿ',
     customSignUp: 'ಪ್ರೊಫೈಲ್ ನೋಂದಾಯಿಸಿ',
     registerFamilyProfile: 'ಕುಟುಂಬ ಪ್ರೊಫೈಲ್ ನೋಂದಣಿ',
-    parentGuardianName: 'ಪೋಷಕರ ಅಥವಾ ಪಾಲಕರ ಹೆಸರು',
+    parentName: 'ಪೋಷಕರ ಹೆಸರು',
+    parentParentName: 'ಪೋಷಕರ ಹೆಸರು',
     childName: 'ಮಗುವಿನ ಹೆಸರು',
     primaryCityNeighborhood: 'ನಗರ ಅಥವಾ ನೆರೆಹೊರೆ',
     verifyMobileNumber: 'ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ಪರಿಶೀಲಿಸಿ (SMS OTP)',
@@ -218,7 +222,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'பயன்பாட்டை ஆராயுங்கள்',
     customSignUp: 'உங்கள் சுயவிவரத்தை பதிவு செய்யவும்',
     registerFamilyProfile: 'குடும்ப சுயவிவரத்தை பதிவு செய்யவும்',
-    parentGuardianName: 'பெற்றோர் அல்லது பாதுகாவலர் பெயர்',
+    parentName: 'பெற்றோர் பெயர்',
+    parentParentName: 'பெற்றோர் பெயர்',
     childName: 'குழந்தையின் பெயர்',
     primaryCityNeighborhood: 'முக்கிய நகரம் அல்லது வட்டாரம்',
     verifyMobileNumber: 'உங்கள் மொபைல் எண்ணை சரிபார்க்கவும் (எஸ்எம்எஸ் ஓடிபி)',
@@ -261,7 +266,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'యాప్ అన్వేషించండి',
     customSignUp: 'ప్రొఫైల్ నమోదు చేసుకోండి',
     registerFamilyProfile: 'కుటుంబ ప్రొఫైల్ నమోదు',
-    parentGuardianName: 'తల్లిదండ్రుల లేదా సంరక్షకుని పేరు',
+    parentName: 'తల్లిదండ్రుల పేరు',
+    parentParentName: 'తల్లిదండ్రుల పేరు',
     childName: 'పిల్లల పేరు',
     primaryCityNeighborhood: 'నగరం లేదా ప్రాంతం',
     verifyMobileNumber: 'మొబైల్ సంఖ్య ధృవీకరించండి (SMS OTP)',
@@ -304,7 +310,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'ആപ്പ് പര്യവേക്ഷണം ചെയ്യുക',
     customSignUp: 'പ്രൊഫൈൽ രജിസ്റ്റർ ചെയ്യുക',
     registerFamilyProfile: 'കുടുംബ പ്രൊഫൈൽ രജിസ്റ്റർ ചെയ്യുക',
-    parentGuardianName: 'രക്ഷാകർത്താവിന്റെ പേര്',
+    parentName: 'മാതാപിതാക്കളുടെ പേര്',
+    parentParentName: 'മാതാപിതാക്കളുടെ പേര്',
     childName: 'കുട്ടിയുടെ പേര്',
     primaryCityNeighborhood: 'നഗരം അല്ലെങ്കിൽ പ്രദേശം',
     verifyMobileNumber: 'മൊബൈൽ നമ്പർ പരിശോധിക്കുക (SMS OTP)',
@@ -347,7 +354,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'अ‍ॅप एक्सप्लोर करा',
     customSignUp: 'प्रोफाइल नोंदणी करा',
     registerFamilyProfile: 'कौटुंबिक प्रोफाइल नोंदणी',
-    parentGuardianName: 'पालकांचे नाव',
+    parentName: 'पालकांचे नाव',
+    parentParentName: 'पालकांचे नाव',
     childName: 'मुलाचे नाव',
     primaryCityNeighborhood: 'शहर किंवा परिसर',
     verifyMobileNumber: 'मोबाइल नंबर पडताळा (SMS OTP)',
@@ -390,7 +398,8 @@ export const BASE_DICTIONARIES: Record<'en' | 'hi' | 'kn' | 'ta' | 'te' | 'ml' |
     exploreApp: 'অ্যাপ ঘুরে দেখুন',
     customSignUp: 'প্রোফাইল নিবন্ধন করুন',
     registerFamilyProfile: 'পারিবারিক প্রোফাইল নিবন্ধন',
-    parentGuardianName: 'অভিভাবকের নাম',
+    parentName: 'পিতা-মাতার নাম',
+    parentParentName: 'পিতা-মাতার নাম',
     childName: 'শিশুর নাম',
     primaryCityNeighborhood: 'শহর বা এলাকা',
     verifyMobileNumber: 'মোবাইল নম্বর যাচাই করুন (SMS OTP)',

@@ -3,7 +3,8 @@ import { ChildProfile } from '../types.ts';
 import { 
   SlidersHorizontal, ChevronDown, Search, RotateCcw, 
   Clock, UserCheck, Bookmark, Sparkles, Navigation,
-  ShieldCheck, Users, HeartHandshake, Baby, School, Trophy
+  ShieldCheck, Users, HeartHandshake, Baby, School, Trophy,
+  Trees
 } from 'lucide-react';
 import PlaymateCarouselSection from './PlaymateCarouselSection.tsx';
 import { getHaversineDistance } from '../utils/distance.ts';
@@ -19,6 +20,7 @@ interface PlaymateCarouselDashboardProps {
   onSelectPlaymate: (profile: ChildProfile) => void;
   onQuickChat?: (profile: ChildProfile, templateMessage?: string) => void;
   onToggleSave: (id: string) => void;
+  onNavigateToParks?: () => void;
 
   // Filter props
   filterSearchQuery: string;
@@ -68,6 +70,7 @@ export default function PlaymateCarouselDashboard({
   onSelectPlaymate,
   onQuickChat,
   onToggleSave,
+  onNavigateToParks,
 
   filterSearchQuery,
   setFilterSearchQuery,
@@ -603,6 +606,35 @@ export default function PlaymateCarouselDashboard({
       ) : (
         /* Carousel Rails View (BookMyShow / Events style) */
         <div id="playmates-carousel-container" className="space-y-10 sm:space-y-12">
+          {/* 🌳 Bangalore Parks & Playtime Connect Banner */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-950 via-teal-900 to-slate-900 p-5 sm:p-7 text-white shadow-md border border-emerald-800/40">
+            <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-bold text-[10px] uppercase tracking-wider border border-emerald-400/30">
+                  <Trees className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Playmate Sub-Category • Bangalore Parks &amp; Play</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black font-serif tracking-tight leading-tight">
+                  Heading to a park? Discover who&apos;s playing or invite nearby kids!
+                </h3>
+                <p className="text-xs text-emerald-100/90 leading-relaxed">
+                  Explore 140+ parks across Bangalore. Filter by date &amp; time slots (morning, sunset, weekend) to see other verified parents with kids, or broadcast your park visit so friends can join for swings, sandpit, and tag.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={onNavigateToParks}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                >
+                  <Trees className="w-4 h-4 text-slate-950" />
+                  <span>Switch to Parks &amp; Play Sub-Category →</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
           {/* ⚡ Spontaneous Meetups Nearby (< 0.5 km) */}
           {immediateNearbyPlaymates.length > 0 && (
             <PlaymateCarouselSection

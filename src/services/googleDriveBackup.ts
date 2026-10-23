@@ -1,4 +1,4 @@
-import { getFirestore, collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
 import { db, auth, getGoogleAccessToken, setGoogleAccessToken, triggerGoogleSignIn } from '../utils/firebase.ts';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { logSecurityThreat } from '../utils/security.ts';

@@ -383,7 +383,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     openWhatsAppShare(shareText);
   }, [currentProfile?.affiliateCode, currentProfile?.referralCode]);
   const [buyerName, setBuyerName] = useState(currentProfile?.parentName || '');
-  const [buyerEmail, setBuyerEmail] = useState('guardian@vernunt.org');
+  const [buyerEmail, setBuyerEmail] = useState('parent@vernunt.org');
 
   const categories = [
     { 
@@ -1944,7 +1944,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                           type="text"
                           value={buyerName}
                           onChange={(e) => setBuyerName(e.target.value)}
-                          placeholder="Enter guardian name"
+                          placeholder="Enter parent name"
                           className="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none text-slate-700"
                         />
                       </div>
@@ -1955,7 +1955,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                           type="email"
                           value={buyerEmail}
                           onChange={(e) => setBuyerEmail(e.target.value)}
-                          placeholder="guardian@example.com"
+                          placeholder="parent@example.com"
                           className="w-full p-2.5 border border-slate-200 rounded-xl text-xs outline-none text-slate-700"
                         />
                       </div>
@@ -2392,7 +2392,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                     <span className="text-lg">📞</span>
                     <div>
                       <strong className="block text-orange-950 font-extrabold text-[11px]">Unlimited Direct Contact</strong>
-                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">Bypass mobile credentials lockouts & ping other local guardians instantly.</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 leading-tight">Bypass mobile credentials lockouts & ping other local parents instantly.</p>
                     </div>
                   </div>
 

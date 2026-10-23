@@ -389,5 +389,41 @@ service cloud.firestore {
       allow update: if isValidSocialShare(incoming());
       allow delete: if isAdmin();
     }
+
+    // Bangalore Parks & Playtime Connect: Park Visits & Broadcasts
+    match /park_visits/{visitId} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Custom Parks added by Community
+    match /custom_parks/{parkId} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Firebase Trigger Email Queue Collection
+    match /mail/{mailId} {
+      allow read, list: if isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
+
+    // Email OTPs Collection: Public create & read for authentication verification, with expiry checks
+    match /email_otps/{otpId} {
+      allow read, list: if true;
+      allow create, update: if true;
+      allow delete: if isAdmin();
+    }
+
+    // Email Notifications Log Collection
+    match /email_notifications/{notifId} {
+      allow read, list: if isSignedIn() || isAdmin();
+      allow create: if true;
+      allow update, delete: if isAdmin();
+    }
   }
 }
+

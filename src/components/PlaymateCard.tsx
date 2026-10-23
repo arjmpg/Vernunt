@@ -270,7 +270,7 @@ export default function PlaymateCard({
           // Parent Photo Display (MANDATORY VERIFIED)
           <img 
             src={parentPhoto} 
-            alt={`Parent/Guardian: ${profile.parentName}`} 
+            alt={`Parent: ${profile.parentName}`} 
             className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${!isParentPhotoUnlocked ? 'blur-2xl saturate-[0.15] brightness-75 select-none pointer-events-none' : ''}`} 
             referrerPolicy="no-referrer"
           />
@@ -891,7 +891,7 @@ export default function PlaymateCard({
                 </span>
                 <span className="text-xs font-bold text-rose-800 font-serif">Contact Number Locked Permanently</span>
                 <p className="text-[10px] text-slate-500 leading-snug">
-                  This guardian has opted for absolute telephone anonymity. Contacts cannot be revealed under any circumstances.
+                  This parent has opted for absolute telephone anonymity. Contacts cannot be revealed under any circumstances.
                 </p>
               </div>
             );
@@ -906,7 +906,7 @@ export default function PlaymateCard({
                 <div id="phone-widget-visible-accepted" className="p-3 bg-emerald-50 border border-emerald-150 rounded-2xl flex flex-col gap-2.5 text-left animate-fade-in shadow-2xs">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600 block">📱 Guardian Mobile Number</span>
+                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600 block">📱 Parent Mobile Number</span>
                       <span className="block text-sm font-mono font-black text-slate-800 select-all tracking-wider mt-0.5">
                         {profile.phoneNumber || '+91 80737 49074'}
                       </span>
@@ -950,7 +950,7 @@ export default function PlaymateCard({
                 <div id="phone-widget-visible-referral" className="p-3 bg-emerald-50 border border-emerald-150 rounded-2xl flex flex-col gap-2.5 text-left animate-fade-in shadow-2xs">
                   <div className="flex items-center justify-between">
                     <div>
-                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600 block">📱 Guardian Mobile Number</span>
+                      <span className="text-[9px] uppercase font-black tracking-widest text-emerald-600 block">📱 Parent Mobile Number</span>
                       <span className="block text-sm font-mono font-black text-slate-800 select-all tracking-wider mt-0.5">
                         {profile.phoneNumber || '+91 80737 49074'}
                       </span>
@@ -1042,7 +1042,7 @@ export default function PlaymateCard({
             <div id={`pending-badge-${profile.id}`} className="p-2.5 bg-indigo-50 text-indigo-900 rounded-xl text-[11px] font-bold border border-indigo-100 flex items-center justify-between">
               <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></span>
-                <span>⏳ Request pending guardian approval...</span>
+                <span>⏳ Request pending parent approval...</span>
               </span>
             </div>
           ) : (

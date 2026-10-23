@@ -903,7 +903,7 @@ export default function BusinessDashboard({
                         </div>
 
                         <div className="flex flex-col">
-                          <label className="text-[10px] text-slate-400 font-bold mb-1">Guardian Bio Statement</label>
+                          <label className="text-[10px] text-slate-400 font-bold mb-1">Parent Bio Statement</label>
                           <textarea
                             value={formBio}
                             rows={2}
@@ -1000,7 +1000,7 @@ export default function BusinessDashboard({
                         </div>
 
                         <p className="text-[11px] text-slate-300 italic line-clamp-2 leading-relaxed bg-slate-900/40 p-2.5 rounded-xl border border-slate-900">
-                          "{p.bio || 'Guardian has not uploaded a platform story bio statement yet.'}"
+                          "{p.bio || 'Parent has not uploaded a platform story bio statement yet.'}"
                         </p>
 
                         <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-450 font-medium">
@@ -1143,7 +1143,7 @@ export default function BusinessDashboard({
                         <strong className="text-sm font-bold text-white font-serif">Parent</strong>
                         <span className="text-[8px] bg-indigo-500/20 text-indigo-300 font-extrabold px-1.5 rounded uppercase leading-none border border-indigo-500/10">Default</span>
                       </div>
-                      <p className="text-[11px] text-slate-400 leading-relaxed mt-1">Standard playmate networks searcher, chat sender, and location-sharing guardian.</p>
+                      <p className="text-[11px] text-slate-400 leading-relaxed mt-1">Standard playmate networks searcher, chat sender, and location-sharing parent.</p>
                     </div>
                     <div className="pt-2.5 border-t border-slate-900 mt-2 flex flex-wrap gap-1">
                       {['Can View Playmates', 'Can Map Search'].map(cap => (

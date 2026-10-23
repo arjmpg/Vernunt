@@ -42,6 +42,7 @@ const VernuntStore = React.lazy(() => import('./components/store/VernuntStore.ts
 const VendorDashboard = React.lazy(() => import('./components/vendor/VendorDashboard.tsx').then(m => ({ default: m.VendorDashboard })));
 const HostDashboard = React.lazy(() => import('./components/host/HostDashboard.tsx').then(m => ({ default: m.HostDashboard })));
 const HelpCenterAndSopDesk = React.lazy(() => import('./components/help/HelpCenterAndSopDesk.tsx').then(m => ({ default: m.HelpCenterAndSopDesk })));
+const BangaloreParksHub = React.lazy(() => import('./components/parks/BangaloreParksHub.tsx'));
 import { PortalAuthModal, PortalType } from './components/auth/PortalAuthModal.tsx';
 import GlobalUniversalSearch from './components/GlobalUniversalSearch.tsx';
 
@@ -55,7 +56,9 @@ import ContactsPrivacyModal from './components/ContactsPrivacyModal.tsx';
 import { syncContactsSilently } from './utils/contactsSync.ts';
 import RoleSelectionModal from './components/RoleSelectionModal.tsx';
 import ChildSafetyComplianceModal from './components/ChildSafetyComplianceModal.tsx';
-import GoogleAccountSelectModal from './components/GoogleAccountSelectModal.tsx';
+import { ParentAuthModal } from './components/auth/ParentAuthModal.tsx';
+import { PlaytimeLockedTabAuth } from './components/auth/PlaytimeLockedTabAuth.tsx';
+import { SubHeaderPillsCarousel } from './components/navigation/SubHeaderPillsCarousel.tsx';
 import ProximityAlertToast, { ProximityAlert, playSubtleProximityChime } from './components/ProximityAlertToast.tsx';
 import { getSafeChildAreaName } from './utils/childSafetyFilter.ts';
 import EventDynamicQrPassModal from './components/events/EventDynamicQrPassModal.tsx';
@@ -80,11 +83,16 @@ import {
   queueCareBooking, 
   queueCareStatusUpdate 
 } from './utils/syncOutbox.ts';
+import { checkAndCompleteEmailLinkSignIn, dispatchEmailNotification } from './utils/firebaseEmailAuth.ts';
 
 // Vernunt Carousel Dashboard, Groups, Tracker, Community & Security features
 import PlaymateCarouselDashboard from './components/PlaymateCarouselDashboard.tsx';
+import VernuntHomepage, { POPULAR_LOCALITIES } from './components/home/VernuntHomepage.tsx';
+import { autoDetectUserLocality, saveLocalityPreference, LocalityItem } from './utils/geolocation.ts';
+import HomeDashboardFeed from './components/home/HomeDashboardFeed.tsx';
+import UnifiedExploreHub from './components/explore/UnifiedExploreHub.tsx';
+import FamilyProfileHub from './components/profile/FamilyProfileHub.tsx';
 const VernuntGroupsHub = React.lazy(() => import('./components/groups/VernuntGroupsHub.tsx').then(m => ({ default: m.VernuntGroupsHub })));
-const GrowthTrackerHub = React.lazy(() => import('./components/tracker/GrowthTrackerHub.tsx').then(m => ({ default: m.GrowthTrackerHub })));
 const VernuntPagesFeed = React.lazy(() => import('./components/blog/VernuntPagesFeed.tsx').then(m => ({ default: m.VernuntPagesFeed })));
 const CommunityHostingHub = React.lazy(() => import('./components/community/CommunityHostingHub.tsx').then(m => ({ default: m.CommunityHostingHub })));
 import { ProfilePrivacyModal } from './components/profile/ProfilePrivacyModal.tsx';
@@ -115,7 +123,7 @@ import {
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, Globe
+  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, Globe, Trees, Home, Key, ChevronDown
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -133,14 +141,32 @@ export interface TabDefinition {
 }
 
 const TAB_DEFINITIONS: TabDefinition[] = [
-  // 1. Play & Social
+  // 1. Core Destinations
+  { 
+    id: 'home', 
+    label: 'Home Discovery Feed', 
+    shortLabel: 'Home', 
+    icon: Home, 
+    category: 'play',
+    description: 'Personalized family feed, nearby playmates, 140+ Bangalore parks & weekend events',
+    isPopular: true
+  },
+  { 
+    id: 'explore', 
+    label: 'Explore & Search', 
+    shortLabel: 'Explore', 
+    icon: Compass, 
+    category: 'learning',
+    description: 'Unified search across pediatric specialists, Montessori toys & child care guides',
+    isPopular: true
+  },
   { 
     id: 'radar', 
-    label: 'Playmates Radar', 
-    shortLabel: 'Playmates', 
+    label: 'Playtime Connect', 
+    shortLabel: 'Playtime', 
     icon: Navigation, 
     category: 'play',
-    description: 'Find verified nearby kids & playmates by age, distance radius & shared interests',
+    description: 'Find verified nearby kids, filter by distance radius & explore Bangalore parks & playtime connect',
     badge: 'Popular',
     isPopular: true
   },
@@ -185,35 +211,6 @@ const TAB_DEFINITIONS: TabDefinition[] = [
     category: 'play',
     description: 'Private encrypted messaging with matched parents & child specialists',
     isPopular: true
-  },
-
-  // 2. Health & Specialists
-  { 
-    id: 'specialists', 
-    label: 'Kids Specialists Directory', 
-    shortLabel: 'Specialists', 
-    icon: Users, 
-    category: 'health',
-    description: 'Verified pediatricians, child therapists, speech pathologists, nutritionists & coaches',
-    badge: 'Verified 🩺',
-    isPopular: true
-  },
-  { 
-    id: 'tracker', 
-    label: '👶 Baby & Pregnancy Tracker', 
-    shortLabel: 'Baby & Pregnancy Tracker', 
-    icon: Baby, 
-    category: 'health',
-    description: 'Milestone tracking, immunization reminders, weaning guides & growth charts'
-  },
-  { 
-    id: 'daycare', 
-    label: '🍼 Babysitting & Daycare', 
-    shortLabel: 'Baby Sitting & Day Cares', 
-    icon: Baby, 
-    category: 'health',
-    description: 'Hourly drop-in sitters, verified neighborhood playhomes & preschools',
-    badge: 'Drop-in'
   },
 
   // 3. Learning & Activities
@@ -302,6 +299,14 @@ const TAB_DEFINITIONS: TabDefinition[] = [
     description: 'Manage class listings, clinics, ticket bookings, and attendee check-ins'
   },
   { 
+    id: 'profile', 
+    label: 'Family Profile & Vault', 
+    shortLabel: 'Profile', 
+    icon: User, 
+    category: 'tools',
+    description: 'Parent profile, child accounts, encrypted safety records, and bookings'
+  },
+  { 
     id: 'admin', 
     label: 'Admin Control Panel', 
     shortLabel: 'Admin Panel', 
@@ -312,15 +317,17 @@ const TAB_DEFINITIONS: TabDefinition[] = [
 ];
 
 export const DEFAULT_TABS_CONFIG: { [key: string]: 'header' | 'side' } = {
+  home: 'header',
+  explore: 'header',
   radar: 'header',
-  specialists: 'header',
   events: 'header',
+  profile: 'side',
+  specialists: 'header',
   chat: 'header',
   groups: 'side',
   community: 'side',
   pages: 'side',
   tracker: 'side',
-  daycare: 'side',
   store: 'side',
   kid_stories: 'side',
   knowledge: 'side',
@@ -454,53 +461,20 @@ export default function App() {
     if (typeof window !== 'undefined') {
       try {
         const params = new URLSearchParams(window.location.search);
-        const path = window.location.pathname.toLowerCase();
-        if (
-          params.get('tab') === 'store' || path.startsWith('/store') ||
-          params.get('portal') === 'vendor' || path.startsWith('/vendor') ||
-          params.get('portal') === 'host' || path.startsWith('/host') ||
-          params.get('portal') === 'care' || path.startsWith('/care') ||
-          params.get('portal') === 'admin' || params.get('tab') === 'admin' || path.startsWith('/admin') ||
-          params.get('tab') === 'help' || path.startsWith('/help') ||
-          params.get('tab') === 'sop' || path.startsWith('/sop')
-        ) {
-          return 'dashboard';
-        }
-        if (
-          params.get('tab') === 'kid_stories' ||
-          params.get('tab') === 'stories' ||
-          params.get('story') ||
-          params.get('tab') === 'events' ||
-          params.get('event') ||
-          params.get('eventId') ||
-          path.startsWith('/stories') ||
-          path.startsWith('/story')
-        ) {
-          return 'dashboard';
-        }
-        if (
-          params.get('tab') === 'specialists' ||
-          params.get('tab') === 'doctors' ||
-          params.get('portfolio') ||
-          params.get('specialist') ||
-          params.get('doctor') ||
-          path.startsWith('/portfolio') ||
-          path.startsWith('/specialist') ||
-          path.startsWith('/doctor')
-        ) {
-          return 'dashboard';
+        if (params.get('mode') === 'register' || params.get('tab') === 'register') {
+          return 'register';
         }
       } catch (err) {
         console.warn('URL parsing fallback', err);
       }
     }
-    return initialSession ? 'dashboard' : 'landing';
+    return 'dashboard';
   });
   const [activeTab, setActiveTab] = useState<
-    'radar' | 'daycare' | 'chat' | 'planner' | 'events' | 
+    'home' | 'explore' | 'radar' | 'events' | 'profile' | 'parks' | 'chat' | 'planner' | 
     'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 
     'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories' | 
-    'groups' | 'community' | 'pages' | 'tracker' |
+    'groups' | 'community' | 'pages' |
     'vendor' | 'host' | 'care' | 'help'
   >(() => {
     if (typeof window !== 'undefined') {
@@ -510,14 +484,29 @@ export default function App() {
         if (params.get('portal') === 'admin' || params.get('tab') === 'admin' || path.startsWith('/admin')) {
           return 'admin';
         }
-        if (params.get('portal') === 'vendor' || params.get('tab') === 'vendor' || path.startsWith('/vendor')) {
+        if (params.get('tab') === 'home' || path.startsWith('/home')) {
+          return 'home';
+        }
+        if (params.get('tab') === 'explore' || path.startsWith('/explore') || path.startsWith('/discovery')) {
+          return 'explore';
+        }
+        if (params.get('tab') === 'profile' || path.startsWith('/profile')) {
+          return 'profile';
+        }
+        if (params.get('portal') === 'vendor' || params.get('tab') === 'vendor' || path.startsWith('/vendor') || path.startsWith('/vendors')) {
           return 'vendor';
         }
-        if (params.get('portal') === 'host' || params.get('tab') === 'host' || path.startsWith('/host')) {
+        if (params.get('portal') === 'host' || params.get('portal') === 'hosts' || params.get('tab') === 'host' || params.get('tab') === 'hosts' || path.startsWith('/host') || path.startsWith('/hosts')) {
           return 'host';
         }
         if (params.get('portal') === 'care' || params.get('tab') === 'care' || path.startsWith('/care')) {
           return 'care';
+        }
+        if (params.get('tab') === 'daycare' || path.startsWith('/daycare')) {
+          return 'explore';
+        }
+        if (params.get('tab') === 'parks' || path.startsWith('/parks') || path.startsWith('/park')) {
+          return 'radar';
         }
         if (params.get('tab') === 'help' || params.get('tab') === 'sop' || path.startsWith('/help') || path.startsWith('/sop')) {
           return 'help';
@@ -547,15 +536,33 @@ export default function App() {
           path.startsWith('/specialist') ||
           path.startsWith('/doctor')
         ) {
-          return 'specialists';
+          return 'store';
         }
       } catch (err) {
         console.warn('URL parsing fallback', err);
       }
     }
     if (initialSession?.userRole === 'Event Organizer') return 'business';
-    if (initialSession?.userRole === 'Portfolio Professional') return 'portfolio';
-    return 'radar';
+    return 'home';
+  });
+
+  // Playmate Sub-Category: "Nearby Playmates", "Parks & Play", or "Playdate Planner"
+  const [playmateSubCategory, setPlaymateSubCategory] = useState<'playmates' | 'parks' | 'planner'>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const path = window.location.pathname.toLowerCase();
+        if (params.get('tab') === 'parks' || path.startsWith('/parks') || path.startsWith('/park') || params.get('sub') === 'parks') {
+          return 'parks';
+        }
+        if (params.get('tab') === 'planner' || params.get('sub') === 'planner') {
+          return 'planner';
+        }
+      } catch (e) {
+        console.warn('URL sub-category parsing note:', e);
+      }
+    }
+    return 'playmates';
   });
 
   // Portal Authentication State for Vendor, Host, and Daycare Portals
@@ -571,7 +578,7 @@ export default function App() {
         const hasSession = !!localStorage.getItem('vernunt_auth_vendor_session');
         return { isOpen: !hasSession, portalType: 'vendor' };
       }
-      if (path.startsWith('/host') || portalParam === 'host') {
+      if (path.startsWith('/host') || path.startsWith('/hosts') || portalParam === 'host' || portalParam === 'hosts') {
         const hasSession = !!localStorage.getItem('vernunt_auth_host_session');
         return { isOpen: !hasSession, portalType: 'host' };
       }
@@ -609,6 +616,54 @@ export default function App() {
   const [showAppGuideModal, setShowAppGuideModal] = useState<boolean>(false);
   const [showAndroidPlayStoreModal, setShowAndroidPlayStoreModal] = useState<boolean>(false);
   const [showIosAppModal, setShowIosAppModal] = useState<boolean>(false);
+  const [selectedLocality, setSelectedLocality] = useState(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_user_locality');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.debug('Locality load error:', e);
+    }
+    return POPULAR_LOCALITIES[0];
+  });
+  const [showLocationPicker, setShowLocationPicker] = useState<boolean>(false);
+  const [isLocalityDetecting, setIsLocalityDetecting] = useState<boolean>(false);
+  const [showGlobalSearchOverlay, setShowGlobalSearchOverlay] = useState<boolean>(false);
+
+  // Auto-capture GPS location on initial boot for this app and app.vernunt.com
+  useEffect(() => {
+    const handleLocalityChanged = (e: any) => {
+      if (e.detail) {
+        setSelectedLocality(e.detail);
+      }
+    };
+    window.addEventListener('vernunt-locality-changed', handleLocalityChanged);
+
+    // If not already auto-captured, detect automatically via device GPS
+    try {
+      const saved = localStorage.getItem('vernunt_user_locality');
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (!parsed || !parsed.isAutoCaptured) {
+        autoDetectUserLocality().then((captured) => {
+          if (captured) {
+            setSelectedLocality(captured);
+          }
+        });
+      }
+    } catch {
+      autoDetectUserLocality().then((captured) => {
+        if (captured) setSelectedLocality(captured);
+      });
+    }
+
+    // Auto-complete Firebase Passwordless Email Link authentication if user opened link from inbox
+    checkAndCompleteEmailLinkSignIn((user) => {
+      triggerToast(`✓ Welcome back! Signed in securely via Firebase email link (${user.email || 'Parent'}).`, "Email Verified");
+    });
+
+    return () => {
+      window.removeEventListener('vernunt-locality-changed', handleLocalityChanged);
+    };
+  }, []);
 
   // Open-access Knowledge Base state for unregistered/guest users
   const [isGuestViewingKnowledge, setIsGuestViewingKnowledge] = useState<boolean>(() => {
@@ -688,7 +743,7 @@ export default function App() {
 
   const [isAuthenticating, setIsAuthenticating] = useState<boolean>(false);
   const [authErrorMessage, setAuthErrorMessage] = useState<string>('');
-  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>('Parent');
+  const [suggestedRegisterRole, setSuggestedRegisterRole] = useState<'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer'>('Parent');
   const [openEventWizardOnMount, setOpenEventWizardOnMount] = useState<boolean>(false);
 
   // Dynamic Navigation Tab Placements configured via Admin & Firestore
@@ -708,20 +763,18 @@ export default function App() {
   }, []);
 
   // Top Header Tabs:
-  // "In top display community hosting, kids stories, vernunt groups, chat messengers, baby and pregnancy tracker and explore all"
   const primaryHeaderTabIds = useMemo(() => {
-    return ['community', 'kid_stories', 'groups', 'chat', 'tracker'];
+    return ['home', 'explore', 'radar', 'events', 'groups', 'chat'];
   }, []);
 
-  // Bottom Navigation Tabs (BookMyShow Style with small text and icons):
-  // Playmate, Store, Events, Specialists, Baby Sitting & Day Cares in bottom
+  // Bottom Navigation Tabs (5 canonical destinations: Home, Shop, Playtime, Events, Profile/Sign In):
   const bottomNavTabs = useMemo(() => {
     return [
-      { id: 'radar', label: 'Playmate', icon: Navigation },
-      { id: 'store', label: 'Store', icon: ShoppingBag },
+      { id: 'home', label: 'Home', icon: Home },
+      { id: 'store', label: 'Shop', icon: ShoppingBag },
+      { id: 'radar', label: 'Playtime', icon: Baby },
       { id: 'events', label: 'Events', icon: Sparkles },
-      { id: 'specialists', label: 'Specialists', icon: Users },
-      { id: 'daycare', label: 'Baby Sitting & Day Cares', icon: Baby },
+      { id: 'profile', label: 'Profile', icon: User },
     ];
   }, []);
 
@@ -1106,7 +1159,7 @@ export default function App() {
             clearAuthSession();
             setUserProfile(null);
             setUserRole('Parent');
-            setAppMode('landing');
+            setAppMode('dashboard');
           }
         }
         setIsLoading(false);
@@ -1137,18 +1190,22 @@ export default function App() {
       try {
         const cachedList: ChildProfile[] = JSON.parse(cachedPlaymatesStr);
         if (Array.isArray(cachedList) && cachedList.length > 0) {
-          // Always ensure photos are updated with latest authentic curated portraits
+          // Always ensure photos are updated with latest authentic curated portraits and location coordinates are valid
           const refreshedCached = cachedList.map(p => {
             const fresh = mockPhotoMap.get(p.id);
+            const lat = typeof p.location?.lat === 'number' ? p.location.lat : (typeof (p as any).lat === 'number' ? (p as any).lat : 12.9716);
+            const lng = typeof p.location?.lng === 'number' ? p.location.lng : (typeof (p as any).lng === 'number' ? (p as any).lng : 77.5946);
+            const safeLoc = { lat, lng, address: p.location?.address || p.area || p.city || 'Bengaluru, Karnataka' };
             if (fresh) {
               return {
                 ...p,
+                location: safeLoc,
                 photoUrl: fresh.photoUrl,
                 parentPhotoUrl: fresh.parentPhotoUrl,
                 childPhotoUrl: fresh.childPhotoUrl
               };
             }
-            return p;
+            return { ...p, location: safeLoc };
           });
           setPlaymates(refreshedCached);
           setSelectedPlaymate(refreshedCached[0] || null);
@@ -1166,7 +1223,18 @@ export default function App() {
         if (data?.success && Array.isArray(data.users) && data.users.length > 0) {
           setPlaymates(prev => {
             const map = new Map<string, ChildProfile>();
-            data.users.forEach((u: ChildProfile) => map.set(u.id, u));
+            data.users.forEach((u: ChildProfile) => {
+              const lat = typeof u.location?.lat === 'number' ? u.location.lat : (typeof (u as any).lat === 'number' ? (u as any).lat : 12.9716);
+              const lng = typeof u.location?.lng === 'number' ? u.location.lng : (typeof (u as any).lng === 'number' ? (u as any).lng : 77.5946);
+              map.set(u.id, {
+                ...u,
+                location: {
+                  lat,
+                  lng,
+                  address: u.location?.address || u.area || u.city || 'Bengaluru, Karnataka'
+                }
+              });
+            });
             prev.forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
             return Array.from(map.values());
           });
@@ -1265,7 +1333,9 @@ export default function App() {
     return () => unsubscribe();
   }, [userProfile]);
 
-  const [showGoogleAccountModal, setShowGoogleAccountModal] = useState<boolean>(false);
+  const [showParentAuthModal, setShowParentAuthModal] = useState<boolean>(false);
+  const setShowGoogleAccountModal = (val: boolean) => setShowParentAuthModal(val);
+  const showGoogleAccountModal = showParentAuthModal;
 
   const handleSelectGoogleAccount = async (account: { email: string; displayName: string; photoURL?: string; role?: string }) => {
     setIsLoading(true);
@@ -2442,7 +2512,7 @@ export default function App() {
     // Dispatch instant admin KYC notification to ardha@vernunt.com and arjunmpgupta@gmail.com
     sendAdminKycPendingNotification({
       applicantId: updatedProfile.id,
-      applicantName: updatedProfile.parentName || 'Verified Guardian',
+      applicantName: updatedProfile.parentName || 'Verified Parent',
       applicantRole: updatedProfile.userRole || 'Parent',
       applicantPhone: updatedProfile.phoneNumber || '',
       applicantEmail: updatedProfile.email,
@@ -2555,7 +2625,27 @@ export default function App() {
           console.debug('Sync outbox connect note:', err);
         }
 
-        triggerToast("💌 Connect request sent to parent! Awaiting guardian review & approval...", "Request Sent (Pending)");
+        // Dispatch email notification to recipient parent
+        try {
+          const partnerProfile = profiles.find(p => p.id === partnerId);
+          if (partnerProfile) {
+            dispatchEmailNotification({
+              toEmail: (partnerProfile as any).email || 'parent@vernunt.org',
+              recipientName: partnerProfile.parentName,
+              type: 'playdate_request',
+              details: {
+                requesterName: userProfile?.parentName || 'Vernunt Parent',
+                childName: userProfile?.childName || 'Playmate',
+                childAge: userProfile?.childAge,
+                neighborhood: userProfile?.neighbourhood || 'Bangalore'
+              }
+            });
+          }
+        } catch (emailErr) {
+          console.debug('Connect email notification notice:', emailErr);
+        }
+
+        triggerToast("💌 Connect request sent to parent! Awaiting parent review & approval...", "Request Sent (Pending)");
       }
     );
   };
@@ -2625,7 +2715,7 @@ export default function App() {
       colors: ['#fbbf24', '#3b82f6', '#10b981']
     });
 
-    alert("🎉 Guardian Contact Mobile Decrypted! Balance: " + (currentCredits - 1) + " credits.");
+    alert("🎉 Parent Contact Mobile Decrypted! Balance: " + (currentCredits - 1) + " credits.");
   };
 
   // Modal display toggles
@@ -2741,7 +2831,7 @@ export default function App() {
 
   const handleCompleteRegistration = async (newProfile: ChildProfile, options?: { openCreateWizard?: boolean }) => {
     setIsLoading(true);
-    setLoadingTitle('Saving verified guardian profile...');
+    setLoadingTitle('Saving verified parent profile...');
 
     try {
       // Ensure Firebase Auth session exists so Firestore security rules allow persistent write
@@ -3001,12 +3091,14 @@ export default function App() {
       clearAuthSession();
       setUserProfile(null);
       setUserRole('Parent');
-      setAppMode('landing');
-      setActiveTab('radar');
+      setAppMode('dashboard');
+      setActiveTab('home');
       setIsLoading(false);
       setIsAuthenticating(false);
     }
   };
+
+  const handleSignOut = handleLogOut;
 
   const handleSelectPlaymate = (profile: ChildProfile) => {
     setSelectedPlaymate(profile);
@@ -3218,690 +3310,298 @@ export default function App() {
   const activePlaymate = filteredPlaymates.find(p => p.id === selectedPlaymate?.id) || filteredPlaymates[0] || null;
 
   return (
-    <div id="app-root-container" className="min-h-screen bg-slate-50 flex flex-col font-sans select-none antialiased">
+    <div id="app-root-container" className="min-h-screen bg-white flex flex-col font-sans select-none antialiased">
       
-      {/* Top Banner & Emergency Bar if Logged In / In Dashboard */}
-      {appMode === 'dashboard' && (
-        userProfile ? (
-          <div id="sos-top-banner" className="bg-slate-900 text-slate-100 py-2 sm:py-2.5 border-b border-slate-800 w-full overflow-hidden">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping shrink-0"></span>
-                <span className="truncate">{t.loggedInAs}: <strong>{userProfile?.parentName}</strong> • Matchable with <strong>{playmates.length} {t.localPlaymatesCount}</strong>.</span>
-              </div>
-              
-              <button
-                id="btn-trigger-sos"
-                onClick={() => setShowSOSModal(true)}
-                className="px-2.5 sm:px-3 py-1 bg-red-650 hover:bg-red-700 text-white font-bold rounded-lg transition active:scale-95 flex items-center gap-1 shrink-0 uppercase tracking-wider text-[10px]"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" /> {t.safetySOSHelp}
-              </button>
+      {/* Top Banner: Android & iOS Mobile Apps (from screenshot) */}
+      <AndroidDownloadBanner 
+        onOpenModal={() => setShowAndroidPlayStoreModal(true)} 
+        onOpenIosModal={() => setShowIosAppModal(true)} 
+      />
+
+      {/* Main Header Navigation: Clean Single Row Contract (from screenshot) */}
+      <header id="main-navigation-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-2xs w-full">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3 w-full">
+          
+          {/* Zone 1: Wordmark & Brand Title (Matching Screenshot) */}
+          <div 
+            id="logo-branding-block" 
+            className="flex items-center gap-2 cursor-pointer shrink-0 select-none group"
+            onClick={() => {
+              setActiveTab('home');
+              setAppMode('dashboard');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            title="Vernunt - Play Time Connect"
+          >
+            <VernuntLogo size="xs" showText={false} animated={false} />
+            <div className="flex flex-col">
+              <span className="text-lg sm:text-xl font-black tracking-tight leading-none text-slate-900 font-serif">
+                <span className="text-rose-600">vern</span>
+                <span className="text-amber-500">unt</span>
+              </span>
+              <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase tracking-wider mt-0.5">
+                Play Time Connect
+              </span>
             </div>
           </div>
-        ) : (
-          <div id="guest-specialists-top-banner" className="bg-slate-900 text-slate-100 py-2 border-b border-slate-800 w-full overflow-hidden">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap sm:flex-nowrap justify-between items-center gap-2 text-xs">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="w-2 h-2 bg-rose-500 rounded-full animate-ping shrink-0"></span>
-                <span className="truncate font-medium text-slate-200">
-                  <strong className="text-white">Vernunt Open Directory:</strong> Verified Specialists across India ({specialistsList.length}+ Specialists)
-                </span>
+
+          {/* Zone 2: Desktop 5-Nav Links (Shop replaces Explore) */}
+          <nav id="header-desktop-nav" className="hidden md:flex items-center gap-6 text-sm font-medium">
+            {[
+              { id: 'home', label: 'Home' },
+              { id: 'store', label: 'Shop' },
+              { id: 'radar', label: 'Playtime' },
+              { id: 'events', label: 'Events' },
+              { id: 'profile', label: 'Profile' }
+            ].map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <button
+                  key={item.id}
+                  id={`header-nav-${item.id}`}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(item.id as any);
+                    setAppMode('dashboard');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className={`text-sm py-1 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                    isActive
+                      ? 'font-bold text-rose-600 border-b-2 border-rose-600'
+                      : 'text-slate-600 hover:text-slate-900 font-medium'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+
+          {/* Zone 3: Actions (Search, Location Selector, Notifications Bell, Profile/Sign In, Menu Drawer) */}
+          <div id="header-action-zone" className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+            {/* Quick Search Button */}
+            <button
+              id="header-btn-search"
+              type="button"
+              onClick={() => setShowGlobalSearchOverlay(true)}
+              className="p-2 text-slate-600 hover:text-rose-600 hover:bg-slate-100 rounded-xl transition cursor-pointer"
+              title="Search products, playmates, events, parks..."
+            >
+              <Search className="w-5 h-5 text-slate-700" />
+            </button>
+
+            {/* Location Selector (Matching Screenshot: 📍 Indiranagar ˅) */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowLocationPicker(!showLocationPicker)}
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-rose-50/80 hover:bg-rose-100/80 border border-rose-200/70 rounded-xl text-xs font-bold text-rose-900 transition cursor-pointer"
+                title="Select location"
+              >
+                <MapPin className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                <span className="max-w-[85px] sm:max-w-[120px] truncate">{selectedLocality.name}</span>
+                <ChevronDown className="w-3 h-3 text-rose-500 shrink-0" />
+              </button>
+
+              {showLocationPicker && (
+                <div className="absolute right-0 mt-2 w-72 sm:w-80 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 z-50 animate-fade-in text-left">
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-100 mb-2">
+                    <span className="text-xs font-black uppercase text-slate-500 tracking-wider">Select Neighborhood</span>
+                    <button 
+                      onClick={() => setShowLocationPicker(false)}
+                      className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* 1-Tap GPS Auto-Detection Button */}
+                  <button
+                    type="button"
+                    disabled={isLocalityDetecting}
+                    onClick={async () => {
+                      setIsLocalityDetecting(true);
+                      const captured = await autoDetectUserLocality();
+                      setIsLocalityDetecting(false);
+                      if (captured) {
+                        setSelectedLocality(captured);
+                        setShowLocationPicker(false);
+                      }
+                    }}
+                    className="w-full mb-2.5 p-2 bg-gradient-to-r from-rose-50 to-amber-50 hover:from-rose-100 hover:to-amber-100 border border-rose-200 rounded-xl flex items-center justify-between text-xs font-bold text-rose-950 transition cursor-pointer shadow-2xs active:scale-98"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Navigation className={`w-3.5 h-3.5 text-rose-600 ${isLocalityDetecting ? 'animate-spin' : ''}`} />
+                      <span>{isLocalityDetecting ? 'Detecting GPS...' : '📍 Auto-Detect My Location (GPS)'}</span>
+                    </div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-700 bg-white px-2 py-0.5 rounded-md border border-rose-200">
+                      GPS
+                    </span>
+                  </button>
+
+                  <div className="space-y-1 max-h-48 overflow-y-auto no-scrollbar">
+                    {POPULAR_LOCALITIES.map((loc) => (
+                      <button
+                        key={loc.pincode}
+                        type="button"
+                        onClick={() => {
+                          setSelectedLocality(loc);
+                          try {
+                            localStorage.setItem('vernunt_user_locality', JSON.stringify(loc));
+                          } catch (e) {
+                            console.debug('Locality save error:', e);
+                          }
+                          setShowLocationPicker(false);
+                        }}
+                        className={`w-full px-2.5 py-1.5 text-xs text-left rounded-xl font-medium flex items-center justify-between transition cursor-pointer ${
+                          selectedLocality.pincode === loc.pincode ? 'bg-rose-50 text-rose-900 font-bold' : 'text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <span>{loc.name}, {loc.city}</span>
+                        <span className="text-[11px] text-slate-400 font-mono">{loc.pincode}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notifications Bell */}
+            <button
+              id="header-bell-notifications"
+              type="button"
+              onClick={() => setShowNotificationDrawer(!showNotificationDrawer)}
+              className="p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition relative cursor-pointer"
+              title="Notifications"
+            >
+              <Bell className="w-5 h-5 text-slate-700" />
+              {notificationsHistory.length > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-white" />
+              )}
+            </button>
+
+            {userProfile ? (
+              <div className="flex items-center gap-2 shrink-0">
+                {/* User Profile Pill */}
+                <button
+                  id="header-btn-profile"
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('profile');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex items-center gap-1.5 p-1 sm:px-2.5 sm:py-1.5 bg-slate-100 hover:bg-slate-200/80 rounded-2xl transition cursor-pointer"
+                  title="View Family Profile"
+                >
+                  <img
+                    src={userProfile.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'}
+                    alt={userProfile.parentName || 'Parent'}
+                    className="w-7 h-7 rounded-full object-cover shrink-0 border border-white"
+                    referrerPolicy="no-referrer"
+                  />
+                  <span className="text-xs font-bold text-slate-800 hidden sm:inline max-w-[90px] truncate">
+                    {userProfile.parentName || 'Parent'}
+                  </span>
+                </button>
+
+                {/* Logout Button */}
+                <button
+                  id="header-btn-logout"
+                  type="button"
+                  onClick={handleLogOut}
+                  className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition cursor-pointer hidden md:flex"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-              
+            ) : (
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setAppMode('landing')}
-                  className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg transition cursor-pointer"
-                >
-                  ← Home
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAppMode('landing')}
-                  className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition shadow-xs cursor-pointer"
+                  id="header-btn-signin"
+                  onClick={() => setShowGoogleAccountModal(true)}
+                  className="px-3 sm:px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
                 >
                   Sign In
                 </button>
               </div>
-            </div>
-          </div>
-        )
-      )}
+            )}
 
-      {/* Persistent Mobile Apps (Android & iOS) Download Banner */}
-      <AndroidDownloadBanner 
-        onOpenModal={() => setShowAndroidPlayStoreModal(true)} 
-        onOpenIosModal={() => setShowIosAppModal(true)}
-      />
-
-      {/* Main Header navigation */}
-      <header id="main-navigation-header" className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs w-full">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 md:py-3 flex items-center justify-between gap-3 w-full">
-          <div 
-            id="logo-branding-block" 
-            className="flex items-center gap-2.5 cursor-pointer group shrink-0"
-            onClick={() => {
-              if (auth.currentUser || userProfile) {
-                setAppMode('dashboard');
-                setActiveTab('radar');
-              } else {
-                setIsGuestViewingKnowledge(false);
-                setGuestKnowledgeSlug(undefined);
-                setAppMode('landing');
-              }
-            }}
-            title={auth.currentUser || userProfile ? "Go to Radar Tab" : "Back to Landing Gateway"}
-          >
-            <VernuntLogo size="xs" showText={false} animated={true} />
-            <div className="flex flex-col">
-              <span id="nav-brand-title" className="text-lg sm:text-xl font-black tracking-tight leading-none text-slate-900 font-serif flex items-center gap-1.5">
-                <span>
-                  <span className="text-rose-700">vern</span>
-                  <span className="text-amber-500">unt</span>
-                  <span className="text-rose-800 text-[10px] sm:text-xs font-sans font-bold ml-0.5">.com</span>
-                </span>
-                {isOffline && (
-                  <span className="bg-amber-100/80 border border-amber-200/60 text-amber-900 font-sans font-bold text-[8px] tracking-wide px-1.5 py-0.5 rounded-full flex items-center gap-1 shrink-0">
-                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse inline-block" /> Offline
-                  </span>
-                )}
-              </span>
-              <span className="block text-[7.5px] sm:text-[8px] uppercase font-black text-rose-800 tracking-wider mt-0.5">Verified Playmate Network</span>
-            </div>
-          </div>
-
-          {/* Dynamic Nav Tabs for Dashboard (Clean & Peaceful: Core 4 Essentials + Active Tab + Explore) */}
-          {appMode === 'dashboard' && (
-            <nav id="nav-menu-links" className="hidden lg:flex items-center gap-2">
-              {primaryHeaderTabIds.map((tabId) => {
-                const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
-                if (!def) return null;
-
-                const IconComponent = def.icon;
-                const isBilling = tabId === 'billing';
-                const isActive = activeTab === tabId;
-
-                return (
-                  <button
-                    key={tabId}
-                    id={`tab-btn-${tabId}`}
-                    onClick={() => {
-                      setActiveTab(tabId as any);
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className={`px-4 py-2.5 rounded-2xl text-sm font-extrabold transition-all duration-150 flex items-center gap-2 cursor-pointer select-none min-h-[44px] ${
-                      isActive
-                        ? isBilling
-                          ? 'bg-amber-500 text-slate-950 font-black shadow-md'
-                          : 'bg-rose-700 text-white shadow-md shadow-rose-700/20 font-black'
-                        : isBilling
-                        ? 'hover:bg-amber-100/40 text-amber-800 bg-amber-500/10 border border-amber-200/60'
-                        : 'hover:bg-rose-50 text-slate-700 hover:text-rose-800'
-                    }`}
-                  >
-                    <IconComponent className={`w-4 h-4 ${isBilling ? 'text-amber-600 animate-pulse' : isActive ? 'text-white' : 'text-rose-700'}`} />
-                    <span>
-                      {tabId === 'billing' ? '👑 VIP Club' : def.shortLabel || def.label}
-                    </span>
-                  </button>
-                );
-              })}
-
-              {/* Explore All Features Menu Trigger Button */}
-              <button
-                id="tab-btn-more-menu"
-                onClick={() => setIsSideMenuOpen(true)}
-                className="px-5 py-3 rounded-2xl text-base font-black transition-all duration-150 flex items-center gap-2.5 text-rose-800 bg-rose-50 hover:bg-rose-100/90 border-2 border-rose-200 cursor-pointer shadow-2xs hover:shadow-xs group ml-1 min-h-[48px]"
-                title="Open feature explorer to discover all features step by step"
-              >
-                <Compass className="w-5 h-5 text-rose-700 group-hover:rotate-45 transition-transform duration-300" />
-                <span>Explore All</span>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-full bg-rose-700 text-white font-mono shadow-2xs">
-                  Menu
-                </span>
-              </button>
-            </nav>
-          )}
-
-          {/* User Identity / Action Block & Global Language Dropdown */}
-          <div id="user-branding-badge" className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-          {/* PWA & Android App Installation Actions */}
-          <PWAInstallButton />
-
-          {/* Global Language Selector Dropdown */}
-          <div id="global-language-selector" className="relative flex items-center gap-1 bg-slate-50 border border-slate-200 py-1 px-1.5 sm:py-1.5 sm:px-2 rounded-xl hover:bg-slate-100 transition max-w-[120px] sm:max-w-none">
-            <span className="text-xs shrink-0" role="img" aria-label="language-globe">🌐</span>
-            <select
-              value={language}
-              onChange={(e) => changeLanguage(e.target.value as LanguageCode)}
-              className="bg-transparent text-[11px] sm:text-xs font-bold text-slate-755 focus:outline-none cursor-pointer truncate"
-              id="select-pref-language"
+            {/* Side Menu Drawer Button */}
+            <button
+              id="header-btn-menu-drawer"
+              type="button"
+              onClick={() => setIsSideMenuOpen(true)}
+              className="p-2 text-slate-700 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 rounded-xl transition cursor-pointer"
+              title="More Features & Tools"
             >
-              {LANGUAGES.map((lang) => (
-                <option key={lang.code} value={lang.code} className="text-slate-800 bg-white">
-                  {lang.flag} {lang.label}
-                </option>
-              ))}
-            </select>
+              <Menu className="w-4 h-4" />
+            </button>
           </div>
 
-          {appMode === 'dashboard' && userProfile ? (
-            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-              {/* Background Sync Outbox Badge */}
-              <SyncStatusBadge onClick={() => setIsOutboxDrawerOpen(true)} />
-
-              {/* Real-time Push alerts console trigger */}
-              <div className="relative">
-                <button
-                  id="btn-bell-notification-center"
-                  onClick={() => setShowNotificationDrawer(!showNotificationDrawer)}
-                  className="p-2 border border-slate-200 hover:bg-slate-100/75 rounded-xl text-slate-650 transition active:scale-95 relative cursor-pointer"
-                  title="Vernunt Push Broadcast Alerts Log Book"
-                >
-                  <Bell className={`w-4 h-4 ${notificationsHistory.length > 0 ? 'text-orange-500 fill-orange-50/20' : ''}`} />
-                  {notificationsHistory.length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-rose-500 text-white font-mono font-black text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                      {Math.min(9, notificationsHistory.length)}
-                    </span>
-                  )}
-                </button>
-              </div>
-
-              {/* Multilingual Voice Call Support Button (Compact & Clean) */}
-              <button
-                id="header-btn-voice-support"
-                type="button"
-                onClick={() => {
-                  setVoiceInitialLanguage('en-IN');
-                  setShowKannadaVoiceModal(true);
-                }}
-                className="flex items-center gap-1 px-2.5 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white rounded-xl text-xs font-black transition cursor-pointer shadow-xs border border-rose-600/80 shrink-0"
-                title="Call for support in English, Kannada, Hindi, Tamil, Telugu"
-              >
-                <span className="text-xs sm:text-sm">🎙️</span>
-                <span className="hidden sm:inline">Call Support</span>
-              </button>
-
-              {/* Current Wallet Balance & Top Up Action in Header */}
-              <div 
-                id="header-wallet-container" 
-                className="flex items-center bg-rose-50/90 hover:bg-rose-100/80 border border-rose-200/90 rounded-2xl p-1 pl-2 sm:pl-2.5 gap-1.5 sm:gap-2 transition shadow-2xs shrink-0"
-              >
-                <button
-                  type="button"
-                  id="header-btn-wallet-balance"
-                  onClick={() => {
-                    setWalletModalAction('balance');
-                    setShowWalletModal(true);
-                  }}
-                  className="flex items-center gap-1.5 cursor-pointer text-left focus:outline-none"
-                  title="View In-App Wallet Balance & Ledger"
-                >
-                  <div className="w-5 h-5 rounded-lg bg-rose-700/10 text-rose-700 flex items-center justify-center shrink-0">
-                    <Wallet className="w-3.5 h-3.5" />
-                  </div>
-                  <div className="flex flex-col leading-none">
-                    <span className="text-[8px] sm:text-[9px] uppercase tracking-wider font-extrabold text-rose-900/70">
-                      Wallet
-                    </span>
-                    <span className="text-xs font-black text-rose-950 font-mono">
-                      ₹{wallet.balance}
-                    </span>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  id="header-btn-top-up-wallet"
-                  onClick={() => {
-                    setWalletModalAction('deposit');
-                    setShowWalletModal(true);
-                  }}
-                  className="px-2 py-1 sm:px-2.5 sm:py-1 bg-gradient-to-r from-rose-700 to-amber-600 hover:from-rose-800 hover:to-amber-700 text-white rounded-xl text-[10px] sm:text-[11px] font-black transition-all flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 shrink-0"
-                  title="Top Up Wallet Funds via UPI or Card"
-                >
-                  <Plus className="w-3 h-3 stroke-[3]" />
-                  <span>Top Up</span>
-                </button>
-              </div>
-
-              {/* User Profile Pill */}
-              <button
-                id="header-btn-user-profile"
-                type="button"
-                onClick={() => setShowEditProfileModal(true)}
-                className="flex items-center gap-2 p-1 sm:pr-2.5 rounded-full hover:bg-slate-100 border border-slate-200 transition cursor-pointer shrink-0"
-                title="View & Edit Profile"
-              >
-                <div className="relative shrink-0">
-                  <img 
-                    src={userProfile?.photoUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150'} 
-                    alt={userProfile?.parentName || 'Parent'} 
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-rose-200 shrink-0 ${
-                      !userProfile?.aadhaarVerified ? 'blur-xs saturate-50 brightness-90' : ''
-                    }`}
-                    referrerPolicy="no-referrer"
-                  />
-                  {!userProfile?.aadhaarVerified && (
-                    <div 
-                      className="absolute inset-0 bg-slate-950/60 rounded-full flex items-center justify-center shadow-xs" 
-                      title="Profile photo locked until Aadhaar & KYC verified"
-                    >
-                      <EyeOff className="w-3.5 h-3.5 text-amber-400" />
-                    </div>
-                  )}
-                </div>
-                <span className="text-xs font-bold text-slate-800 hidden md:inline max-w-[100px] truncate leading-tight">
-                  {userProfile?.parentName}
-                </span>
-                {!userProfile?.aadhaarVerified && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[9px] font-black uppercase text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded-full">
-                    <EyeOff className="w-2.5 h-2.5 text-amber-700" />
-                    <span>Locked</span>
-                  </span>
-                )}
-              </button>
-
-              {/* Universal Side Menu & Explorer Trigger */}
-              <button
-                id="header-btn-hamburger-menu"
-                type="button"
-                onClick={() => setIsSideMenuOpen(true)}
-                className="p-2 sm:px-3 sm:py-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-2xs group shrink-0"
-                title="Open feature explorer to explore all features and account tools"
-              >
-                <Menu className="w-4 h-4 text-rose-700 group-hover:rotate-90 transition-transform duration-200" />
-                <span className="hidden sm:inline">Menu</span>
-              </button>
-
-              {/* Desktop Logout button */}
-              <button
-                id="btn-logout"
-                onClick={handleLogOut}
-                type="button"
-                className="hidden lg:flex p-2 border border-slate-200 hover:bg-rose-50 hover:text-rose-700 rounded-xl text-slate-600 transition items-center gap-1 cursor-pointer shrink-0"
-                title="Log Out"
-              >
-                <LogOut className="w-4 h-4" />
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 select-none font-sans flex-wrap justify-end">
-              {/* Public Specialists Tab Trigger */}
-              <button
-                id="header-btn-specialists-public"
-                type="button"
-                onClick={() => {
-                  setAppMode('dashboard');
-                  setActiveTab('specialists');
-                  setIsGuestViewingKnowledge(false);
-                }}
-                className={`text-xs font-bold px-3 py-2 rounded-xl border flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
-                  appMode === 'dashboard' && activeTab === 'specialists'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-rose-50/80 text-rose-800 border-rose-200/80 hover:bg-rose-100/80'
-                }`}
-                title="View verified specialists portfolios across India"
-              >
-                <Users className="w-3.5 h-3.5 text-rose-600" />
-                <span>🩺 Specialists ({specialistsList.length}+)</span>
-              </button>
-
-              {/* Public Kids Stories Button */}
-              <button
-                id="header-btn-stories-public"
-                type="button"
-                onClick={() => {
-                  setAppMode('dashboard');
-                  setActiveTab('kid_stories');
-                  setIsGuestViewingKnowledge(false);
-                }}
-                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden sm:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
-                  appMode === 'dashboard' && activeTab === 'kid_stories'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-rose-50/60 text-rose-800 border-rose-200/70 hover:bg-rose-100/70'
-                }`}
-                title="Read & publish kid achievements, awards and stories"
-              >
-                <BookOpen className="w-3.5 h-3.5 text-rose-600" />
-                <span>📖 Kids Stories</span>
-              </button>
-
-              {/* Public Events Button */}
-              <button
-                id="header-btn-events-public"
-                type="button"
-                onClick={() => {
-                  setAppMode('dashboard');
-                  setActiveTab('events');
-                  setIsGuestViewingKnowledge(false);
-                }}
-                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden md:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
-                  appMode === 'dashboard' && activeTab === 'events'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-indigo-50/60 text-indigo-900 border-indigo-200/70 hover:bg-indigo-100/70'
-                }`}
-                title="Browse kids events, workshops and weekend activities"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-                <span>🎟️ Events</span>
-              </button>
-
-              {/* 1000+ Guides */}
-              <button
-                id="header-btn-knowledge-guest"
-                type="button"
-                onClick={() => {
-                  if (appMode === 'dashboard') {
-                    setActiveTab('knowledge');
-                  } else if (isGuestViewingKnowledge) {
-                    setIsGuestViewingKnowledge(false);
-                    setGuestKnowledgeSlug(undefined);
-                  } else {
-                    setIsGuestViewingKnowledge(true);
-                    setGuestKnowledgeSlug(undefined);
-                  }
-                }}
-                className={`text-xs font-bold px-3 py-2 rounded-xl border hidden lg:flex items-center gap-1.5 transition cursor-pointer shrink-0 ${
-                  (appMode === 'dashboard' && activeTab === 'knowledge') || isGuestViewingKnowledge
-                    ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                }`}
-              >
-                <BookOpen className="w-3.5 h-3.5" />
-                <span>{isGuestViewingKnowledge ? '← Home' : '1,000+ Guides'}</span>
-              </button>
-
-              {/* Vernunt Store */}
-              <button
-                type="button"
-                id="header-btn-store-guest"
-                onClick={() => {
-                  setAppMode('dashboard');
-                  setActiveTab('store');
-                }}
-                className={`text-xs font-bold hidden md:flex items-center gap-1.5 transition cursor-pointer px-3 py-2 rounded-xl border shrink-0 ${
-                  appMode === 'dashboard' && activeTab === 'store'
-                    ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
-                    : 'bg-white text-rose-700 border-rose-200 hover:bg-rose-50'
-                }`}
-              >
-                <ShoppingBag className="w-3.5 h-3.5 text-rose-600" />
-                <span>🛍️ Store</span>
-              </button>
-
-              {/* Call For Support Helpline Guest Button */}
-              <button
-                type="button"
-                id="header-btn-voice-support-guest"
-                onClick={() => {
-                  setVoiceInitialLanguage('en-IN');
-                  setShowKannadaVoiceModal(true);
-                }}
-                className="text-xs bg-gradient-to-r from-red-800 via-rose-800 to-amber-700 hover:from-red-900 hover:to-amber-800 text-white font-black hidden sm:flex items-center gap-1.5 transition hover:scale-102 cursor-pointer px-3 py-2 rounded-xl border border-rose-600/80 shadow-xs shrink-0"
-                title="Call for support (English, Kannada, Hindi, Tamil, Telugu & all Indian languages)"
-              >
-                <span className="text-sm animate-bounce">🎙️</span>
-                <span>Helpline</span>
-              </button>
-
-              <span className="w-px h-4 bg-slate-200 hidden sm:inline shrink-0" />
-
-              {/* Sign In & Join for Guests */}
-              <button
-                type="button"
-                onClick={() => setAppMode('landing')}
-                className="text-xs font-bold text-slate-700 hover:text-slate-900 px-3 py-2 rounded-xl hover:bg-slate-100 transition cursor-pointer shrink-0"
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => handleStartSignUp('Parent')}
-                className="text-xs font-black bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-xl shadow-xs transition cursor-pointer shrink-0"
-              >
-                Join Free
-              </button>
-            </div>
-          )}
-          </div>
         </div>
       </header>
 
-      {/* Sub-Header Bar: Brings Trust Score, Contacts Sync Status, Aadhaar Verification and Logout clearly below the header for easy one-tap access */}
-      {appMode === 'dashboard' && userProfile && (
-        <div id="mobile-user-status-bar" className="bg-gradient-to-r from-rose-50/90 via-amber-50/60 to-rose-50/90 border-b border-rose-200/70 py-2 w-full shadow-2xs">
-          <div className="max-w-7xl mx-auto px-3 sm:px-4 flex items-center justify-between gap-2 text-xs w-full flex-wrap sm:flex-nowrap">
-            {/* Trust Score Button */}
-            <button
-              id="btn-mob-trustscore"
-              onClick={() => setShowTrustScoreExplanation(true)}
-              className="flex items-center gap-2 bg-white/95 border border-rose-200/90 hover:border-rose-300 rounded-xl px-2.5 py-1.5 shadow-2xs transition active:scale-95 text-left cursor-pointer shrink-0"
-              title="View Safety & Trust Score Breakdown"
-            >
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-rose-800 uppercase tracking-widest leading-none">Trust Score</span>
-                <span className="text-xs font-serif font-black text-rose-950 leading-tight">
-                  {calculateTrustScore(userProfile)}/100
-                </span>
-              </div>
-              <span className="text-xs font-mono font-black text-rose-700 bg-rose-100/70 px-1 py-0.5 rounded">
-                🛡️
-              </span>
-            </button>
-
-
-            {/* User Parent Name & Aadhaar Badge */}
-            <div className="flex items-center gap-1 min-w-0 flex-1 justify-center overflow-hidden">
-              <span className={`text-[9px] px-2 py-1 rounded-lg font-bold uppercase tracking-wider truncate flex items-center gap-1 border ${
-                userProfile?.aadhaarVerified 
-                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                  : 'bg-amber-50 text-amber-800 border-amber-200'
-              }`}>
-                {userProfile?.aadhaarVerified ? '✓ Verified' : '⚠ Unverified'}
-              </span>
-            </div>
-
-            {/* Direct Mobile/Quick Log Out Button */}
-            <button
-              id="btn-mob-logout"
-              onClick={handleLogOut}
-              type="button"
-              className="flex items-center gap-1 bg-white hover:bg-rose-50 border border-rose-300 text-rose-800 hover:text-rose-900 px-2.5 py-1.5 rounded-xl text-xs font-black shadow-2xs transition active:scale-95 shrink-0 cursor-pointer"
-              title="Log Out of Vernunt"
-            >
-              <LogOut className="w-3.5 h-3.5 text-rose-700" />
-              <span>Log Out</span>
-            </button>
-          </div>
-        </div>
-      )}
-
-
-      {/* Mobile Sticky Tab Navigation Bar (Clean & Streamlined, with larger easy-to-tap pills) */}
-      {appMode === 'dashboard' && (
+      {/* Global Universal Search Overlay Modal */}
+      {showGlobalSearchOverlay && (
         <div 
-          id="mobile-sticky-tabs" 
-          className="lg:hidden bg-white/95 backdrop-blur-md border-b border-slate-200 sticky top-[60px] sm:top-[68px] z-20 shadow-xs py-3"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-6 overflow-y-auto animate-fade-in"
+          onClick={() => setShowGlobalSearchOverlay(false)}
         >
-          <div className="max-w-7xl mx-auto px-3 sm:px-5 flex items-center gap-2.5 overflow-x-auto no-scrollbar scroll-smooth">
-            {primaryHeaderTabIds.map((tabId) => {
-              const def = TAB_DEFINITIONS.find(tab => tab.id === tabId);
-              if (!def) return null;
-
-              const IconComponent = def.icon;
-              const isBilling = tabId === 'billing';
-              const isActive = activeTab === tabId;
-
-              return (
-                <button
-                  key={tabId}
-                  id={`mob-btn-${tabId}`}
-                  onClick={() => {
-                    setActiveTab(tabId as any);
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className={`shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-extrabold transition whitespace-nowrap cursor-pointer select-none active:scale-95 min-h-[42px] ${
-                    isActive
-                      ? isBilling
-                        ? 'bg-amber-500 text-slate-950 font-black shadow-xs'
-                        : 'bg-rose-700 text-white font-black shadow-xs shadow-rose-700/20'
-                      : isBilling
-                      ? 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100/60'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200/70'
-                  }`}
-                >
-                  <IconComponent className={`w-4 h-4 shrink-0 ${isBilling ? 'animate-pulse text-amber-500' : isActive ? 'text-white' : 'text-rose-700'}`} />
-                  <span>{def.shortLabel || def.label}</span>
-                </button>
-              );
-            })}
-
-            {/* Explore All Features Menu Trigger (Direct sibling with distinct border & spacing so it never blocks or overlaps events) */}
-            <button
-              id="mob-btn-more-menu"
-              onClick={() => setIsSideMenuOpen(true)}
-              className="shrink-0 flex items-center gap-2 px-4.5 py-2.5 rounded-2xl text-sm sm:text-base font-black text-rose-800 bg-rose-50 hover:bg-rose-100 border-2 border-rose-300 transition whitespace-nowrap cursor-pointer shadow-xs min-h-[46px] ml-1"
-            >
-              <Compass className="w-5 h-5 text-rose-700 shrink-0" />
-              <span>Explore All</span>
-            </button>
+          <div 
+            className="bg-white w-full max-w-2xl rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-6 space-y-4 my-8 text-left animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <h3 className="text-xs font-black uppercase text-slate-500 tracking-wider">Search Vernunt</h3>
+              <button 
+                onClick={() => setShowGlobalSearchOverlay(false)}
+                className="p-1 rounded-lg hover:bg-slate-100 text-slate-400"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <GlobalUniversalSearch
+              playmates={playmates}
+              events={eventsList}
+              daycares={daycarePlayhomes}
+              storeProducts={MOCK_MARKETPLACE}
+              onSelectResult={(type, tabId, item) => {
+                setShowGlobalSearchOverlay(false);
+                if (type === 'park') {
+                  setActiveTab('radar');
+                  setPlaymateSubCategory('parks');
+                } else {
+                  setActiveTab(tabId as any);
+                }
+                if (type === 'playmate' && item) {
+                  setSelectedPlaymate(item);
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
           </div>
         </div>
       )}
 
-      {/* Top Global Universal Search (Filters dynamically across playmates, specialists, events, daycares & whole app) */}
-      {appMode === 'dashboard' && (
-        <div id="top-global-search-container" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3.5 pb-1">
-          <GlobalUniversalSearch
-            playmates={playmates}
-            specialists={specialistsList as any}
-            events={eventsList}
-            daycares={daycarePlayhomes}
-            storeProducts={MOCK_MARKETPLACE}
-            onSelectResult={(type, tabId, item) => {
-              setActiveTab(tabId as any);
-              if (type === 'playmate' && item) {
-                setSelectedPlaymate(item);
-              }
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
-        </div>
-      )}
+      {/* Sub-Header Pills Carousel on all tabs EXCEPT Home (Community Hosting, Kids Stories, Vernunt Groups) */}
+      <SubHeaderPillsCarousel
+        activeTab={activeTab}
+        onNavigateToTab={(tab) => {
+          setActiveTab(tab as any);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+      />
 
       {/* Main content body panel */}
-      <main id="app-main" className={`flex-1 w-full ${appMode === 'landing' && !isGuestViewingKnowledge ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-6 pb-6 md:pb-8'}`}>
+      <main id="app-main" className={`flex-1 w-full ${activeTab === 'home' ? 'p-0 pb-28' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-6 pb-28'}`}>
         
-        {/* Onboarding View Logic */}
-        {appMode === 'landing' && !isGuestViewingKnowledge && (
-          <LandingLoginGateway 
-            onStartSignUp={handleStartSignUp} 
-            onQuickStart={handleQuickStartPlayground} 
-            onGoogleSignIn={handleGoogleSignIn}
-            onSelectGoogleAccount={handleSelectGoogleAccount}
-            onOpenKnowledgeBase={(slug) => {
-              setIsGuestViewingKnowledge(true);
-              setGuestKnowledgeSlug(slug);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenSpecialists={(category) => {
-              setSpecialistCategoryToOpen(category || 'All');
-              setAppMode('dashboard');
-              setActiveTab('specialists');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenKidStories={() => {
-              setAppMode('dashboard');
-              setActiveTab('kid_stories');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenEvents={() => {
-              setAppMode('dashboard');
-              setActiveTab('events');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenStore={() => {
-              setAppMode('dashboard');
-              setActiveTab('store');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenDaycare={() => {
-              setAppMode('dashboard');
-              setActiveTab('daycare');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenGroups={() => {
-              setAppMode('dashboard');
-              setActiveTab('groups');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenTracker={() => {
-              setAppMode('dashboard');
-              setActiveTab('tracker');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenCommunity={() => {
-              setAppMode('dashboard');
-              setActiveTab('community');
-              setIsGuestViewingKnowledge(false);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onOpenEventBuyerRegistration={() => setShowEventBuyerRegModal(true)}
-            onOpenKannadaVoice={(lang) => {
-              setVoiceInitialLanguage(lang || 'en-IN');
-              setShowKannadaVoiceModal(true);
-            }}
-            onOpenContactUs={() => setShowContactUsModal(true)}
-            isAuthenticating={isAuthenticating}
-            externalAuthError={authErrorMessage}
-            language={language}
-            banners={banners.filter(b => b.placement === 'home' && b.active)}
-          />
-        )}
-
-        {/* Unregistered / Guest 1000+ Knowledge Base Open View */}
-        {appMode === 'landing' && isGuestViewingKnowledge && (
-          <div className="animate-fade-in">
-            <Suspense fallback={<TabLoadingFallback />}>
-              <KnowledgeHub
-                initialSlug={guestKnowledgeSlug}
-                isGuest={true}
-                onNavigateToRadar={(interestKeyword) => {
-                  handleStartSignUp('Parent');
-                }}
-                onStartSignUp={(role, details) => handleStartSignUp((role as any) || 'Parent', details)}
-                onBackToLanding={() => {
-                  setIsGuestViewingKnowledge(false);
-                  setGuestKnowledgeSlug(undefined);
-                  if (typeof window !== 'undefined' && window.history?.replaceState) {
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('tab');
-                    url.searchParams.delete('guide');
-                    url.searchParams.delete('article');
-                    url.searchParams.delete('slug');
-                    window.history.replaceState({}, '', url.toString());
-                  }
-                }}
-              />
-            </Suspense>
-          </div>
-        )}
-
         {appMode === 'register' && (
           <div className="animate-fade-in">
             <RegistrationHub 
               onCompleteSignup={handleCompleteRegistration} 
-              onCancel={() => setAppMode('landing')} 
+              onCancel={() => setAppMode('dashboard')} 
               language={language}
               initialRole={suggestedRegisterRole}
               initialPhone={pendingRegisterDetails.phone}
@@ -4143,113 +3843,361 @@ export default function App() {
               </div>
             ))}
 
-            {/* Radar Guardian Sign-In Protection (Child Safety & Privacy) */}
-            {!userProfile && activeTab === 'radar' && (
-              <div className="max-w-2xl mx-auto my-12 p-8 bg-white rounded-3xl border border-amber-200 shadow-md text-center space-y-5 animate-fade-in">
-                <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-3xl mx-auto border border-amber-200">
-                  🛡️
-                </div>
-                <div className="space-y-2">
-                  <h3 className="text-xl font-black font-serif text-slate-900">
-                    Guardian Sign-In Required for Kids Radar
-                  </h3>
-                  <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed">
-                    To safeguard neighborhood children and maintain 100% Aadhaar safety, real-time playmates proximity radar and connect requests require guardian sign-in.
-                  </p>
-                  <p className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-200 max-w-md mx-auto">
-                    ✨ All other features — Verified Specialists, Playfest Events, 1000+ Guides, Stories Flipbooks, and Daycares — are 100% open for guests!
-                  </p>
-                </div>
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAppMode('landing');
-                      setIsGuestViewingKnowledge(false);
-                    }}
-                    className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-black rounded-xl shadow-md transition active:scale-95 cursor-pointer"
-                  >
-                    Sign In / Register Guardian ↗
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab('specialists')}
-                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl transition cursor-pointer"
-                  >
-                    Specialists Directory ↗
-                  </button>
-                </div>
-              </div>
+
+            {/* Tab: Home Discovery Feed (Exact UI/UX from screenshot) */}
+            {activeTab === 'home' && (
+              <VernuntHomepage
+                userProfile={userProfile}
+                playmates={playmates}
+                events={eventsList}
+                banners={banners}
+                onStartSignUp={handleStartSignUp}
+                onQuickStart={() => handleStartSignUp('Parent')}
+                onGoogleSignIn={() => setShowGoogleAccountModal(true)}
+                onSelectGoogleAccount={handleSelectGoogleAccount}
+                onOpenStore={(_cat) => {
+                  setActiveTab('store');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenEvents={(_evtId) => {
+                  setActiveTab('events');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenPlaymates={(playmateId) => {
+                  setActiveTab('radar');
+                  setPlaymateSubCategory('playmates');
+                  if (playmateId) {
+                    const p = playmates.find(item => item.id === playmateId);
+                    if (p) setSelectedPlaymate(p);
+                  }
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenParks={() => {
+                  setActiveTab('radar');
+                  setPlaymateSubCategory('parks');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenKidStories={() => {
+                  setActiveTab('kid_stories');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenGroups={() => {
+                  setActiveTab('groups');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenTracker={() => {
+                  setActiveTab('tracker');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenCommunity={() => {
+                  setActiveTab('community');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenContactUs={() => {
+                  setShowNotificationDrawer(true);
+                }}
+                onSelectPlaymate={(p) => {
+                  setSelectedPlaymate(p);
+                  setActiveTab('radar');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenAuthModal={() => setShowGoogleAccountModal(true)}
+                language={language}
+                unreadNotificationsCount={notificationsHistory.length}
+                hideHeader={true}
+              />
             )}
 
-            {/* Tab: Radar / Playmates Carousel View */}
-            {activeTab === 'radar' && userProfile && (
-              <div id="radar-dashboard-section" className="w-full">
-                <PlaymateCarouselDashboard
-                  playmates={playmates}
-                  filteredPlaymates={filteredPlaymates}
-                  userProfile={userProfile}
-                  userLat={userLat}
-                  userLng={userLng}
-                  connectedIds={connectedIds}
-                  savedProfileIds={savedProfileIds}
-                  onSelectPlaymate={(p) => {
-                    handleSelectPlaymate(p);
-                    setDetailModalProfile(p);
-                  }}
-                  onQuickChat={handleOpenChatTrigger}
-                  onToggleSave={handleToggleSaveProfile}
-                  filterSearchQuery={filterSearchQuery}
-                  setFilterSearchQuery={setFilterSearchQuery}
-                  maxDistanceKm={maxDistanceKm}
-                  setMaxDistanceKm={setMaxDistanceKm}
-                  filterPlayStyle={filterPlayStyle}
-                  setFilterPlayStyle={setFilterPlayStyle}
-                  filterAgeGroup={filterAgeGroup}
-                  setFilterAgeGroup={setFilterAgeGroup}
-                  filterGender={filterGender}
-                  setFilterGender={setFilterGender}
-                  filterLanguage={filterLanguage}
-                  setFilterLanguage={setFilterLanguage}
-                  filterMinAge={filterMinAge}
-                  setFilterMinAge={setFilterMinAge}
-                  filterMaxAge={filterMaxAge}
-                  setFilterMaxAge={setFilterMaxAge}
-                  selectedInterests={selectedInterests}
-                  setSelectedInterests={setSelectedInterests}
-                  selectedPreferredActivities={selectedPreferredActivities}
-                  setSelectedPreferredActivities={setSelectedPreferredActivities}
-                  filterAvailableDay={filterAvailableDay}
-                  setFilterAvailableDay={setFilterAvailableDay}
-                  filterAvailableTime={filterAvailableTime}
-                  setFilterAvailableTime={setFilterAvailableTime}
-                  filterOnlyConnected={filterOnlyConnected}
-                  setFilterOnlyConnected={setFilterOnlyConnected}
-                  filterOnlySaved={filterOnlySaved}
-                  setFilterOnlySaved={setFilterOnlySaved}
-                  filterActivityRecency={filterActivityRecency}
-                  setFilterActivityRecency={setFilterActivityRecency}
-                  radarRecentSearches={radarRecentSearches}
-                  commitRadarSearchQuery={commitRadarSearchQuery}
-                  clearRecentRadarSearches={clearRecentRadarSearches}
-                  onResetFilters={() => {
-                    setMaxDistanceKm(3.0);
-                    setFilterPlayStyle('All');
-                    setFilterAgeGroup('All');
-                    setFilterGender('All');
-                    setFilterLanguage('All');
-                    setFilterSearchQuery('');
-                    setFilterMinAge(0);
-                    setFilterMaxAge(15);
-                    setSelectedInterests([]);
-                    setSelectedPreferredActivities([]);
-                    setFilterAvailableDay('All');
-                    setFilterAvailableTime('All');
-                    setFilterOnlyConnected(false);
-                    setFilterOnlySaved(false);
-                    setFilterActivityRecency('All');
-                  }}
-                />
+            {/* Tab: Unified Explore & Discovery Hub */}
+            {activeTab === 'explore' && (
+              <UnifiedExploreHub
+                currentProfile={userProfile}
+                specialistsList={specialistsList}
+                bookingsList={bookingsList}
+                onAddBooking={(newBooking) => {
+                  setBookingsList(prev => [newBooking, ...prev]);
+                  confetti({ particleCount: 140, spread: 75 });
+                }}
+                onUpdateRole={(newRole) => {
+                  setUserRole(newRole);
+                  if (userProfile) {
+                    setUserProfile({ ...userProfile, userRole: newRole });
+                  }
+                }}
+                onAddNewSpecialist={(newSpec) => {
+                  setSpecialistsList(prev => [...prev, newSpec]);
+                  confetti({ particleCount: 100, spread: 60 });
+                }}
+                globalCommissionRate={globalCommissionRate}
+                onUpdateUserProfile={(profileObj) => {
+                  setUserProfile(profileObj);
+                }}
+                onUpdateSpecialist={handleUpdateSpecialist}
+                onNavigateToTab={(t) => setActiveTab(t as any)}
+                onContactSupport={() => setShowSupportChat(true)}
+                onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
+              />
+            )}
+
+            {/* Tab: Playtime Connect (with 3 medium category boxes: "Nearby Playmates", "Parks & Play", and "Playtime Planner") */}
+            {(activeTab === 'radar' || activeTab === 'parks') && (
+              <div id="radar-dashboard-section" className="w-full space-y-6">
+                {/* 3 Medium-Sized Category Boxes at the Top */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+                  {/* Category 1: Nearby Playmates */}
+                  <button
+                    type="button"
+                    id="btn-subcat-nearby-playmates"
+                    onClick={() => {
+                      setPlaymateSubCategory('playmates');
+                      if (activeTab === 'parks') setActiveTab('radar');
+                    }}
+                    className={`relative p-4 sm:p-5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md ${
+                      playmateSubCategory === 'playmates' && activeTab !== 'parks'
+                        ? 'border-indigo-600 bg-indigo-50/70 ring-2 ring-indigo-500/20'
+                        : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${
+                        playmateSubCategory === 'playmates' && activeTab !== 'parks'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'bg-indigo-100 text-indigo-700'
+                      }`}>
+                        <Navigation className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        playmateSubCategory === 'playmates' && activeTab !== 'parks'
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-indigo-100 text-indigo-800'
+                      }`}>
+                        {filteredPlaymates.length} Verified
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <h3 className={`text-base font-black transition-colors ${
+                        playmateSubCategory === 'playmates' && activeTab !== 'parks' ? 'text-indigo-950 font-serif' : 'text-slate-900'
+                      }`}>
+                        Nearby Playmates
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        Verified neighborhood kids by age, radius &amp; shared play interests with privacy.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Category 2: Parks & Play */}
+                  <button
+                    type="button"
+                    id="btn-subcat-parks-play"
+                    onClick={() => {
+                      setPlaymateSubCategory('parks');
+                      if (activeTab === 'parks') setActiveTab('radar');
+                    }}
+                    className={`relative p-4 sm:p-5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md ${
+                      playmateSubCategory === 'parks' || activeTab === 'parks'
+                        ? 'border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20'
+                        : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${
+                        playmateSubCategory === 'parks' || activeTab === 'parks'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        <Trees className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        playmateSubCategory === 'parks' || activeTab === 'parks'
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        140+ Bangalore Parks
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <h3 className={`text-base font-black transition-colors ${
+                        playmateSubCategory === 'parks' || activeTab === 'parks' ? 'text-emerald-950 font-serif' : 'text-slate-900'
+                      }`}>
+                        Parks &amp; Play
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        Bangalore parks directory, mandatory GPS coordinates, admin verification &amp; kid check-ins.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Category 3: Playtime Planner */}
+                  <button
+                    type="button"
+                    id="btn-subcat-planner"
+                    onClick={() => {
+                      setPlaymateSubCategory('planner');
+                      if (activeTab === 'parks') setActiveTab('radar');
+                    }}
+                    className={`relative p-4 sm:p-5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md ${
+                      playmateSubCategory === 'planner'
+                        ? 'border-amber-600 bg-amber-50/70 ring-2 ring-amber-500/20'
+                        : 'border-slate-200 bg-white hover:border-amber-300 hover:bg-slate-50/70'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className={`w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${
+                        playmateSubCategory === 'planner'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        <CalendarRange className="w-5 h-5 sm:w-6 sm:h-6" />
+                      </div>
+                      <span className={`text-[10px] sm:text-[11px] font-bold px-2.5 py-1 rounded-full ${
+                        playmateSubCategory === 'planner'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-amber-100 text-amber-800'
+                      }`}>
+                        Split Venue Costs
+                      </span>
+                    </div>
+                    <div className="mt-3">
+                      <h3 className={`text-base font-black transition-colors ${
+                        playmateSubCategory === 'planner' ? 'text-amber-950 font-serif' : 'text-slate-900'
+                      }`}>
+                        Playtime Planner
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
+                        Schedule group playtimes, split hourly venue costs (₹300/hr) with 15-min auto-lock.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Sub-Category 1: Nearby Playmates Carousel (When Logged In) */}
+                {playmateSubCategory === 'playmates' && activeTab !== 'parks' && userProfile && (
+                  <PlaymateCarouselDashboard
+                    playmates={playmates}
+                    filteredPlaymates={filteredPlaymates}
+                    userProfile={userProfile}
+                    userLat={userLat}
+                    userLng={userLng}
+                    connectedIds={connectedIds}
+                    savedProfileIds={savedProfileIds}
+                    onNavigateToParks={() => {
+                      setPlaymateSubCategory('parks');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    onSelectPlaymate={(p) => {
+                      handleSelectPlaymate(p);
+                      setDetailModalProfile(p);
+                    }}
+                    onQuickChat={handleOpenChatTrigger}
+                    onToggleSave={handleToggleSaveProfile}
+                    filterSearchQuery={filterSearchQuery}
+                    setFilterSearchQuery={setFilterSearchQuery}
+                    maxDistanceKm={maxDistanceKm}
+                    setMaxDistanceKm={setMaxDistanceKm}
+                    filterPlayStyle={filterPlayStyle}
+                    setFilterPlayStyle={setFilterPlayStyle}
+                    filterAgeGroup={filterAgeGroup}
+                    setFilterAgeGroup={setFilterAgeGroup}
+                    filterGender={filterGender}
+                    setFilterGender={setFilterGender}
+                    filterLanguage={filterLanguage}
+                    setFilterLanguage={setFilterLanguage}
+                    filterMinAge={filterMinAge}
+                    setFilterMinAge={setFilterMinAge}
+                    filterMaxAge={filterMaxAge}
+                    setFilterMaxAge={setFilterMaxAge}
+                    selectedInterests={selectedInterests}
+                    setSelectedInterests={setSelectedInterests}
+                    selectedPreferredActivities={selectedPreferredActivities}
+                    setSelectedPreferredActivities={setSelectedPreferredActivities}
+                    filterAvailableDay={filterAvailableDay}
+                    setFilterAvailableDay={setFilterAvailableDay}
+                    filterAvailableTime={filterAvailableTime}
+                    setFilterAvailableTime={setFilterAvailableTime}
+                    filterOnlyConnected={filterOnlyConnected}
+                    setFilterOnlyConnected={setFilterOnlyConnected}
+                    filterOnlySaved={filterOnlySaved}
+                    setFilterOnlySaved={setFilterOnlySaved}
+                    filterActivityRecency={filterActivityRecency}
+                    setFilterActivityRecency={setFilterActivityRecency}
+                    radarRecentSearches={radarRecentSearches}
+                    commitRadarSearchQuery={commitRadarSearchQuery}
+                    clearRecentRadarSearches={clearRecentRadarSearches}
+                    onResetFilters={() => {
+                      setMaxDistanceKm(3.0);
+                      setFilterPlayStyle('All');
+                      setFilterAgeGroup('All');
+                      setFilterGender('All');
+                      setFilterLanguage('All');
+                      setFilterSearchQuery('');
+                      setFilterMinAge(0);
+                      setFilterMaxAge(15);
+                      setSelectedInterests([]);
+                      setSelectedPreferredActivities([]);
+                      setFilterAvailableDay('All');
+                      setFilterAvailableTime('All');
+                      setFilterOnlyConnected(false);
+                      setFilterOnlySaved(false);
+                      setFilterActivityRecency('All');
+                    }}
+                  />
+                )}
+
+                {/* Sub-Category 1: Locked Full Tab Auth by Default (When not Logged In) */}
+                {playmateSubCategory === 'playmates' && activeTab !== 'parks' && !userProfile && (
+                  <PlaytimeLockedTabAuth
+                    onSuccessLogin={(loggedInProfile) => {
+                      setUserProfile(loggedInProfile);
+                      const user_role = loggedInProfile.userRole || 'Parent';
+                      setUserRole(user_role);
+                      persistAuthSession(loggedInProfile, user_role);
+                      confetti({ particleCount: 120, spread: 75 });
+                    }}
+                    onStartSignup={(details) => {
+                      setPendingRegisterDetails({
+                        phone: details.phone,
+                        email: details.email,
+                        phoneVerified: details.phoneVerified,
+                        emailVerified: details.emailVerified
+                      });
+                      handleStartSignUp('Parent', details);
+                    }}
+                    onGoogleSignIn={() => setShowGoogleAccountModal(true)}
+                  />
+                )}
+
+                {/* Sub-Category 2: Bangalore Parks & Playtime Connect */}
+                {(playmateSubCategory === 'parks' || activeTab === 'parks') && (
+                  <div className="w-full">
+                    <BangaloreParksHub
+                      userProfile={effectiveProfile}
+                      userLat={userLat}
+                      userLng={userLng}
+                      onOpenChatWithParent={(targetUserId) => {
+                        setActiveTab('chat');
+                        const target = playmates.find(p => p.id === targetUserId);
+                        if (target) setSelectedPlaymate(target);
+                      }}
+                      onRequireAuth={() => {
+                        setShowGoogleAccountModal(true);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Sub-Category 3: Playdate Planner (Scheduling, Custom Locations & Cost Splitting) */}
+                {playmateSubCategory === 'planner' && (
+                  <div className="w-full">
+                    <PlaydatePlanner 
+                      playmates={playmates} 
+                      userProfile={effectiveProfile} 
+                      activeCompanion={selectedPlaymate}
+                      onOpenPushModal={() => setShowPushNotificationModal(true)}
+                      onRequireAuth={() => setShowParentAuthModal(true)}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -4285,37 +4233,6 @@ export default function App() {
               />
             )}
 
-            {/* Tab: Pregnancy & Baby Growth/Milestones/Vaccine Tracker */}
-            {activeTab === 'tracker' && (
-              <GrowthTrackerHub 
-                userProfile={effectiveProfile} 
-              />
-            )}
-
-            {/* Tab: Babysitting & Drop-in Daycare Marketplace */}
-            {activeTab === 'daycare' && (
-              <DaycareSittingTab
-                daycarePlayhomes={daycarePlayhomes}
-                careBookings={careBookings}
-                currentUserProfile={effectiveProfile}
-                onSaveDaycareProfile={handleSaveDaycareProfile}
-                onAddCareBooking={handleAddCareBooking}
-                onUpdateBookingStatus={handleUpdateBookingStatus}
-                onOpenChatWithUser={(opponentId) => {
-                  const mate = playmates.find(p => p.id === opponentId);
-                  if (mate) {
-                    handleOpenChatTrigger(mate);
-                  } else {
-                    setActiveTab('chat');
-                  }
-                }}
-                onOpenUserProfile={(targetUser) => {
-                  setSelectedPlaymate(targetUser);
-                  setActiveTab('radar');
-                }}
-              />
-            )}
-
             {/* Tab: Instant chats log */}
             {activeTab === 'chat' && (
               <ChatPanel 
@@ -4344,6 +4261,7 @@ export default function App() {
               />
             )}
 
+
             {/* Tab: Community Board walk plans */}
             {activeTab === 'events' && (
               <EventsTab 
@@ -4367,7 +4285,7 @@ export default function App() {
                   setUserProfile(profileObj);
                 }}
                 onOpenLogin={() => {
-                  setAppMode('landing');
+                  setShowGoogleAccountModal(true);
                 }}
               />
             )}
@@ -4392,33 +4310,15 @@ export default function App() {
               </div>
             )}
 
-            {/* Tab: Specialists registration & appointments booking */}
+            {/* If tab is ever specialists, redirect to store */}
             {activeTab === 'specialists' && (
-              <SpecialistsTab 
-                currentProfile={userProfile}
-                initialCategory={specialistCategoryToOpen}
-                onUpdateRole={(newRole) => {
-                  setUserRole(newRole);
-                  if (userProfile) {
-                    setUserProfile({ ...userProfile, userRole: newRole });
-                  }
-                }}
-                onAddNewSpecialist={(newSpec) => {
-                  setSpecialistsList(prev => [...prev, newSpec]);
-                  confetti({ particleCount: 100, spread: 60 });
-                }}
-                specialistsList={specialistsList}
-                bookingsList={bookingsList}
-                onAddBooking={(newBooking) => {
-                  setBookingsList(prev => [newBooking, ...prev]);
-                  confetti({ particleCount: 140, spread: 75 });
-                }}
-                globalCommissionRate={globalCommissionRate}
-                onUpdateUserProfile={(profileObj) => {
-                  setUserProfile(profileObj);
-                }}
-                onUpdateSpecialist={handleUpdateSpecialist}
-              />
+              <div className="py-12 text-center text-sm font-semibold text-slate-500">
+                Redirecting to Vernunt Shop...
+                {(() => {
+                  setTimeout(() => setActiveTab('store'), 50);
+                  return null;
+                })()}
+              </div>
             )}
 
             {/* Tab: Consolidated Business dashboard */}
@@ -4455,6 +4355,26 @@ export default function App() {
                 }}
               />
             )}
+
+            {/* Tab: Family Profile & Safety Vault Hub */}
+            {activeTab === 'profile' && effectiveProfile && (
+              <FamilyProfileHub
+                userProfile={effectiveProfile}
+                connectedPlaymates={playmates.filter(p => connectedIds.includes(p.id))}
+                bookingsList={bookingsList}
+                walletBalance={wallet.balance}
+                onEditProfile={() => setShowEditProfileModal(true)}
+                onOpenAadhaarVerification={() => setShowAadhaarModal(true)}
+                onOpenWallet={() => setShowWalletModal(true)}
+                onOpenVIPBilling={() => setActiveTab('billing')}
+                onOpenReferrals={() => setActiveTab('referrals')}
+                onOpenChatWithPlaymate={(p) => handleOpenChatTrigger(p)}
+                onNavigateToTab={(t) => setActiveTab(t as any)}
+                onOpenSupport={() => setShowSupportChat(true)}
+                onSignOut={handleSignOut}
+              />
+            )}
+
 
             {/* Tab: System Admin panel */}
             {activeTab === 'admin' && (isSuperAdmin || userRole === 'Admin' || userProfile?.userRole === 'Admin' || (typeof window !== 'undefined' && (window.location.pathname.startsWith('/admin') || new URLSearchParams(window.location.search).get('portal') === 'admin' || new URLSearchParams(window.location.search).get('tab') === 'admin'))) && (
@@ -4552,19 +4472,6 @@ export default function App() {
               />
             )}
 
-            {/* Dedicated Portal: Daycare & Babysitter Provider Portal (https://app.vernunt.com/care) */}
-            {activeTab === 'care' && (
-              <DaycareSittingTab
-                daycarePlayhomes={daycarePlayhomes}
-                careBookings={careBookings}
-                currentUserProfile={userProfile}
-                onSaveDaycareProfile={handleSaveDaycareProfile}
-                onAddCareBooking={handleAddCareBooking}
-                onUpdateBookingStatus={handleUpdateBookingStatus}
-                initialSubView="host"
-              />
-            )}
-
             {/* Help & Standard Operating Procedures (SOP) Hub */}
             {activeTab === 'help' && (
               <HelpCenterAndSopDesk
@@ -4582,7 +4489,7 @@ export default function App() {
       {/* Persistent global footer with safe clearance for fixed bottom navigation */}
       <footer 
         id="global-page-footer" 
-        className={`bg-gradient-to-b from-slate-50 via-white to-slate-100/80 border-t border-slate-200/90 pt-3 sm:pt-4 mt-auto text-slate-600 transition-all ${
+        className={`bg-white border-t border-slate-200/90 pt-3 sm:pt-4 mt-auto text-slate-600 transition-all ${
           appMode === 'dashboard' 
             ? 'pb-40 sm:pb-44 md:pb-48 portrait:pb-[calc(10rem+20px)] sm:portrait:pb-[calc(11rem+20px)] md:portrait:pb-[calc(12rem+20px)]' 
             : 'pb-16 sm:pb-20 portrait:pb-[calc(4rem+20px)] sm:portrait:pb-[calc(5rem+20px)]'
@@ -4613,7 +4520,7 @@ export default function App() {
               <div className="space-y-2 pt-1 text-[11px] text-slate-600">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>DigiLocker Govt ID Verified Guardians</span>
+                  <span>DigiLocker Govt ID Verified Parents</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <Lock className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -4647,16 +4554,13 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (userProfile && appMode === 'dashboard') {
-                        setActiveTab('radar');
-                      } else {
-                        handleStartSignUp('Parent');
-                      }
+                      setActiveTab('radar');
+                      setPlaymateSubCategory('playmates');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
-                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">🎯</span>
+                    <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🎯</span>
                     <span>Playmate Radar (Nearby Match)</span>
                   </button>
                 </li>
@@ -4664,28 +4568,21 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (userProfile && appMode === 'dashboard') {
-                        setActiveTab('daycare');
-                      } else {
-                        handleStartSignUp('Parent');
-                      }
+                      setActiveTab('radar');
+                      setPlaymateSubCategory('parks');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-teal-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
-                    <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-600 flex items-center justify-center text-xs shrink-0">🍼</span>
-                    <span>Babysitting &amp; Drop-in Daycare</span>
+                    <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🌳</span>
+                    <span>Bangalore Parks &amp; Play</span>
                   </button>
                 </li>
                 <li>
                   <button
                     type="button"
                     onClick={() => {
-                      if (userProfile && appMode === 'dashboard') {
-                        setActiveTab('events');
-                      } else {
-                        handleStartSignUp('Parent');
-                      }
+                      setActiveTab('events');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="hover:text-orange-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
@@ -4698,16 +4595,12 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (userProfile && appMode === 'dashboard') {
-                        setActiveTab('groups');
-                      } else {
-                        handleStartSignUp('Parent');
-                      }
+                      setActiveTab('groups');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-indigo-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
-                    <span className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs shrink-0">🌸</span>
+                    <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🌸</span>
                     <span>Vernunt Groups &amp; Neighborhood Pods</span>
                   </button>
                 </li>
@@ -4715,13 +4608,12 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      setAppMode('dashboard');
                       setActiveTab('store');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-rose-800 transition flex items-center gap-2 cursor-pointer font-bold text-rose-700"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer font-semibold text-slate-700"
                   >
-                    <span className="w-5 h-5 rounded-md bg-rose-100 text-rose-700 flex items-center justify-center text-xs shrink-0">🛍️</span>
+                    <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🛍️</span>
                     <span>Vernunt Store &amp; Play Gear</span>
                   </button>
                 </li>
@@ -4729,18 +4621,37 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (userProfile && appMode === 'dashboard') {
-                        setActiveTab('knowledge');
-                      } else {
-                        setIsGuestViewingKnowledge(true);
-                        setGuestKnowledgeSlug(undefined);
-                      }
+                      setActiveTab('knowledge');
+                      setIsGuestViewingKnowledge(false);
+                      setGuestKnowledgeSlug(undefined);
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
                     className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">📚</span>
                     <span>1,000+ Child Growth Guides</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    id="btn-footer-vendor-portal"
+                    onClick={() => handleOpenPortal('vendor')}
+                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">🏪</span>
+                    <span>Product Vendor Registration &amp; Login</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    id="btn-footer-host-portal"
+                    onClick={() => handleOpenPortal('host')}
+                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">🎪</span>
+                    <span>Event, Classes &amp; Host Registration</span>
                   </button>
                 </li>
               </ul>
@@ -5297,10 +5208,10 @@ export default function App() {
                 <input
                   type="text"
                   id="input-drawer-feature-search"
-                  placeholder="Search features (e.g. specialists, stories, daycare)..."
+                  placeholder="Search features (e.g. playmates, parks, events, store)..."
                   value={drawerSearchQuery}
                   onChange={(e) => setDrawerSearchQuery(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-400 transition"
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-white border border-slate-200 rounded-xl placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400 transition"
                 />
                 {drawerSearchQuery && (
                   <button
@@ -5782,12 +5693,32 @@ export default function App() {
         />
       )}
 
-      {/* Google Account Selector & Instant Fast-Login Modal */}
-      {showGoogleAccountModal && (
-        <GoogleAccountSelectModal
-          isOpen={showGoogleAccountModal}
-          onClose={() => setShowGoogleAccountModal(false)}
-          onSelectGoogleAccount={handleSelectGoogleAccount}
+      {/* Parent Login & Sign Up Modal (Mobile OTP / Email OTP / Password) */}
+      {showParentAuthModal && (
+        <ParentAuthModal
+          isOpen={showParentAuthModal}
+          onClose={() => setShowParentAuthModal(false)}
+          onSuccessLogin={(loggedInProfile) => {
+            setUserProfile(loggedInProfile);
+            const user_role = loggedInProfile.userRole || 'Parent';
+            setUserRole(user_role);
+            setAppMode('dashboard');
+            persistAuthSession(loggedInProfile, user_role);
+            setShowParentAuthModal(false);
+            if (user_role === 'Event Organizer') setActiveTab('business');
+            else if (user_role === 'Portfolio Professional') setActiveTab('portfolio');
+            else setActiveTab('radar');
+          }}
+          onStartSignup={(details) => {
+            setShowParentAuthModal(false);
+            setPendingRegisterDetails({
+              phone: details.phone,
+              email: details.email,
+              phoneVerified: details.phoneVerified,
+              emailVerified: details.emailVerified
+            });
+            handleStartSignUp('Parent', details);
+          }}
         />
       )}
 
@@ -6000,31 +5931,39 @@ export default function App() {
                   id={`bottom-nav-${item.id}`}
                   type="button"
                   onClick={() => {
-                    setActiveTab(item.id as any);
+                    if (item.id === 'profile') {
+                      if (userProfile) {
+                        setActiveTab('profile');
+                      } else {
+                        setShowParentAuthModal(true);
+                      }
+                    } else {
+                      setActiveTab(item.id as any);
+                    }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className={`flex flex-col items-center justify-center py-1 px-1.5 sm:px-2.5 min-w-[54px] sm:min-w-[70px] shrink-0 cursor-pointer select-none transition-all duration-150 group active:scale-95 ${
-                    isActive ? 'text-rose-600' : 'text-slate-600 hover:text-slate-900'
+                    isActive ? 'text-rose-600' : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
-                  <div className={`relative flex items-center justify-center p-1.5 rounded-2xl transition-all duration-200 ${
+                  <div className={`relative flex items-center justify-center p-1.5 rounded-xl transition-all duration-200 ${
                     isActive 
-                      ? 'bg-rose-100/90 text-rose-600 shadow-xs ring-2 ring-rose-400/40 scale-105' 
-                      : 'text-slate-700 group-hover:text-slate-950 group-hover:bg-slate-100'
+                      ? 'bg-rose-50 text-rose-600 shadow-2xs ring-1 ring-rose-200 scale-105' 
+                      : 'text-slate-600 group-hover:text-slate-950 group-hover:bg-slate-50'
                   }`}>
                     <IconComponent 
                       className={`w-5 h-5 sm:w-5.5 sm:h-5.5 transition-transform duration-200 ${
                         isActive 
-                          ? 'text-rose-600 stroke-[3] drop-shadow-xs' 
-                          : 'text-slate-700 group-hover:text-slate-950 stroke-[2.4]'
+                          ? 'text-rose-600 stroke-[2.8]' 
+                          : 'text-slate-600 group-hover:text-slate-950 stroke-[2.2]'
                       }`} 
                     />
                     {isActive && (
-                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-rose-600 shadow-xs" />
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-rose-600" />
                     )}
                   </div>
-                  <span className={`text-[9.5px] sm:text-[11px] leading-tight mt-1 text-center truncate max-w-[72px] sm:max-w-none tracking-tight ${
-                    isActive ? 'font-black text-rose-600' : 'font-bold text-slate-600 group-hover:text-slate-900'
+                  <span className={`text-[10px] sm:text-[11px] leading-tight mt-1 text-center truncate max-w-[72px] sm:max-w-none tracking-tight ${
+                    isActive ? 'font-bold text-rose-600' : 'font-medium text-slate-500 group-hover:text-slate-900'
                   }`}>
                     {item.label}
                   </span>

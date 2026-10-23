@@ -1,4 +1,4 @@
-export type UserPlatformRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Vendor';
+export type UserPlatformRole = 'Parent' | 'Event Organizer' | 'Portfolio Professional' | 'Influencer' | 'Vendor';
 
 export interface RegistrationFieldItem {
   name: string;
@@ -24,30 +24,14 @@ export const USER_ROLES_CONFIG: Record<UserPlatformRole, UserRoleMeta> = {
     shortLabel: 'Parent',
     badge: 'Verified Family Access',
     icon: '👪',
-    description: 'Find verified neighborhood playmates, match kids by age and hobbies, book vetted sitters, and coordinate safe playdates.',
+    description: 'Find verified neighborhood playmates, explore Bangalore parks, discover family events, and coordinate safe playdates.',
     requiredFields: [
-      { name: 'Guardian Contact (Mobile / Email)', desc: '10-digit mobile number with OTP verification', icon: '📱', isMandatory: true },
-      { name: 'Parent / Guardian Full Name', desc: 'Mother, father, or legal guardian name', icon: '👤', isMandatory: true },
+      { name: 'Parent Contact (Mobile / Email)', desc: '10-digit mobile number with OTP verification', icon: '📱', isMandatory: true },
+      { name: 'Parent Full Name', desc: 'Mother, father, or legal parent name', icon: '👤', isMandatory: true },
       { name: 'Child Details (Name, Age & Gender)', desc: 'Age (0-17 yrs) and interests for peer matching', icon: '👶', isMandatory: true },
       { name: 'Playmate Interests & Preferred Activities', desc: 'Park play, Lego, sports, crafts, storytelling', icon: '🎨', isMandatory: true },
-      { name: 'Neighborhood & Pincode', desc: 'Proximity radar location (strictly guardian protected)', icon: '📍', isMandatory: true },
-      { name: 'Guardian Aadhaar ID Verification', desc: 'Secure zero-knowledge neighborhood trust badging', icon: '🛡️', isMandatory: true }
-    ]
-  },
-  'Daycare Center': {
-    role: 'Daycare Center',
-    label: 'Daycare Center / Creche',
-    shortLabel: 'Daycare Center',
-    badge: '6 Months Free Listing',
-    icon: '🏫',
-    description: 'List commercial daycares, Montessori early learning centers, infant creches, or certified home playhomes with live CCTV slots.',
-    requiredFields: [
-      { name: 'Daycare / Creche Center Name', desc: 'Official registered entity name', icon: '🏢', isMandatory: true },
-      { name: 'Director / In-charge Name & Phone', desc: 'Authorized administrator contact & OTP', icon: '👤', isMandatory: true },
-      { name: 'Facility Address & Landmark', desc: 'Street address, city, and verified pincode', icon: '📍', isMandatory: true },
-      { name: 'Operating Hours & Accepted Age Groups', desc: 'Full-day, half-day timings, and age limits', icon: '⏰', isMandatory: true },
-      { name: 'Capacity & CCTV Parent Access', desc: 'Student capacity and live streaming security setup', icon: '📹', isMandatory: true },
-      { name: 'Govt License / Identity Registration', desc: 'Facility registration certificate or director Aadhaar', icon: '📄', isMandatory: true }
+      { name: 'Neighborhood & Pincode', desc: 'Proximity radar location (strictly parent protected)', icon: '📍', isMandatory: true },
+      { name: 'Parent Aadhaar ID Verification', desc: 'Secure zero-knowledge neighborhood trust badging', icon: '🛡️', isMandatory: true }
     ]
   },
   'Event Organizer': {

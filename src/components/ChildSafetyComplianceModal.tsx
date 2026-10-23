@@ -45,12 +45,12 @@ export default function ChildSafetyComplianceModal({
       // Generate downloadable JSON
       const exportBlob = new Blob([
         JSON.stringify({
-          accountHolder: userProfile?.parentName || 'Verified Guardian',
+          accountHolder: userProfile?.parentName || 'Verified Parent',
           childProfile: {
             name: userProfile?.childName || 'Dependent Minor',
             age: userProfile?.age || 'Unspecified',
             interests: userProfile?.interests || ['Lego', 'Outdoor Games'],
-            guardianConsentDate: new Date().toISOString(),
+            parentConsentDate: new Date().toISOString(),
             complianceStandard: 'COPPA & DPDP Act 2023 Verified'
           },
           privacyGuarantees: {
@@ -304,7 +304,7 @@ export default function ChildSafetyComplianceModal({
                   </li>
                   <li className="flex items-start gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                    <span><strong>Government ID / Aadhaar Verified Circle:</strong> Only verified adult guardians with validated KYC can interact with the community.</span>
+                    <span><strong>Government ID / Aadhaar Verified Circle:</strong> Only verified adult parents with validated KYC can interact with the community.</span>
                   </li>
                   <li className="flex items-start gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
@@ -392,7 +392,7 @@ export default function ChildSafetyComplianceModal({
             <div className="space-y-4">
               <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
                 <h4 className="font-bold text-amber-950 text-sm flex items-center gap-1.5">
-                  <HeartHandshake className="w-4 h-4 text-amber-600" /> The Vernunt Guardian Safety Pledge
+                  <HeartHandshake className="w-4 h-4 text-amber-600" /> The Vernunt Parent Safety Pledge
                 </h4>
                 <p className="text-amber-800 text-xs">
                   Every parent, organizer, and caregiver on Vernunt signs this mutual covenant to keep all playground and playdate interactions respectful, safe, and positive.
@@ -404,7 +404,7 @@ export default function ChildSafetyComplianceModal({
                   <div className="flex items-start gap-2">
                     <span className="bg-amber-100 text-amber-900 font-bold w-5 h-5 rounded-full flex items-center justify-center text-[10px] shrink-0 mt-0.5">1</span>
                     <p className="text-slate-700 text-xs">
-                      <strong>Mandatory Adult Supervision:</strong> I pledge that an authorized, verified parent or adult guardian will be physically present for all coordinated playdates.
+                      <strong>Mandatory Adult Supervision:</strong> I pledge that an authorized, verified parent or adult parent will be physically present for all coordinated playdates.
                     </p>
                   </div>
 
@@ -434,7 +434,7 @@ export default function ChildSafetyComplianceModal({
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     <span className="text-slate-700 font-bold text-[11px]">
-                      Pledge Signed & Acknowledged by {userProfile?.parentName || 'Verified Guardian'}
+                      Pledge Signed & Acknowledged by {userProfile?.parentName || 'Verified Parent'}
                     </span>
                   </div>
                   <span className="text-slate-400 font-mono text-[10px]">Token: #CG-SAFE-{Date.now().toString(36).toUpperCase().slice(0, 8)}</span>

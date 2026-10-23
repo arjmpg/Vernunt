@@ -439,7 +439,7 @@ export function PlaymateSwipeDeck({
                       {currentProfile.parentName}
                     </h2>
                     {(currentProfile.aadhaarVerified || currentProfile.digilockerVerified) && (
-                      <span title="Aadhaar / DigiLocker Verified Indian Guardian">
+                      <span title="Aadhaar / DigiLocker Verified Indian Parent">
                         <ShieldCheck className="w-6 h-6 text-emerald-400 fill-emerald-500/30 drop-shadow" />
                       </span>
                     )}

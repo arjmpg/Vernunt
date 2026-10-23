@@ -27,7 +27,7 @@ export function generateBookingEmailHtml(booking: Booking, event?: CommunityEven
   const eventDate = booking.dateStr || event?.date || '';
   const eventTime = booking.timeSelected || event?.time || '';
   const eventVenue = booking.eventVenue || event?.location || 'Designated Event Venue';
-  const attendeeName = booking.childName ? `${booking.childName} (Guardian: ${booking.buyerName})` : booking.buyerName;
+  const attendeeName = booking.childName ? `${booking.childName} (Parent: ${booking.buyerName})` : booking.buyerName;
   const qrPassLink = typeof window !== 'undefined' ? `${window.location.origin}?tab=events&ticket=${ticketNumber}` : `https://app.vernunt.com?tab=events&ticket=${ticketNumber}`;
   const isFree = !booking.amountPaid || booking.amountPaid === 0;
 

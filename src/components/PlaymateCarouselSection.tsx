@@ -160,16 +160,19 @@ export default function PlaymateCarouselSection({
 
                 {/* Locked state overlay with EyeOff icon until Aadhaar KYC is verified */}
                 {!isPhotoUnlocked && (
-                  <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-md flex flex-col items-center justify-center p-3 text-center select-none z-10 font-serif">
-                    <div className="w-10 h-10 rounded-full bg-amber-500/25 border border-amber-400/60 flex items-center justify-center mb-1.5 shadow-md">
-                      <EyeOff className="w-5 h-5 text-amber-400 animate-pulse" />
+                  <div className="absolute inset-0 bg-slate-950/75 backdrop-blur-md flex flex-col items-center justify-center p-3 text-center select-none z-10 font-sans">
+                    <div className="w-10 h-10 rounded-full bg-amber-500/20 border border-amber-400/60 flex items-center justify-center mb-1.5 shadow-md">
+                      <EyeOff className="w-5 h-5 text-amber-400" />
                     </div>
-                    <span className="text-[10px] text-white uppercase font-black tracking-widest font-mono flex items-center gap-1">
-                      <EyeOff className="w-3 h-3 text-amber-400" />
-                      <span>Photo Locked</span>
+                    <span className="text-[10px] text-white uppercase font-black tracking-widest flex items-center gap-1">
+                      <span>Profile Locked</span>
                     </span>
-                    <span className="text-[8.5px] text-slate-200 leading-tight mt-1 font-sans">
-                      Aadhaar KYC Required
+                    <span className="text-[8.5px] text-amber-300 leading-tight mt-1 max-w-[140px]">
+                      {!currentUserProfile 
+                        ? 'Sign in to unlock playmate profiles' 
+                        : ((currentUserProfile as any).kycSkipped || (currentUserProfile as any).kycStatus === 'skipped' || currentUserProfile.verificationStatus === 'Unverified')
+                          ? 'KYC verification skipped. Upload documents to unlock'
+                          : 'KYC pending Admin review & approval'}
                     </span>
                   </div>
                 )}
@@ -254,7 +257,7 @@ export default function PlaymateCarouselSection({
                   </button>
 
                   <div className="bg-slate-950/80 backdrop-blur-xs px-2 py-0.5 rounded-lg border border-white/20 text-[10px] text-amber-300">
-                    <span>{p.childAge}y • {p.childGender}</span>
+                    <span>{isPhotoUnlocked ? `${p.childAge}y • ${p.childGender}` : '🔒 Private'}</span>
                   </div>
                 </div>
               </div>
@@ -263,12 +266,12 @@ export default function PlaymateCarouselSection({
               <div className="mt-2.5 px-0.5 space-y-1">
                 {/* Child Title */}
                 <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 line-clamp-1 leading-snug group-hover:text-rose-600 transition-colors">
-                  {p.childName}, {p.childAge} yrs
+                  {isPhotoUnlocked ? `${p.childName}, ${p.childAge} yrs` : '🔒 Playmate, •• yrs'}
                 </h4>
 
                 {/* Parent & Neighborhood */}
                 <p className="text-[11px] text-slate-500 font-medium truncate">
-                  Parent: {p.parentName} {p.location?.address ? `• ${p.location.address.split(',')[0]}` : ''}
+                  {isPhotoUnlocked ? `Parent: ${p.parentName} ${p.location?.address ? `• ${p.location.address.split(',')[0]}` : ''}` : 'Verified Parent Profile'}
                 </p>
 
                 {/* Shared Hobbies / Interests */}

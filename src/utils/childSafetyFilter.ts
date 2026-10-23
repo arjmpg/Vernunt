@@ -23,7 +23,7 @@ const INAPPROPRIATE_WORDS = [
 
 // Suspicious grooming / predatory patterns (asking child to meet secretly, hide from parents, private photos)
 const PREDATORY_PATTERNS = [
-  /don't\s+tell\s+(your\s+)?(mom|dad|parents|guardian)/i,
+  /don't\s+tell\s+(your\s+)?(mom|dad|parents|parent)/i,
   /keep\s+(this|it)\s+a\s+secret/i,
   /come\s+alone/i,
   /without\s+(your\s+)?(mom|dad|parents)/i,
@@ -58,7 +58,7 @@ export function evaluateChildSafetyText(text: string, senderRole: string = 'Pare
     if (pattern.test(text)) {
       flaggedCategories.push('GROOMING_PREDATORY');
       severity = 'CRITICAL';
-      reason = 'Potential predatory or secrecy cue detected. Guardian intervention required.';
+      reason = 'Potential predatory or secrecy cue detected. Parent intervention required.';
       sanitizedText = '[Content Blocked: Safety Policy Violation - Grooming / Secrecy Warning]';
       break;
     }
@@ -68,7 +68,7 @@ export function evaluateChildSafetyText(text: string, senderRole: string = 'Pare
   if (PHONE_HARVEST_PATTERN.test(text) || EMAIL_HARVEST_PATTERN.test(text)) {
     flaggedCategories.push('PII_HARVESTING');
     if (severity !== 'CRITICAL') severity = 'MEDIUM';
-    if (!reason) reason = 'Direct phone number or personal email sharing is restricted to verified guardian connections.';
+    if (!reason) reason = 'Direct phone number or personal email sharing is restricted to verified parent connections.';
   }
 
   // 3. Check for specific residential address leaks
@@ -139,7 +139,7 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
       items: [
         {
           rule: 'Verifiable Parental Consent (VPC)',
-          description: 'All child accounts require verified parent/guardian ownership with government ID & Aadhaar correlation.',
+          description: 'All child accounts require verified Parent ownership with government ID & Aadhaar correlation.',
           implemented: true
         },
         {
@@ -165,7 +165,7 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
       status: 'COMPLIANT' as const,
       items: [
         {
-          rule: 'Mandatory Guardian Consent Architecture',
+          rule: 'Mandatory Parent Consent Architecture',
           description: 'Unambiguous electronic consent token captured before activating playdate matching.',
           implemented: true
         },
@@ -193,7 +193,7 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
         },
         {
           rule: 'Emergency SOS & Geo-Beacon Panic Broadcast',
-          description: 'Real-time GPS coordinates dispatcher with 1-tap notifications to guardian contacts and Childline 1098.',
+          description: 'Real-time GPS coordinates dispatcher with 1-tap notifications to parent contacts and Childline 1098.',
           implemented: true
         },
         {

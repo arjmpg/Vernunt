@@ -6,16 +6,21 @@ import firebaseConfig from '../../firebase-applet-config.json';
 // Initialize core Firebase elements
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
-// Initialize Firestore with robust connection settings (auto-detect long-polling for iframe/proxy environments)
+// Initialize Firestore with robust connection settings (forcing long-polling for iframe/proxy environments and binding to custom firestoreDatabaseId)
+const firestoreDbId = (firebaseConfig as any).firestoreDatabaseId || undefined;
 let firestoreInstance;
 try {
-  firestoreInstance = initializeFirestore(app, {
-    experimentalAutoDetectLongPolling: true,
-  });
+  firestoreInstance = firestoreDbId
+    ? initializeFirestore(app, { experimentalForceLongPolling: true }, firestoreDbId)
+    : initializeFirestore(app, { experimentalForceLongPolling: true });
 } catch (e) {
-  // Fallback to standard getFirestore if already initialized
-  const dbId = (firebaseConfig as any).firestoreDatabaseId;
-  firestoreInstance = dbId ? getFirestore(app, dbId) : getFirestore(app);
+  // Fallback to getFirestore if already initialized
+  try {
+    firestoreInstance = firestoreDbId ? getFirestore(app, firestoreDbId) : getFirestore(app);
+  } catch (err) {
+    console.warn('Firestore fallback initialization note:', err);
+    firestoreInstance = getFirestore(app);
+  }
 }
 
 export const db = firestoreInstance;

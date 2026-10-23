@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { RecaptchaVerifier, signInWithPhoneNumber, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { auth } from '../utils/firebase.ts';
+import { sendFirebaseEmailOtp, verifyFirebaseEmailOtp } from '../utils/firebaseEmailAuth.ts';
 import { DICTIONARY, LanguageCode, getDictionary } from '../utils/dictionary.ts';
 import VernuntLogo from './VernuntLogo.tsx';
 import AestheticImageUploader from './AestheticImageUploader.tsx';
@@ -229,6 +230,14 @@ export default function RegistrationHub({
     canRetryEnhanced?: boolean;
     title?: string;
   } | null>(null);
+
+  // Child Birth Certificate & Parent KYC Choice states
+  const [birthCertificateDocName, setBirthCertificateDocName] = useState('');
+  const [birthCertificateDocPreview, setBirthCertificateDocPreview] = useState('');
+  const [birthCertificateDocUrl, setBirthCertificateDocUrl] = useState('');
+  const [birthCertificateDocSize, setBirthCertificateDocSize] = useState<number | undefined>(undefined);
+  const [kycChoice, setKycChoice] = useState<'upload' | 'skip'>('upload');
+  const birthCertInputRef = useRef<HTMLInputElement>(null);
 
   // Location/Address & KYC Proof states
   const [address, setAddress] = useState('');
@@ -997,44 +1006,30 @@ export default function RegistrationHub({
     setEmailOtpMsg({ text: '⏳ Sending 6-digit verification code to your email...', type: 'info' });
 
     try {
-      let codeExpected = '';
-      try {
-        const response = await fetch('/api/auth/send-email-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            userName: parentName || directorName || hostName || 'Parent Member',
-            role: preferredRole
-          })
+      const res = await sendFirebaseEmailOtp(
+        cleanEmail,
+        parentName || directorName || hostName || 'Parent Member',
+        preferredRole
+      );
+
+      setEmailVerificationCode('');
+      setEmailOtpSent(true);
+      if (res.success) {
+        setEmailOtpMsg({
+          text: res.message || `✓ 6-digit verification code sent to ${cleanEmail}. Please check your inbox or spam folder.`,
+          type: 'success'
         });
-
-        if (response.ok) {
-          await response.json().catch(() => ({}));
-        }
-      } catch (fetchErr) {
-        console.warn('Email OTP API dispatch notice:', fetchErr);
+      } else {
+        setEmailOtpMsg({
+          text: res.message || 'Unable to deliver verification code. Please check your email address.',
+          type: 'error'
+        });
       }
-
-      if (!codeExpected) {
-        codeExpected = Math.floor(100000 + Math.random() * 900000).toString();
-      }
-
-      setExpectedEmailOtpCode(codeExpected);
-      setEmailVerificationCode('');
-      setEmailOtpSent(true);
-      setEmailOtpMsg({
-        text: `✓ 6-digit verification code sent to ${cleanEmail}. Please check your inbox and spam folder, then enter the code below.`,
-        type: 'success'
-      });
     } catch (err: any) {
-      console.warn("Email OTP dispatch network fallback:", err);
-      const fallbackOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setExpectedEmailOtpCode(fallbackOtp);
-      setEmailVerificationCode('');
+      console.warn("Email OTP dispatch notice:", err);
       setEmailOtpSent(true);
       setEmailOtpMsg({
-        text: `✓ 6-digit verification code dispatched to ${cleanEmail}. Please enter the code below.`,
+        text: `✓ 6-digit verification code dispatched to ${cleanEmail}. Please check your inbox.`,
         type: 'success'
       });
     } finally {
@@ -1053,27 +1048,10 @@ export default function RegistrationHub({
     setEmailOtpMsg({ text: 'Verifying code...', type: 'info' });
 
     try {
-      const cleanEmail = email.trim().toLowerCase();
-      let serverVerified = false;
+      const cleanEmail = (hostEmail.trim() || email.trim()).toLowerCase();
+      const verifyResult = await verifyFirebaseEmailOtp(cleanEmail, code);
 
-      // Check against server endpoint
-      try {
-        const res = await fetch('/api/auth/verify-email-otp', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, otp: code })
-        });
-        if (res.ok) {
-          const data = await res.json().catch(() => ({}));
-          if (data.success || data.verified) {
-            serverVerified = true;
-          }
-        }
-      } catch (fetchErr) {
-        console.warn('Verify OTP endpoint notice:', fetchErr);
-      }
-
-      if (serverVerified || (expectedEmailOtpCode && expectedEmailOtpCode === code)) {
+      if (verifyResult.success || verifyResult.verified) {
         setEmailVerified(true);
         setEmailOtpMsg({ text: '✓ Email address verified successfully!', type: 'success' });
         setErrors(prev => {
@@ -1084,24 +1062,13 @@ export default function RegistrationHub({
         });
       } else {
         setEmailOtpMsg({
-          text: 'Invalid verification code. Please check the 6-digit code sent to your email and try again.',
+          text: verifyResult.message || 'Invalid verification code. Please check the 6-digit code sent to your email and try again.',
           type: 'error'
         });
       }
     } catch (err: any) {
-      console.warn("Email OTP verification network fallback:", err);
-      if (expectedEmailOtpCode && expectedEmailOtpCode === emailVerificationCode.trim()) {
-        setEmailVerified(true);
-        setEmailOtpMsg({ text: '✓ Email address verified successfully!', type: 'success' });
-        setErrors(prev => {
-          const next = { ...prev };
-          delete next.email;
-          delete next.emailVerified;
-          return next;
-        });
-      } else {
-        setEmailOtpMsg({ text: 'Invalid verification code. Please check the code and try again.', type: 'error' });
-      }
+      console.warn("Email OTP verification notice:", err);
+      setEmailOtpMsg({ text: 'Verification error. Please try again.', type: 'error' });
     } finally {
       setIsVerifyingEmailOtp(false);
     }
@@ -1637,7 +1604,7 @@ export default function RegistrationHub({
         }
       } else if (step === 2) {
         if (!parentName.trim()) {
-          newErrors.parentName = 'Parent or Guardian full name is required';
+          newErrors.parentName = 'Parent full name is required';
         }
         if (!address.trim() && !currentAddress.trim()) {
           const defaultLoc = 'Indiranagar, Bangalore';
@@ -1866,6 +1833,14 @@ export default function RegistrationHub({
     const initialExpiryDateStr = initialExpiry.toISOString().split('T')[0];
 
     if (preferredRole === 'Parent' || preferredRole === 'Influencer') {
+      const hasUploadedKyc = kycChoice === 'upload' && Boolean(aadhaarDocName || aadhaarDocUrl || aadhaarNumber || birthCertificateDocName || birthCertificateDocUrl);
+      const isKycSkipped = kycChoice === 'skip' || !hasUploadedKyc;
+      const initialVerificationStatus = preferredRole === 'Admin' 
+        ? VerificationStatus.VERIFIED 
+        : isKycSkipped 
+          ? VerificationStatus.UNVERIFIED 
+          : VerificationStatus.PENDING;
+
       finalProfile = {
         id: `user-${Date.now()}`,
         parentName: parentName.trim(),
@@ -1881,7 +1856,7 @@ export default function RegistrationHub({
           address: (currentAddress || address).trim() || 'Bangalore, Karnataka'
         },
         locationSharing: LocationSharing.PRECISE,
-        verificationStatus: preferredRole === 'Admin' ? VerificationStatus.VERIFIED : VerificationStatus.PENDING, // Awaiting Admin Manual Verification & Approval
+        verificationStatus: initialVerificationStatus,
         interests: selectedInterests.length > 0 ? selectedInterests : ['Lego Building', 'Drawing & Painting', 'Outdoor Play'],
         preferredActivities: selectedPreferredActivities.length > 0 ? selectedPreferredActivities : ['Indoor Games', 'Park Play'],
         parentPhotoUrl: parentProfilePhoto.trim() || undefined,
@@ -1909,25 +1884,30 @@ export default function RegistrationHub({
         phoneVerified: true,
         email: email.trim(),
         emailVerified: true,
-        aadhaarNumber: aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : undefined,
+        aadhaarNumber: isKycSkipped ? undefined : (aadhaarNumber ? aadhaarNumber.replace(/\s/g, '') : undefined),
         aadhaarVerified: preferredRole === 'Admin',
-        aadhaarDocUrl: aadhaarDocUrl || aadhaarDocPreview || undefined,
-        aadhaarDocName: aadhaarDocName || undefined,
-        aadhaarDocSize: aadhaarDocSize || undefined,
-        verificationMethod: preferredRole === 'Admin' ? 'admin_verified' : 'manual_upload',
+        aadhaarDocUrl: isKycSkipped ? undefined : (aadhaarDocUrl || aadhaarDocPreview || undefined),
+        aadhaarDocName: isKycSkipped ? undefined : (aadhaarDocName || undefined),
+        aadhaarDocSize: isKycSkipped ? undefined : aadhaarDocSize,
+        birthCertificateDocName: isKycSkipped ? undefined : (birthCertificateDocName || undefined),
+        birthCertificateDocUrl: isKycSkipped ? undefined : (birthCertificateDocUrl || birthCertificateDocPreview || undefined),
+        birthCertificateDocSize: isKycSkipped ? undefined : birthCertificateDocSize,
+        verificationMethod: preferredRole === 'Admin' ? 'admin_verified' : (isKycSkipped ? 'skipped' : 'manual_upload'),
         
         // Address & Indian Standard KYC Proof Properties
         currentAddress: (currentAddress || address).trim(),
         permanentAddress: isSameAddress ? (currentAddress || address).trim() : permanentAddress.trim(),
         isSameAddress,
         apartmentCommunityName: apartmentCommunityName.trim() || undefined,
-        addressProofDocName: addressProofDocName || aadhaarDocName || undefined,
-        addressProofDocUrl: addressProofDocUrl || addressProofDocPreview || undefined,
+        addressProofDocName: isKycSkipped ? undefined : (addressProofDocName || aadhaarDocName || undefined),
+        addressProofDocUrl: isKycSkipped ? undefined : (addressProofDocUrl || addressProofDocPreview || undefined),
         addressProofDocType: addressProofDocType || 'Aadhaar Card',
         addressProofDocSize: addressProofDocSize || undefined,
-        kycSubmitted: true,
-        kycSubmittedAt: new Date().toISOString(),
+        kycSubmitted: !isKycSkipped,
+        kycSubmittedAt: !isKycSkipped ? new Date().toISOString() : undefined,
         kycVerifiedAt: preferredRole === 'Admin' ? new Date().toISOString() : undefined,
+        kycStatus: isKycSkipped ? 'skipped' : 'pending',
+        kycSkipped: isKycSkipped,
 
         // Complimentary Membership for Parents & Influencers
         subscriptionActive: preferredRole === 'Influencer', // Instant VIP access for Influencer Partners!
@@ -2729,7 +2709,7 @@ export default function RegistrationHub({
 
                 {/* Parent Name */}
                 <div className="flex flex-col space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700">Parent / Guardian Full Name</label>
+                  <label className="text-xs font-bold text-slate-700">Parent Full Name</label>
                   <input
                     type="text"
                     id="input-parent-name"
@@ -2794,7 +2774,7 @@ export default function RegistrationHub({
                       }`}
                     >
                       <span className="text-base">🧑</span>
-                      <span>Guardian / Other</span>
+                      <span>Parent / Other</span>
                     </button>
                   </div>
 
@@ -3253,72 +3233,223 @@ export default function RegistrationHub({
                   )}
                 </div>
 
-                  {/* Mandatory Aadhaar / DigiLocker Verification Field */}
-                  <div className="pt-2" id="parent-aadhaar-verification-section">
-                    <AadhaarUploadField
-                      label="Parent Identity & Aadhaar Verification (Upload Document or Verify in App)"
-                      labelPrefix="Parent"
-                      required={false}
-                      maxSizeMb={3}
-                      aadhaarNumber={aadhaarNumber}
-                      onNumberChange={setAadhaarNumber}
-                      aadhaarDocName={aadhaarDocName}
-                      aadhaarDocUrl={aadhaarDocUrl || aadhaarDocPreview}
-                      aadhaarDocSize={aadhaarDocSize}
-                      userName={parentName}
-                      userPhone={phoneNumber}
-                      userAddress={currentAddress || address}
-                      onDocUploaded={(docData) => {
-                        setAadhaarDocName(docData.docName);
-                        setAadhaarDocUrl(docData.docUrl || docData.docPreview);
-                        setAadhaarDocPreview(docData.docPreview);
-                        setAadhaarDocSize(docData.docSize);
-                        if (docData.digilockerVerified && docData.digilockerPayload) {
-                          setDigilockerVerified(true);
-                          setDigilockerTxnId(docData.digilockerPayload.digilockerTxnId);
-                          setDigilockerDocUri(docData.digilockerPayload.digilockerDocUri);
-                          setDigilockerIssuedName(docData.digilockerPayload.digilockerIssuedName);
-                          setDigilockerMaskedAadhaar(docData.digilockerPayload.digilockerMaskedAadhaar);
-                          if (docData.digilockerPayload.digilockerAddress) {
-                            setCurrentAddress(docData.digilockerPayload.digilockerAddress);
-                            setAddress(docData.digilockerPayload.digilockerAddress);
-                          }
-                        }
-                        setErrors(prev => {
-                          const copy = { ...prev };
-                          delete copy.aadhaar;
-                          return copy;
-                        });
-                      }}
-                      onDocRemoved={() => {
-                        setAadhaarDocName('');
-                        setAadhaarDocUrl('');
-                        setAadhaarDocPreview('');
-                        setAadhaarDocSize(undefined);
-                        setDigilockerVerified(false);
-                      }}
-                      onDigiLockerVerified={(payload) => {
-                        setDigilockerVerified(true);
-                        setDigilockerTxnId(payload.digilockerTxnId);
-                        setDigilockerDocUri(payload.digilockerDocUri);
-                        setDigilockerIssuedName(payload.digilockerIssuedName);
-                        setDigilockerMaskedAadhaar(payload.digilockerMaskedAadhaar);
-                        if (payload.digilockerAddress) {
-                          setCurrentAddress(payload.digilockerAddress);
-                          setAddress(payload.digilockerAddress);
-                        }
-                        setErrors(prev => {
-                          const copy = { ...prev };
-                          delete copy.aadhaar;
-                          return copy;
-                        });
-                      }}
-                    />
-                    {errors.aadhaar && (
-                      <p className="text-[11px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
-                        <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                        <span>{errors.aadhaar}</span>
+                  {/* Parent KYC & Child Birth Certificate Upload / Skip Section */}
+                  <div className="pt-2 space-y-4" id="parent-kyc-verification-section">
+                    <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-2xl space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <ShieldCheck className="w-5 h-5 text-indigo-600 shrink-0" />
+                          <h4 className="text-xs font-black text-slate-900">
+                            Identity &amp; Child Safety Verification
+                          </h4>
+                        </div>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          Safety Protocol
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        To protect children across Bangalore neighborhoods, child profiles remain locked until Admin verifies and approves your KYC documents. You can upload now or skip and complete anytime from your profile.
                       </p>
+
+                      {/* Choice Buttons: Upload Now vs Skip for Now */}
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <button
+                          type="button"
+                          id="btn-kyc-choice-upload"
+                          onClick={() => setKycChoice('upload')}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            kycChoice === 'upload'
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Upload Documents Now</span>
+                        </button>
+                        <button
+                          type="button"
+                          id="btn-kyc-choice-skip"
+                          onClick={() => setKycChoice('skip')}
+                          className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+                            kycChoice === 'skip'
+                              ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          <span>Skip for Now</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {kycChoice === 'upload' ? (
+                      <div className="space-y-4 animate-fade-in">
+                        {/* 1. Parent Identity & Aadhaar Verification Field */}
+                        <div id="parent-aadhaar-verification-section">
+                          <AadhaarUploadField
+                            label="Parent Identity & Aadhaar Verification (Upload Document or Verify in App)"
+                            labelPrefix="Parent"
+                            required={false}
+                            maxSizeMb={3}
+                            aadhaarNumber={aadhaarNumber}
+                            onNumberChange={setAadhaarNumber}
+                            aadhaarDocName={aadhaarDocName}
+                            aadhaarDocUrl={aadhaarDocUrl || aadhaarDocPreview}
+                            aadhaarDocSize={aadhaarDocSize}
+                            userName={parentName}
+                            userPhone={phoneNumber}
+                            userAddress={currentAddress || address}
+                            onDocUploaded={(docData) => {
+                              setAadhaarDocName(docData.docName);
+                              setAadhaarDocUrl(docData.docUrl || docData.docPreview);
+                              setAadhaarDocPreview(docData.docPreview);
+                              setAadhaarDocSize(docData.docSize);
+                              if (docData.digilockerVerified && docData.digilockerPayload) {
+                                setDigilockerVerified(true);
+                                setDigilockerTxnId(docData.digilockerPayload.digilockerTxnId);
+                                setDigilockerDocUri(docData.digilockerPayload.digilockerDocUri);
+                                setDigilockerIssuedName(docData.digilockerPayload.digilockerIssuedName);
+                                setDigilockerMaskedAadhaar(docData.digilockerPayload.digilockerMaskedAadhaar);
+                                if (docData.digilockerPayload.digilockerAddress) {
+                                  setCurrentAddress(docData.digilockerPayload.digilockerAddress);
+                                  setAddress(docData.digilockerPayload.digilockerAddress);
+                                }
+                              }
+                              setErrors(prev => {
+                                const copy = { ...prev };
+                                delete copy.aadhaar;
+                                return copy;
+                              });
+                            }}
+                            onDocRemoved={() => {
+                              setAadhaarDocName('');
+                              setAadhaarDocUrl('');
+                              setAadhaarDocPreview('');
+                              setAadhaarDocSize(undefined);
+                              setDigilockerVerified(false);
+                            }}
+                            onDigiLockerVerified={(payload) => {
+                              setDigilockerVerified(true);
+                              setDigilockerTxnId(payload.digilockerTxnId);
+                              setDigilockerDocUri(payload.digilockerDocUri);
+                              setDigilockerIssuedName(payload.digilockerIssuedName);
+                              setDigilockerMaskedAadhaar(payload.digilockerMaskedAadhaar);
+                              if (payload.digilockerAddress) {
+                                setCurrentAddress(payload.digilockerAddress);
+                                setAddress(payload.digilockerAddress);
+                              }
+                              setErrors(prev => {
+                                const copy = { ...prev };
+                                delete copy.aadhaar;
+                                return copy;
+                              });
+                            }}
+                          />
+                          {errors.aadhaar && (
+                            <p className="text-[11px] text-red-500 font-bold mt-1.5 flex items-center gap-1">
+                              <AlertCircle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                              <span>{errors.aadhaar}</span>
+                            </p>
+                          )}
+                        </div>
+
+                        {/* 2. Child Birth Certificate Upload Field */}
+                        <div id="child-birth-certificate-section" className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                              <span>Child Birth Certificate Document (Optional in this stage)</span>
+                            </label>
+                            <span className="text-[10px] text-slate-500 font-semibold bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                              PDF / JPG / PNG &lt; 5MB
+                            </span>
+                          </div>
+
+                          <input
+                            ref={birthCertInputRef}
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                setErrors(prev => ({ ...prev, birthCert: 'File size must be under 5MB' }));
+                                return;
+                              }
+                              setBirthCertificateDocName(file.name);
+                              setBirthCertificateDocSize(file.size);
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const res = reader.result as string;
+                                setBirthCertificateDocPreview(res);
+                                setBirthCertificateDocUrl(res);
+                              };
+                              reader.readAsDataURL(file);
+                              setErrors(prev => {
+                                const copy = { ...prev };
+                                delete copy.birthCert;
+                                return copy;
+                              });
+                            }}
+                          />
+
+                          {birthCertificateDocName ? (
+                            <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 text-sm font-bold">
+                                  ✓
+                                </div>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-slate-800 truncate">
+                                    {birthCertificateDocName}
+                                  </p>
+                                  <p className="text-[10px] text-emerald-600 font-semibold">
+                                    Attached for Admin Review • {birthCertificateDocSize ? `${Math.round(birthCertificateDocSize / 1024)} KB` : 'Ready'}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setBirthCertificateDocName('');
+                                  setBirthCertificateDocPreview('');
+                                  setBirthCertificateDocUrl('');
+                                  setBirthCertificateDocSize(undefined);
+                                  if (birthCertInputRef.current) birthCertInputRef.current.value = '';
+                                }}
+                                className="text-xs text-rose-600 hover:text-rose-800 font-bold px-2 py-1 hover:bg-rose-50 rounded-lg cursor-pointer"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          ) : (
+                            <div
+                              onClick={() => birthCertInputRef.current?.click()}
+                              className="border-2 border-dashed border-slate-300 hover:border-indigo-400 bg-white rounded-xl p-4 text-center cursor-pointer transition hover:bg-indigo-50/20 group"
+                            >
+                              <Upload className="w-6 h-6 text-slate-400 group-hover:text-indigo-600 mx-auto mb-1 transition" />
+                              <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-900">
+                                Click to Upload Child&apos;s Birth Certificate
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">
+                                Official municipal birth certificate / Hospital record
+                              </p>
+                            </div>
+                          )}
+                          {errors.birthCert && (
+                            <p className="text-[11px] text-red-500 font-bold">{errors.birthCert}</p>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-left space-y-2 animate-fade-in">
+                        <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
+                          <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                          <span>KYC Verification Skipped</span>
+                        </div>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          You can complete registration and browse public parks and events now. However, neighborhood child profiles and connect requests will remain locked until you upload your KYC documents in your Profile and receive Admin approval.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>

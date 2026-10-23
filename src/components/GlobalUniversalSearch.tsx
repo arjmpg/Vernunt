@@ -2,13 +2,14 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
   Search, X, User, Stethoscope, Calendar, Home, ShoppingBag, 
   ArrowRight, Sparkles, MapPin, Tag, CheckCircle2, ChevronRight,
-  Filter
+  Filter, Trees
 } from 'lucide-react';
 import { ChildProfile, Specialist, CommunityEvent, DaycarePlayhomeProfile, MarketItem } from '../types.ts';
+import { BANGALORE_PARKS } from '../data/bangaloreParks.ts';
 
 export interface GlobalUniversalSearchResult {
   id: string;
-  type: 'playmate' | 'specialist' | 'event' | 'daycare' | 'store';
+  type: 'playmate' | 'event' | 'daycare' | 'store' | 'park';
   title: string;
   subtitle: string;
   badge: string;
@@ -21,7 +22,7 @@ export interface GlobalUniversalSearchResult {
 
 interface GlobalUniversalSearchProps {
   playmates: ChildProfile[];
-  specialists: Specialist[];
+  specialists?: Specialist[];
   events: CommunityEvent[];
   daycares?: DaycarePlayhomeProfile[];
   storeProducts?: MarketItem[];
@@ -40,7 +41,7 @@ export default function GlobalUniversalSearch({
 }: GlobalUniversalSearchProps) {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-  const [activeFilter, setActiveFilter] = useState<'all' | 'playmates' | 'specialists' | 'events' | 'daycares' | 'store'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'parks' | 'playmates' | 'events' | 'daycares' | 'store'>('all');
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -106,33 +107,7 @@ export default function GlobalUniversalSearch({
       }
     }
 
-    // 2. Search Specialists
-    if (activeFilter === 'all' || activeFilter === 'specialists') {
-      for (const s of specialists) {
-        const matchesName = s.name?.toLowerCase().includes(q);
-        const matchesCategory = s.category?.toLowerCase().includes(q);
-        const matchesSpecialty = s.specialties?.some(sp => sp.toLowerCase().includes(q));
-        const matchesClinic = s.clinicAddress?.toLowerCase().includes(q);
-        const matchesHospital = s.hospitalAffiliation?.toLowerCase().includes(q);
-        const matchesBio = s.bio?.toLowerCase().includes(q);
 
-        if (matchesName || matchesCategory || matchesSpecialty || matchesClinic || matchesHospital || matchesBio) {
-          results.push({
-            id: s.id,
-            type: 'specialist',
-            title: s.name,
-            subtitle: `${s.category} • ${s.hospitalAffiliation || s.clinicAddress || 'Clinic'}`,
-            badge: s.category || 'Specialist',
-            badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-            icon: Stethoscope,
-            tabId: 'specialists',
-            extraInfo: s.experienceYears ? `${s.experienceYears}y exp • ₹${s.consultationFee}` : undefined,
-            meta: s
-          });
-          if (results.length > 75) break;
-        }
-      }
-    }
 
     // 3. Search Events
     if (activeFilter === 'all' || activeFilter === 'events') {
@@ -213,6 +188,32 @@ export default function GlobalUniversalSearch({
       }
     }
 
+    // 6. Search Bangalore Parks
+    if (activeFilter === 'all' || activeFilter === 'parks') {
+      for (const park of BANGALORE_PARKS) {
+        const matchesName = park.name?.toLowerCase().includes(q);
+        const matchesLoc = park.locality?.toLowerCase().includes(q);
+        const matchesAddress = park.address?.toLowerCase().includes(q);
+        const matchesFac = park.facilities?.some(f => f.toLowerCase().includes(q));
+
+        if (matchesName || matchesLoc || matchesAddress || matchesFac) {
+          results.push({
+            id: park.id,
+            type: 'park',
+            title: park.name,
+            subtitle: `${park.locality} • ${park.zone} Bangalore • ${park.timings}`,
+            badge: '🌳 Playmate • Park',
+            badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+            icon: Trees,
+            tabId: 'radar',
+            extraInfo: park.entryFee,
+            meta: park
+          });
+          if (results.length > 160) break;
+        }
+      }
+    }
+
     return results;
   }, [query, activeFilter, playmates, specialists, events, daycares, storeProducts]);
 
@@ -282,7 +283,7 @@ export default function GlobalUniversalSearch({
             <span className="text-[10px] uppercase font-black tracking-wider text-slate-400 pl-1 pr-1 flex items-center gap-1">
               <Filter className="w-3 h-3 text-slate-400" /> Filter:
             </span>
-            {(['all', 'playmates', 'specialists', 'events', 'daycares', 'store'] as const).map((filterKey) => (
+            {(['all', 'parks', 'playmates', 'events', 'daycares', 'store'] as const).map((filterKey) => (
               <button
                 key={filterKey}
                 type="button"

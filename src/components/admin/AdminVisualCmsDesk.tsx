@@ -25,7 +25,7 @@ const PAGES_LIST = [
   { id: 'groups', label: '🌸 Vernunt Parenting Groups & Circles', path: '/groups' },
   { id: 'home', label: '🏠 Parent Home Dashboard & Radar', path: '/' },
   { id: 'safety', label: '🛡️ Child Safety & Meetup Protection', path: '/safety' },
-  { id: 'terms', label: '📄 Guardian Terms & Safe Harbor', path: '/terms' },
+  { id: 'terms', label: '📄 Parent Terms & Safe Harbor', path: '/terms' },
   { id: 'privacy', label: '🔒 Privacy Policy (DPDP Act)', path: '/privacy' }
 ];
 

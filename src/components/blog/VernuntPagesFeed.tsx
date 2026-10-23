@@ -394,7 +394,7 @@ export function VernuntPagesFeed({ userProfile }: VernuntPagesFeedProps) {
                           )}
                         </div>
                         <p className="text-[11px] text-slate-400">
-                          {post.authorRole || 'Community Guardian'} • {post.createdAt}
+                          {post.authorRole || 'Community Parent'} • {post.createdAt}
                         </p>
                       </div>
                     </div>

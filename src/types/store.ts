@@ -107,9 +107,50 @@ export interface CartItem {
   vendorName?: string;
 }
 
+export interface DimensionalShippingRules {
+  baseWeightGrams: number;
+  baseRateLocal: number;
+  baseRateRegional: number;
+  baseRateMetro: number;
+  baseRateNational: number;
+  baseRateSpecial: number;
+  additionalWeightStepGrams: number;
+  additionalRatePerStep: number;
+  volumetricDivisor: number;
+  oversizeLengthThresholdCm: number;
+  oversizeSurcharge: number;
+  freeShippingThreshold: number;
+  customPincodeRates?: Record<string, number>;
+}
+
+export const DEFAULT_DIMENSIONAL_SHIPPING_RULES: DimensionalShippingRules = {
+  baseWeightGrams: 500,
+  baseRateLocal: 35,
+  baseRateRegional: 49,
+  baseRateMetro: 59,
+  baseRateNational: 79,
+  baseRateSpecial: 119,
+  additionalWeightStepGrams: 500,
+  additionalRatePerStep: 25,
+  volumetricDivisor: 5000,
+  oversizeLengthThresholdCm: 40,
+  oversizeSurcharge: 30,
+  freeShippingThreshold: 499,
+  customPincodeRates: {
+    '560102': 29,
+    '560034': 29,
+    '560100': 35,
+    '110001': 59,
+    '400001': 59,
+    '700001': 69,
+    '500001': 49
+  }
+};
+
 export interface StoreSettings {
   // Payment Options
-  enableRazorpay: boolean;
+  enableOnlineGateway?: boolean;
+  enableRazorpay?: boolean;
   enableCOD: boolean;
   enableCashOnDelivery?: boolean;
   codExtraFee: number;
@@ -120,6 +161,9 @@ export interface StoreSettings {
   enableCards?: boolean;
   enableNetBanking?: boolean;
   enableWallet?: boolean;
+
+  // Weight, Dimensions & Pincode Dynamic Shipping Rules
+  shippingRules?: DimensionalShippingRules;
 
   // Shipping & Logistics
   standardShippingFee: number;
@@ -206,7 +250,7 @@ export interface CustomerAddress {
   isDefault?: boolean;
 }
 
-export type PaymentMethod = 'Razorpay' | 'COD' | 'UPI' | 'Card' | 'NetBanking' | 'VernuntWallet';
+export type PaymentMethod = 'OnlineGateway' | 'COD' | 'VernuntWallet' | 'Cards' | 'UPI' | 'NetBanking' | 'Cashfree' | 'Razorpay' | 'Complimentary';
 
 export type OrderStatus = 
   | 'pending'

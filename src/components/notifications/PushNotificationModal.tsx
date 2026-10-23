@@ -65,7 +65,7 @@ export default function PushNotificationModal({
     try {
       const result = await requestPushPermissionAndGetToken(
         userProfile?.id || 'guest',
-        userProfile?.parentName || 'Vernunt Guardian'
+        userProfile?.parentName || 'Vernunt Parent'
       );
 
       setPermission(result.permission);

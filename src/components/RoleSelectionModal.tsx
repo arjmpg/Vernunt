@@ -122,7 +122,6 @@ export default function RoleSelectionModal({
                   <option value="Vendor">🛍️ Kids Brand &amp; Product Vendor / Seller (Toys, Gear, Books, Care)</option>
                   <option value="Daycare Center">🏫 Daycare Center / Creche (Pre-schools &amp; Care Facilities)</option>
                   <option value="Event Organizer">🎪 Events, Activity &amp; Classes Host (Workshops &amp; Camps)</option>
-                  <option value="Portfolio Professional">🩺 Kids Specialist, Doctor &amp; Pediatrician</option>
                   <option value="Influencer">⭐ Community Creator &amp; Influencer Ambassador (VIP Pass)</option>
                 </select>
                 <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-500">

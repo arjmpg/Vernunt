@@ -68,7 +68,7 @@ export default function VerificationModal({ profile, onClose, onVerifyCompleted 
                 </p>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed max-w-sm mx-auto">
-                {profile.childName} has cleared standard pediatric booster logs (MMR, DTaP), parental city address checks, and guardian identification factors. This profile is fully approved for companion matching.
+                {profile.childName} has cleared standard pediatric booster logs (MMR, DTaP), parental city address checks, and parent identification factors. This profile is fully approved for companion matching.
               </p>
               <button
                 id="btn-close-verified"
@@ -97,7 +97,7 @@ export default function VerificationModal({ profile, onClose, onVerifyCompleted 
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  <span>Guardian City Neighborhood verification</span>
+                  <span>Parent City Neighborhood verification</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500" />

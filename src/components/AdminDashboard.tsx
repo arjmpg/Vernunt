@@ -1259,26 +1259,36 @@ export default function AdminDashboard({
     return () => clearInterval(interval);
   }, [fetchServerUsers]);
 
-  // Helper to accurately classify any pending KYC applicant
+  // Helper to accurately classify any pending KYC applicant (documents submitted, awaiting review)
   const isPendingKycUser = React.useCallback((u: ChildProfile) => {
     if (!u || isDemoOrGuest(u.id)) return false;
     const status = (u.verificationStatus || '').toString().toUpperCase();
-    if (status === 'PENDING') return true;
-    if (status === 'UNVERIFIED' || !u.aadhaarVerified) {
-      if (
-        u.kycSubmitted || 
-        !!u.aadhaarDocName || 
-        !!u.aadhaarDocUrl || 
-        !!u.idDocumentName || 
-        !!(u as any).addressProofDocName || 
-        !!(u as any).companyDocName || 
-        !!(u as any).licenseDocName ||
-        (u.userRole && u.userRole !== 'Admin')
-      ) {
-        return true;
-      }
-    }
-    return false;
+    if (status === 'VERIFIED') return false;
+    // Has submitted documents for KYC verification
+    return !!(
+      u.kycSubmitted || 
+      u.kycStatus === 'pending' || 
+      status === 'PENDING' ||
+      u.aadhaarDocName || 
+      u.aadhaarDocUrl || 
+      (u as any).birthCertificateDocName ||
+      (u as any).birthCertificateDocUrl ||
+      u.idDocumentName || 
+      (u as any).addressProofDocName
+    );
+  }, [isDemoOrGuest]);
+
+  // Helper to accurately classify any user who skipped KYC verification at signup
+  const isSkippedKycUser = React.useCallback((u: ChildProfile) => {
+    if (!u || isDemoOrGuest(u.id)) return false;
+    const status = (u.verificationStatus || '').toString().toUpperCase();
+    if (status === 'VERIFIED') return false;
+    // Did NOT submit documents, or explicitly marked as skipped
+    return !!(
+      (u as any).kycSkipped || 
+      (u as any).kycStatus === 'skipped' || 
+      (!u.aadhaarDocName && !u.aadhaarDocUrl && !u.aadhaarVerified && !(u as any).birthCertificateDocName && status !== 'PENDING')
+    );
   }, [isDemoOrGuest]);
 
   // Filtered Users computation: Merges live Firestore users, backend storage, playmates, and current admin session
@@ -1311,6 +1321,7 @@ export default function AdminDashboard({
 
   const verifiedCount = allUsers.filter(u => u.verificationStatus === VerificationStatus.VERIFIED || u.verificationStatus === 'VERIFIED').length;
   const pendingCount = allUsers.filter(isPendingKycUser).length;
+  const skippedCount = allUsers.filter(isSkippedKycUser).length;
   const organizerCount = allUsers.filter(u => u.userRole === 'Event Organizer').length;
   const specialistCount = allUsers.filter(u => u.userRole === 'Portfolio Professional').length;
   const influencerCount = allUsers.filter(u => u.userRole === 'Influencer').length;
@@ -1338,6 +1349,7 @@ export default function AdminDashboard({
 
     if (activeSubTab === 'verified') return matchesSearch && (u.verificationStatus === VerificationStatus.VERIFIED || u.verificationStatus === 'VERIFIED');
     if (activeSubTab === 'pending') return matchesSearch && isPendingKycUser(u);
+    if (activeSubTab === 'skipped') return matchesSearch && isSkippedKycUser(u);
     if (activeSubTab === 'organizers') return matchesSearch && u.userRole === 'Event Organizer';
     if (activeSubTab === 'specialists') return matchesSearch && u.userRole === 'Portfolio Professional';
     if (activeSubTab === 'admins') return matchesSearch && u.userRole === 'Admin';
@@ -2813,6 +2825,16 @@ export default function AdminDashboard({
                 <li>
                   <button 
                     type="button" 
+                    onClick={() => setActiveSubTab('skipped')}
+                    className={`hover:text-[#2271b1] ${activeSubTab === 'skipped' ? 'text-[#1d2327] font-bold' : 'text-[#2271b1]'}`}
+                  >
+                    Skipped Verification <span className="text-amber-600 font-bold">({skippedCount})</span>
+                  </button>
+                  <span className="mx-1 text-[#dcdcde]">|</span>
+                </li>
+                <li>
+                  <button 
+                    type="button" 
                     onClick={() => setActiveSubTab('organizers')}
                     className={`hover:text-[#2271b1] ${activeSubTab === 'organizers' ? 'text-[#1d2327] font-bold' : 'text-[#2271b1]'}`}
                   >
@@ -3344,7 +3366,7 @@ export default function AdminDashboard({
                     <span className="text-xs font-bold uppercase tracking-wider">Parental Custody</span>
                     <UserCheck className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <div className="text-2xl font-bold font-mono text-[#1d2327]">100% Guardians</div>
+                  <div className="text-2xl font-bold font-mono text-[#1d2327]">100% Parents</div>
                   <span className="text-[11px] text-[#646970] block">No direct minor self-registration</span>
                 </div>
               </div>
@@ -3409,11 +3431,11 @@ export default function AdminDashboard({
                             <button
                               type="button"
                               onClick={() => {
-                                alert('Formal guardian warning issued to registered account email.');
+                                alert('Formal parent warning issued to registered account email.');
                               }}
                               className="px-2 py-1 bg-[#f6f7f7] hover:bg-white text-[#2c3338] border border-[#c3c4c7] font-bold text-[10px] rounded-xs cursor-pointer"
                             >
-                              Warn Guardian
+                              Warn Parent
                             </button>
                           </td>
                         </tr>
@@ -3495,11 +3517,11 @@ export default function AdminDashboard({
                       <UserCheck className="w-4 h-4 text-emerald-600" /> Verifiable Parental Consent (VPC) Audit Register
                     </h3>
                     <p className="text-xs text-[#646970]">
-                      COPPA 16 CFR § 312.5 and DPDP Act 2023 proof of verifiable guardian authorization.
+                      COPPA 16 CFR § 312.5 and DPDP Act 2023 proof of verifiable parent authorization.
                     </p>
                   </div>
                   <span className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold px-2.5 py-1 rounded-xs">
-                    Total Consents: {allUsers.length} Active Guardians
+                    Total Consents: {allUsers.length} Active Parents
                   </span>
                 </div>
 
@@ -3507,7 +3529,7 @@ export default function AdminDashboard({
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-[#c3c4c7] text-[#646970] font-semibold text-[11px]">
-                        <th className="py-2">Parent / Legal Guardian</th>
+                        <th className="py-2">Parents</th>
                         <th className="py-2">Dependent Minor</th>
                         <th className="py-2">Age Bracket</th>
                         <th className="py-2">KYC & Aadhaar Token</th>
@@ -6043,12 +6065,14 @@ export default function AdminDashboard({
                     onClick={async () => {
                       try {
                         const userRef = doc(db, 'users', selectedUser.id);
-                        await updateDoc(userRef, {
+                        const safeLocation = selectedUser.location?.lat ? selectedUser.location : { lat: 12.9716, lng: 77.5946, address: selectedUser.area || selectedUser.city || 'Bengaluru, Karnataka' };
+                        await setDoc(userRef, {
                           facialAuditRequired: false,
                           faceVerificationStatus: 'verified',
                           verificationStatus: VerificationStatus.VERIFIED,
-                          aadhaarVerified: true
-                        });
+                          aadhaarVerified: true,
+                          location: safeLocation
+                        }, { merge: true });
                         setTargetVerification(VerificationStatus.VERIFIED);
                         setTargetAadhaarVerified(true);
                         await sendApprovalNotification(selectedUser);
@@ -6153,12 +6177,14 @@ export default function AdminDashboard({
                         onClick={async () => {
                           try {
                             const userRef = doc(db, 'users', selectedUser.id);
-                            await updateDoc(userRef, {
+                            const safeLocation = selectedUser.location?.lat ? selectedUser.location : { lat: 12.9716, lng: 77.5946, address: selectedUser.area || selectedUser.city || 'Bengaluru, Karnataka' };
+                            await setDoc(userRef, {
                               verificationStatus: VerificationStatus.VERIFIED,
                               aadhaarVerified: true,
                               verificationMethod: 'admin_verified',
-                              adminVerifiedAt: new Date().toISOString()
-                            });
+                              adminVerifiedAt: new Date().toISOString(),
+                              location: safeLocation
+                            }, { merge: true });
                             setTargetVerification(VerificationStatus.VERIFIED);
                             setTargetAadhaarVerified(true);
                             await sendApprovalNotification(selectedUser);

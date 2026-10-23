@@ -72,7 +72,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
     }
 
     if (!parentPhotoUrl.trim()) {
-      setErrorMsg("Parent/Guardian portrait photo is mandatory for verified identity and child safety.");
+      setErrorMsg("Parent portrait photo is mandatory for verified identity and child safety.");
       return;
     }
 
@@ -174,7 +174,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase text-amber-900 flex items-center gap-1.5 tracking-wide">
                   <User className="w-3.5 h-3.5 text-amber-700" />
-                  Parent / Guardian Portrait Photo *
+                  Parent Portrait Photo *
                 </span>
                 <span className="bg-amber-200/70 text-amber-900 text-[9px] font-black uppercase px-2 py-0.5 rounded-full">
                   Mandatory Verified Adult
@@ -188,7 +188,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
                 presetSuggestions={[
                   { name: 'Mother Portrait', url: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=400&crop=faces' },
                   { name: 'Father Portrait', url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400&crop=faces' },
-                  { name: 'Guardian Headshot', url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=400&crop=faces' }
+                  { name: 'Parent Headshot', url: 'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&q=80&w=400&crop=faces' }
                 ]}
               />
               <p className="text-[10px] text-amber-800 font-medium leading-relaxed">
@@ -226,7 +226,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Parent / Guardian Name *</label>
+              <label className="block text-xs font-bold text-slate-700">Parent Name *</label>
               <input
                 type="text"
                 required
@@ -291,7 +291,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-amber-50/50'
                 }`}
               >
-                <span>🧑 Guardian</span>
+                <span>🧑 Parent</span>
               </button>
             </div>
             <div className="flex items-start gap-1.5 bg-white/90 p-2 rounded-xl text-[10.5px] text-slate-600 leading-tight">
@@ -349,7 +349,7 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="block text-xs font-bold text-slate-700">Guardian's Profession (Optional)</label>
+              <label className="block text-xs font-bold text-slate-700">Parent's Profession (Optional)</label>
               <input
                 type="text"
                 placeholder="Tech Architect, Doctor, etc."
@@ -534,10 +534,10 @@ export default function EditProfileModal({ currentProfile, onSave, onClose }: Ed
             </div>
           </div>
 
-          {/* Guardian Phone Privacy Preferences */}
+          {/* Parent Phone Privacy Preferences */}
           <div className="p-4 bg-orange-50/40 border border-orange-100 rounded-2xl space-y-1.5">
             <label className="block text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1">
-              📱 Guardian Phone Security Protocol:
+              📱 Parent Phone Security Protocol:
             </label>
             <p className="text-[10px] text-slate-500 leading-normal">
               Control which families can access your registered contact coordinates. Locking permanently blocks all revelations.

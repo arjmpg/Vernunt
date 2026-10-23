@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ShieldAlert, Phone, MapPin, X, Send, Navigation, Share2, Plus, Trash2, Volume2, VolumeX } from 'lucide-react';
+import { dispatchEmailNotification } from '../utils/firebaseEmailAuth.ts';
 
 interface EmergencySOSModalProps {
   onClose: () => void;
@@ -197,9 +198,33 @@ export default function EmergencySOSModal({ onClose, userProfile }: EmergencySOS
       }, 3500 + index * 1200);
     });
 
+    // Dispatch Emergency SOS Email Alerts to registered contacts & parents
+    const targetEmail = userProfile?.email || 'parent@vernunt.org';
+    const latVal = coords?.latitude ? coords.latitude.toFixed(6) : '12.971598';
+    const lngVal = coords?.longitude ? coords.longitude.toFixed(6) : '77.594562';
+    const mapsLink = `https://maps.google.com/?q=${latVal},${lngVal}`;
+
+    dispatchEmailNotification({
+      toEmail: targetEmail,
+      recipientName: userProfile?.parentName || 'Parent',
+      type: 'emergency_sos',
+      subject: `🚨 EMERGENCY SOS DISTRESS ALERT: ${userProfile?.childName || 'Child'} (${userProfile?.parentName || 'Parent'})`,
+      details: {
+        childName: userProfile?.childName || 'Child',
+        coordinates: `${latVal}, ${lngVal}`,
+        mapsUrl: mapsLink
+      },
+      customMessage: `An emergency beacon was triggered. Live GPS coordinates: ${latVal}, ${lngVal}. Help is urgently requested.`,
+      callToAction: {
+        label: 'Open GPS in Google Maps',
+        url: mapsLink
+      }
+    });
+
     // Final alert to local authorities simulation
     setTimeout(() => {
       addTerminalLog('🚓 Alerts matching active coordinates successfully routed to Regional Municipal Emergency Helpdesks.');
+      addTerminalLog('📧 High-priority SOS distress email dispatched to family emergency contacts.');
       addTerminalLog('🔔 Audio Beacon active. Keep window open to preserve continuous satellite coordination.');
     }, 3800 + contacts.length * 1200);
 
@@ -211,7 +236,7 @@ export default function EmergencySOSModal({ onClose, userProfile }: EmergencySOS
         try {
           const latVal = coords?.latitude ? coords.latitude.toFixed(6) : '19.076032';
           const lngVal = coords?.longitude ? coords.longitude.toFixed(6) : '72.877711';
-          const text = `🚨 *EMERGENCY DISTRESS BEACON TRACE* 🚨\n*Guardian:* ${userProfile.parentName || 'Parent'}\n*GPS Coords:* https://maps.google.com/?q=${latVal},${lngVal}\n*Status:* Distress signal broadcasted to registered regional family contacts. Help is requested immediately!`;
+          const text = `🚨 *EMERGENCY DISTRESS BEACON TRACE* 🚨\n*Parent:* ${userProfile.parentName || 'Parent'}\n*GPS Coords:* https://maps.google.com/?q=${latVal},${lngVal}\n*Status:* Distress signal broadcasted to registered regional family contacts. Help is requested immediately!`;
           await fetch(config.webhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

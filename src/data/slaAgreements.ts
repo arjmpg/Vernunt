@@ -63,7 +63,7 @@ export const VERNUNT_SLA_DEFINITIONS: Record<string, SLADefinition> = {
       {
         metric: 'Handover & Pickup Verification',
         target: '100% Zero-Unverified Gate Release',
-        description: 'Strict verification of guardian government photo ID / OTP code before releasing any child.',
+        description: 'Strict verification of parent government photo ID / OTP code before releasing any child.',
         consequence: 'Zero tolerance: Immediate permanent deregistration and legal reporting.'
       }
     ],
@@ -88,7 +88,7 @@ export const VERNUNT_SLA_DEFINITIONS: Record<string, SLADefinition> = {
       {
         title: '3. Handover Protocol & Anti-Abduction Security',
         clauses: [
-          'Children shall be released solely to guardians registered in the Vernunt child profile, verified by secondary mobile OTP or biometric verification.',
+          'Children shall be released solely to parents registered in the Vernunt child profile, verified by secondary mobile OTP or biometric verification.',
           'Written parental consent via Vernunt app is strictly required 2 hours in advance for any emergency non-parent pickup.',
           'Center must maintain timestamped entry and exit logs archived digitally for minimum 180 days.'
         ]
@@ -210,7 +210,7 @@ export const VERNUNT_SLA_DEFINITIONS: Record<string, SLADefinition> = {
         metric: 'Specialist Emergency Notice Window',
         target: '≥ 2 Hours in Advance',
         description: 'Advance notice for doctor surgery or emergency delay, offering seamless priority rebooking.',
-        consequence: 'Unconditional 100% refund if the alternate slot is inconvenient to guardian.'
+        consequence: 'Unconditional 100% refund if the alternate slot is inconvenient to parent.'
       },
       {
         metric: 'Registration & License Compliance',
@@ -229,7 +229,7 @@ export const VERNUNT_SLA_DEFINITIONS: Record<string, SLADefinition> = {
         ]
       },
       {
-        title: '2. Confidentiality & Guardian Consent',
+        title: '2. Confidentiality & Parent Consent',
         clauses: [
           'Specialist agrees never to use, disclose, or publish child health assessments, developmental scores, or photos without explicit parent consent.',
           'All records must comply with the Digital Personal Data Protection Act 2023 and DISHA digital health standards.'
@@ -279,7 +279,7 @@ export const VERNUNT_SLA_DEFINITIONS: Record<string, SLADefinition> = {
       },
       {
         metric: 'Authorized Handover Security',
-        target: '100% OTP / Registered Guardian Only',
+        target: '100% OTP / Registered Parent Only',
         description: 'Never hand over the child to any neighbor, delivery person, or stranger without prior parent consent.',
         consequence: 'Immediate police reporting and permanent lifetime ban.'
       }

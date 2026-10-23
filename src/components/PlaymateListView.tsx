@@ -171,7 +171,7 @@ export function PlaymateListView({
                       </div>
                     )}
                     {p.verificationStatus === VerificationStatus.VERIFIED && (
-                      <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border border-white shadow-xs" title="Aadhaar Verified Guardian">
+                      <span className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full border border-white shadow-xs" title="Aadhaar Verified Parent">
                         <ShieldCheck className="w-3.5 h-3.5" />
                       </span>
                     )}

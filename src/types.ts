@@ -15,7 +15,7 @@ export type UserRole = 'Parent' | 'Daycare Center' | 'Event Organizer' | 'Portfo
 
 export type ChildProfileVisibility = 'PRIVATE' | 'CONNECTIONS' | 'PUBLIC';
 
-export type ConsentType = 'GUARDIAN_AUTHORITY' | 'TERMS_OF_SERVICE' | 'DPDP_PRIVACY' | 'MARKETING_EMAIL' | 'COOKIE_ANALYTICS';
+export type ConsentType = 'PARENT_AUTHORITY' | 'TERMS_OF_SERVICE' | 'DPDP_PRIVACY' | 'MARKETING_EMAIL' | 'COOKIE_ANALYTICS';
 
 export interface UserConsentRecord {
   id: string;
@@ -121,7 +121,7 @@ export interface ChildProfile {
   verificationStatus: VerificationStatus;
   interests: string[];
   photoUrl: string;
-  parentPhotoUrl?: string; // Parent/Guardian photo (MANDATORY for trust & safety)
+  parentPhotoUrl?: string; // Parent photo (MANDATORY for trust & safety)
   childPhotoUrl?: string; // Child photo (OPTIONAL for child COPPA/DPDP privacy)
   ageUnit?: 'years' | 'months';
   parentsIncome?: string; // Hidden in frontend - used strictly for intelligent matching
@@ -154,6 +154,11 @@ export interface ChildProfile {
   aadhaarDocUrl?: string; // Uploaded Aadhaar card document URL / base64 proof
   aadhaarDocName?: string; // Uploaded Aadhaar card document filename
   aadhaarDocSize?: number; // File size in bytes (max 3MB)
+  childBirthCertificateUrl?: string; // Uploaded Child Birth Certificate document / image URL
+  childBirthCertificateName?: string; // Uploaded Child Birth Certificate document filename
+  childBirthCertificateSize?: number; // File size in bytes
+  kycSkipped?: boolean; // Whether the user skipped KYC document submission at registration
+  kycStatus?: 'pending' | 'verified' | 'skipped' | 'none'; // Current KYC approval workflow status
   
   // Official DigiLocker (Government of India) e-Aadhaar verification
   digilockerVerified?: boolean;
@@ -1219,5 +1224,75 @@ export interface SocialShareRecord {
   userAgent?: string;
 }
 
+// -------------------------------------------------------------
+// BANGALORE PARKS & PLAYTIME CONNECT DATA SCHEMAS
+// -------------------------------------------------------------
 
+export type BangaloreParkZone = 'Central' | 'South' | 'North' | 'East' | 'West' | 'Outer / Greater';
 
+export interface BangalorePark {
+  id: string;
+  name: string;
+  kannadaName?: string;
+  locality: string;
+  zone: BangaloreParkZone;
+  address: string;
+  pincode: string;
+  lat: number;
+  lng: number;
+  areaAcres?: number;
+  timings: string;
+  entryFee: string;
+  facilities: string[];
+  highlights: string[];
+  imageUrl: string;
+  googleMapsUrl: string;
+  placeRating?: number;
+  reviewsCount?: number;
+  bbmpWard?: string;
+  isPopular?: boolean;
+  distanceKm?: number;
+  activeVisitsCount?: number;
+  isCustomAdded?: boolean;
+  isApproved?: boolean;
+  approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  submittedByUserId?: string;
+  submittedByUserName?: string;
+  submittedAt?: string;
+}
+
+export interface ParkVisitRsvp {
+  userId: string;
+  parentName: string;
+  parentPhotoUrl?: string;
+  childName: string;
+  childAge: number;
+  childInterests?: string[];
+  message?: string;
+  joinedAt: string;
+}
+
+export interface ParkVisitBroadcast {
+  id: string;
+  parkId: string;
+  parkName: string;
+  parkLocality: string;
+  parkAddress: string;
+  parkLat: number;
+  parkLng: number;
+  parentUserId: string;
+  parentName: string;
+  parentPhotoUrl?: string;
+  childName: string;
+  childAge: number;
+  childInterests: string[];
+  visitDate: string; // YYYY-MM-DD
+  timeSlot: string; // e.g. "04:30 PM - 06:00 PM"
+  timeCategory: 'morning' | 'midday' | 'evening' | 'sunset';
+  plannedActivity: string;
+  notes?: string;
+  isOpenInvitation: boolean;
+  rsvps: ParkVisitRsvp[];
+  createdAt: string;
+  updatedAt: string;
+}

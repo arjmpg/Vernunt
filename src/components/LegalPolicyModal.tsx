@@ -301,7 +301,7 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Eligibility &amp; Mandatory Parental Authority</h4>
                   <p className="mt-1">
-                    Direct account creation or usage by minors under the age of 18 is strictly prohibited. By registering on Vernunt, you affirmatively warrant that you are at least 18 years of age, have legal competence under the Indian Contract Act, 1872, and are the legal parent or court-appointed legal guardian of every child added to your account. You warrant that you have sole legal authority to manage their profiles, playdate requests, and bookings.
+                    Direct account creation or usage by minors under the age of 18 is strictly prohibited. By registering on Vernunt, you affirmatively warrant that you are at least 18 years of age, have legal competence under the Indian Contract Act, 1872, and are the legal parent of every child added to your account. You warrant that you have sole legal authority to manage their profiles, playdate requests, and bookings.
                   </p>
                 </div>
 
@@ -371,7 +371,7 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Verifiable Parental Consent (VPC)</h4>
                   <p className="mt-1">
-                    Under Section 9 of the DPDP Act 2023, processing of any child's data is carried out strictly upon obtaining verifiable consent from the parent or lawful guardian via authenticated multi-factor mobile OTP and government credentials.
+                    Under Section 9 of the DPDP Act 2023, processing of any child's data is carried out strictly upon obtaining verifiable consent from the parent via authenticated multi-factor mobile OTP and government credentials.
                   </p>
                 </div>
 
@@ -509,7 +509,7 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">1. Mandatory Continuous Parental Custody &amp; Supervision</h4>
                   <p className="mt-1">
-                    Parents and legal guardians warrant that they or their designated adult representative shall physically accompany and directly supervise their minor children at all times during any meetup, playdate, or class arranged through the platform. <strong>Vernunt is not a child care agency, baby sitting employer, or security guard service.</strong> Leaving a minor unattended with another family or provider is undertaken entirely at the guardian's sole risk and discretion.
+                    Parents warrant that they or their designated adult representative shall physically accompany and directly supervise their minor children at all times during any meetup, playdate, or class arranged through the platform. <strong>Vernunt is not a child care agency, baby sitting employer, or security guard service.</strong> Leaving a minor unattended with another family or provider is undertaken entirely at the parent's sole risk and discretion.
                   </p>
                 </div>
 

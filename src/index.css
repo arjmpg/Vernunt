@@ -134,4 +134,13 @@ body:has(#bottom-navigation-bar) #global-page-footer {
   }
 }
 
+/* Hide Google reCAPTCHA badge completely from screen while keeping it functional in background */
+.grecaptcha-badge {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  z-index: -9999 !important;
+}
+
+
 
