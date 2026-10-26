@@ -519,8 +519,9 @@ export const PlaytimeLockedTabAuth: React.FC<PlaytimeLockedTabAuthProps> = ({
                   ) : (
                     <button
                       type="button"
+                      disabled={loading}
                       onClick={handleSendOtp}
-                      className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer"
+                      className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer disabled:opacity-50"
                     >
                       Resend OTP
                     </button>

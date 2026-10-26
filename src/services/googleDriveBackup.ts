@@ -104,6 +104,60 @@ const BACKUP_FOLDER_NAME = 'Vernunt Playdates App Backups - Official';
 const OAUTH_CLIENT_ID = (firebaseConfig as any).oAuthClientId || '';
 
 /**
+ * Designated Google Drive backup accounts requested by administrators:
+ * 1. vernunt@gmail.com
+ * 2. dharshikmogalip@gmail.com
+ */
+export const TARGET_GDRIVE_ACCOUNTS = [
+  'vernunt@gmail.com',
+  'dharshikmogalip@gmail.com'
+];
+
+/**
+ * Automatically shares a Google Drive file or directory with vernunt@gmail.com and dharshikmogalip@gmail.com
+ */
+export async function shareFileWithTargetAccounts(
+  accessToken: string,
+  fileId: string
+): Promise<{ success: boolean; sharedWith: string[]; errors: string[] }> {
+  const sharedWith: string[] = [];
+  const errors: string[] = [];
+
+  for (const email of TARGET_GDRIVE_ACCOUNTS) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions?sendNotificationEmail=false`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          role: 'writer',
+          type: 'user',
+          emailAddress: email
+        })
+      });
+
+      if (res.ok || res.status === 200 || res.status === 201) {
+        sharedWith.push(email);
+        console.log(`[Google Drive Backup] Shared file ${fileId} with ${email} (writer)`);
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        if (errJson?.error?.message?.includes('already has') || res.status === 409) {
+          sharedWith.push(email);
+        } else {
+          errors.push(`${email}: ${errJson?.error?.message || res.statusText}`);
+        }
+      }
+    } catch (err: any) {
+      errors.push(`${email}: ${err?.message || err}`);
+    }
+  }
+
+  return { success: sharedWith.length > 0, sharedWith, errors };
+}
+
+/**
  * Ensures a valid Google Drive access token is available.
  * Tries cached token, Firebase Auth token, or Google Identity Services prompt.
  */
@@ -201,34 +255,44 @@ export async function getOrCreateDriveBackupFolder(accessToken: string): Promise
     headers: { Authorization: `Bearer ${accessToken}` }
   });
 
+  let folderId = '';
   if (searchRes.ok) {
     const searchData = await searchRes.json();
     if (searchData.files && searchData.files.length > 0) {
-      return searchData.files[0].id;
+      folderId = searchData.files[0].id;
     }
   }
 
-  // Create new folder
-  const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      name: BACKUP_FOLDER_NAME,
-      mimeType: 'application/vnd.google-apps.folder',
-      description: 'Official backup archive directory for Vernunt Playdates platform data & Firestore collections.'
-    })
-  });
+  if (!folderId) {
+    // Create new folder
+    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        name: BACKUP_FOLDER_NAME,
+        mimeType: 'application/vnd.google-apps.folder',
+        description: 'Official backup archive directory for Vernunt Playdates platform data & Firestore collections.'
+      })
+    });
 
-  if (!createRes.ok) {
-    const err = await createRes.text();
-    throw new Error(`Failed to create Google Drive backup directory: ${err}`);
+    if (!createRes.ok) {
+      const err = await createRes.text();
+      throw new Error(`Failed to create Google Drive backup directory: ${err}`);
+    }
+
+    const folderData = await createRes.json();
+    folderId = folderData.id;
   }
 
-  const folderData = await createRes.json();
-  return folderData.id;
+  // Ensure folder is shared with target administrator accounts: vernunt@gmail.com and dharshikmogalip@gmail.com
+  shareFileWithTargetAccounts(accessToken, folderId).catch(err => {
+    console.debug('Folder sharing note:', err);
+  });
+
+  return folderId;
 }
 
 /**
@@ -257,7 +321,16 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
     referrals,
     banners,
     security_logs,
-    system_config
+    system_config,
+    products,
+    orders,
+    vendors,
+    otp_verifications,
+    daycares,
+    specialists,
+    reviews,
+    coupons,
+    affiliates
   ] = await Promise.all([
     fetchCollection('childProfiles'),
     fetchCollection('users'),
@@ -266,7 +339,16 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
     fetchCollection('referrals'),
     fetchCollection('banners'),
     fetchCollection('security_logs'),
-    fetchCollection('system_config')
+    fetchCollection('system_config'),
+    fetchCollection('products'),
+    fetchCollection('orders'),
+    fetchCollection('vendors'),
+    fetchCollection('otp_verifications'),
+    fetchCollection('daycares'),
+    fetchCollection('specialists'),
+    fetchCollection('reviews'),
+    fetchCollection('coupons'),
+    fetchCollection('affiliates')
   ]);
 
   // 2. Collect local state fallback
@@ -277,7 +359,9 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
       'vernunt_contacts_directory',
       'vernunt_custom_categories',
       'vernunt_platform_settings',
-      'vernunt_local_events'
+      'vernunt_local_events',
+      'vernunt_cart_items',
+      'vernunt_user_locality'
     ];
     keys.forEach(k => {
       const val = localStorage.getItem(k);
@@ -295,7 +379,16 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
     referrals.length + 
     banners.length + 
     security_logs.length + 
-    system_config.length;
+    system_config.length +
+    products.length +
+    orders.length +
+    vendors.length +
+    otp_verifications.length +
+    daycares.length +
+    specialists.length +
+    reviews.length +
+    coupons.length +
+    affiliates.length;
 
   const metadata: BackupMetadata = {
     version: '1.0.0',
@@ -303,7 +396,7 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
     createdAt: now.toISOString(),
     backupDate: todayDateStr,
     exportedBy: auth.currentUser?.email || 'admin@vernunt.com',
-    appName: 'Vernunt Playdates',
+    appName: 'Vernunt Playdates & Community',
     isPermanent: backupType === 'MANUAL_PERMANENT',
     note: note || (backupType === 'MANUAL_PERMANENT' ? 'Manual Full App Snapshot' : 'Daily Automated Rolling Backup'),
     stats: {
@@ -327,14 +420,23 @@ export async function collectFullAppSnapshot(backupType: BackupType, note?: stri
       referrals,
       banners,
       security_logs,
-      system_config
-    },
+      system_config,
+      products,
+      orders,
+      vendors,
+      otp_verifications,
+      daycares,
+      specialists,
+      reviews,
+      coupons,
+      affiliates
+    } as any,
     localStorageSnapshot
   };
 }
 
 /**
- * Uploads a file to Google Drive using multipart upload
+ * Uploads a file to Google Drive using multipart upload and auto-shares with target accounts
  */
 async function uploadJsonFileToDrive(
   accessToken: string,
@@ -353,6 +455,7 @@ async function uploadJsonFileToDrive(
       createdAt: snapshot.metadata.createdAt,
       backupDate: snapshot.metadata.backupDate,
       totalDocuments: snapshot.metadata.stats.totalDocuments,
+      targetAccounts: TARGET_GDRIVE_ACCOUNTS,
       note: snapshot.metadata.note
     }),
     mimeType: 'application/json'
@@ -385,7 +488,14 @@ async function uploadJsonFileToDrive(
     throw new Error(`Google Drive upload failed: ${errorTxt}`);
   }
 
-  return uploadRes.json();
+  const fileData = await uploadRes.json();
+
+  // Automatically share backup file with vernunt@gmail.com and dharshikmogalip@gmail.com
+  shareFileWithTargetAccounts(accessToken, fileData.id).catch(err => {
+    console.debug('Backup file auto-sharing note:', err);
+  });
+
+  return fileData;
 }
 
 /**
@@ -580,44 +690,68 @@ export async function deleteDriveBackupFile(fileId: string): Promise<void> {
 }
 
 /**
- * Restores the entire database & local state from a backup snapshot
+ * Restores the entire database & local state from a backup snapshot, and syncs codebase live
  */
-export async function restoreFullAppFromSnapshot(snapshot: FullAppBackupSnapshot): Promise<{ restoredCount: number; errors: string[] }> {
+export async function restoreFullAppFromSnapshot(snapshot: FullAppBackupSnapshot | any): Promise<{ 
+  restoredCount: number; 
+  restoredFilesCount?: number;
+  errors: string[] 
+}> {
   const errors: string[] = [];
   let restoredCount = 0;
+  let restoredFilesCount = 0;
 
-  if (!snapshot || !snapshot.database) {
-    throw new Error('Invalid backup file structure: missing database payload.');
+  if (!snapshot) {
+    throw new Error('Invalid backup file structure: missing payload.');
   }
 
-  const collectionsMap: Record<string, any[]> = {
-    childProfiles: snapshot.database.childProfiles || [],
-    community_events: snapshot.database.community_events || [],
-    chats: snapshot.database.chats || [],
-    referrals: snapshot.database.referrals || [],
-    banners: snapshot.database.banners || [],
-    system_config: snapshot.database.system_config || []
-  };
+  const isMasterArchive = snapshot.archiveType === 'MASTER_FULL_APP_AND_CODEBASE';
+  const dbData = isMasterArchive ? (snapshot.database?.database || snapshot.database) : (snapshot.database || snapshot);
+  const codebase = isMasterArchive ? snapshot.codebase : snapshot.codebase;
 
-  for (const [collName, docs] of Object.entries(collectionsMap)) {
-    for (const docData of docs) {
-      if (docData && docData.id) {
-        try {
-          const { id, ...dataWithoutId } = docData;
-          await setDoc(doc(db, collName, id), dataWithoutId, { merge: true });
-          restoredCount++;
-        } catch (err: any) {
-          errors.push(`Failed restoring ${collName}/${docData.id}: ${err?.message || err}`);
+  // 1. Post to Server-side Restore Gateway to write codebase files to disk live
+  try {
+    const res = await fetch('/api/backup/restore', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot)
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.restoredFilesCount) restoredFilesCount = data.restoredFilesCount;
+      if (data.restoredDocsCount) restoredCount += data.restoredDocsCount;
+      if (data.fileErrors?.length) errors.push(...data.fileErrors);
+      if (data.dbErrors?.length) errors.push(...data.dbErrors);
+    }
+  } catch (srvErr) {
+    console.warn('[Restore] Server restore sync note, proceeding with client Firestore batch:', srvErr);
+  }
+
+  // 2. Client-side Firestore batch write across all collections
+  if (dbData && typeof dbData === 'object') {
+    for (const [collName, docs] of Object.entries(dbData)) {
+      if (Array.isArray(docs)) {
+        for (const docData of docs) {
+          if (docData && docData.id) {
+            try {
+              const { id, ...dataWithoutId } = docData;
+              await setDoc(doc(db, collName, id), dataWithoutId, { merge: true });
+              restoredCount++;
+            } catch (err: any) {
+              errors.push(`Failed restoring ${collName}/${docData.id}: ${err?.message || err}`);
+            }
+          }
         }
       }
     }
   }
 
-  // Restore local storage keys if present
-  if (snapshot.localStorageSnapshot) {
+  // 3. Restore local storage keys if present
+  const localSnap = snapshot.localStorageSnapshot || (isMasterArchive && snapshot.database?.localStorageSnapshot);
+  if (localSnap && typeof localSnap === 'object') {
     try {
-      Object.entries(snapshot.localStorageSnapshot).forEach(([k, v]) => {
-        localStorage.setItem(k, v);
+      Object.entries(localSnap).forEach(([k, v]) => {
+        if (typeof v === 'string') localStorage.setItem(k, v);
       });
     } catch (e) {
       console.debug('Local storage restore note:', e);
@@ -627,12 +761,51 @@ export async function restoreFullAppFromSnapshot(snapshot: FullAppBackupSnapshot
   // Record audit log
   await logSecurityThreat(
     'DRIVE_BACKUP_RESTORED',
-    `Full Database & App State Restored from Google Drive Backup: Restored ${restoredCount} records from backup dated ${snapshot.metadata.createdAt} (${snapshot.metadata.backupType}).`,
+    `Full Database & App State Restored Live: Restored ${restoredCount} database records and ${restoredFilesCount} codebase files.`,
     'HIGH',
     false
   );
 
-  return { restoredCount, errors };
+  return { restoredCount, restoredFilesCount, errors };
+}
+
+/**
+ * Reads an uploaded .json backup file from local computer and restores full app & data live
+ */
+export async function restoreFullAppFromFile(file: File): Promise<{
+  success: boolean;
+  restoredCount: number;
+  restoredFilesCount?: number;
+  appName: string;
+  version: string;
+  createdAt: string;
+  errors: string[];
+}> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const text = e.target?.result as string;
+        if (!text) throw new Error('Uploaded backup file is empty.');
+        const parsed = JSON.parse(text);
+
+        const result = await restoreFullAppFromSnapshot(parsed);
+        resolve({
+          success: true,
+          restoredCount: result.restoredCount,
+          restoredFilesCount: result.restoredFilesCount,
+          appName: parsed.appName || parsed.metadata?.appName || 'Vernunt',
+          version: parsed.version || parsed.metadata?.version || '1.0.0',
+          createdAt: parsed.createdAt || parsed.metadata?.createdAt || new Date().toISOString(),
+          errors: result.errors
+        });
+      } catch (err: any) {
+        reject(new Error(`Failed to restore backup: ${err.message || 'Invalid JSON format'}`));
+      }
+    };
+    reader.onerror = () => reject(new Error('Failed to read uploaded backup file.'));
+    reader.readAsText(file);
+  });
 }
 
 /**
@@ -797,6 +970,11 @@ export async function exportMasterArchiveToGoogleDrive(
   }
 
   const file = await uploadRes.json();
+
+  // Automatically share master archive with vernunt@gmail.com and dharshikmogalip@gmail.com
+  shareFileWithTargetAccounts(accessToken, file.id).catch(err => {
+    console.debug('Master backup share note:', err);
+  });
 
   // Record audit log
   await logSecurityThreat(

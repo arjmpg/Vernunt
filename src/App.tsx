@@ -455,7 +455,7 @@ export default function App() {
 
   const effectiveProfile = userProfile || guestProfile;
   const isSuperAdmin = Boolean(
-    isAuthorizedSystemAdmin(auth.currentUser?.email || userProfile?.email, userProfile?.userRole || userRole)
+    isAuthorizedSystemAdmin(auth.currentUser?.email || userProfile?.email, userProfile?.userRole || userRole, userProfile?.id)
   );
   const [appMode, setAppMode] = useState<'landing' | 'register' | 'dashboard'>(() => {
     if (typeof window !== 'undefined') {
@@ -3622,9 +3622,10 @@ export default function App() {
         </div>
       )}
 
-      {/* Sub-Header Pills Carousel on all tabs EXCEPT Home (Community Hosting, Kids Stories, Vernunt Groups) */}
+      {/* Sub-Header Pills Carousel: Community Hosting, Kids Stories, Vernunt Groups & Admin Dashboard (exclusively for verified admin) */}
       <SubHeaderPillsCarousel
         activeTab={activeTab}
+        isAdmin={isSuperAdmin}
         onNavigateToTab={(tab) => {
           setActiveTab(tab as any);
           window.scrollTo({ top: 0, behavior: 'smooth' });

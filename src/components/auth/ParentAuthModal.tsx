@@ -491,7 +491,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSendOtp}
-                    disabled={countdown > 0}
+                    disabled={countdown > 0 || loading}
                     className="text-[11px] font-bold text-rose-600 hover:text-rose-700 disabled:opacity-50 cursor-pointer"
                   >
                     {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend Code'}
@@ -530,7 +530,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                   <button
                     type="button"
                     onClick={handleSendOtp}
-                    disabled={checkingUser || (method === 'phone' ? cleanPhone.length !== 10 : !cleanEmail)}
+                    disabled={loading || checkingUser || (method === 'phone' ? cleanPhone.length !== 10 : !cleanEmail)}
                     className="w-full py-3 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold rounded-2xl text-xs sm:text-sm transition flex items-center justify-center gap-2 cursor-pointer shadow-md hover:shadow-lg active:scale-98"
                   >
                     {checkingUser ? (

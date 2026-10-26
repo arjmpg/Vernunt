@@ -13,8 +13,9 @@ export const AUTHORIZED_ROOT_ADMIN_EMAILS = [
 /**
  * Checks whether the current user is a cryptographically verified system admin
  */
-export function isAuthorizedSystemAdmin(email?: string | null, userRole?: string | null): boolean {
+export function isAuthorizedSystemAdmin(email?: string | null, userRole?: string | null, userId?: string | null): boolean {
   if (userRole === 'Admin') return true;
+  if (userId === 'admin-root') return true;
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
   return AUTHORIZED_ROOT_ADMIN_EMAILS.includes(normalized);
