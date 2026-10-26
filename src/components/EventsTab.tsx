@@ -296,7 +296,7 @@ export default function EventsTab({
     }
   };
 
-  // Razorpay event ticket purchase state
+  // Safe online event ticket purchase state
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [allowGuestCheckout, setAllowGuestCheckout] = useState(false);
   const [checkoutEvent, setCheckoutEvent] = useState<CommunityEvent | null>(null);
@@ -413,7 +413,8 @@ export default function EventsTab({
             hostEarned: 0,
             dateStr: eventsList[0].date,
             timeSelected: eventsList[0].time,
-            razorpayPaymentId: 'pay_shared_verified',
+            paymentId: 'pay_shared_verified',
+            cashfreePaymentId: 'pay_shared_verified',
             status: 'Paid',
             ticketNumber: targetTicket,
             ticketTierName: 'Official Family Pass',
@@ -491,7 +492,7 @@ export default function EventsTab({
         hostEarned: hostEarned,
         dateStr: checkoutEvent.date,
         timeSelected: checkoutEvent.time,
-        razorpayPaymentId: payId,
+        paymentId: payId,
         cashfreePaymentId: payId,
         paymentGateway: isFree ? 'Free' : 'Cashfree',
         paymentStatus: isFree ? 'NOT_REQUIRED' : 'PAID',
@@ -2666,7 +2667,7 @@ ${deepLink}`;
         </div>
       )}
 
-      {/* Razorpay Event Ticket Purchase checkout Modal */}
+      {/* Online Event Ticket Purchase checkout Modal */}
       {showCheckoutModal && checkoutEvent && (
         <div id="event-checkout-modal" className="fixed inset-0 bg-slate-950/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-[9999] overflow-y-auto animate-fade-in">
           <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden transform scale-100 transition-all flex flex-col max-h-[85vh] my-auto">
@@ -2679,7 +2680,7 @@ ${deepLink}`;
                 </div>
                 <div>
                   <h4 className="font-serif font-black text-base text-white">Event Ticket Checkout</h4>
-                  <span className="text-[9px] font-mono tracking-widest text-slate-400">RAZORPAY SECURE SPLIT CHANNEL</span>
+                  <span className="text-[9px] font-mono tracking-widest text-slate-400">256-BIT SSL ENCRYPTED GATEWAY</span>
                 </div>
               </div>
               <button
@@ -2811,7 +2812,7 @@ ${deepLink}`;
                       onClick={handleCashfreeEventCheckout}
                       className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-md flex items-center justify-center gap-2 cursor-pointer"
                     >
-                      <CreditCard className="w-4.5 h-4.5" /> {checkoutEvent.ticketPrice === 0 ? 'Confirm Free Pass Directly' : 'Proceed to Cashfree Secure Checkout'}
+                      <CreditCard className="w-4.5 h-4.5" /> {checkoutEvent.ticketPrice === 0 ? 'Confirm Free Pass Directly' : 'Pay via Debit / Credit Card, NetBanking, UPI'}
                     </button>
                   </div>
                 )
@@ -2821,8 +2822,8 @@ ${deepLink}`;
               <div className="p-12 text-center space-y-4">
                 <div className="w-12 h-12 border-4 border-indigo-505 border-t-transparent rounded-full animate-spin mx-auto" />
                 <div>
-                  <h5 className="font-bold text-sm text-slate-800">Connecting Cashfree Gateway...</h5>
-                  <p className="text-xs text-slate-400">Verifying authorized payment session with Cashfree Payments...</p>
+                  <h5 className="font-bold text-sm text-slate-800">Connecting to Secure Payment Gateway...</h5>
+                  <p className="text-xs text-slate-400">Authorizing secure encrypted transaction with banking network...</p>
                 </div>
               </div>
             )}
@@ -2882,7 +2883,8 @@ ${deepLink}`;
                         hostEarned: hostEarned,
                         dateStr: checkoutEvent.date,
                         timeSelected: checkoutEvent.time,
-                        razorpayPaymentId: payId,
+                        paymentId: payId,
+                        cashfreePaymentId: payId,
                         status: 'Paid',
                         ticketNumber: `VERN-EVT-${Date.now().toString().slice(-6)}`,
                         eventVenue: checkoutEvent.location,
@@ -2931,7 +2933,7 @@ ${deepLink}`;
                     }}
                     className="w-2/3 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl text-xs font-black uppercase transition shadow-md"
                   >
-                    Confirm ₹{checkoutEvent.ticketPrice} via Razorpay
+                    Confirm ₹{checkoutEvent.ticketPrice} via Cards / NetBanking / UPI
                   </button>
                 </div>
               </div>
@@ -2945,7 +2947,7 @@ ${deepLink}`;
                 <div>
                   <h5 className="font-serif font-black text-lg text-slate-800 leading-none">Ticket Booked Successfully!</h5>
                   <p className="text-xs text-slate-500 leading-relaxed mt-2">
-                    Payment transaction <strong className="text-indigo-600 font-mono text-[10px]">{productionPayId}</strong> has been secure split approved dynamically.
+                    Payment transaction <strong className="text-indigo-600 font-mono text-[10px]">{productionPayId}</strong> has been approved successfully.
                   </p>
                 </div>
 
@@ -3095,7 +3097,7 @@ ${deepLink}`;
         </div>
       )}
 
-      {/* WooEvents Multi-Tier Ticket Booking & Razorpay Checkout Modal */}
+      {/* WooEvents Multi-Tier Ticket Booking & Online Gateway Checkout Modal */}
       {bookingModalEvent && (
         <EventBookingModal
           event={bookingModalEvent}

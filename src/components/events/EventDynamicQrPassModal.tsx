@@ -951,7 +951,7 @@ export default function EventDynamicQrPassModal({
       const bTicket = (b.ticketNumber || '').toLowerCase();
       const bId = (b.id || '').toLowerCase();
       const bQr = (b.qrPayload || '').toLowerCase();
-      const bRazor = (b.razorpayPaymentId || '').toLowerCase();
+      const bPay = (b.cashfreePaymentId || b.paymentId || '').toLowerCase();
       const bChild = (b.childName || '').toLowerCase();
       const bBuyer = (b.buyerName || '').toLowerCase();
       const bPhone = (b.buyerPhone || '').replace(/\D/g, '');
@@ -961,7 +961,7 @@ export default function EventDynamicQrPassModal({
         (bTicket && (cleanMatchStr === bTicket || cleanMatchStr.includes(bTicket) || bTicket.includes(cleanMatchStr))) ||
         (bId && (cleanMatchStr === bId || cleanMatchStr.includes(bId))) ||
         (bQr && (cleanRaw === bQr || bQr.includes(cleanRaw))) ||
-        (bRazor && cleanMatchStr.includes(bRazor)) ||
+        (bPay && cleanMatchStr.includes(bPay)) ||
         (bChild && cleanMatchStr.includes(bChild)) ||
         (bBuyer && cleanMatchStr.includes(bBuyer)) ||
         (inputPhone.length >= 8 && bPhone.includes(inputPhone))

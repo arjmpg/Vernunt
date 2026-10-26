@@ -581,7 +581,7 @@ export default function AffiliateDashboard({
               </div>
               <h4 className="font-bold text-slate-900 text-xs">Automatic Instant Attribution</h4>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Every ticket checkout via Razorpay, UPI, or Credit Card automatically computes your 15% partner commission and credits your wallet immediately.
+                Every ticket checkout via Debit/Credit Card, UPI, or NetBanking automatically computes your 15% partner commission and credits your wallet immediately.
               </p>
             </div>
 

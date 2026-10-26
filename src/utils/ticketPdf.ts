@@ -22,8 +22,8 @@ export async function generateTicketPdfDoc({ booking, event, qrCodeDataUrl }: Ti
   const childName = booking.childName ? `${booking.childName}${booking.childAge ? ` (${booking.childAge} yrs)` : ''}` : 'General Attendee';
   const tierName = booking.ticketTierName || 'Standard Admission';
   const isFree = !booking.amountPaid || booking.amountPaid === 0;
-  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Verified via Cashfree Payments)`;
-  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.cashfreePaymentId || booking.razorpayPaymentId || booking.id);
+  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Paid Online • Verified)`;
+  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.cashfreePaymentId || booking.paymentId || booking.id);
 
   // Ensure high-res QR code
   let finalQr = qrCodeDataUrl;
@@ -118,7 +118,7 @@ export async function generateTicketPdfDoc({ booking, event, qrCodeDataUrl }: Ti
   doc.setTextColor(22, 163, 74);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
-  doc.text(isFree ? '✓ Free Admission Pass' : '✓ Razorpay Confirmed', pageWidth - margin - 48, currentY + 7.5);
+  doc.text(isFree ? '✓ Free Admission Pass' : '✓ Verified & Confirmed', pageWidth - margin - 48, currentY + 7.5);
 
   // Event Title Section
   currentY += 18;
@@ -317,7 +317,7 @@ export async function printTicketPass({ booking, event, qrCodeDataUrl }: TicketP
   const childName = booking.childName ? `${booking.childName}${booking.childAge ? ` (${booking.childAge} yrs)` : ''}` : 'General Attendee';
   const tierName = booking.ticketTierName || 'Standard Admission';
   const isFree = !booking.amountPaid || booking.amountPaid === 0;
-  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Paid via Razorpay Secure)`;
+  const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Paid Online • Verified)`;
 
   // Generate QR if needed
   let finalQr = qrCodeDataUrl;
@@ -489,7 +489,7 @@ export async function printTicketPass({ booking, event, qrCodeDataUrl }: TicketP
     <div class="content">
       <div class="ticket-id-bar">
         <span>TICKET ID: ${ticketNumber}</span>
-        <span style="color: #16a34a;">${isFree ? '✓ Free Admission Pass' : '✓ Razorpay Paid'}</span>
+        <span style="color: #16a34a;">${isFree ? '✓ Free Admission Pass' : '✓ Paid & Confirmed'}</span>
       </div>
 
       <div class="event-title">${eventTitle}</div>

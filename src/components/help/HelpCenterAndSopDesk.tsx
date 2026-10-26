@@ -62,7 +62,7 @@ export const HelpCenterAndSopDesk: React.FC<HelpCenterAndSopDeskProps> = ({
             'When an order is placed, an instant notification is dispatched to your vendor dashboard.',
             'Click "Generate Shipping Label" to print your barcode label and manifest via Shiprocket.',
             'Courier partners (BlueDart, Delhivery, Xpressbees) pick up the packaged goods from your warehouse.',
-            'Cashfree Payouts: Order amounts are escrowed and settled directly to your verified IFSC bank account on the automated weekly Tuesday settlement cycle.'
+            'Direct Bank Settlements: Order amounts are escrowed and settled directly to your verified IFSC bank account on the automated weekly Tuesday settlement cycle.'
           ]
         }
       ]
@@ -106,8 +106,8 @@ export const HelpCenterAndSopDesk: React.FC<HelpCenterAndSopDeskProps> = ({
         {
           heading: '4. Ticket Revenue Settlement',
           steps: [
-            'Gross ticket collections are processed seamlessly via the official Cashfree gateway.',
-            'Track ticket revenue in real-time under "Cashfree Payouts & Bank KYC".',
+            'Gross ticket collections are processed seamlessly via encrypted online payment gateways.',
+            'Track ticket revenue in real-time under "Direct Payouts & Bank KYC".',
             'Net payouts (92% after standard 8% processing/platform fee) are wired directly to your bank account.'
           ]
         }
@@ -180,7 +180,7 @@ export const HelpCenterAndSopDesk: React.FC<HelpCenterAndSopDeskProps> = ({
           steps: [
             'Add items to your cart using the 1-click `+ ADD` or `[- 1 +]` stepper.',
             'Enjoy Free Express Delivery on all orders above ₹499.',
-            'Pay securely via Cashfree using UPI (Google Pay, PhonePe, Paytm), NetBanking, Cards, or Cash on Delivery (COD).'
+            'Pay securely via Debit / Credit Cards, NetBanking, instant UPI (Google Pay, PhonePe, Paytm), or Cash on Delivery (COD).'
           ]
         }
       ]

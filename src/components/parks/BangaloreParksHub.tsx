@@ -59,6 +59,35 @@ export default function BangaloreParksHub({
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState<'distance' | 'popular' | 'rating' | 'visits'>('distance');
   const [activeTab, setActiveTab] = useState<'all_parks' | 'today_schedule' | 'my_broadcasts'>('all_parks');
+  const [amenityFilter, setAmenityFilter] = useState<'all' | 'verified' | 'accessible' | 'cafeteria'>('all');
+
+  // Helper amenities evaluators
+  const isParkVerified = (p: BangalorePark) => {
+    return Boolean(
+      p.verified === true || 
+      p.isApproved === true || 
+      p.approvalStatus === 'APPROVED' || 
+      Boolean(p.bbmpWard) || 
+      (p.placeRating !== undefined && p.placeRating >= 4.0)
+    );
+  };
+
+  const isParkAccessible = (p: BangalorePark) => {
+    return Boolean(
+      (p as any).accessible === true ||
+      p.facilities.some(f => /accessible|stroller|wheelchair|ramp/i.test(f)) ||
+      p.highlights.some(h => /accessible|stroller|wheelchair|ramp/i.test(h)) ||
+      p.name.toLowerCase().includes('inclusive')
+    );
+  };
+
+  const isParkHasCafeteria = (p: BangalorePark) => {
+    return Boolean(
+      (p as any).hasCafeteria === true ||
+      p.facilities.some(f => /cafeteria|canteen|food|refreshment|snack|kiosk|tea|coffee/i.test(f)) ||
+      p.highlights.some(h => /cafeteria|canteen|food|refreshment|snack|kiosk|tea|coffee|mtr|hopcoms|eatery/i.test(h))
+    );
+  };
 
   const isParentVerified = Boolean(userProfile && (
     userProfile.userRole === 'Admin' || 
@@ -234,6 +263,19 @@ export default function BangaloreParksHub({
     return allParks.filter(p => p.isCustomAdded && (p.isApproved === false || p.approvalStatus === 'PENDING_APPROVAL'));
   }, [allParks]);
 
+  // Compute counts for amenities filter buttons
+  const amenityCounts = useMemo(() => {
+    let verified = 0;
+    let accessible = 0;
+    let cafeteria = 0;
+    allParks.forEach(p => {
+      if (isParkVerified(p)) verified++;
+      if (isParkAccessible(p)) accessible++;
+      if (isParkHasCafeteria(p)) cafeteria++;
+    });
+    return { verified, accessible, cafeteria };
+  }, [allParks]);
+
   // Filtered and sorted parks
   const filteredParks = useMemo(() => {
     return allParks.filter(p => {
@@ -243,6 +285,17 @@ export default function BangaloreParksHub({
         if (!p.isApproved && !isSelfSubmitted) {
           return false;
         }
+      }
+
+      // Amenity filters: 'Verified', 'Accessible', 'Has Cafeteria'
+      if (amenityFilter === 'verified' && !isParkVerified(p)) {
+        return false;
+      }
+      if (amenityFilter === 'accessible' && !isParkAccessible(p)) {
+        return false;
+      }
+      if (amenityFilter === 'cafeteria' && !isParkHasCafeteria(p)) {
+        return false;
       }
 
       // Zone filter
@@ -283,7 +336,7 @@ export default function BangaloreParksHub({
       // popular
       return (b.reviewsCount || 0) - (a.reviewsCount || 0);
     });
-  }, [allParks, selectedZone, selectedFacilities, searchQuery, sortBy]);
+  }, [allParks, amenityFilter, selectedZone, selectedFacilities, searchQuery, sortBy]);
 
   // Get visits for a specific park and filtered by selected date and time
   const getFilteredVisitsForPark = (parkId: string, date: string, timeSlotId: string) => {
@@ -615,27 +668,47 @@ export default function BangaloreParksHub({
           </button>
         </div>
 
-        {/* Proximity / Sorting Dropdown */}
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="w-4 h-4 text-slate-400" />
-          <span className="text-xs font-bold text-slate-500 hidden sm:inline">Sort by:</span>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as any)}
-            className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-emerald-500 cursor-pointer shadow-2xs"
-          >
-            <option value="distance">📍 Closest to My Location</option>
-            <option value="visits">🔥 Most Active Kids Today</option>
-            <option value="popular">⭐ Most Popular &amp; Historic</option>
-            <option value="rating">🏆 Highest Rated by Parents</option>
-          </select>
+        {/* Amenity Filter & Proximity / Sorting Dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Amenity Filter Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <Filter className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+            <span className="text-xs font-bold text-slate-600 hidden sm:inline">Amenity:</span>
+            <select
+              value={amenityFilter}
+              onChange={(e) => setAmenityFilter(e.target.value as any)}
+              className="bg-white border border-emerald-300 text-emerald-950 font-bold text-xs rounded-xl px-3 py-1.5 focus:outline-emerald-600 cursor-pointer shadow-2xs"
+              aria-label="Filter parks by amenity"
+            >
+              <option value="all">🌟 All Parks ({allParks.length})</option>
+              <option value="verified">🛡️ Verified ({amenityCounts.verified})</option>
+              <option value="accessible">♿ Accessible ({amenityCounts.accessible})</option>
+              <option value="cafeteria">☕ Has Cafeteria ({amenityCounts.cafeteria})</option>
+            </select>
+          </div>
+
+          {/* Proximity / Sorting Dropdown */}
+          <div className="flex items-center gap-1.5">
+            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span className="text-xs font-bold text-slate-500 hidden sm:inline">Sort:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-bold text-slate-700 focus:outline-emerald-500 cursor-pointer shadow-2xs"
+            >
+              <option value="distance">📍 Closest to My Location</option>
+              <option value="visits">🔥 Most Active Kids Today</option>
+              <option value="popular">⭐ Most Popular &amp; Historic</option>
+              <option value="rating">🏆 Highest Rated by Parents</option>
+            </select>
+          </div>
         </div>
       </div>
 
       {/* Main Tab 1: All Parks Directory & Search */}
       {activeTab === 'all_parks' && (
         <div className="space-y-6">
-          {/* Search Bar & Zone Filter Strip */}
+          {/* Search Bar & Filter Controls Strip */}
           <div className="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200/80 space-y-4">
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <div className="relative w-full">
@@ -656,6 +729,87 @@ export default function BangaloreParksHub({
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* Amenity Filter Buttons: 'Verified', 'Accessible', 'Has Cafeteria' */}
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 border-t border-slate-100">
+              <span className="text-xs font-black text-slate-700 uppercase tracking-wider shrink-0 mr-1 flex items-center gap-1">
+                <Filter className="w-3.5 h-3.5 text-emerald-600" />
+                Amenity Filter:
+              </span>
+              <button
+                type="button"
+                onClick={() => setAmenityFilter('all')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 ${
+                  amenityFilter === 'all'
+                    ? 'bg-slate-900 text-white shadow-xs'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                }`}
+              >
+                <span>All Parks</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAmenityFilter(prev => prev === 'verified' ? 'all' : 'verified')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 border ${
+                  amenityFilter === 'verified'
+                    ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-500/20'
+                    : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-current" />
+                <span>Verified</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  amenityFilter === 'verified' ? 'bg-white text-emerald-900' : 'bg-emerald-200 text-emerald-950'
+                }`}>
+                  {amenityCounts.verified}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAmenityFilter(prev => prev === 'accessible' ? 'all' : 'accessible')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 border ${
+                  amenityFilter === 'accessible'
+                    ? 'bg-blue-700 text-white border-blue-700 shadow-xs ring-2 ring-blue-500/20'
+                    : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                }`}
+              >
+                <span>♿ Accessible</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  amenityFilter === 'accessible' ? 'bg-white text-blue-900' : 'bg-blue-200 text-blue-950'
+                }`}>
+                  {amenityCounts.accessible}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAmenityFilter(prev => prev === 'cafeteria' ? 'all' : 'cafeteria')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition cursor-pointer flex items-center gap-1.5 border ${
+                  amenityFilter === 'cafeteria'
+                    ? 'bg-amber-600 text-white border-amber-600 shadow-xs ring-2 ring-amber-500/20'
+                    : 'bg-amber-50 text-amber-950 border-amber-300 hover:bg-amber-100'
+                }`}
+              >
+                <span>☕ Has Cafeteria</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                  amenityFilter === 'cafeteria' ? 'bg-white text-amber-950' : 'bg-amber-200 text-amber-950'
+                }`}>
+                  {amenityCounts.cafeteria}
+                </span>
+              </button>
+
+              {amenityFilter !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setAmenityFilter('all')}
+                  className="text-xs font-bold text-rose-600 hover:underline shrink-0 ml-1 cursor-pointer"
+                >
+                  Clear Filter
+                </button>
+              )}
             </div>
 
             {/* Zone Filter Chips */}
@@ -681,9 +835,9 @@ export default function BangaloreParksHub({
             {/* Facility Filter Chips */}
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 mr-1">
-                Amenities:
+                Facilities:
               </span>
-              {PARK_FACILITY_OPTIONS.slice(0, 7).map((facility) => {
+              {PARK_FACILITY_OPTIONS.slice(0, 8).map((facility) => {
                 const isSelected = selectedFacilities.includes(facility);
                 return (
                   <button
@@ -767,6 +921,22 @@ export default function BangaloreParksHub({
                             ⏳ Pending Approval
                           </span>
                         )}
+                        {isParkVerified(park) && !isPending && (
+                          <span className="bg-emerald-700/95 text-white font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm backdrop-blur-xs flex items-center gap-1">
+                            <ShieldCheck className="w-2.5 h-2.5 text-emerald-200" />
+                            <span>Verified</span>
+                          </span>
+                        )}
+                        {isParkAccessible(park) && (
+                          <span className="bg-blue-600/90 text-white font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm backdrop-blur-xs">
+                            ♿ Accessible
+                          </span>
+                        )}
+                        {isParkHasCafeteria(park) && (
+                          <span className="bg-amber-600/90 text-white font-bold text-[10px] px-2 py-0.5 rounded-full shadow-sm backdrop-blur-xs">
+                            ☕ Cafeteria
+                          </span>
+                        )}
                         {park.distanceKm !== undefined && (
                           <span className="bg-slate-900/80 text-amber-300 font-mono font-bold text-[10px] px-2 py-0.5 rounded-full backdrop-blur-xs">
                             📍 {park.distanceKm} km away
@@ -838,7 +1008,7 @@ export default function BangaloreParksHub({
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="p-4 pt-0 space-y-2">
+                  <div className="p-4 pt-0 space-y-2.5">
                     <div className="grid grid-cols-2 gap-2">
                       {/* Who is Going Inspector Button */}
                       <button
@@ -871,22 +1041,31 @@ export default function BangaloreParksHub({
                       </button>
                     </div>
 
-                    {/* Google Maps Directions Link */}
-                    <div className="flex items-center justify-between pt-1">
-                      <button
-                        type="button"
-                        onClick={() => openDeviceNavigation(park.lat, park.lng, `${park.name}, Bangalore`)}
-                        className="text-[11px] font-bold text-blue-700 hover:underline flex items-center gap-1 cursor-pointer"
-                      >
-                        <Navigation className="w-3 h-3 text-blue-600" />
-                        <span>Directions on Google Maps</span>
-                      </button>
+                    {/* Dedicated Get Directions Button Linking to Google Maps */}
+                    <a
+                      href={`https://www.google.com/maps/dir/?api=1&destination=${park.lat},${park.lng}&destination_place_id=&travelmode=walking&dir_action=navigate`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2.5 px-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs group/dir"
+                      title={`Get directions to ${park.name} on Google Maps`}
+                    >
+                      <Navigation className="w-4 h-4 text-white group-hover/dir:rotate-45 transition-transform" />
+                      <span>Get Directions</span>
+                      <span className="text-[11px] font-bold text-blue-100">
+                        ({park.distanceKm !== undefined ? `${park.distanceKm} km` : 'Google Maps'})
+                      </span>
+                    </a>
 
+                    {/* Secondary Link: View Place on Google Maps */}
+                    <div className="flex items-center justify-between pt-0.5 px-1 text-[11px]">
+                      <span className="text-slate-400 font-medium truncate max-w-[200px]">
+                        📍 {park.locality}
+                      </span>
                       <a
-                        href={park.googleMapsUrl}
+                        href={park.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${park.name} ${park.locality} Bangalore`)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-[11px] font-semibold text-slate-400 hover:text-slate-600 flex items-center gap-0.5"
+                        className="text-slate-400 hover:text-slate-600 font-semibold flex items-center gap-0.5 shrink-0"
                       >
                         <span>View Place</span>
                         <ExternalLink className="w-2.5 h-2.5" />

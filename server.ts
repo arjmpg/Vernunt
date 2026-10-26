@@ -3801,8 +3801,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   };
   app.post("/api/verify-face", handleVerifyFace);
 
-  // NOTE: Razorpay has been permanently decommissioned.
-  // All payment flows across Vernunt use Cashfree Payments (/api/cashfree/* registered above).
+  // All payment flows across Vernunt use the unified online payment gateway (/api/cashfree/* registered above).
 
   // =========================================================================
   // USER PROFILE APPROVAL NOTIFICATIONS (EMAIL + SMS GATEWAY WITH LOGIN LINK)

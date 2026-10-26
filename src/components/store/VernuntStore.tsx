@@ -6,12 +6,12 @@ import {
   CreditCard, Smartphone, DollarSign, Clock, HelpCircle, MessageCircle,
   ChevronDown, ThumbsUp, Send, FileText, ArrowLeft, ExternalLink, Box,
   Store, Building, CheckSquare, MessageSquare, AlertTriangle, Users, Award,
-  Lock, Barcode, Printer, Zap, RefreshCw, Mail
+  Lock, Barcode, Printer, Zap, RefreshCw, Mail, Scale
 } from 'lucide-react';
 import {
   StoreProduct, CartItem, CustomerAddress, PaymentMethod,
   StoreOrder, StoreCoupon, ProductReview, StoreSettings, DEFAULT_STORE_SETTINGS,
-  StoreCategory
+  StoreCategory, DimensionalShippingRules
 } from '../../types/store.ts';
 import { VendorProfile } from '../../types/vendor.ts';
 import {
@@ -27,8 +27,12 @@ import {
 } from '../../data/storeVendors.ts';
 import { 
   checkProductDeliverability, validateCartForDelivery, cleanPincode, 
-  DeliverabilityCheckResult, CartDeliverabilityResult 
+  DeliverabilityCheckResult, CartDeliverabilityResult,
+  calculateCartDimensionalShipping, CartShippingCalculation,
+  getStoredShippingRules, saveStoredShippingRules
 } from '../../utils/pincodeChecker.ts';
+import { AdminShippingRulesModal } from './AdminShippingRulesModal.tsx';
+import { AdminProductDimensionModal } from './AdminProductDimensionModal.tsx';
 import { StoreInvoiceModal } from './StoreInvoiceModal.tsx';
 import { VendorStorePage } from '../vendor/VendorStorePage.tsx';
 import { VendorDashboard } from '../vendor/VendorDashboard.tsx';
@@ -62,6 +66,8 @@ interface VernuntStoreProps {
   onNavigateToTab?: (tab: string) => void;
   onContactSupport?: () => void;
   onOpenGoogleMerchantModal?: () => void;
+  initialAction?: string;
+  onClearInitialAction?: () => void;
 }
 
 const STORAGE_KEY_CART = 'vernunt_store_cart_v1';
@@ -72,7 +78,9 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   userProfile,
   onNavigateToTab,
   onContactSupport,
-  onOpenGoogleMerchantModal
+  onOpenGoogleMerchantModal,
+  initialAction,
+  onClearInitialAction
 }) => {
   // Google Merchant Center & Search Console Modal state
   const [showLocalMerchantModal, setShowLocalMerchantModal] = useState<boolean>(false);
@@ -235,9 +243,33 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const isEffectiveAdmin = isAdminUser || adminEditMode;
   const [showAdminShowcaseModal, setShowAdminShowcaseModal] = useState<boolean>(false);
 
+  // Admin Dynamic Shipping Rules & Product Dimensions Modal State
+  const [showShippingRulesModal, setShowShippingRulesModal] = useState<boolean>(false);
+  const [editingDimensionProduct, setEditingDimensionProduct] = useState<StoreProduct | null>(null);
+
+  const handleSaveProductDimensions = (updatedProduct: StoreProduct) => {
+    const updated = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
+    setProducts(updated);
+    saveStoredProducts(updated);
+    if (selectedProduct?.id === updatedProduct.id) {
+      setSelectedProduct(updatedProduct);
+    }
+    showToast(`Updated weight & dimensions for "${updatedProduct.name}"`);
+  };
+
+  const handleSaveShippingRules = (rules: DimensionalShippingRules) => {
+    const updatedSettings: StoreSettings = {
+      ...storeSettings,
+      shippingRules: rules
+    };
+    setStoreSettings(updatedSettings);
+    saveStoredShippingRules(rules);
+    showToast('Shipping rate rules updated successfully!');
+  };
+
   // Easy Shipping Quick-Check State
   const [quickPinInput, setQuickPinInput] = useState<string>('560102');
-  const [quickPinResult, setQuickPinResult] = useState<string>('⚡ Delivery by Tomorrow 2 PM · BlueDart Express · Free Shipping on ₹499+');
+  const [quickPinResult, setQuickPinResult] = useState<string>('⚡ Delivery by Tomorrow 2 PM · Express Logistics · Free Shipping on ₹499+');
 
   // Toggle Featured & Highlighted handlers with instant sync & storage
   const handleToggleProductFeatured = (productId: string, e?: React.MouseEvent) => {
@@ -416,6 +448,18 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   // Checkout Modal
   const [isCheckoutOpen, setIsCheckoutOpen] = useState<boolean>(false);
   const [checkoutStep, setCheckoutStep] = useState<1 | 2 | 3 | 4>(1); // 1: Address, 2: Shipping, 3: Payment, 4: Success
+
+  // Handle direct navigation to checkout or cart
+  useEffect(() => {
+    if (initialAction === 'checkout') {
+      setIsCheckoutOpen(true);
+      setCheckoutStep(1);
+      if (onClearInitialAction) onClearInitialAction();
+    } else if (initialAction === 'cart') {
+      setIsCartOpen(true);
+      if (onClearInitialAction) onClearInitialAction();
+    }
+  }, [initialAction]);
   const [shippingAddress, setShippingAddress] = useState<CustomerAddress>({
     fullName: userProfile?.parentName || 'Aarti Menon',
     phone: userProfile?.phone || '+91 98765 43210',
@@ -435,7 +479,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     return validateCartForDelivery(cart, shippingAddress.pincode, vendors);
   }, [cart, shippingAddress.pincode, vendors]);
 
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('Razorpay');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('OnlineGateway');
   const [orderToCancel, setOrderToCancel] = useState<StoreOrder | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [completedOrder, setCompletedOrder] = useState<StoreOrder | null>(null);
@@ -584,14 +628,20 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     return 0;
   }, [cartSubtotal, appliedCoupon]);
 
+  // Dynamic Shipping Calculation based on Product Dead Weight, Package Dimensions & Customer PIN Code
+  const cartShippingCalculation = useMemo<CartShippingCalculation>(() => {
+    return calculateCartDimensionalShipping(
+      cart,
+      shippingAddress.pincode,
+      storeSettings.shippingRules,
+      cartSubtotal
+    );
+  }, [cart, shippingAddress.pincode, storeSettings.shippingRules, cartSubtotal]);
+
   const shippingFee = useMemo(() => {
     if (appliedCoupon?.discountType === 'free_shipping') return 0;
-    const threshold = storeSettings?.freeShippingThreshold ?? 499;
-    if (cartSubtotal >= threshold) return 0; // Free shipping threshold from Vernunt settings
-    if (shippingMethod === 'instant') return 149;
-    if (shippingMethod === 'express') return 99;
-    return storeSettings?.standardShippingFee ?? 49;
-  }, [cartSubtotal, appliedCoupon, shippingMethod, storeSettings]);
+    return cartShippingCalculation.totalShippingFee;
+  }, [appliedCoupon, cartShippingCalculation]);
 
   const gstTaxAmount = useMemo(() => {
     const taxable = Math.max(0, cartSubtotal - discountAmount);
@@ -970,7 +1020,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       : 'Payment successful! Order & tax receipt emailed 🎉');
   };
 
-  // Execute Order Placement via Razorpay or COD
+  // Execute Order Placement via Online Gateway or COD
   const handlePlaceOrder = async () => {
     if (cart.length === 0) return;
 
@@ -988,57 +1038,21 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    // Perform a real-time check of the user's wallet balance
-    const freshWallet = getStoredWallet();
-    const currentBalance = freshWallet?.balance || 0;
-
-    // Prioritize deducting funds from wallet first
-    if (currentBalance >= cartGrandTotal) {
-      setIsProcessingPayment(true);
-      debitFromWallet(
-        cartGrandTotal,
-        `Store Order: ${cartItemCount} item${cartItemCount > 1 ? 's' : ''}`
-      );
-      setTimeout(() => {
-        completeOrder(
-          'VernuntWallet',
-          `WALLET-ORD-${Date.now().toString().slice(-8)}`,
-          'paid',
-          `Paid 100% via Vernunt In-App Wallet (₹${cartGrandTotal} deducted)`
-        );
-      }, 700);
-      return;
-    }
-
-    // If wallet has partial balance, deduct from wallet first and pay remaining online
-    const walletDeducted = currentBalance > 0 ? currentBalance : 0;
-    const remainingOnlinePayable = Math.max(0, cartGrandTotal - walletDeducted);
-
-    if (walletDeducted > 0) {
-      debitFromWallet(
-        walletDeducted,
-        `Split Payment (Wallet): Store Order (${cartItemCount} items)`
-      );
-      showToast(`Deducted ₹${walletDeducted} from your wallet. Paying remaining ₹${remainingOnlinePayable} via Gateway.`);
-    }
-
-    // Critical: If total remaining payable is ₹0 (100% wallet or zero-cost product), complete directly
-    if (cartGrandTotal === 0 || remainingOnlinePayable === 0) {
+    // If total payable is ₹0 (e.g. 100% coupon discount), complete directly
+    if (cartGrandTotal === 0) {
       setIsProcessingPayment(true);
       setTimeout(() => {
         completeOrder(
-          walletDeducted > 0 ? 'VernuntWallet' : 'Complimentary',
+          'Complimentary',
           `ORD-ZERO-${Date.now().toString().slice(-8)}`,
           'paid',
-          walletDeducted > 0
-            ? `Paid 100% via Vernunt In-App Wallet (₹${walletDeducted})`
-            : 'Zero-cost complimentary order completed directly'
+          'Zero-cost complimentary order completed directly'
         );
       }, 500);
       return;
     }
 
-    // Handle Cashfree Payment Gateway for remaining balance
+    // Handle Cashfree Online Payment Gateway (Cards, UPI, NetBanking, Wallets)
     setIsProcessingPayment(true);
 
     try {
@@ -1047,11 +1061,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: remainingOnlinePayable,
+          amount: cartGrandTotal,
           orderType: 'marketplace_order',
           itemTitle: `Vernunt Store (${cartItemCount} items)`,
           customer: {
-            customer_id: currentUser?.id || `cust_${shippingAddress.phone.replace(/\D/g, '') || Date.now()}`,
+            customer_id: userProfile?.id || `cust_${shippingAddress.phone.replace(/\D/g, '') || Date.now()}`,
             customer_name: shippingAddress.fullName,
             customer_email: shippingAddress.email,
             customer_phone: shippingAddress.phone
@@ -1060,8 +1074,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
             customerName: shippingAddress.fullName,
             email: shippingAddress.email,
             phone: shippingAddress.phone,
-            itemCount: String(cartItemCount),
-            walletDeducted: String(walletDeducted)
+            itemCount: String(cartItemCount)
           }
         })
       });
@@ -1077,9 +1090,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           'Cashfree',
           orderData.orderId,
           'paid',
-          walletDeducted > 0
-            ? `Paid via Vernunt Wallet (₹${walletDeducted})`
-            : 'Zero-cost order completed'
+          'Zero-cost order completed'
         );
         setIsProcessingPayment(false);
         return;
@@ -1090,7 +1101,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         paymentSessionId: orderData.paymentSessionId,
         orderId: orderData.orderId,
         isProd: orderData.isProd ?? (orderData.environment === 'production'),
-        amount: remainingOnlinePayable,
+        amount: cartGrandTotal,
         onSuccess: async (details) => {
           // Verify on backend before confirming order
           try {
@@ -1105,9 +1116,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               'Cashfree',
               confirmedPayId,
               'paid',
-              walletDeducted > 0
-                ? `Split Paid: ₹${walletDeducted} via Wallet + ₹${remainingOnlinePayable} via Cashfree`
-                : 'Verified via Cashfree API'
+              'Verified via Online Gateway'
             );
           } catch (vErr) {
             console.warn('Verification fallback note:', vErr);
@@ -1115,7 +1124,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               'Cashfree',
               details.payment_id || orderData.orderId,
               'paid',
-              'Payment authorized via Cashfree'
+              'Payment authorized via Online Gateway'
             );
           } finally {
             setIsProcessingPayment(false);
@@ -1123,16 +1132,16 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         },
         onFailure: (err) => {
           setIsProcessingPayment(false);
-          showToast(`Cashfree payment not completed: ${err?.message || 'Cancelled by user'}`);
+          showToast(`Online payment not completed: ${err?.message || 'Cancelled by user'}`);
         },
         onClose: () => {
           setIsProcessingPayment(false);
         }
       });
     } catch (error: any) {
-      console.error('Cashfree initialization error:', error);
+      console.error('Payment initialization error:', error);
       setIsProcessingPayment(false);
-      showToast(error.message || 'Unable to open Cashfree gateway. Please try again.');
+      showToast(error.message || 'Unable to open online payment gateway. Please try again.');
     }
   };
 
@@ -2052,15 +2061,26 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     <Truck className="w-3 h-3" /> Free Express Delivery &gt; ₹499
                   </span>
                   {isEffectiveAdmin && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAdminShowcaseModal(true)}
-                      className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-black flex items-center gap-1 transition cursor-pointer"
-                      title="Manage featured and highlighted products in this category"
-                    >
-                      <Sparkles className="w-3 h-3 text-purple-600" />
-                      <span>Admin Showcase</span>
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowShippingRulesModal(true)}
+                        className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                        title="Configure shipping rates based on weight, dimensions & destination PIN code"
+                      >
+                        <Scale className="w-3 h-3 text-emerald-600" />
+                        <span>Shipping Rate Rules</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowAdminShowcaseModal(true)}
+                        className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-black flex items-center gap-1 transition cursor-pointer"
+                        title="Manage featured and highlighted products in this category"
+                      >
+                        <Sparkles className="w-3 h-3 text-purple-600" />
+                        <span>Admin Showcase</span>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
@@ -3360,18 +3380,45 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     <span className="font-bold text-slate-800">{selectedProduct.brand}</span>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 font-bold block uppercase">SKU</span>
-                    <span className="font-bold font-mono text-slate-800">{selectedProduct.sku}</span>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">SKU / HSN</span>
+                    <span className="font-bold font-mono text-slate-800">{selectedProduct.sku} ({selectedProduct.hsnCode || '950300'})</span>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 font-bold block uppercase">HSN Code</span>
-                    <span className="font-bold font-mono text-slate-800">{selectedProduct.hsnCode || '950300'}</span>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">Dead Weight</span>
+                    <span className="font-bold text-slate-800">{selectedProduct.weightGrams ? `${selectedProduct.weightGrams}g (${(selectedProduct.weightGrams / 1000).toFixed(2)} kg)` : 'Digital'}</span>
                   </div>
                   <div className="bg-white p-3 rounded-xl border border-slate-200">
-                    <span className="text-[10px] text-slate-400 font-bold block uppercase">Weight</span>
-                    <span className="font-bold text-slate-800">{selectedProduct.weightGrams ? `${selectedProduct.weightGrams}g` : 'Digital'}</span>
+                    <span className="text-[10px] text-slate-400 font-bold block uppercase">Dimensions (L×B×H)</span>
+                    <span className="font-bold font-mono text-slate-800">
+                      {selectedProduct.dimensionsCm
+                        ? `${selectedProduct.dimensionsCm.length} × ${selectedProduct.dimensionsCm.width} × ${selectedProduct.dimensionsCm.height} cm`
+                        : 'Standard (20×15×8 cm)'}
+                    </span>
                   </div>
                 </div>
+
+                {/* Admin Quick Weight & Dimensions Editor Button */}
+                {isEffectiveAdmin && (
+                  <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <Scale className="w-4 h-4 text-indigo-700 shrink-0" />
+                      <div>
+                        <span className="font-bold text-xs text-indigo-950 block">Logistics Weight &amp; Dimensions</span>
+                        <span className="text-[10.5px] text-indigo-700">
+                          Used to compute customer checkout shipping fees based on destination PIN code
+                        </span>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingDimensionProduct(selectedProduct)}
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-xs shrink-0"
+                    >
+                      <Box className="w-3.5 h-3.5" />
+                      <span>Edit Weight &amp; Dimensions</span>
+                    </button>
+                  </div>
+                )}
 
                 {/* Vernunt Verified Merchant Profile Box */}
                 {(() => {
@@ -4005,130 +4052,139 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                 </div>
               )}
 
-              {/* STEP 2: Shipping Method (Powered by National Shipping Network) */}
+              {/* STEP 2: Package Weight, Dimensions & Pincode Logistics Calculation */}
               {checkoutStep === 2 && (
                 <div className="space-y-4 animate-fade-in">
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">Select Courier Shipping Speed</h3>
-                      <p className="text-[11px] text-slate-500">Serviceable to PIN: <strong className="font-mono text-slate-800">{shippingAddress.pincode}</strong> ({shippingAddress.city})</p>
+                      <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">
+                        Package Weight, Dimensions &amp; Shipping Charges
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Delivery to PIN: <strong className="font-mono text-slate-800">{shippingAddress.pincode}</strong> ({shippingAddress.city}, {shippingAddress.state})
+                      </p>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-black uppercase">
-                      <Truck className="w-3 h-3 text-indigo-600" />
-                      Verified Shipping
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-black uppercase">
+                      <Truck className="w-3 h-3 text-emerald-600" />
+                      Dynamic Rate
                     </span>
                   </div>
 
-                  {/* Multi-Vendor Seller Shipping Breakdown */}
-                  {Object.keys(cartDeliverability.vendorGroups).length > 0 && (
-                    <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2 text-xs">
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">
-                        Seller-Wise Shipping &amp; Logistics Breakdown:
-                      </span>
-                      <div className="space-y-1">
-                        {Object.values(cartDeliverability.vendorGroups).map(g => (
-                          <div key={g.vendorId} className="flex justify-between items-center text-slate-700">
-                            <span className="font-medium">
-                              🏪 <strong>{g.vendorName}</strong> ({g.items.length} {g.items.length === 1 ? 'item' : 'items'}):
-                            </span>
-                            <span className="font-mono font-bold">
-                              {g.isFreeDelivery ? (
-                                <span className="text-emerald-700">FREE Delivery</span>
-                              ) : (
-                                `₹${g.shippingFee}`
-                              )}
-                            </span>
-                          </div>
-                        ))}
+                  {/* 3 Metric Cards for Dead Weight, Dimensions, and Chargeable Weight */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-600 font-bold text-xs">
+                        <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                        <span>Actual Dead Weight</span>
                       </div>
+                      <div className="font-mono font-black text-slate-900 text-base">
+                        {cartShippingCalculation.totalDeadWeightKg} kg
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        {cartShippingCalculation.totalDeadWeightGrams}g across {cartItemCount} item{cartItemCount > 1 ? 's' : ''}
+                      </p>
                     </div>
-                  )}
 
-                  <div className="space-y-3">
-                    {[
-                      {
-                        id: 'express',
-                        name: '⚡ BlueDart Express Air (via Shipping)',
-                        desc: 'Guaranteed Next-Day Delivery • Priority Air Transit with tamper-proof seal.',
-                        cost: cartSubtotal >= 499 ? 0 : 99,
-                        badge: 'Fastest Air',
-                        etd: 'Next Day',
-                        rating: '4.9 ★'
-                      },
-                      {
-                        id: 'standard',
-                        name: '📦 Delhivery Surface Express (via Shipping)',
-                        desc: 'Eco-friendly national surface transport across 24,000+ PIN codes.',
-                        cost: cartSubtotal >= 499 ? 0 : 49,
-                        badge: 'Best Value',
-                        etd: '2-3 Days',
-                        rating: '4.8 ★'
-                      },
-                      {
-                        id: 'instant',
-                        name: '🚀 Shadowfax Hyperlocal / Same-Day (via Shipping)',
-                        desc: 'Direct doorstep dispatch for local city societies and instant playdates.',
-                        cost: 149,
-                        badge: 'Within 3 Hours',
-                        etd: 'Same Day',
-                        rating: '4.6 ★'
-                      }
-                    ].map(method => (
-                      <div
-                        key={method.id}
-                        onClick={() => {
-                          setShippingMethod(method.id as any);
-                          const matching = shiprocketAvailableCouriers.find(c => 
-                            (method.id === 'express' && c.mode === 'Air') ||
-                            (method.id === 'standard' && c.courier_name.toLowerCase().includes('delhivery')) ||
-                            (method.id === 'instant' && c.courier_name.toLowerCase().includes('shadowfax'))
-                          );
-                          if (matching) setSelectedShiprocketCourier(matching);
-                        }}
-                        className={`p-4 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
-                          shippingMethod === method.id
-                            ? 'bg-indigo-50/70 border-indigo-500 ring-1 ring-indigo-500/20 shadow-xs'
-                            : 'bg-white border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-slate-900 text-xs">{method.name}</span>
-                            {method.badge && (
-                              <span className="bg-indigo-600 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded">
-                                {method.badge}
-                              </span>
-                            )}
-                            <span className="text-[10px] text-amber-600 font-bold bg-amber-50 px-1 rounded border border-amber-200">
-                              {method.rating}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500">{method.desc}</p>
-                          <div className="flex items-center gap-3 pt-0.5 text-[10px] text-slate-500">
-                            <span>⏱️ ETA: <strong className="text-slate-700">{method.etd}</strong></span>
-                            <span>•</span>
-                            <span className="text-emerald-700 font-semibold">✓ Live GPS Milestone Tracking</span>
-                          </div>
-                        </div>
-                        <span className="font-mono font-bold text-slate-900 shrink-0 text-sm">
-                          {method.cost === 0 ? <span className="text-emerald-700 font-bold">FREE</span> : `₹${method.cost}`}
+                    <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-1">
+                      <div className="flex items-center gap-1.5 text-slate-600 font-bold text-xs">
+                        <Box className="w-3.5 h-3.5 text-purple-600" />
+                        <span>Package Dimensions</span>
+                      </div>
+                      <div className="font-mono font-black text-slate-900 text-sm">
+                        {cartShippingCalculation.packageDimensions.length} × {cartShippingCalculation.packageDimensions.width} × {cartShippingCalculation.packageDimensions.height} cm
+                      </div>
+                      <p className="text-[10px] text-slate-400">
+                        Volumetric: {cartShippingCalculation.volumetricWeightKg} kg
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 bg-rose-50/70 border border-rose-200 rounded-2xl space-y-1">
+                      <div className="flex items-center gap-1.5 text-rose-800 font-bold text-xs">
+                        <ShieldCheck className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Chargeable Weight</span>
+                      </div>
+                      <div className="font-mono font-black text-rose-900 text-base">
+                        {cartShippingCalculation.chargeableWeightKg} kg
+                      </div>
+                      <p className="text-[10px] text-rose-700 font-medium">
+                        {cartShippingCalculation.chargeableWeightKg === cartShippingCalculation.totalDeadWeightKg
+                          ? 'Dead weight applied'
+                          : 'Volumetric weight applied'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Calculated Shipping Charges Breakdown */}
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5 text-xs">
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                      <div>
+                        <span className="font-black text-slate-900 text-xs block">
+                          Logistics Routing: {cartShippingCalculation.zoneName}
+                        </span>
+                        <span className="text-[10.5px] text-slate-500">
+                          {cartShippingCalculation.zoneDescription}
                         </span>
                       </div>
-                    ))}
+                      <span className="font-mono text-xs bg-white px-2 py-0.5 rounded border border-slate-200 font-bold text-slate-700">
+                        PIN {cleanPincode(shippingAddress.pincode)}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1 text-slate-600">
+                      <div className="flex justify-between">
+                        <span>Base Regional Shipping (Up to 500g):</span>
+                        <span className="font-mono font-bold">₹{cartShippingCalculation.baseCharge}</span>
+                      </div>
+                      {cartShippingCalculation.weightCharge > 0 && (
+                        <div className="flex justify-between">
+                          <span>Incremental Weight ({cartShippingCalculation.chargeableWeightKg - 0.5 > 0 ? (cartShippingCalculation.chargeableWeightKg - 0.5).toFixed(2) : 0} kg extra):</span>
+                          <span className="font-mono font-bold">+₹{cartShippingCalculation.weightCharge}</span>
+                        </div>
+                      )}
+                      {cartShippingCalculation.oversizeCharge > 0 && (
+                        <div className="flex justify-between text-amber-800">
+                          <span>Oversize Dimension Surcharge:</span>
+                          <span className="font-mono font-bold">+₹{cartShippingCalculation.oversizeCharge}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-200 flex items-center justify-between">
+                      <span className="font-bold text-slate-900">Total Calculated Shipping:</span>
+                      <div>
+                        {cartShippingCalculation.isFreeShipping ? (
+                          <div className="text-right">
+                            <span className="font-mono font-black text-emerald-700 text-sm">FREE DELIVERY 🎉</span>
+                            <span className="text-[10px] text-emerald-600 block">Orders above ₹{cartShippingCalculation.freeShippingThreshold} qualify</span>
+                          </div>
+                        ) : (
+                          <span className="font-mono font-black text-rose-700 text-base">
+                            ₹{cartShippingCalculation.totalShippingFee}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-xl text-[11px] text-emerald-900 flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <span>
+                      100% Verified Non-Toxic Montessori Packaging with tamper-proof seal and doorstep delivery OTP.
+                    </span>
                   </div>
 
                   <div className="flex gap-3 pt-2">
                     <button
                       type="button"
                       onClick={() => setCheckoutStep(1)}
-                      className="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-bold hover:bg-slate-100 transition"
+                      className="px-4 py-2.5 border border-slate-200 rounded-xl text-slate-700 font-bold hover:bg-slate-100 transition cursor-pointer"
                     >
-                      Back
+                      Back to Address
                     </button>
                     <button
                       type="button"
                       onClick={() => setCheckoutStep(3)}
-                      className="flex-1 py-2.5 bg-slate-900 hover:bg-indigo-700 text-white font-black text-xs rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+                      className="flex-1 py-3 bg-slate-900 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition cursor-pointer flex items-center justify-center gap-2 active:scale-95"
                     >
                       <span>Proceed to Payment</span>
                       <ArrowRight className="w-4 h-4" />
@@ -4137,37 +4193,43 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                 </div>
               )}
 
-              {/* STEP 3: Payment Method */}
+              {/* STEP 3: Payment Method (White-labeled Gateway) */}
               {checkoutStep === 3 && (
                 <div className="space-y-4 animate-fade-in">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">Select Payment Gateway</h3>
+                    <h3 className="font-black text-sm text-slate-900 uppercase tracking-wide">Select Payment Method</h3>
                     <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1">
                       <Lock className="w-3 h-3 text-emerald-600" /> 256-Bit SSL Encrypted
                     </span>
                   </div>
 
                   <div className="space-y-3">
-                    {/* Razorpay Unified Payment Gateway */}
+                    {/* Unified White-Labeled Online Payment Gateway */}
                     <div
-                      onClick={() => setPaymentMethod('Razorpay')}
-                      className={`p-4 rounded-xl border transition cursor-pointer space-y-3 ${
-                        paymentMethod === 'Razorpay'
+                      onClick={() => setPaymentMethod('OnlineGateway')}
+                      className={`p-4 rounded-2xl border transition cursor-pointer space-y-3 ${
+                        paymentMethod !== 'COD'
                           ? 'bg-rose-50/70 border-rose-500 ring-1 ring-rose-500/20 shadow-xs'
                           : 'bg-white border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center font-black text-xs shadow-xs tracking-tight">
-                            rzp
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-700 to-rose-600 text-white flex items-center justify-center font-black text-sm shadow-xs">
+                            <CreditCard className="w-5 h-5 text-white" />
                           </div>
                           <div>
                             <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-slate-900 text-xs block">Razorpay Payment Gateway</span>
-                              <span className="bg-blue-100 text-blue-800 text-[9.5px] font-bold px-1.5 py-0.2 rounded-sm">Official</span>
+                              <span className="font-bold text-slate-900 text-xs block">
+                                Pay via Debit / Credit Card, NetBanking, UPI &amp; Wallets
+                              </span>
+                              <span className="bg-emerald-100 text-emerald-800 text-[9.5px] font-bold px-1.5 py-0.2 rounded-sm">
+                                Instant
+                              </span>
                             </div>
-                            <span className="text-[10.5px] text-slate-500">Instant UPI (PhonePe, GPay, Paytm, CRED), Cards &amp; NetBanking</span>
+                            <span className="text-[10.5px] text-slate-500">
+                              Instant UPI (PhonePe, Google Pay, Paytm, BHIM, CRED), All Major Bank Cards &amp; 50+ NetBanking
+                            </span>
                           </div>
                         </div>
                         <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -4175,59 +4237,54 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         </span>
                       </div>
 
-                      {paymentMethod === 'Razorpay' && (
-                        <div className="pt-3 border-t border-rose-100/80 space-y-3 animate-fade-in">
-                          {/* Supported Payment Channels */}
-                          <div className="space-y-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Accepted via Razorpay</span>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
-                              <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-2 h-2 rounded-full bg-purple-500"></span>
-                                <span className="font-bold text-slate-800">UPI (GPay / PhonePe)</span>
-                              </div>
-                              <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                <span className="font-bold text-slate-800">Credit / Debit Cards</span>
-                              </div>
-                              <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-                                <span className="font-bold text-slate-800">50+ NetBanking</span>
-                              </div>
-                              <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                <span className="font-bold text-slate-800">CRED &amp; Wallets</span>
-                              </div>
+                      {paymentMethod !== 'COD' && (
+                        <div className="pt-3 border-t border-rose-100 space-y-2.5 animate-fade-in">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[10.5px]">
+                            <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+                              <span className="font-bold text-slate-800">UPI (GPay / PhonePe)</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                              <span className="font-bold text-slate-800">Credit / Debit Cards</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
+                              <span className="font-bold text-slate-800">50+ NetBanking</span>
+                            </div>
+                            <div className="p-2 rounded-lg bg-white border border-slate-200 flex items-center gap-1.5 shadow-2xs">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                              <span className="font-bold text-slate-800">CRED &amp; Wallets</span>
                             </div>
                           </div>
-
-                          <div className="p-2.5 bg-blue-50/70 border border-blue-200/80 rounded-lg text-[11px] text-blue-900 flex items-start gap-2">
-                            <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                          <div className="p-2.5 bg-rose-50 border border-rose-200/80 rounded-lg text-[11px] text-rose-950 flex items-start gap-2">
+                            <Sparkles className="w-3.5 h-3.5 text-rose-600 shrink-0 mt-0.5" />
                             <span>
-                              Clicking <strong>"Pay via Razorpay"</strong> opens the secure Razorpay checkout portal where you can authorize with your favorite payment method.
+                              Secure encrypted checkout overlay opens upon clicking. Authorize smoothly using any UPI app, bank card, or NetBanking account.
                             </span>
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* COD Option */}
+                    {/* Cash on Delivery Option */}
                     {storeSettings?.enableCashOnDelivery !== false && (
                       <div
                         onClick={() => setPaymentMethod('COD')}
-                        className={`p-4 rounded-xl border transition cursor-pointer space-y-2 ${
+                        className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
                           paymentMethod === 'COD'
                             ? 'bg-rose-50/70 border-rose-500 ring-1 ring-rose-500/20 shadow-xs'
                             : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-9 h-9 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
-                              <DollarSign className="w-4 h-4" />
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
+                              <DollarSign className="w-5 h-5" />
                             </div>
                             <div>
                               <span className="font-bold text-slate-900 text-xs block">Cash on Delivery (COD)</span>
-                              <span className="text-[10.5px] text-slate-500">Pay cash or scan QR when BlueDart courier arrives</span>
+                              <span className="text-[10.5px] text-slate-500">Pay cash or scan QR when logistics associate arrives</span>
                             </div>
                           </div>
                           <span className="text-[10px] text-slate-500 font-mono">Doorstep OTP</span>
@@ -4239,10 +4296,29 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   {/* Order Summary Recap */}
                   <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5 text-xs">
                     <div className="flex justify-between text-slate-600">
-                      <span>Grand Total to Pay:</span>
-                      <span className="font-mono text-base font-black text-rose-700">₹{cartGrandTotal.toLocaleString('en-IN')}</span>
+                      <span>Item Subtotal ({cartItemCount} items):</span>
+                      <span className="font-mono font-bold">₹{cartSubtotal.toLocaleString('en-IN')}</span>
                     </div>
-                    <p className="text-[10.5px] text-slate-500">Includes 12% GST tax and priority express delivery.</p>
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-rose-700">
+                        <span>Coupon Discount:</span>
+                        <span className="font-mono font-bold">-₹{discountAmount}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-slate-600">
+                      <span>Calculated Shipping ({cartShippingCalculation.totalDeadWeightKg} kg):</span>
+                      <span className="font-mono font-bold">
+                        {shippingFee === 0 ? <span className="text-emerald-700">FREE</span> : `₹${shippingFee}`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>GST (12% Included):</span>
+                      <span className="font-mono font-bold">₹{gstTaxAmount}</span>
+                    </div>
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-baseline">
+                      <span className="font-bold text-slate-900 text-sm">Grand Total:</span>
+                      <span className="font-mono text-lg font-black text-rose-700">₹{cartGrandTotal.toLocaleString('en-IN')}</span>
+                    </div>
                   </div>
 
                   <div className="flex gap-3 pt-2">
@@ -4262,13 +4338,15 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       {isProcessingPayment ? (
                         <>
                           <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Opening Secure Gateway...</span>
+                          <span>Opening Secure Payment Gateway...</span>
                         </>
                       ) : (
                         <>
                           <Lock className="w-3.5 h-3.5 text-rose-200" />
                           <span>
-                            {paymentMethod === 'Razorpay' ? 'Pay via Razorpay' : 'Confirm COD Order'} • ₹{cartGrandTotal.toLocaleString('en-IN')}
+                            {paymentMethod === 'COD'
+                              ? `Confirm COD Order • ₹${cartGrandTotal.toLocaleString('en-IN')}`
+                              : `Pay ₹${cartGrandTotal.toLocaleString('en-IN')} (Cards, UPI, NetBanking)`}
                           </span>
                         </>
                       )}
@@ -4512,6 +4590,24 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         onToggleHighlighted={handleToggleProductHighlighted}
         onBatchUpdate={handleBatchUpdateProducts}
       />
+
+      {/* Admin Dimensional Shipping & PIN Code Rules Modal */}
+      <AdminShippingRulesModal
+        isOpen={showShippingRulesModal}
+        onClose={() => setShowShippingRulesModal(false)}
+        initialRules={storeSettings.shippingRules}
+        onSaveRules={handleSaveShippingRules}
+      />
+
+      {/* Admin Product Weight & Dimensions (L × B × H) Modal */}
+      {editingDimensionProduct && (
+        <AdminProductDimensionModal
+          isOpen={Boolean(editingDimensionProduct)}
+          onClose={() => setEditingDimensionProduct(null)}
+          product={editingDimensionProduct}
+          onSave={handleSaveProductDimensions}
+        />
+      )}
 
     </div>
   );

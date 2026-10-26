@@ -112,7 +112,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
     setErrorMessage(null);
 
     try {
-      // 1. If Plan is Free (₹0 or promotional zero-cost set by admin), activate instantly without Razorpay
+      // 1. If Plan is Free (₹0 or promotional zero-cost set by admin), activate instantly without payment gateway
       if (!plan.price || Number(plan.price) <= 0) {
         const today = new Date();
         const expiryDate = new Date(today);
@@ -618,7 +618,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
       <div className="space-y-4">
         <div className="text-center md:text-left">
           <h2 className="text-xl font-serif font-black text-slate-900 tracking-tight">Select Premium Playdate Plan</h2>
-          <p className="text-xs text-slate-500 mt-1">Payments are hosted securely with Razorpay India API. Major cards, UPI, and netbanking accepted.</p>
+          <p className="text-xs text-slate-500 mt-1">Payments are protected with 256-bit bank encryption. Pay via Debit / Credit Card, NetBanking, UPI &amp; In-App Wallets.</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -752,7 +752,7 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-2">
             <span className="text-[10px] font-black uppercase text-amber-600 font-mono">🌟 Rule #1: neighborhood Events & Classes</span>
             <p className="leading-relaxed">
-              Your overall subscription allows you to book **all free community play events and kids development classes** without paying extra! If the event host organizes a specific **paid event/class/activity**, you can still easily join by paying that host's ticket fee directly via Razorpay at check-in.
+              Your overall subscription allows you to book **all free community play events and kids development classes** without paying extra! If the event host organizes a specific **paid event/class/activity**, you can still easily join by paying that host's ticket fee directly online via card, netbanking, or UPI at check-in.
             </p>
           </div>
           <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-2xs space-y-2">

@@ -565,6 +565,10 @@ export default function PlaydatePlanner({
   // Direct 1-on-1 invite submit
   const handleDirectInviteSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!userProfile && onRequireAuth) {
+      onRequireAuth();
+      return;
+    }
     if (!guestId || !directDate || !directTime || !directLocation) {
       alert('Please fill out all required fields.');
       return;

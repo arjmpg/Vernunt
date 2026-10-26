@@ -2594,7 +2594,7 @@ export default function AdminDashboard({
                           <span className="font-bold text-[#1d2327] block flex items-center gap-1">
                             <ShoppingCart className="w-3.5 h-3.5 text-[#96588a]" /> Vernunt Commerce
                           </span>
-                          <span className="text-[11px] text-[#646970] block">Enabled (Razorpay + UPI)</span>
+                          <span className="text-[11px] text-[#646970] block">Enabled (Online Gateway & UPI)</span>
                         </div>
                         <div className="space-y-1">
                           <span className="font-bold text-[#1d2327] block flex items-center gap-1">

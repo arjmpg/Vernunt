@@ -55,11 +55,11 @@ export function saveStoredWallet(wallet: UserWallet): void {
 }
 
 /**
- * Deposits funds into user's wallet (e.g. after online top-up via UPI or Razorpay)
+ * Deposits funds into user's wallet (e.g. after online top-up via UPI or Online Gateway)
  */
 export function depositToWallet(
   amount: number,
-  channel: 'Razorpay' | 'UPI' | 'Bank Transfer' | 'App Checkout' = 'Razorpay',
+  channel: 'Online Gateway' | 'UPI' | 'Bank Transfer' | 'App Checkout' = 'Online Gateway',
   referenceId?: string,
   description?: string
 ): UserWallet {

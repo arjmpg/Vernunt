@@ -69,7 +69,7 @@ export default function BusinessDashboard({
       return;
     }
     setIsPayingSub(true);
-    triggerToast("Initiating UPI/Razorpay payment gateway validation...");
+    triggerToast("Initiating online payment gateway validation...");
     
     setTimeout(async () => {
       try {
@@ -360,7 +360,7 @@ export default function BusinessDashboard({
             💼 Interactive Business & Admin Console
           </h3>
           <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-            Manage customized Razorpay fee structures, update events or portfolios, and check direct split commission splits globally or individually.
+            Manage customized payment gateway fee structures, update events or portfolios, and check direct split commission splits globally or individually.
           </p>
         </div>
 
@@ -1220,7 +1220,7 @@ export default function BusinessDashboard({
                 ⚙️ Global Commissions Overrides Manager
               </h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Configure percentage commission debits applied globally across ALL newly registered child specialists portfolios & neighborhood events bookings standard Razorpay split routines.
+                Configure percentage commission debits applied globally across ALL newly registered child specialists portfolios & neighborhood events bookings standard payment split routines.
               </p>
 
               <div className="pt-2 flex items-center gap-3">
@@ -1251,7 +1251,7 @@ export default function BusinessDashboard({
                 <span className="text-[9px] uppercase font-bold text-slate-500 font-mono tracking-widest">Commission splitting audit</span>
                 <h4 className="font-bold text-white font-serif tracking-tight mt-1">Platform Treasury & Splits</h4>
                 <p className="text-[11.5px] text-slate-405 leading-relaxed mt-2">
-                  All transaction values booked are parsed dynamically through Razorpay securely. Admin commissions are dynamically split upon payment verification. Output displays payout ledger.
+                  All transaction values booked are parsed dynamically through the online gateway securely. Admin commissions are dynamically split upon payment verification. Output displays payout ledger.
                 </p>
               </div>
 
@@ -1348,10 +1348,10 @@ export default function BusinessDashboard({
             </div>
           </div>
 
-          {/* DIRECT RAZORPAY LEDGER */}
+          {/* DIRECT ONLINE PAYMENTS LEDGER */}
           <div className="bg-white border border-slate-100 rounded-[32px] p-6 space-y-4">
             <h4 className="font-bold text-sm uppercase tracking-wider text-slate-400 font-serif flex items-center gap-1.5">
-              <FileText className="w-5 h-5 text-indigo-500" /> Razorpay Direct Splits Ledgers (Actual verified bookings)
+              <FileText className="w-5 h-5 text-indigo-500" /> Online Payments & Splits Ledger (Actual verified bookings)
             </h4>
 
             {bookingsList.length === 0 ? (
@@ -1365,7 +1365,7 @@ export default function BusinessDashboard({
                 <table className="w-full text-left text-xs border-collapse font-sans">
                   <thead>
                     <tr className="border-b border-slate-100 bg-slate-50 text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">
-                      <th className="py-2.5 px-3">Transaction ID (Razorpay)</th>
+                      <th className="py-2.5 px-3">Transaction ID</th>
                       <th className="py-2.5 px-3">Client (Buyer)</th>
                       <th className="py-2.5 px-3">Consultant / Event Name</th>
                       <th className="py-2.5 px-3">Gross Fee</th>
@@ -1377,7 +1377,7 @@ export default function BusinessDashboard({
                     {bookingsList.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-50/50">
                         <td className="py-3.5 px-3 font-mono font-bold text-[10px] text-slate-800">
-                          {log.cashfreePaymentId || log.razorpayPaymentId || log.id}
+                          {log.cashfreePaymentId || log.paymentId || log.id}
                           {log.paymentGateway && (
                             <span className="block text-[9px] font-normal text-slate-400">{log.paymentGateway}</span>
                           )}

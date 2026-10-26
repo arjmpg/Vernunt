@@ -150,7 +150,6 @@ export const DEFAULT_DIMENSIONAL_SHIPPING_RULES: DimensionalShippingRules = {
 export interface StoreSettings {
   // Payment Options
   enableOnlineGateway?: boolean;
-  enableRazorpay?: boolean;
   enableCOD: boolean;
   enableCashOnDelivery?: boolean;
   codExtraFee: number;
@@ -197,7 +196,7 @@ export interface StoreSettings {
 }
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
-  enableRazorpay: true,
+  enableOnlineGateway: true,
   enableCOD: true,
   enableCashOnDelivery: true,
   codExtraFee: 0,
@@ -250,7 +249,7 @@ export interface CustomerAddress {
   isDefault?: boolean;
 }
 
-export type PaymentMethod = 'OnlineGateway' | 'COD' | 'VernuntWallet' | 'Cards' | 'UPI' | 'NetBanking' | 'Cashfree' | 'Razorpay' | 'Complimentary';
+export type PaymentMethod = 'OnlineGateway' | 'COD' | 'VernuntWallet' | 'Cards' | 'UPI' | 'NetBanking' | 'Cashfree' | 'Complimentary';
 
 export type OrderStatus = 
   | 'pending'

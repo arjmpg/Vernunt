@@ -147,7 +147,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
               ₹{estimatedEarnings.toLocaleString('en-IN')}
             </div>
             <span className="text-[10px] text-emerald-600 font-bold block">
-              Cashfree Direct Settlement
+              Direct Bank Settlement
             </span>
           </div>
 
@@ -201,7 +201,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
               activeTab === 'payouts' ? 'bg-amber-500 text-slate-950 shadow-2xs' : 'text-slate-600 hover:text-slate-900'
             }`}
           >
-            Cashfree Payouts &amp; Bank KYC
+            Direct Payouts &amp; Bank KYC
           </button>
         </div>
 
@@ -396,7 +396,7 @@ export const HostDashboard: React.FC<HostDashboardProps> = ({
         {activeTab === 'payouts' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
             <h3 className="text-base font-black text-slate-900">
-              Cashfree Host Settlements &amp; Bank Account
+              Direct Host Settlements &amp; Bank Account
             </h3>
             <p className="text-xs text-slate-600">
               Ticket payouts are disbursed automatically every Tuesday directly to your verified IFSC bank account.

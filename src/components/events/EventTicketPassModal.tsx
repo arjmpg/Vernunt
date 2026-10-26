@@ -140,7 +140,7 @@ export default function EventTicketPassModal({
     const venueName = booking.eventVenue || event?.location || 'Designated Event Venue';
     
     const isFree = !booking.amountPaid || booking.amountPaid === 0;
-    const amountLine = isFree ? '🎟️ *Admission:* FREE (Complimentary Pass)' : `💳 *Amount:* ₹${booking.amountPaid}.00 (Paid via Razorpay Secure)`;
+    const amountLine = isFree ? '🎟️ *Admission:* FREE (Complimentary Pass)' : `💳 *Amount:* ₹${booking.amountPaid}.00 (Paid Online • Verified)`;
     
     const text = `🎟️ *Vernunt Verified Admission Pass*
 📌 *${booking.itemTitle}*
@@ -261,7 +261,7 @@ ${ticketViewUrl}`;
     const targetEmail = emailInput || booking.buyerEmail || '';
     const subject = encodeURIComponent(`🎟️ Vernunt Admission Pass #${ticketNumber}: ${booking.itemTitle}`);
     const isFree = !booking.amountPaid || booking.amountPaid === 0;
-    const amountLine = isFree ? '🎟️ Admission: FREE (Complimentary Pass)' : `💳 Amount Paid: ₹${booking.amountPaid}.00 (Paid via Razorpay Secure)`;
+    const amountLine = isFree ? '🎟️ Admission: FREE (Complimentary Pass)' : `💳 Amount Paid: ₹${booking.amountPaid}.00 (Paid Online • Verified)`;
     const body = encodeURIComponent(`Hi ${booking.buyerName},
 
 Your booking is confirmed for "${booking.itemTitle}".
@@ -532,7 +532,7 @@ END:VCALENDAR`;
                 {!booking.amountPaid || booking.amountPaid === 0 ? (
                   <span className="text-emerald-600 font-black">FREE (Complimentary Pass)</span>
                 ) : (
-                  <>₹{booking.amountPaid} <span className="text-[10px] font-normal text-emerald-600">(Paid via Razorpay Secure)</span></>
+                  <>₹{booking.amountPaid} <span className="text-[10px] font-normal text-emerald-600">(Paid Online • Verified)</span></>
                 )}
               </span>
             </div>

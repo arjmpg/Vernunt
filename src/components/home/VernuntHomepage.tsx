@@ -8,7 +8,8 @@ import {
 } from 'lucide-react';
 import VernuntLogo from '../VernuntLogo.tsx';
 import type { ChildProfile, CommunityEvent } from '../../types.ts';
-import type { StoreProduct, CartItem } from '../../types/store.ts';
+import type { StoreProduct, CartItem, StoreCoupon } from '../../types/store.ts';
+import { CartSlideOverDrawer } from '../store/CartSlideOverDrawer.tsx';
 import { getStoredProducts } from '../../data/storeProducts.ts';
 import { LanguageCode } from '../../utils/dictionary.ts';
 import { autoDetectUserLocality, saveLocalityPreference, BANGALORE_LOCALITIES_GPS, LocalityItem } from '../../utils/geolocation.ts';
@@ -248,17 +249,57 @@ export default function VernuntHomepage({
     });
   };
 
+  // Shopping Cart Slide-Over Drawer State
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('vernunt_store_cart_v1') || localStorage.getItem('vernunt_cart_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [appliedCoupon, setAppliedCoupon] = useState<StoreCoupon | null>({
+    code: 'VERNUNT15',
+    discountType: 'percentage',
+    discountValue: 15,
+    description: '15% Off Your Entire Order',
+    minOrderAmount: 0
+  });
+  const [couponMessage, setCouponMessage] = useState<{ type: 'success' | 'error'; text: string } | null>({
+    type: 'success',
+    text: 'Code VERNUNT15 applied (15% OFF)!'
+  });
+
+  // Cross-tab and cross-component cart synchronization
+  useEffect(() => {
+    const handleCartSync = (e: any) => {
+      if (e.detail && Array.isArray(e.detail)) {
+        setCart(e.detail);
+      } else {
+        try {
+          const saved = localStorage.getItem('vernunt_store_cart_v1') || localStorage.getItem('vernunt_cart_v1');
+          if (saved) setCart(JSON.parse(saved));
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener('vernunt_cart_updated', handleCartSync);
+    return () => window.removeEventListener('vernunt_cart_updated', handleCartSync);
+  }, []);
+
   const handleAddToCart = (product: StoreProduct, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
-      const cartKey = 'vernunt_cart_v1';
-      const existingStr = localStorage.getItem(cartKey);
-      const cart: CartItem[] = existingStr ? JSON.parse(existingStr) : [];
-      const matchIndex = cart.findIndex(c => c.productId === product.id);
+      const cartKey = 'vernunt_store_cart_v1';
+      const existingStr = localStorage.getItem(cartKey) || localStorage.getItem('vernunt_cart_v1');
+      const currentCart: CartItem[] = existingStr ? JSON.parse(existingStr) : [];
+      const matchIndex = currentCart.findIndex(c => c.productId === product.id);
 
       if (matchIndex >= 0) {
-        cart[matchIndex].quantity += 1;
-        cart[matchIndex].totalPrice = cart[matchIndex].quantity * cart[matchIndex].unitPrice;
+        currentCart[matchIndex].quantity += 1;
+        currentCart[matchIndex].totalPrice = currentCart[matchIndex].quantity * currentCart[matchIndex].unitPrice;
       } else {
         const newItem: CartItem = {
           id: `${product.id}-default`,
@@ -273,14 +314,64 @@ export default function VernuntHomepage({
           vendorId: (product as any).vendorId,
           vendorName: product.brand || 'Vernunt'
         };
-        cart.push(newItem);
+        currentCart.push(newItem);
       }
-      localStorage.setItem(cartKey, JSON.stringify(cart));
-      window.dispatchEvent(new CustomEvent('vernunt_cart_updated', { detail: cart }));
+      setCart([...currentCart]);
+      localStorage.setItem(cartKey, JSON.stringify(currentCart));
+      localStorage.setItem('vernunt_cart_v1', JSON.stringify(currentCart));
+      window.dispatchEvent(new CustomEvent('vernunt_cart_updated', { detail: currentCart }));
+      setIsCartOpen(true);
       showToast(`🛍️ Added "${product.name}" to cart!`);
     } catch (err) {
       console.warn('Cart update note:', err);
       showToast(`Added "${product.name}" to cart!`);
+    }
+  };
+
+  const handleUpdateQuantity = (cartItemId: string, newQty: number) => {
+    let updatedCart: CartItem[] = [];
+    if (newQty <= 0) {
+      updatedCart = cart.filter(item => item.id !== cartItemId);
+      showToast('Item removed from cart');
+    } else {
+      updatedCart = cart.map(item =>
+        item.id === cartItemId
+          ? { ...item, quantity: newQty, totalPrice: newQty * item.unitPrice }
+          : item
+      );
+    }
+    setCart(updatedCart);
+    localStorage.setItem('vernunt_store_cart_v1', JSON.stringify(updatedCart));
+    localStorage.setItem('vernunt_cart_v1', JSON.stringify(updatedCart));
+    window.dispatchEvent(new CustomEvent('vernunt_cart_updated', { detail: updatedCart }));
+  };
+
+  const handleApplyCoupon = (code: string) => {
+    const trimmed = code.trim().toUpperCase();
+    if (!trimmed) {
+      setCouponMessage({ type: 'error', text: 'Please enter a valid coupon code.' });
+      return;
+    }
+    if (trimmed === 'VERNUNT15') {
+      setAppliedCoupon({
+        code: 'VERNUNT15',
+        discountType: 'percentage',
+        discountValue: 15,
+        description: '15% Off Your Entire Order',
+        minOrderAmount: 0
+      });
+      setCouponMessage({ type: 'success', text: 'Code VERNUNT15 applied (15% OFF)!' });
+    } else if (trimmed === 'WELCOME50') {
+      setAppliedCoupon({
+        code: 'WELCOME50',
+        discountType: 'fixed',
+        discountValue: 50,
+        description: '₹50 Off Welcome Coupon',
+        minOrderAmount: 199
+      });
+      setCouponMessage({ type: 'success', text: 'Code WELCOME50 applied (₹50 OFF)!' });
+    } else {
+      setCouponMessage({ type: 'error', text: `Coupon code "${trimmed}" is invalid or expired.` });
     }
   };
 
@@ -1905,6 +1996,23 @@ export default function VernuntHomepage({
           <span className="text-[10px] mt-0.5">{userProfile ? 'Profile' : 'Sign In'}</span>
         </button>
       </nav>
+
+      {/* Shopping Cart Slide-Over Drawer */}
+      <CartSlideOverDrawer
+        isOpen={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        cart={cart}
+        onUpdateQuantity={handleUpdateQuantity}
+        onProceedToCheckout={() => {
+          setIsCartOpen(false);
+          if (onOpenStore) {
+            onOpenStore('checkout');
+          }
+        }}
+        appliedCoupon={appliedCoupon}
+        onApplyCoupon={handleApplyCoupon}
+        couponMessage={couponMessage}
+      />
 
     </div>
   );

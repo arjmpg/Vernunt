@@ -20,6 +20,7 @@ import { REGIONAL_PINCODE_PRESETS, cleanPincode, checkProductDeliverability, get
 import { MarketplaceApiClient } from '../../services/marketplaceApiClient.ts';
 import { ShiprocketShippingDesk } from './ShiprocketShippingDesk.tsx';
 import ServiceLevelAgreementModal from '../legal/ServiceLevelAgreementModal.tsx';
+import { PortalAuthModal } from '../auth/PortalAuthModal.tsx';
 
 export type VendorTabKey = 
   | 'overview'
@@ -43,25 +44,87 @@ export type VendorTabKey =
 
 interface VendorDashboardProps {
   userProfile?: any;
+  currentUserProfile?: any;
   onBackToStore?: () => void;
   onOpenStorefront?: (vendor: VendorProfile) => void;
+  onNavigateHome?: () => void;
+  onOpenHelpSop?: () => void;
 }
 
 export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   userProfile,
+  currentUserProfile,
   onBackToStore,
-  onOpenStorefront
+  onOpenStorefront,
+  onNavigateHome,
+  onOpenHelpSop
 }) => {
   // Master Vendors State
   const [vendors, setVendors] = useState<VendorProfile[]>(getStoredVendors);
-  const [activeVendorId, setActiveVendorId] = useState<string>(() => {
-    return vendors[0]?.id || 'vend-montessori-minds';
+
+  // Check for authenticated vendor session from localStorage or props
+  const [vendorSession, setVendorSession] = useState<any>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('vernunt_auth_vendor_session');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    const propUser = userProfile || currentUserProfile;
+    if (propUser && (propUser.userRole === 'Vendor' || (propUser as any).isVendor)) return propUser;
+    return null;
   });
 
-  // Current active vendor
-  const currentVendor = useMemo(() => {
-    return vendors.find(v => v.id === activeVendorId) || vendors[0];
-  }, [vendors, activeVendorId]);
+  const [showPortalAuthModal, setShowPortalAuthModal] = useState<boolean>(false);
+
+  // Current active vendor - strictly bound to the authenticated vendor
+  const currentVendor = useMemo<VendorProfile | null>(() => {
+    if (!vendorSession) return null;
+    const sessionPhone = vendorSession.phoneNumber ? vendorSession.phoneNumber.replace(/[^\d]/g, '').slice(-10) : '';
+    const sessionEmail = vendorSession.email?.toLowerCase().trim();
+    const sessionId = vendorSession.id || vendorSession.vendorId;
+
+    // Check if matched existing registered vendor
+    const found = vendors.find(v => 
+      v.id === sessionId || 
+      (v as any).userId === sessionId ||
+      (v.phone && v.phone.replace(/[^\d]/g, '').slice(-10) === sessionPhone) ||
+      (sessionEmail && v.email && v.email.toLowerCase().trim() === sessionEmail)
+    );
+    if (found) return found;
+
+    // Construct a dedicated isolated vendor profile for this authenticated vendor
+    const storeTitle = vendorSession.companyName || vendorSession.parentName || 'My Vernunt Store';
+    return {
+      id: sessionId || `vend_${sessionPhone || Date.now()}`,
+      storeName: storeTitle,
+      ownerName: vendorSession.parentName || 'Verified Seller',
+      slug: storeTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      email: vendorSession.email || `${sessionPhone || 'seller'}@vernunt.com`,
+      phone: vendorSession.phoneNumber || '+91 98765 43210',
+      status: 'active',
+      kycVerified: true,
+      rating: 5.0,
+      reviewCount: 0,
+      totalSales: 0,
+      balance: 0,
+      walletBalance: 0,
+      commissionRate: 8,
+      defaultShippingFee: 49,
+      freeShippingThreshold: 499,
+      expressShippingFee: 89,
+      serviceablePincodes: ['560001', '560100', '560102'],
+      badge: 'Vernunt Verified Seller',
+      bankDetails: {
+        accountHolder: vendorSession.companyName || vendorSession.parentName || 'Verified Seller',
+        bankName: 'HDFC Bank',
+        accountNumber: 'XXXXXX' + (sessionPhone ? sessionPhone.slice(-4) : '1234'),
+        ifscCode: 'HDFC0001234',
+        upiId: (sessionPhone ? `${sessionPhone}@okhdfcbank` : 'seller@upi')
+      }
+    };
+  }, [vendors, vendorSession]);
 
   // Master Products, Orders & Settings
   const [products, setProducts] = useState<StoreProduct[]>(getStoredProducts);
@@ -191,23 +254,34 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
     }
   }, [currentVendor]);
 
-  // Filtered Products for Current Vendor
+  // Filtered Products for Current Vendor - ONLY products added by THIS vendor!
   const vendorProducts = useMemo(() => {
-    if (!currentVendor) return [];
-    return products.filter(p => p.vendorId === currentVendor.id || p.brand === currentVendor.storeName);
-  }, [products, currentVendor]);
+    if (!vendorSession || !currentVendor) return [];
+    return products.filter(p => {
+      if (p.vendorId && p.vendorId === currentVendor.id) return true;
+      if ((p as any).createdByUserId && (p as any).createdByUserId === currentVendor.id) return true;
+      if ((p as any).vendorUserId && (p as any).vendorUserId === vendorSession.id) return true;
+      if (p.vendorSlug && currentVendor.slug && p.vendorSlug === currentVendor.slug) return true;
+      return false;
+    });
+  }, [products, currentVendor, vendorSession]);
 
-  // Filtered Orders for Current Vendor
+  // Filtered Orders for Current Vendor - ONLY orders containing THIS vendor's items!
   const vendorOrders = useMemo(() => {
-    if (!currentVendor) return [];
-    return orders.filter(ord =>
-      ord.items.some(item => 
-        item.vendorId === currentVendor.id || 
-        item.product?.vendorId === currentVendor.id || 
-        item.product?.brand === currentVendor.storeName
+    if (!vendorSession || !currentVendor) return [];
+    return orders
+      .filter(ord =>
+        ord.items.some(item => 
+          item.vendorId === currentVendor.id || 
+          item.product?.vendorId === currentVendor.id
+        )
       )
-    );
-  }, [orders, currentVendor]);
+      .map(ord => ({
+        ...ord,
+        // Strip items belonging to other vendors!
+        items: ord.items.filter(it => it.vendorId === currentVendor.id || it.product?.vendorId === currentVendor.id)
+      }));
+  }, [orders, currentVendor, vendorSession]);
 
   // Filtered Withdrawals
   const vendorWithdrawals = useMemo(() => {
@@ -376,7 +450,12 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   // Handle Edit Product Save
   const handleSaveEditedProduct = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingProduct) return;
+    if (!editingProduct || !currentVendor) return;
+
+    if (editingProduct.vendorId !== currentVendor.id && (editingProduct as any).createdByUserId !== currentVendor.id) {
+      alert('Security policy violation: You can only edit products added by your vendor account.');
+      return;
+    }
 
     const updated = products.map(p => p.id === editingProduct.id ? editingProduct : p);
     setProducts(updated);
@@ -388,6 +467,13 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
 
   // Handle Toggle Product Active/Draft
   const handleToggleProductStatus = (productId: string) => {
+    if (!currentVendor) return;
+    const target = products.find(p => p.id === productId);
+    if (!target) return;
+    if (target.vendorId !== currentVendor.id && (target as any).createdByUserId !== currentVendor.id) {
+      alert('Security policy violation: You can only change status for products added by your vendor account.');
+      return;
+    }
     const updated = products.map(p => {
       if (p.id === productId) {
         const nextStatus = p.approvalStatus === 'approved' ? 'draft' : 'approved';
@@ -402,6 +488,13 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
 
   // Handle Delete Product
   const handleDeleteProduct = (productId: string, productName: string) => {
+    if (!currentVendor) return;
+    const target = products.find(p => p.id === productId);
+    if (!target) return;
+    if (target.vendorId !== currentVendor.id && (target as any).createdByUserId !== currentVendor.id) {
+      alert('Security policy violation: You can only delete products added by your vendor account.');
+      return;
+    }
     if (!confirm(`Are you sure you want to remove "${productName}" from your store catalog?`)) return;
     const updated = products.filter(p => p.id !== productId);
     setProducts(updated);
@@ -793,6 +886,129 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
     { id: 'help_support', label: 'Help & Seller Support', icon: HelpCircle, group: 'Store & Support' }
   ];
 
+  // ---------------------------------------------------------------------------
+  // SECURITY GATE: RESTRICT ACCESS TO AUTHENTICATED SELLERS ONLY
+  // ---------------------------------------------------------------------------
+  if (!vendorSession || !currentVendor) {
+    return (
+      <div className="min-h-screen bg-slate-900 text-white flex flex-col justify-between selection:bg-teal-500 selection:text-white">
+        {/* Top Header */}
+        <header className="px-4 sm:px-8 py-4 border-b border-slate-800 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-teal-500/20 text-teal-400 border border-teal-500/30">
+              <Store className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-base font-black tracking-tight text-white flex items-center gap-2">
+                Vernunt Marketplace
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-500/30 font-bold uppercase">
+                  Seller Portal
+                </span>
+              </h1>
+              <p className="text-xs text-slate-400">app.vernunt.com/vendor • Multi-Tenant Partner Security</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {(onNavigateHome || onBackToStore) && (
+              <button
+                type="button"
+                onClick={onNavigateHome || onBackToStore}
+                className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Marketplace</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Access Gate Card */}
+        <main className="max-w-xl mx-auto px-4 py-12 text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-teal-500/10 border border-teal-500/30 flex items-center justify-center text-teal-400 mx-auto text-3xl shadow-lg">
+            🔒
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+              Seller Authentication Required
+            </h2>
+            <p className="text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
+              To protect vendor catalog security and customer data, only authenticated sellers can access product management, shipping desk, and payout logs.
+            </p>
+          </div>
+
+          {/* Feature Highlights */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left">
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 space-y-1">
+              <Package className="w-4 h-4 text-teal-400" />
+              <h3 className="text-xs font-bold text-white">Your Products Only</h3>
+              <p className="text-[11px] text-slate-400">Manage, edit, and delete only items added by your verified store account.</p>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 space-y-1">
+              <Truck className="w-4 h-4 text-amber-400" />
+              <h3 className="text-xs font-bold text-white">Direct Shipments</h3>
+              <p className="text-[11px] text-slate-400">Pincode serviceability, AWB dispatch, and packing slip printing.</p>
+            </div>
+            <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-3.5 space-y-1">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <h3 className="text-xs font-bold text-white">Zero Data Leakage</h3>
+              <p className="text-[11px] text-slate-400">Customer privacy &amp; seller financial metrics are strictly isolated.</p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setShowPortalAuthModal(true)}
+              className="w-full py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-slate-950 font-black text-sm rounded-xl shadow-lg transition active:scale-98 flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Smartphone className="w-4 h-4" />
+              <span>Log In with Mobile OTP / Registered Seller Account</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsRegisterModalOpen(true)}
+              className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-teal-300 font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>New Seller? Register Your Store with GST/Aadhaar</span>
+            </button>
+          </div>
+        </main>
+
+        {/* Footer */}
+        <footer className="text-center py-6 text-xs text-slate-500 border-t border-slate-800">
+          Vernunt Marketplace B2B Seller Desk • Secured with 256-bit encryption
+        </footer>
+
+        {/* Portal Auth Modal */}
+        <PortalAuthModal
+          isOpen={showPortalAuthModal}
+          portalType="vendor"
+          onClose={() => setShowPortalAuthModal(false)}
+          onSuccess={(profile) => {
+            setShowPortalAuthModal(false);
+            setVendorSession(profile);
+            localStorage.setItem('vernunt_auth_vendor_session', JSON.stringify(profile));
+          }}
+        />
+
+        {/* Registration Modal */}
+        <ServiceLevelAgreementModal
+          isOpen={showSlaModal}
+          onClose={() => setShowSlaModal(false)}
+          onAccept={() => {
+            setRegForm(prev => ({ ...prev, slaAccepted: true }));
+            setShowSlaModal(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#f8fafc] text-slate-800 pb-20 font-sans selection:bg-teal-500 selection:text-white">
       {/* Toast Notification Banner */}
@@ -835,20 +1051,15 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5">
-            {/* Active Vendor Store Selector */}
+            {/* Authenticated Seller Badge & Identity */}
             <div className="bg-slate-800/90 border border-slate-700 rounded-xl px-3 py-1 flex items-center gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase hidden sm:inline">Seller:</span>
-              <select
-                value={activeVendorId}
-                onChange={e => setActiveVendorId(e.target.value)}
-                className="bg-transparent text-xs font-bold text-teal-400 outline-hidden cursor-pointer"
-              >
-                {vendors.map(v => (
-                  <option key={v.id} value={v.id} className="bg-slate-900 text-white">
-                    {v.storeName} ({v.status})
-                  </option>
-                ))}
-              </select>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+              <span className="text-xs font-bold text-teal-300">
+                {currentVendor.storeName}
+              </span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-400 font-bold uppercase">
+                {currentVendor.status}
+              </span>
             </div>
 
             {onOpenStorefront && currentVendor && (
@@ -863,10 +1074,16 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
 
             <button
               type="button"
-              onClick={() => setIsRegisterModalOpen(true)}
-              className="px-3.5 py-1.5 bg-teal-600 hover:bg-teal-500 text-white rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-xs"
+              onClick={() => {
+                localStorage.removeItem('vernunt_auth_vendor_session');
+                setVendorSession(null);
+                showToast('Logged out of seller desk.');
+              }}
+              className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-rose-400 rounded-xl text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+              title="Sign Out of Seller Desk"
             >
-              <Plus className="w-3.5 h-3.5" /> + New Seller Account
+              <LogOut className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Sign Out</span>
             </button>
           </div>
         </div>
@@ -1597,15 +1814,24 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {vendorProducts
-                      .filter(p => {
-                        if (productCategoryFilter !== 'all' && p.category !== productCategoryFilter) return false;
-                        if (productStockFilter !== 'all' && p.stockStatus !== productStockFilter) return false;
-                        if (productSearch && !p.name.toLowerCase().includes(productSearch.toLowerCase()) && !p.sku.toLowerCase().includes(productSearch.toLowerCase())) return false;
-                        return true;
-                      })
-                      .map(prod => (
-                        <tr key={prod.id} className="hover:bg-slate-50/80 transition">
+                    {vendorProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-slate-400">
+                          <Package className="w-9 h-9 text-slate-300 mx-auto mb-2" />
+                          <p className="font-bold text-slate-700 text-xs">No products added by your store yet</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">Click &quot;+ Add Product&quot; to list your first child developmental toy, book, or kit.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      vendorProducts
+                        .filter(p => {
+                          if (productCategoryFilter !== 'all' && p.category !== productCategoryFilter) return false;
+                          if (productStockFilter !== 'all' && p.stockStatus !== productStockFilter) return false;
+                          if (productSearch && !p.name.toLowerCase().includes(productSearch.toLowerCase()) && !p.sku.toLowerCase().includes(productSearch.toLowerCase())) return false;
+                          return true;
+                        })
+                        .map(prod => (
+                          <tr key={prod.id} className="hover:bg-slate-50/80 transition">
                           <td className="py-3 px-4 flex items-center gap-3">
                             <img
                               src={prod.featuredImage}
@@ -1685,7 +1911,8 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                             </button>
                           </td>
                         </tr>
-                      ))}
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>

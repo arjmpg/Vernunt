@@ -472,8 +472,8 @@ export interface WalletTransaction {
   amount: number; // In INR
   description: string;
   timestamp: string; // ISO 8601
-  referenceId?: string; // e.g. Razorpay payment ID, bank reference, or order ID
-  channel?: 'UPI' | 'Razorpay' | 'Bank Transfer' | 'App Checkout';
+  referenceId?: string; // e.g. Payment transaction ID, bank reference, or order ID
+  channel?: 'UPI' | 'Online Gateway' | 'Bank Transfer' | 'App Checkout';
   status: 'Completed' | 'Pending' | 'Failed';
 }
 
@@ -718,10 +718,10 @@ export interface Booking {
   hostEarned: number;
   dateStr: string;
   timeSelected: string;
-  razorpayPaymentId: string;
+  paymentId?: string;
   cashfreePaymentId?: string;
   cashfreeOrderId?: string;
-  paymentGateway?: 'Cashfree' | 'VernuntWallet' | 'Free' | 'COD' | 'Razorpay' | 'Hybrid';
+  paymentGateway?: 'Cashfree' | 'VernuntWallet' | 'Free' | 'COD' | 'OnlineGateway' | 'Hybrid';
   paymentStatus?: 'NOT_REQUIRED' | 'PAID' | 'PENDING' | 'FAILED';
   status: 'Paid' | 'Refunded';
   // WooCommerce Affiliate Tracking & Attribution
@@ -748,8 +748,8 @@ export interface Booking {
   selectedMenuItems?: EventSelectedMenuItem[]; // Menu pre-orders with quantities
   menuSubtotal?: number; // Total spent on event menu items
   walletAmountUsed?: number; // Amount debited from wallet
-  onlineAmountPaid?: number; // Remainder paid online through Razorpay
-  paymentMethodUsed?: 'Razorpay' | 'VernuntWallet' | 'Hybrid';
+  onlineAmountPaid?: number; // Remainder paid online through payment gateway
+  paymentMethodUsed?: 'OnlineGateway' | 'VernuntWallet' | 'Hybrid';
   createdAt?: string;
 }
 
@@ -1256,6 +1256,9 @@ export interface BangalorePark {
   isCustomAdded?: boolean;
   isApproved?: boolean;
   approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  verified?: boolean;
+  accessible?: boolean;
+  hasCafeteria?: boolean;
   submittedByUserId?: string;
   submittedByUserName?: string;
   submittedAt?: string;

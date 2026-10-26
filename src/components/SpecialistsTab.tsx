@@ -324,8 +324,8 @@ export default function SpecialistsTab({
   const [bookingDate, setBookingDate] = useState<string>('2026-06-01');
   const [showBookingModal, setShowBookingModal] = useState(false);
 
-  // Razorpay live payment states
-  const [razorpayStep, setRazorpayStep] = useState<'details' | 'processing' | 'otp' | 'success'>('details');
+  // Safe live payment states
+  const [paymentStep, setPaymentStep] = useState<'details' | 'processing' | 'otp' | 'success'>('details');
   const [otpInput, setOtpInput] = useState('');
   const [productionPaymentId, setProductionPaymentId] = useState('');
   const [copiedSpecId, setCopiedSpecId] = useState<string | null>(null);
@@ -733,7 +733,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     }
     setSelectedSpecialist(spec);
     setSelectedSlot(spec.availableSlots[0] || '10:00 AM');
-    setRazorpayStep('details');
+    setPaymentStep('details');
     setShowBookingModal(true);
   }, [currentProfile?.subscriptionActive]);
 
@@ -742,13 +742,13 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     if (pendingSpecToBook) {
       setSelectedSpecialist(pendingSpecToBook);
       setSelectedSlot(pendingSpecToBook.availableSlots[0] || '10:00 AM');
-      setRazorpayStep('details');
+      setPaymentStep('details');
       setShowBookingModal(true);
       setPendingSpecToBook(null);
     }
   };
 
-  const handleTriggerRazorpayPayment = async () => {
+  const handleTriggerPayment = async () => {
     if (!selectedSpecialist) return;
     const baseFee = selectedSpecialist.sessionFee || 0;
     const gatewayFee = baseFee > 0 ? Math.round(baseFee * 0.02) : 0;
@@ -756,11 +756,11 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
     // If consultation fee is free, we complete booking immediately without payment gateway invocation!
     if (totalAmount === 0) {
-      setRazorpayStep('processing');
+      setPaymentStep('processing');
       setTimeout(() => {
         const payId = `free_VIP_${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
         setProductionPaymentId(payId);
-        setRazorpayStep('success');
+        setPaymentStep('success');
 
         const rate = selectedSpecialist.commissionPercentage ?? globalCommissionRate;
         const earnedCommission = 0;
@@ -779,7 +779,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           hostEarned: hostShare,
           dateStr: bookingDate,
           timeSelected: selectedSlot,
-          razorpayPaymentId: payId,
+          paymentId: payId,
+          cashfreePaymentId: payId,
           status: 'Paid'
         };
 
@@ -806,10 +807,10 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       return;
     }
 
-    // 2. Paid Appointment: Initiate Cashfree Payment Gateway
-    setRazorpayStep('processing');
+    // 2. Paid Appointment: Initiate Online Gateway
+    setPaymentStep('processing');
     try {
-      // Create Cashfree Order on server
+      // Create Order on server
       const response = await fetch('/api/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -842,7 +843,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       if (orderData.free) {
         const payId = `FREE_SPEC_${Date.now().toString().slice(-6)}`;
         setProductionPaymentId(payId);
-        setRazorpayStep('success');
+        setPaymentStep('success');
 
         const freeBooking: Booking = {
           id: `booking-${Date.now()}`,
@@ -857,7 +858,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
           hostEarned: 0,
           dateStr: bookingDate,
           timeSelected: selectedSlot,
-          razorpayPaymentId: payId,
+          paymentId: payId,
+          cashfreePaymentId: payId,
           status: 'Paid'
         };
         onAddBooking(freeBooking);
@@ -882,7 +884,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             const payId = verifyResult.paymentId || checkoutRes.payment_id || `CF_SPEC_${Date.now().toString().slice(-8)}`;
 
             setProductionPaymentId(payId);
-            setRazorpayStep('success');
+            setPaymentStep('success');
 
             const rate = selectedSpecialist.commissionPercentage ?? globalCommissionRate;
             const earnedCommission = Math.round((fee * rate) / 100);
@@ -901,7 +903,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               hostEarned: hostShare,
               dateStr: bookingDate,
               timeSelected: selectedSlot,
-              razorpayPaymentId: payId,
+              paymentId: payId,
               cashfreePaymentId: payId,
               cashfreeOrderId: orderData.orderId,
               paymentGateway: 'Cashfree',
@@ -930,20 +932,20 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             });
           } catch (vErr) {
             console.warn('Specialist verify fallback note:', vErr);
-            setRazorpayStep('success');
+            setPaymentStep('success');
           }
         },
         onFailure: (err) => {
-          setRazorpayStep('details');
+          setPaymentStep('details');
           console.warn(`Payment not completed: ${err?.message || 'Cancelled by user'}`);
         },
         onClose: () => {
-          setRazorpayStep('details');
+          setPaymentStep('details');
         }
       });
     } catch (e: any) {
       console.error(e);
-      setRazorpayStep('details');
+      setPaymentStep('details');
     }
   };
 
@@ -951,7 +953,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     e.preventDefault();
     const payId = `pay_VRN_${Math.random().toString(36).substring(2, 12).toUpperCase()}`;
     setProductionPaymentId(payId);
-    setRazorpayStep('success');
+    setPaymentStep('success');
   };
 
   const activeCityInfo = INDIAN_CITIES.find(c => c.id === selectedCity);
@@ -1816,7 +1818,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       )}
 
 
-      {/* Booking and Razorpay Payment Integrated Modal */}
+      {/* Booking and Online Payment Integrated Modal */}
       {showBookingModal && selectedSpecialist && (
         <div id="booking-checkout-modal" className="fixed inset-0 bg-slate-955/75 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-[9999] overflow-y-auto animate-fade-in">
           <div className="bg-white rounded-[32px] w-full max-w-lg shadow-2xl border border-slate-100 overflow-hidden transform transition-all flex flex-col max-h-[85vh] my-auto">
@@ -1829,7 +1831,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 </div>
                 <div>
                   <h4 className="font-serif font-black text-base text-white">Safe Booking Checkout</h4>
-                  <span className="text-[9px] font-mono tracking-widest text-slate-400">POWERED BY RAZORPAY SECURE</span>
+                  <span className="text-[9px] font-mono tracking-widest text-slate-400">256-BIT SSL ENCRYPTED GATEWAY</span>
                 </div>
               </div>
               <button
@@ -1841,8 +1843,8 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             </div>
 
             <div className="overflow-y-auto flex-1 text-left">
-              {/* Main Stage Handler depending on Razorpay Steps */}
-              {razorpayStep === 'details' && (
+              {/* Main Stage Handler depending on Payment Steps */}
+              {paymentStep === 'details' && (
                 currentProfile && !currentProfile.subscriptionActive ? (
                   <div id="sub-invitation-box" className="p-6 space-y-5">
                     <div className="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl text-white p-5 space-y-2 select-none font-sans">
@@ -1990,7 +1992,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                           </div>
 
                           <button
-                            onClick={handleTriggerRazorpayPayment}
+                            onClick={handleTriggerPayment}
                             type="button"
                             className="w-full py-3 bg-[radial-gradient(ellipse_at_bottom,_var(--tw-gradient-stops))] from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xs uppercase tracking-widest rounded-xl transition shadow-md active:scale-95 flex items-center justify-center gap-2 cursor-pointer select-none"
                           >
@@ -2000,7 +2002,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                               </>
                             ) : (
                               <>
-                                <CreditCard className="w-4 h-4" /> Pay ₹{totalPay} with Razorpay Secure
+                                <CreditCard className="w-4 h-4" /> Pay ₹{totalPay} via Debit / Credit Card, NetBanking, UPI
                               </>
                             )}
                           </button>
@@ -2011,17 +2013,17 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 )
               )}
 
-            {razorpayStep === 'processing' && (
+            {paymentStep === 'processing' && (
               <div className="p-12 text-center space-y-4">
                 <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto" />
                 <div>
-                  <h5 className="font-bold text-sm text-slate-800">Spawning Razorpay Secure payment overlay...</h5>
+                  <h5 className="font-bold text-sm text-slate-800">Connecting to secure payment gateway...</h5>
                   <p className="text-xs text-slate-400">Authenticating transaction with high security bank servers...</p>
                 </div>
               </div>
             )}
 
-            {razorpayStep === 'otp' && (
+            {paymentStep === 'otp' && (
               <form onSubmit={handleVerifyOtpSubmit} className="p-6 space-y-4 text-center">
                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto text-lg font-black animate-pulse">
                   🔑
@@ -2049,7 +2051,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 <div className="pt-3 border-t border-slate-100 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setRazorpayStep('details')}
+                    onClick={() => setPaymentStep('details')}
                     className="w-1/3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition"
                   >
                     Go Back
@@ -2064,7 +2066,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               </form>
             )}
 
-            {razorpayStep === 'success' && (
+            {paymentStep === 'success' && (
               <div className="p-8 text-center space-y-6">
                 <div className="w-16 h-16 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full flex items-center justify-center mx-auto text-2xl font-black">
                   <Check className="w-8 h-8" strokeWidth={3} />
@@ -2072,7 +2074,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                 <div>
                   <h5 className="font-serif font-black text-lg text-slate-800">Appointment Booked Successfully!</h5>
                   <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                    Razorpay secured split transaction with identifier <strong className="text-slate-700 font-mono text-[10px]">{productionPaymentId}</strong> verified successfully on the production live network.
+                    Secure online transaction with identifier <strong className="text-slate-700 font-mono text-[10px]">{productionPaymentId}</strong> verified successfully on the production live network.
                   </p>
                 </div>
 
@@ -2262,7 +2264,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
                   <span>Interactive Split Commission Policy</span>
                 </div>
                 <p>
-                  Vernunt marketplace secures slot bookkeeping bookings automatically. A platform commission of <strong className="text-indigo-900">{selectedSpecialist?.commissionPercentage ?? globalCommissionRate}%</strong> is split via Razorpay standard splits. Remaining ₹ amounts are direct-transfer routed.
+                  Vernunt marketplace secures slot bookkeeping bookings automatically. A platform commission of <strong className="text-indigo-900">{selectedSpecialist?.commissionPercentage ?? globalCommissionRate}%</strong> is processed via instant split gateway. Remaining ₹ amounts are direct-transfer routed.
                 </p>
               </div>
 
@@ -2410,7 +2412,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               <div className="space-y-3 p-4 bg-slate-50 border border-slate-200/60 rounded-2xl">
                 <div className="flex justify-between items-center">
                   <span className="text-[10px] uppercase font-black text-slate-500 tracking-wider">Choose Kids Connect Period Pass</span>
-                  <span className="text-[10px] font-bold text-slate-400">Secure Razorpay checkout</span>
+                  <span className="text-[10px] font-bold text-slate-400">Secure 256-Bit SSL Checkout</span>
                 </div>
                 
                 <div className="grid grid-cols-3 gap-2.5">
@@ -2430,7 +2432,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
               </div>
 
               <p className="text-[10px] text-slate-400 text-center font-medium leading-relaxed">
-                By selecting a plan, you authorize UPI/Secured Razorpay transaction. You will bypass future consultation commissions.
+                By selecting a plan, you authorize payment via Cards, NetBanking, UPI or Wallets. You will bypass future consultation commissions.
               </p>
             </div>
 

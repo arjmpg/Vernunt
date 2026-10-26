@@ -299,7 +299,7 @@ export default function EventBookingModal({
     paymentId: string,
     walletUsed: number = walletDeduction,
     onlinePaid: number = remainingOnlinePayable,
-    methodUsed: 'Cashfree' | 'VernuntWallet' | 'Hybrid' | 'Free' | 'Razorpay' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Cashfree',
+    methodUsed: 'Cashfree' | 'VernuntWallet' | 'Hybrid' | 'Free' | 'OnlineGateway' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Cashfree',
     cfOrderId?: string
   ) => {
     // If hybrid/online payment and wallet was debited:
@@ -329,7 +329,7 @@ export default function EventBookingModal({
       hostEarned: hostEarned,
       dateStr: event.date,
       timeSelected: selectedTimeSlot,
-      razorpayPaymentId: paymentId,
+      paymentId: paymentId,
       cashfreePaymentId: paymentId,
       cashfreeOrderId: cfOrderId,
       paymentGateway: methodUsed === 'VernuntWallet' ? 'VernuntWallet' : (walletUsed > 0 ? 'Hybrid' : (onlinePaid === 0 ? 'Free' : 'Cashfree')),
@@ -936,22 +936,22 @@ export default function EventBookingModal({
                     {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable === 0 && (
                       <div className="text-[11px] text-emerald-800 bg-emerald-100/70 p-2 rounded-xl font-medium flex items-center gap-1.5 border border-emerald-200">
                         <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                        <span>Full amount covered by your Vernunt Wallet! No Cashfree gateway checkout needed.</span>
+                        <span>Full amount covered by your Vernunt Wallet! No online payment checkout needed.</span>
                       </div>
                     )}
 
                     {useWalletFunds && walletDeduction > 0 && remainingOnlinePayable > 0 && (
                       <div className="text-[10px] text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-xl font-medium border border-amber-200">
-                        ⚡ Priority Deduction: <strong>₹{walletDeduction}</strong> deducted from wallet first. Remaining balance of <strong>₹{remainingOnlinePayable}</strong> defaults to Cashfree gateway.
+                        ⚡ Priority Deduction: <strong>₹{walletDeduction}</strong> deducted from wallet first. Remaining balance of <strong>₹{remainingOnlinePayable}</strong> defaults to online payment gateway.
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Final Net Payable Online via Cashfree */}
+                {/* Final Net Payable Online */}
                 <div className="pt-2 flex justify-between items-center text-sm font-bold border-t border-slate-100">
                   <div>
-                    <span className="text-slate-900 block">Remaining via Cashfree:</span>
+                    <span className="text-slate-900 block">Remaining Online Payable:</span>
                     <span className="text-[10px] text-slate-400 font-normal">
                       {walletDeduction > 0 ? `After ₹${walletDeduction} wallet deduction` : 'Instant UPI, Cards & NetBanking'}
                     </span>
@@ -987,7 +987,7 @@ export default function EventBookingModal({
                   {isCashfreeLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Initializing Cashfree Gateway...</span>
+                      <span>Initializing Secure Payment Gateway...</span>
                     </>
                   ) : remainingOnlinePayable === 0 ? (
                     <>
@@ -999,8 +999,8 @@ export default function EventBookingModal({
                       <CreditCard className="w-4 h-4" />
                       <span>
                         {walletDeduction > 0 
-                          ? `Pay Remaining ₹${remainingOnlinePayable} with Cashfree (₹${walletDeduction} via Wallet)` 
-                          : `Pay ₹${finalTotal} with Cashfree`}
+                          ? `Pay Remaining ₹${remainingOnlinePayable} via Cards / UPI (₹${walletDeduction} via Wallet)` 
+                          : `Pay ₹${finalTotal} via Debit / Credit Card, NetBanking, UPI`}
                       </span>
                     </>
                   )}
@@ -1009,17 +1009,17 @@ export default function EventBookingModal({
             </div>
           )}
 
-          {/* STEP 3: Cashfree Payment Processing Indicator */}
+          {/* STEP 3: Payment Processing Indicator */}
           {step === 'payment_processing' && (
             <div className="py-10 text-center space-y-3 animate-fadeIn">
               <div className="w-14 h-14 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center mx-auto animate-pulse">
                 <CreditCard className="w-7 h-7" />
               </div>
               <h4 className="font-black text-slate-900 text-base">
-                Connecting to Cashfree Payments Gateway...
+                Connecting to Secure Payment Gateway...
               </h4>
               <p className="text-xs text-slate-500">
-                Securing ₹{remainingOnlinePayable} transaction with Cashfree Bank-Grade 256-bit encryption.
+                Securing ₹{remainingOnlinePayable} transaction with bank-grade 256-bit SSL encryption.
                 {walletDeduction > 0 && (
                   <span className="block text-[11px] text-emerald-700 font-semibold mt-1">
                     (₹{walletDeduction} already deducted from Vernunt Wallet)
@@ -1062,10 +1062,10 @@ export default function EventBookingModal({
               <button
                 type="button"
                 onClick={() => finalizeOrder(
-                  'RZP_PROD_' + Date.now().toString().slice(-8),
+                  'CF_PAY_' + Date.now().toString().slice(-8),
                   walletDeduction,
                   remainingOnlinePayable,
-                  walletDeduction > 0 ? 'Hybrid' : 'Razorpay'
+                  walletDeduction > 0 ? 'Hybrid' : 'OnlineGateway'
                 )}
                 className="w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-colors"
               >

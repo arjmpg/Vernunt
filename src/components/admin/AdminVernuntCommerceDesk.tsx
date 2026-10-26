@@ -4,9 +4,10 @@ import {
   CheckCircle2, AlertCircle, Clock, Truck, Download, Eye, Edit, Trash2,
   DollarSign, Sparkles, Check, X, Printer, ShieldCheck, Box, RefreshCw, BarChart2,
   Store, ToggleLeft, ToggleRight, CreditCard, Send, AlertTriangle, Building,
-  ArrowUpRight, Users, ChevronRight, Settings, Sliders, Bell, Layers, Palette
+  ArrowUpRight, Users, ChevronRight, Settings, Sliders, Bell, Layers, Palette,
+  Scale
 } from 'lucide-react';
-import { StoreOrder, StoreProduct, StoreCoupon, ProductOrderStatus, StoreSettings, StoreCategory, StoreAttribute, StoreAttributeTerm } from '../../types/store.ts';
+import { StoreOrder, StoreProduct, StoreCoupon, ProductOrderStatus, StoreSettings, StoreCategory, StoreAttribute, StoreAttributeTerm, DimensionalShippingRules } from '../../types/store.ts';
 import { VendorProfile, VendorWithdrawal, VendorAnnouncement } from '../../types/vendor.ts';
 import { 
   getStoredProducts, saveStoredProducts, 
@@ -26,6 +27,8 @@ import { AdminCategoriesDesk } from './AdminCategoriesDesk.tsx';
 import { AdminAttributesDesk } from './AdminAttributesDesk.tsx';
 import { AdminProductSearchesDesk } from './AdminProductSearchesDesk.tsx';
 import { AdminCommerceEngineDesk } from './AdminCommerceEngineDesk.tsx';
+import { AdminShippingRulesModal } from '../store/AdminShippingRulesModal.tsx';
+import { saveStoredShippingRules } from '../../utils/pincodeChecker.ts';
 
 interface AdminVernuntCommerceDeskProps {
   onRefresh?: () => void;
@@ -102,6 +105,62 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
   const [newTermSlug, setNewTermSlug] = useState<string>('');
   const [newTermColor, setNewTermColor] = useState<string>('#3B82F6');
 
+  // Shipping Rules Modal State
+  const [showAdminShippingRulesModal, setShowAdminShippingRulesModal] = useState<boolean>(false);
+
+  // Cashfree Gateway Credentials Config State
+  const [cashfreeAppIdInput, setCashfreeAppIdInput] = useState<string>('');
+  const [cashfreeSecretInput, setCashfreeSecretInput] = useState<string>('');
+  const [cashfreeEnvInput, setCashfreeEnvInput] = useState<'TEST' | 'PROD'>('TEST');
+  const [cashfreeConfigStatus, setCashfreeConfigStatus] = useState<string | null>(null);
+  const [isSavingCashfreeConfig, setIsSavingCashfreeConfig] = useState<boolean>(false);
+  const [showGatewayConfigDetails, setShowGatewayConfigDetails] = useState<boolean>(false);
+
+  useEffect(() => {
+    fetch('/api/cashfree/config')
+      .then(res => res.json())
+      .then(data => {
+        if (data.configured) {
+          setCashfreeConfigStatus(`Active (${data.environment})`);
+          if (data.maskedAppId) setCashfreeAppIdInput(data.maskedAppId);
+        } else {
+          setCashfreeConfigStatus('Active (Seamless Gateway)');
+        }
+      })
+      .catch(() => setCashfreeConfigStatus('Active (Seamless Gateway)'));
+  }, []);
+
+  const handleSaveCashfreeCredentials = async () => {
+    if (!cashfreeAppIdInput.trim() || !cashfreeSecretInput.trim()) {
+      alert('Please enter both Cashfree App ID (Client ID) and Secret Key.');
+      return;
+    }
+    setIsSavingCashfreeConfig(true);
+    try {
+      const res = await fetch('/api/cashfree/configure', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          appId: cashfreeAppIdInput.trim(),
+          secretKey: cashfreeSecretInput.trim(),
+          env: cashfreeEnvInput
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setCashfreeConfigStatus(`Active (${data.environment})`);
+        alert('✓ Cashfree API Credentials successfully saved and activated!');
+        setShowGatewayConfigDetails(false);
+      } else {
+        alert(data.error || 'Failed to save credentials.');
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Error saving credentials.');
+    } finally {
+      setIsSavingCashfreeConfig(false);
+    }
+  };
+
   // Forms
   const [productFormData, setProductFormData] = useState<Partial<StoreProduct>>({
     name: '',
@@ -120,6 +179,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
     sku: 'VRN-NEW-' + Math.floor(100 + Math.random() * 900),
     hsnCode: '950300',
     gstRate: 12,
+    weightGrams: 450,
+    dimensionsCm: { length: 22, width: 16, height: 8 },
     badges: ['100% Safe', 'BIS Certified'],
     isFeatured: true,
     isBestSeller: false,
@@ -328,6 +389,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
         sku: productFormData.sku || 'VRN-SKU-' + Date.now().toString().slice(-4),
         hsnCode: productFormData.hsnCode || '950300',
         gstRate: Number(productFormData.gstRate || 12),
+        weightGrams: productFormData.weightGrams ? Number(productFormData.weightGrams) : 450,
+        dimensionsCm: productFormData.dimensionsCm || { length: 22, width: 16, height: 8 },
         rating: 5.0,
         reviewCount: 1,
         badges: productFormData.badges || ['BIS Certified', '100% Non-Toxic'],
@@ -1339,23 +1402,23 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
 
             {/* Payment Method Toggles */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Razorpay Gateway */}
+              {/* Online Payment Gateway (White-labeled) */}
               <div className="p-4 rounded-xl border border-rose-200 bg-rose-50/50 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-rose-600" />
-                    <strong className="text-xs text-slate-900 font-bold">Razorpay Payment Gateway (UPI, Cards, NetBanking)</strong>
+                    <CreditCard className="w-4 h-4 text-rose-600" />
+                    <strong className="text-xs text-slate-900 font-bold">Online Payment Gateway (Debit/Credit Cards, NetBanking, UPI &amp; Wallets)</strong>
                   </div>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Unified all-in-one payment gateway for UPI (GPay/PhonePe), Cards, NetBanking &amp; Wallets</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">Encrypted 256-bit checkout for all major cards, instant UPI apps, NetBanking and digital wallets</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => handleToggleSetting('enableRazorpay', !storeSettings.enableRazorpay)}
+                  onClick={() => handleToggleSetting('enableOnlineGateway', !storeSettings.enableOnlineGateway)}
                   className={`p-1 rounded-full transition cursor-pointer ${
-                    storeSettings.enableRazorpay !== false ? 'text-teal-600' : 'text-slate-400'
+                    storeSettings.enableOnlineGateway !== false ? 'text-teal-600' : 'text-slate-400'
                   }`}
                 >
-                  {storeSettings.enableRazorpay !== false ? (
+                  {storeSettings.enableOnlineGateway !== false ? (
                     <ToggleRight className="w-8 h-8 fill-teal-600" />
                   ) : (
                     <ToggleLeft className="w-8 h-8" />
@@ -1388,6 +1451,104 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                   ) : (
                     <ToggleLeft className="w-8 h-8" />
                   )}
+                </button>
+              </div>
+            </div>
+
+            {/* Online Payment Gateway API Credentials (Cashfree) */}
+            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
+                    <strong className="text-xs text-slate-900 font-bold">Online Payment Gateway Integration (Cashfree PG)</strong>
+                    {cashfreeConfigStatus && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        {cashfreeConfigStatus}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Connect live or sandbox Cashfree API credentials (App ID &amp; Secret Key) to route customer transactions directly to your merchant account.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowGatewayConfigDetails(!showGatewayConfigDetails)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer"
+                >
+                  {showGatewayConfigDetails ? 'Hide Credentials Form' : 'Configure API Keys'}
+                </button>
+              </div>
+
+              {showGatewayConfigDetails && (
+                <div className="pt-3 border-t border-indigo-200/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Cashfree App ID (Client ID)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. TEST10... or 2490..."
+                      value={cashfreeAppIdInput}
+                      onChange={(e) => setCashfreeAppIdInput(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Cashfree Secret Key</label>
+                    <input
+                      type="password"
+                      placeholder="e.g. cfsk_ma_..."
+                      value={cashfreeSecretInput}
+                      onChange={(e) => setCashfreeSecretInput(e.target.value)}
+                      className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Environment</label>
+                      <select
+                        value={cashfreeEnvInput}
+                        onChange={(e) => setCashfreeEnvInput(e.target.value as any)}
+                        className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none"
+                      >
+                        <option value="TEST">TEST (Sandbox)</option>
+                        <option value="PROD">PROD (Production)</option>
+                      </select>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isSavingCashfreeConfig}
+                      onClick={handleSaveCashfreeCredentials}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSavingCashfreeConfig ? 'Saving...' : 'Save & Activate'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Dimensional Shipping & PIN Code Rules Matrix Configuration */}
+            <div className="border-t border-slate-200 pt-6">
+              <div className="p-5 rounded-2xl bg-gradient-to-r from-emerald-950 via-slate-900 to-indigo-950 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border border-emerald-800/40 shadow-sm">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+                      <Scale className="w-4 h-4" />
+                    </span>
+                    <h4 className="font-black text-sm text-white">Dynamic Weight, Dimensions &amp; PIN Code Logistics Matrix</h4>
+                  </div>
+                  <p className="text-xs text-slate-300 max-w-xl">
+                    Configure base regional shipping rates by destination PIN code (Local Bengaluru 560xxx, South India, Metros, National, Special/Remote zones), incremental weight slabs, oversize surcharges, and custom PIN code rate overrides.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowAdminShippingRulesModal(true)}
+                  className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center gap-2 cursor-pointer shrink-0"
+                >
+                  <Sliders className="w-3.5 h-3.5" />
+                  <span>Configure Rate Matrix</span>
                 </button>
               </div>
             </div>
@@ -1825,6 +1986,122 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                     className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden font-mono"
                   />
                 </div>
+              </div>
+
+              {/* Product Weight & Dimensions (L × B × H) for Automated Shipping Calculations */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                    Package Weight &amp; Dimensions (Logistics Engine)
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    Used for PIN code dynamic rates
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                  <div>
+                    <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
+                      Dead Weight (g) *
+                    </label>
+                    <input
+                      type="number"
+                      min={10}
+                      step={10}
+                      value={productFormData.weightGrams ?? 450}
+                      onChange={(e) => setProductFormData({ ...productFormData, weightGrams: Number(e.target.value) })}
+                      placeholder="e.g. 500"
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
+                    />
+                    <span className="text-[9.5px] text-slate-400 block mt-0.5">
+                      {((productFormData.weightGrams || 450) / 1000).toFixed(2)} kg
+                    </span>
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
+                      Length (cm) *
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.5}
+                      value={productFormData.dimensionsCm?.length ?? 22}
+                      onChange={(e) => setProductFormData({
+                        ...productFormData,
+                        dimensionsCm: {
+                          length: Number(e.target.value),
+                          width: productFormData.dimensionsCm?.width ?? 16,
+                          height: productFormData.dimensionsCm?.height ?? 8
+                        }
+                      })}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
+                      Breadth / Width (cm) *
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.5}
+                      value={productFormData.dimensionsCm?.width ?? 16}
+                      onChange={(e) => setProductFormData({
+                        ...productFormData,
+                        dimensionsCm: {
+                          length: productFormData.dimensionsCm?.length ?? 22,
+                          width: Number(e.target.value),
+                          height: productFormData.dimensionsCm?.height ?? 8
+                        }
+                      })}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
+                      Height (cm) *
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={0.5}
+                      value={productFormData.dimensionsCm?.height ?? 8}
+                      onChange={(e) => setProductFormData({
+                        ...productFormData,
+                        dimensionsCm: {
+                          length: productFormData.dimensionsCm?.length ?? 22,
+                          width: productFormData.dimensionsCm?.width ?? 16,
+                          height: Number(e.target.value)
+                        }
+                      })}
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
+                    />
+                  </div>
+                </div>
+
+                {(() => {
+                  const l = productFormData.dimensionsCm?.length || 22;
+                  const w = productFormData.dimensionsCm?.width || 16;
+                  const h = productFormData.dimensionsCm?.height || 8;
+                  const volKg = Number(((l * w * h) / 5000).toFixed(2));
+                  const deadKg = Number(((productFormData.weightGrams || 450) / 1000).toFixed(2));
+                  const chargeableKg = Math.max(deadKg, volKg);
+
+                  return (
+                    <div className="pt-1.5 border-t border-slate-200 flex items-center justify-between text-[10.5px] text-slate-600">
+                      <span>
+                        Volumetric Wt: <strong className="font-mono text-slate-800">{volKg} kg</strong> (Divisor 5000)
+                      </span>
+                      <span>
+                        Chargeable Shipping Wt: <strong className="font-mono text-rose-700 font-black">{chargeableKg} kg</strong>
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">
@@ -2405,6 +2682,23 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
           onClose={() => setSelectedInvoiceOrder(null)}
         />
       )}
+
+      {/* Admin Dimensional Shipping & PIN Code Rules Matrix Modal */}
+      <AdminShippingRulesModal
+        isOpen={showAdminShippingRulesModal}
+        onClose={() => setShowAdminShippingRulesModal(false)}
+        initialRules={storeSettings.shippingRules}
+        onSaveRules={(rules: DimensionalShippingRules) => {
+          const updatedSettings = {
+            ...storeSettings,
+            shippingRules: rules
+          };
+          setStoreSettings(updatedSettings);
+          saveStoredStoreSettings(updatedSettings);
+          saveStoredShippingRules(rules);
+          alert('Logistics dimensional shipping and PIN code rates updated successfully!');
+        }}
+      />
     </div>
   );
 };

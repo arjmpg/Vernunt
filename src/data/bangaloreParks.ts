@@ -20,7 +20,7 @@ export const BANGALORE_PARKS: BangalorePark[] = [
     facilities: [
       'Toddler Play Area', 'Swings & Slides', 'Sandpit', 'Lush Shade Trees',
       'Cycling / Skating Track', 'Stroller Accessible', 'Restrooms', 'Drinking Water',
-      'Gated & Security Guarded', 'Toy Train / Rides', 'Picnic Lawns'
+      'Gated & Security Guarded', 'Toy Train / Rides', 'Picnic Lawns', 'Cafeteria / Refreshments'
     ],
     highlights: ['Bal Bhavan Kids Play Zone & Mini Toy Train', 'Puppet shows & craft lawns', 'Bamboo grove picnic area'],
     imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=1200&q=80',
@@ -28,7 +28,10 @@ export const BANGALORE_PARKS: BangalorePark[] = [
     placeRating: 4.8,
     reviewsCount: 42100,
     bbmpWard: 'Sampangiram Nagar Ward 110',
-    isPopular: true
+    isPopular: true,
+    verified: true,
+    accessible: true,
+    hasCafeteria: true
   },
   {
     id: 'lalbagh-botanical-garden',
@@ -46,7 +49,7 @@ export const BANGALORE_PARKS: BangalorePark[] = [
     facilities: [
       'Toddler Play Area', 'Lush Shade Trees', 'Stroller Accessible',
       'Restrooms', 'Drinking Water', 'Gated & Security Guarded',
-      'Lake / Water Body', 'Picnic Lawns'
+      'Lake / Water Body', 'Picnic Lawns', 'Cafeteria / Refreshments'
     ],
     highlights: ['Glass House, lotus lake & bonsai garden', 'Huge ancient tree shade for toddlers', 'Peninsular Gneiss rock climbing'],
     imageUrl: 'https://images.unsplash.com/photo-1588714477688-cf28a50e94f7?auto=format&fit=crop&w=1200&q=80',
@@ -54,7 +57,10 @@ export const BANGALORE_PARKS: BangalorePark[] = [
     placeRating: 4.7,
     reviewsCount: 38900,
     bbmpWard: 'Hombegowda Nagar Ward 144',
-    isPopular: true
+    isPopular: true,
+    verified: true,
+    accessible: true,
+    hasCafeteria: true
   },
   {
     id: 'coles-park-frazer-town',
@@ -1362,6 +1368,7 @@ export const PARK_FACILITY_OPTIONS = [
   '🛝 Swings & Slides',
   '🏖️ Sandpit',
   '🌳 Lush Shade Trees',
+  '☕ Cafeteria / Canteen',
   '🛹 Skating Track',
   '🚲 Cycling Track',
   '🦆 Lake / Water Body',

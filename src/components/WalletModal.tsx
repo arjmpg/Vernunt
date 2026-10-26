@@ -86,7 +86,7 @@ export default function WalletModal({
         finalAmount,
         'Cashfree',
         payId,
-        `Wallet top-up via Cashfree Unified Gateway (₹${finalAmount})`
+        `Wallet top-up via Online Gateway (₹${finalAmount})`
       );
       setWallet(updated);
       if (onBalanceUpdated) onBalanceUpdated(updated.balance);
@@ -329,7 +329,7 @@ export default function WalletModal({
                 <div>
                   <span className="font-bold block text-[11px]">Universal Hybrid Checkout Supported:</span>
                   <span className="text-[10.5px] text-amber-900/90">
-                    When purchasing event passes, refreshments from the menu, booking specialists, or buying toys from Vernunt Store, your wallet balance will automatically deduct first. Any remaining balance can be smoothly paid online via Cashfree Payments (UPI, Cards, NetBanking).
+                    When purchasing event passes, refreshments from the menu, booking specialists, or buying toys from Vernunt Store, your wallet balance will automatically deduct first. Any remaining balance can be smoothly paid online via Debit / Credit Cards, NetBanking, UPI or Wallets.
                   </span>
                 </div>
               </div>
@@ -458,7 +458,7 @@ export default function WalletModal({
               {/* Accepted Channels Preview */}
               <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Top-up Payment Modes via Razorpay
+                  Top-up Payment Modes (Cards, NetBanking, UPI &amp; Wallets)
                 </span>
                 <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-700">
                   <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md font-semibold">📱 Google Pay</span>

@@ -81,13 +81,13 @@ export function generateBookingEmailHtml(booking: Booking, event?: CommunityEven
           <tr>
             <td style="padding: 6px 0; color: #64748b;">${isFree ? '🎟️ Admission:' : '💳 Amount Paid:'}</td>
             <td style="padding: 6px 0; font-weight: 800; color: #16a34a;">
-              ${isFree ? 'FREE (Complimentary Pass)' : `₹${booking.amountPaid}.00 (Verified via Cashfree Payments)`}
+              ${isFree ? 'FREE (Complimentary Pass)' : `₹${booking.amountPaid}.00 (Paid Online • Verified)`}
             </td>
           </tr>
           ${!isFree ? `
           <tr>
             <td style="padding: 6px 0; color: #64748b;">🔒 Reference ID:</td>
-            <td style="padding: 6px 0; font-family: monospace; font-size: 11px; color: #475569;">${booking.cashfreePaymentId || booking.razorpayPaymentId || booking.id}</td>
+            <td style="padding: 6px 0; font-family: monospace; font-size: 11px; color: #475569;">${booking.cashfreePaymentId || booking.paymentId || booking.id}</td>
           </tr>
           ` : `
           <tr>
@@ -312,7 +312,7 @@ export async function sendSpecialistBookingNotifications(payload: SpecialistNoti
   };
 
   const isFree = !payload.fee || payload.fee === 0;
-  const feeLabel = isFree ? 'FREE (Complimentary Consultation)' : `₹${payload.fee}.00 (Paid via Razorpay Secure)`;
+  const feeLabel = isFree ? 'FREE (Complimentary Consultation)' : `₹${payload.fee}.00 (Paid Online • Verified)`;
 
   if (payload.toEmail && payload.toEmail.includes('@')) {
     try {

@@ -1517,7 +1517,8 @@ export default function App() {
       hostEarned: 382,
       dateStr: '2026-06-03',
       timeSelected: '14:05',
-      razorpayPaymentId: 'pay_EVT_K9X8P3L2Q1',
+      paymentId: 'pay_EVT_K9X8P3L2Q1',
+      cashfreePaymentId: 'pay_EVT_K9X8P3L2Q1',
       status: 'Paid'
     },
     {
@@ -1533,7 +1534,8 @@ export default function App() {
       hostEarned: 808,
       dateStr: '2026-06-05',
       timeSelected: '11:00',
-      razorpayPaymentId: 'pay_SPC_A4Z7M1Y9V2',
+      paymentId: 'pay_SPC_A4Z7M1Y9V2',
+      cashfreePaymentId: 'pay_SPC_A4Z7M1Y9V2',
       status: 'Paid'
     }
   ]);
@@ -1769,6 +1771,17 @@ export default function App() {
   }, [specialistsList]);
 
   const [eventsList, setEventsList] = useState<CommunityEvent[]>(MOCK_EVENTS);
+  const [storeInitialAction, setStoreInitialAction] = useState<string | undefined>(undefined);
+
+  const handleAddEvent = (newEvent: CommunityEvent) => {
+    setEventsList(prev => [newEvent, ...prev]);
+    try {
+      localStorage.setItem('vernunt_community_events', JSON.stringify([newEvent, ...eventsList]));
+    } catch (e) {
+      console.debug('Failed to cache event:', e);
+    }
+    triggerToast(`🎉 Event "${newEvent.title}" published!`);
+  };
 
   // Babysitting & Drop-in Daycare Playhome state
   const [daycarePlayhomes, setDaycarePlayhomes] = useState<DaycarePlayhomeProfile[]>(() => {
@@ -2464,6 +2477,10 @@ export default function App() {
   }, [savedProfileIds]);
 
   const handleToggleSaveProfile = (profileId: string) => {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
     setSavedProfileIds(prev => {
       const isAlreadySaved = prev.includes(profileId);
       const next = isAlreadySaved ? prev.filter(id => id !== profileId) : [...prev, profileId];
@@ -2482,7 +2499,11 @@ export default function App() {
   const aadhaarSuccessCallbackRef = useRef<(() => void) | null>(null);
 
   const ensureAadhaarVerified = (actionMessage: string, onSuccess: () => void) => {
-    if (userProfile && userProfile.aadhaarVerified) {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
+    if (userProfile.aadhaarVerified) {
       onSuccess();
     } else {
       setAadhaarActionMessage(actionMessage);
@@ -2573,6 +2594,10 @@ export default function App() {
   };
 
   const handleAcceptConnection = (partnerId: string) => {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
     ensureAadhaarVerified(
       "To accept incoming peer requests, connect with playmates, and swap private dashboard contacts, Aadhaar authentication is required.",
       () => {
@@ -2601,7 +2626,11 @@ export default function App() {
   };
 
   const handleSendConnectionRequest = (partnerId: string) => {
-    if (!userProfile?.subscriptionActive) {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
+    if (!userProfile.subscriptionActive) {
       alert("👑 To send connect requests to neighborhood parents, please activate any Kids Connect Club plan (including Free Plan) first!");
       setActiveTab('billing');
       return;
@@ -3105,6 +3134,10 @@ export default function App() {
   };
 
   const handleBookPlaydateTrigger = (profile: ChildProfile) => {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
     ensureAadhaarVerified(
       "Aadhaar verification is mandatory to schedule and book playdates with neighborhood families.",
       () => {
@@ -3115,6 +3148,10 @@ export default function App() {
   };
 
   const handleOpenChatTrigger = (profile: ChildProfile, templateMessage?: string) => {
+    if (!userProfile) {
+      setShowParentAuthModal(true);
+      return;
+    }
     ensureAadhaarVerified(
       "Aadhaar verification is mandatory to send direct messages and connect with other parents.",
       () => {
@@ -3855,7 +3892,12 @@ export default function App() {
                 onQuickStart={() => handleStartSignUp('Parent')}
                 onGoogleSignIn={() => setShowGoogleAccountModal(true)}
                 onSelectGoogleAccount={handleSelectGoogleAccount}
-                onOpenStore={(_cat) => {
+                onOpenStore={(catOrAction) => {
+                  if (catOrAction === 'checkout' || catOrAction === 'cart') {
+                    setStoreInitialAction(catOrAction);
+                  } else {
+                    setStoreInitialAction(undefined);
+                  }
                   setActiveTab('store');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
@@ -3870,7 +3912,17 @@ export default function App() {
                     const p = playmates.find(item => item.id === playmateId);
                     if (p) setSelectedPlaymate(p);
                   }
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                  if (!userProfile) {
+                    setTimeout(() => {
+                      const el = document.getElementById('playtime-auth-gate');
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }
+                    }, 120);
+                    setShowParentAuthModal(true);
+                  } else {
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
                 }}
                 onOpenParks={() => {
                   setActiveTab('radar');
@@ -3901,7 +3953,7 @@ export default function App() {
                   setActiveTab('radar');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                onOpenAuthModal={() => setShowGoogleAccountModal(true)}
+                onOpenAuthModal={() => setShowParentAuthModal(true)}
                 language={language}
                 unreadNotificationsCount={notificationsHistory.length}
                 hideHeader={true}
@@ -3951,6 +4003,15 @@ export default function App() {
                     onClick={() => {
                       setPlaymateSubCategory('playmates');
                       if (activeTab === 'parks') setActiveTab('radar');
+                      if (!userProfile) {
+                        setTimeout(() => {
+                          const el = document.getElementById('playtime-auth-gate');
+                          if (el) {
+                            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                          }
+                        }, 120);
+                        setShowParentAuthModal(true);
+                      }
                     }}
                     className={`relative p-4 sm:p-5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md ${
                       playmateSubCategory === 'playmates' && activeTab !== 'parks'
@@ -4035,6 +4096,9 @@ export default function App() {
                     onClick={() => {
                       setPlaymateSubCategory('planner');
                       if (activeTab === 'parks') setActiveTab('radar');
+                      if (!userProfile) {
+                        setShowParentAuthModal(true);
+                      }
                     }}
                     className={`relative p-4 sm:p-5 rounded-2xl border-2 text-left transition-all duration-200 cursor-pointer flex flex-col justify-between shadow-xs hover:shadow-md ${
                       playmateSubCategory === 'planner'
@@ -4146,25 +4210,27 @@ export default function App() {
 
                 {/* Sub-Category 1: Locked Full Tab Auth by Default (When not Logged In) */}
                 {playmateSubCategory === 'playmates' && activeTab !== 'parks' && !userProfile && (
-                  <PlaytimeLockedTabAuth
-                    onSuccessLogin={(loggedInProfile) => {
-                      setUserProfile(loggedInProfile);
-                      const user_role = loggedInProfile.userRole || 'Parent';
-                      setUserRole(user_role);
-                      persistAuthSession(loggedInProfile, user_role);
-                      confetti({ particleCount: 120, spread: 75 });
-                    }}
-                    onStartSignup={(details) => {
-                      setPendingRegisterDetails({
-                        phone: details.phone,
-                        email: details.email,
-                        phoneVerified: details.phoneVerified,
-                        emailVerified: details.emailVerified
-                      });
-                      handleStartSignUp('Parent', details);
-                    }}
-                    onGoogleSignIn={() => setShowGoogleAccountModal(true)}
-                  />
+                  <div id="playtime-auth-gate" className="w-full scroll-mt-24">
+                    <PlaytimeLockedTabAuth
+                      onSuccessLogin={(loggedInProfile) => {
+                        setUserProfile(loggedInProfile);
+                        const user_role = loggedInProfile.userRole || 'Parent';
+                        setUserRole(user_role);
+                        persistAuthSession(loggedInProfile, user_role);
+                        confetti({ particleCount: 120, spread: 75 });
+                      }}
+                      onStartSignup={(details) => {
+                        setPendingRegisterDetails({
+                          phone: details.phone,
+                          email: details.email,
+                          phoneVerified: details.phoneVerified,
+                          emailVerified: details.emailVerified
+                        });
+                        handleStartSignUp('Parent', details);
+                      }}
+                      onGoogleSignIn={() => setShowGoogleAccountModal(true)}
+                    />
+                  </div>
                 )}
 
                 {/* Sub-Category 2: Bangalore Parks & Playtime Connect */}
@@ -4180,7 +4246,7 @@ export default function App() {
                         if (target) setSelectedPlaymate(target);
                       }}
                       onRequireAuth={() => {
-                        setShowGoogleAccountModal(true);
+                        setShowParentAuthModal(true);
                       }}
                     />
                   </div>
@@ -4285,7 +4351,7 @@ export default function App() {
                   setUserProfile(profileObj);
                 }}
                 onOpenLogin={() => {
-                  setShowGoogleAccountModal(true);
+                  setShowParentAuthModal(true);
                 }}
               />
             )}
@@ -4440,6 +4506,8 @@ export default function App() {
             {activeTab === 'store' && (
               <VernuntStore 
                 userProfile={userProfile}
+                initialAction={storeInitialAction}
+                onClearInitialAction={() => setStoreInitialAction(undefined)}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
                 onContactSupport={() => setShowSupportChat(true)}
                 onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
@@ -4449,10 +4517,15 @@ export default function App() {
             {/* Dedicated Portal: Vendor / Seller Dashboard (https://app.vernunt.com/vendor) */}
             {activeTab === 'vendor' && (
               <VendorDashboard
+                userProfile={userProfile}
                 currentUserProfile={userProfile}
                 onNavigateHome={() => {
                   window.history.pushState({}, '', '/');
-                  setActiveTab('radar');
+                  setActiveTab('home');
+                }}
+                onBackToStore={() => {
+                  setActiveTab('store');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
                 onOpenHelpSop={() => setActiveTab('help')}
               />
@@ -4462,11 +4535,11 @@ export default function App() {
             {activeTab === 'host' && (
               <HostDashboard
                 currentUserProfile={userProfile}
-                events={events}
+                events={eventsList}
                 onAddEvent={handleAddEvent}
                 onNavigateHome={() => {
                   window.history.pushState({}, '', '/');
-                  setActiveTab('radar');
+                  setActiveTab('home');
                 }}
                 onOpenHelpSop={() => setActiveTab('help')}
               />
