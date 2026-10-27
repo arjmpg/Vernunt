@@ -3678,27 +3678,47 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               </div>
 
               {/* Free Delivery Meter */}
-              <div className="bg-rose-50 px-5 py-2.5 border-b border-rose-100 text-xs">
-                {cartSubtotal >= 499 ? (
-                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>You qualified for FREE Express Courier Delivery! 🎉</span>
+              {(() => {
+                const allItemsFree = cart.length > 0 && cart.every(it => {
+                  const p = it.product;
+                  return Boolean(
+                    p?.isFreeShipping === true ||
+                    p?.shippingFee === 0 ||
+                    p?.defaultShippingFee === 0 ||
+                    (p as any)?.freeShipping === true ||
+                    p?.badges?.some(b => b.toLowerCase().includes('free shipping'))
+                  );
+                });
+                const qualifies = cartSubtotal >= 499 || allItemsFree || shippingFee === 0;
+
+                return (
+                  <div className="bg-rose-50 px-5 py-2.5 border-b border-rose-100 text-xs">
+                    {qualifies ? (
+                      <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span>
+                          {allItemsFree
+                            ? '🎉 Free Shipping included on this product!'
+                            : 'You qualified for FREE Express Courier Delivery! 🎉'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[11px] text-rose-900 font-semibold">
+                          <span>Add ₹{Math.max(0, 499 - cartSubtotal)} more for FREE Delivery!</span>
+                          <span>₹{cartSubtotal} / ₹499</span>
+                        </div>
+                        <div className="w-full bg-rose-200 h-1.5 rounded-full overflow-hidden">
+                          <div
+                            className="bg-rose-600 h-full rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, (cartSubtotal / 499) * 100)}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-[11px] text-rose-900 font-semibold">
-                      <span>Add ₹{499 - cartSubtotal} more for FREE Delivery!</span>
-                      <span>₹{cartSubtotal} / ₹499</span>
-                    </div>
-                    <div className="w-full bg-rose-200 h-1.5 rounded-full overflow-hidden">
-                      <div
-                        className="bg-rose-600 h-full rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min(100, (cartSubtotal / 499) * 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* Cart Items List */}
               <div className="flex-1 overflow-y-auto p-5 space-y-3">
@@ -3737,10 +3757,23 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                             {Object.entries(item.selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(' | ')}
                           </p>
                         )}
-                        <div className="flex items-baseline gap-1 font-mono mt-1">
-                          <span className="font-bold text-xs text-slate-900">₹{item.unitPrice}</span>
-                          {item.unitRegularPrice > item.unitPrice && (
-                            <span className="text-[10px] text-slate-400 line-through">₹{item.unitRegularPrice}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="flex items-baseline gap-1 font-mono">
+                            <span className="font-bold text-xs text-slate-900">₹{item.unitPrice}</span>
+                            {item.unitRegularPrice > item.unitPrice && (
+                              <span className="text-[10px] text-slate-400 line-through">₹{item.unitRegularPrice}</span>
+                            )}
+                          </div>
+                          {Boolean(
+                            item.product?.isFreeShipping === true ||
+                            item.product?.shippingFee === 0 ||
+                            item.product?.defaultShippingFee === 0 ||
+                            (item.product as any)?.freeShipping === true ||
+                            item.product?.badges?.some(b => b.toLowerCase().includes('free shipping'))
+                          ) && (
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-sm">
+                              Free Shipping
+                            </span>
                           )}
                         </div>
 

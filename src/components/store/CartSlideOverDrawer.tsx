@@ -45,8 +45,39 @@ export const CartSlideOverDrawer: React.FC<CartSlideOverDrawerProps> = ({
     }
   }
 
-  // Free delivery threshold: ₹499
-  const shippingFee = cartSubtotal >= 499 || cartSubtotal === 0 ? 0 : 29;
+  // Check if an item has free shipping marked on it
+  const isItemFreeShipping = (item: CartItem) => {
+    const prod = item.product;
+    if (!prod) return false;
+    return Boolean(
+      prod.isFreeShipping === true ||
+      prod.shippingFee === 0 ||
+      prod.defaultShippingFee === 0 ||
+      (prod as any).freeShipping === true ||
+      prod.badges?.some(b => b.toLowerCase().includes('free shipping'))
+    );
+  };
+
+  const allItemsFreeShipping = cart.length > 0 && cart.every(isItemFreeShipping);
+  const qualifiesForFreeDelivery = cartSubtotal >= 499 || allItemsFreeShipping || appliedCoupon?.discountType === 'free_shipping';
+
+  // Shipping fee calculation:
+  // If cart is empty or qualifies for free delivery -> ₹0
+  // Otherwise, if any items have custom shipping fees, take maximum or fallback to 29
+  let shippingFee = 0;
+  if (!qualifiesForFreeDelivery && cart.length > 0) {
+    const nonFreeItems = cart.filter(item => !isItemFreeShipping(item));
+    if (nonFreeItems.length > 0) {
+      const fees = nonFreeItems.map(item => {
+        const fee = item.product?.shippingFee ?? item.product?.defaultShippingFee;
+        return typeof fee === 'number' && fee > 0 ? fee : 29;
+      });
+      shippingFee = Math.max(...fees, 29);
+    } else {
+      shippingFee = 0;
+    }
+  }
+
   const cartGrandTotal = Math.max(0, cartSubtotal - discountAmount + shippingFee);
 
   const handleApplyClick = () => {
@@ -85,15 +116,19 @@ export const CartSlideOverDrawer: React.FC<CartSlideOverDrawerProps> = ({
 
           {/* Free Delivery Meter */}
           <div className="bg-rose-50 px-5 py-2.5 border-b border-rose-100 text-xs">
-            {cartSubtotal >= 499 ? (
+            {qualifiesForFreeDelivery ? (
               <div className="flex items-center gap-1.5 text-emerald-800 font-bold">
                 <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>You qualified for FREE Express Courier Delivery! 🎉</span>
+                <span>
+                  {allItemsFreeShipping
+                    ? '🎉 Free Shipping included on this product!'
+                    : 'You qualified for FREE Express Courier Delivery! 🎉'}
+                </span>
               </div>
             ) : (
               <div className="space-y-1">
                 <div className="flex justify-between text-[11px] text-rose-900 font-semibold">
-                  <span>Add ₹{499 - cartSubtotal} more for FREE Delivery!</span>
+                  <span>Add ₹{Math.max(0, 499 - cartSubtotal)} more for FREE Delivery!</span>
                   <span>₹{cartSubtotal} / ₹499</span>
                 </div>
                 <div className="w-full bg-rose-200 h-1.5 rounded-full overflow-hidden">
@@ -143,10 +178,17 @@ export const CartSlideOverDrawer: React.FC<CartSlideOverDrawerProps> = ({
                         {Object.entries(item.selectedAttributes).map(([k, v]) => `${k}: ${v}`).join(' | ')}
                       </p>
                     )}
-                    <div className="flex items-baseline gap-1 font-mono mt-1">
-                      <span className="font-bold text-xs text-slate-900">₹{item.unitPrice}</span>
-                      {item.unitRegularPrice > item.unitPrice && (
-                        <span className="text-[10px] text-slate-400 line-through">₹{item.unitRegularPrice}</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-baseline gap-1 font-mono">
+                        <span className="font-bold text-xs text-slate-900">₹{item.unitPrice}</span>
+                        {item.unitRegularPrice > item.unitPrice && (
+                          <span className="text-[10px] text-slate-400 line-through">₹{item.unitRegularPrice}</span>
+                        )}
+                      </div>
+                      {isItemFreeShipping(item) && (
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-sm">
+                          Free Shipping
+                        </span>
                       )}
                     </div>
 

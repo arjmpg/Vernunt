@@ -118,6 +118,7 @@ const AdminVisualPageEditor = React.lazy(() => import('./components/admin/visual
 import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlocksSection.tsx';
 import { AboutUsModal } from './components/about/AboutUsModal.tsx';
 import { AboutUsTab } from './components/about/AboutUsTab.tsx';
+import UniversalSocialShareModal, { PLATFORM_SHAREABLE_LINKS, ShareableItem } from './components/social/UniversalSocialShareModal.tsx';
 
 // Icons
 import { 
@@ -127,7 +128,8 @@ import {
   ExternalLink, Briefcase, User, Edit3, ShieldCheck, Users,
   Bell, BellRing, X, Radio, Gift, Menu, Zap, ShoppingBag, UserCheck, Bookmark, Clock,
   Smartphone, EyeOff, Lock, BookOpen, Share2, QrCode, ScanLine, Baby, ArrowRight, Loader2,
-  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, Globe, Trees, Home, Key, ChevronDown
+  Fingerprint, Download, Apple, Coins, Compass, Wallet, Plus, Globe, Trees, Home, Key, ChevronDown,
+  Copy, MessageCircle, Twitter, Facebook, Linkedin, Send, Mail
 } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge } from './utils/distance.ts';
 import { calculateTrustScore } from './utils/trustScore.ts';
@@ -2026,8 +2028,22 @@ export default function App() {
   // Custom interactive explanation modals
   const [showAadhaarExplanation, setShowAadhaarExplanation] = useState<boolean>(false);
   const [showTrustScoreExplanation, setShowTrustScoreExplanation] = useState<boolean>(false);
-  const [showContactsPrivacyModal, setShowContactsPrivacyModal] = useState<boolean>(false);
-  const [showChildComplianceModal, setShowChildComplianceModal] = useState<boolean>(false);
+  const [showContactsPrivacyModal, setShowContactsPrivacyModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const path = window.location.pathname.toLowerCase();
+      return p.get('modal') === 'privacy-mode' || path === '/privacy-mode';
+    }
+    return false;
+  });
+  const [showChildComplianceModal, setShowChildComplianceModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const path = window.location.pathname.toLowerCase();
+      return p.get('modal') === 'safety' || path === '/safety' || path === '/child-safety';
+    }
+    return false;
+  });
 
   // Silently and automatically acquire GPS location by default without popup modal
   useEffect(() => {
@@ -2764,6 +2780,14 @@ export default function App() {
       try {
         const p = new URLSearchParams(window.location.search).get('legal');
         if (p) return p as LegalPolicyTab;
+        const path = window.location.pathname.toLowerCase();
+        if (path.includes('privacy')) return 'privacy';
+        if (path.includes('shipping')) return 'shipping';
+        if (path.includes('refund')) return 'refund';
+        if (path.includes('child-safety')) return 'child-safety';
+        if (path.includes('seller')) return 'seller-terms';
+        if (path.includes('group')) return 'groups-privacy';
+        if (path.includes('safety')) return 'safety';
       } catch (_e) {
         // Fallback to default terms tab
       }
@@ -2773,7 +2797,9 @@ export default function App() {
   const [showLegalModal, setShowLegalModal] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       try {
-        return !!new URLSearchParams(window.location.search).get('legal');
+        const p = new URLSearchParams(window.location.search);
+        const path = window.location.pathname.toLowerCase();
+        return !!p.get('legal') || path.startsWith('/legal/') || path === '/terms' || path === '/privacy' || path === '/refund-policy' || path === '/shipping-policy';
       } catch (_e) {
         // Fallback to hidden
       }
@@ -2782,8 +2808,104 @@ export default function App() {
   });
   const [showGoogleSeoModal, setShowGoogleSeoModal] = useState(false);
   const [showKannadaVoiceModal, setShowKannadaVoiceModal] = useState<boolean>(false);
-  const [showContactUsModal, setShowContactUsModal] = useState<boolean>(false);
-  const [showAboutUsModal, setShowAboutUsModal] = useState<boolean>(false);
+  const [showContactUsModal, setShowContactUsModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const path = window.location.pathname.toLowerCase();
+      return p.get('modal') === 'contact' || path === '/contact';
+    }
+    return false;
+  });
+  const [showAboutUsModal, setShowAboutUsModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const path = window.location.pathname.toLowerCase();
+      return p.get('modal') === 'about' || p.get('modal') === 'leadership' || path === '/about' || path === '/leadership';
+    }
+    return false;
+  });
+  const [showSocialShareModal, setShowSocialShareModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('share') === 'true' || window.location.pathname.startsWith('/share');
+      } catch (_e) {
+        return false;
+      }
+    }
+    return false;
+  });
+  const [activeShareItem, setActiveShareItem] = useState<ShareableItem | null>(null);
+
+  const handleOpenShare = (itemId?: string) => {
+    if (itemId) {
+      const match = PLATFORM_SHAREABLE_LINKS.find(p => p.id === itemId);
+      if (match) {
+        setActiveShareItem(match);
+        setShowSocialShareModal(true);
+        return;
+      }
+    }
+    const currentPath = typeof window !== 'undefined' ? window.location.pathname.toLowerCase() : `/${activeTab}`;
+    const match = PLATFORM_SHAREABLE_LINKS.find(p => p.path === currentPath || p.id === activeTab) || PLATFORM_SHAREABLE_LINKS[0];
+    setActiveShareItem(match);
+    setShowSocialShareModal(true);
+  };
+
+  const handleNavigateFromShare = (item: ShareableItem) => {
+    switch (item.id) {
+      case 'home':
+      case 'radar':
+      case 'parks':
+      case 'events':
+      case 'groups':
+      case 'store':
+      case 'knowledge':
+      case 'about':
+        if (item.id === 'parks') {
+          setActiveTab('radar');
+          setPlaymateSubCategory('parks');
+        } else {
+          setActiveTab(item.id as any);
+        }
+        window.history.pushState({}, '', item.path);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        break;
+      case 'vendor':
+      case 'host':
+      case 'care':
+        handleOpenPortal(item.id as PortalType);
+        break;
+      case 'terms':
+      case 'privacy':
+      case 'safety':
+      case 'shipping':
+      case 'refund':
+      case 'child-safety':
+      case 'seller-terms':
+      case 'groups-privacy':
+        setLegalModalTab(item.id as LegalPolicyTab);
+        setShowLegalModal(true);
+        window.history.pushState({}, '', item.path);
+        break;
+      case 'contacts-privacy':
+        setShowContactsPrivacyModal(true);
+        window.history.pushState({}, '', '/privacy-mode');
+        break;
+      case 'contact':
+        setShowContactUsModal(true);
+        window.history.pushState({}, '', '/contact');
+        break;
+      case 'android-apk':
+        window.open('/api/download/android-apk', '_blank');
+        break;
+      case 'ios-app':
+        setShowIosAppModal(true);
+        break;
+      default:
+        window.history.pushState({}, '', item.path);
+    }
+  };
   const [showInstagramFlyerModal, setShowInstagramFlyerModal] = useState<boolean>(false);
   const [showEventBuyerRegModal, setShowEventBuyerRegModal] = useState<boolean>(false);
   const [showWriteStoryModal, setShowWriteStoryModal] = useState<boolean>(false);
@@ -4593,6 +4715,79 @@ export default function App() {
               <VernuntLogo size="sm" />
               <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
             </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenShare()}
+                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Share current page URL"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share App / Link</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Universal Social Share & Community Spread Bar */}
+          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-md border border-indigo-900/50">
+            <div className="flex items-center gap-3.5 text-center md:text-left">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl shrink-0 border border-white/10">
+                <Share2 className="w-5 h-5 text-indigo-300" />
+              </div>
+              <div>
+                <h4 className="font-bold text-sm text-white flex items-center gap-2 justify-center md:justify-start">
+                  <span>Spread Safe Play with Vernunt</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">Shareable URLs</span>
+                </h4>
+                <p className="text-xs text-indigo-200/80">
+                  Share verified playdates, growth guides, or legal policies with parents &amp; school groups
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenShare()}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>Share Page</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = typeof window !== 'undefined' ? window.location.href : 'https://app.vernunt.com';
+                  if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(url);
+                  }
+                  alert('Link copied to clipboard! 📋\n' + url);
+                }}
+                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-white/10"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy URL</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenShare('home')}
+                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
+                title="Share via WhatsApp"
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                <span>WhatsApp</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveShareItem(null);
+                  setShowSocialShareModal(true);
+                }}
+                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white rounded-xl text-xs font-bold transition cursor-pointer border border-white/10"
+              >
+                <span>Browse All Links ({PLATFORM_SHAREABLE_LINKS.length})</span>
+              </button>
+            </div>
           </div>
 
           {/* Structured 4-Column Navigation & Info Grid */}
@@ -4623,35 +4818,72 @@ export default function App() {
               </div>
 
               <div className="pt-1.5 flex flex-col items-start gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAboutUsModal(true)}
-                  className="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
-                >
-                  <Users className="w-3.5 h-3.5 text-indigo-600" />
-                  <span>Meet Our Leadership Team</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
+                <div className="flex items-center justify-between w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAboutUsModal(true);
+                      window.history.pushState({}, '', '/about');
+                    }}
+                    className="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Users className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Meet Our Leadership Team</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('about')}
+                    title="Share Leadership Team link"
+                    className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('about');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="text-xs font-medium text-slate-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                >
-                  <span>About Vernunt &amp; Our Story</span>
-                </button>
+                <div className="flex items-center justify-between w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('about');
+                      window.history.pushState({}, '', '/about');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="text-xs font-medium text-slate-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <span>About Vernunt &amp; Our Story</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('about')}
+                    title="Share About link"
+                    className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
+                </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowChildComplianceModal(true)}
-                  className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer pt-0.5"
-                >
-                  <span>Safety &amp; Compliance Standards</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
+                <div className="flex items-center justify-between w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowChildComplianceModal(true);
+                      window.history.pushState({}, '', '/safety');
+                    }}
+                    className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer pt-0.5"
+                  >
+                    <span>Safety &amp; Compliance Standards</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('child-safety')}
+                    title="Share Safety Standards link"
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -4661,108 +4893,178 @@ export default function App() {
                 Platform Features
               </h4>
               <ul className="space-y-2.5 text-xs">
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('radar');
                       setPlaymateSubCategory('playmates');
+                      window.history.pushState({}, '', '/radar');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🎯</span>
                     <span>Playmate Radar (Nearby Match)</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('radar')}
+                    title="Share Playmate Radar link"
+                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('radar');
                       setPlaymateSubCategory('parks');
+                      window.history.pushState({}, '', '/parks');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🌳</span>
                     <span>Bangalore Parks &amp; Play</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('parks')}
+                    title="Share Bangalore Parks link"
+                    className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('events');
+                      window.history.pushState({}, '', '/events');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-orange-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-orange-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-orange-50 text-orange-600 flex items-center justify-center text-xs shrink-0">🎉</span>
                     <span>Events, Workshops &amp; Camps</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('events')}
+                    title="Share Events link"
+                    className="p-1 text-slate-400 hover:text-orange-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('groups');
+                      window.history.pushState({}, '', '/groups');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🌸</span>
                     <span>Vernunt Groups &amp; Neighborhood Pods</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('groups')}
+                    title="Share Groups link"
+                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('store');
+                      window.history.pushState({}, '', '/store');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer font-semibold text-slate-700"
+                    className="hover:text-[#6D3FE8] transition flex items-center gap-2 cursor-pointer font-semibold text-slate-700 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🛍️</span>
                     <span>Vernunt Store &amp; Play Gear</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('store')}
+                    title="Share Store link"
+                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setActiveTab('knowledge');
                       setIsGuestViewingKnowledge(false);
                       setGuestKnowledgeSlug(undefined);
+                      window.history.pushState({}, '', '/knowledge');
                       window.scrollTo({ top: 0, behavior: 'smooth' });
                     }}
-                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">📚</span>
                     <span>1,000+ Child Growth Guides</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('knowledge')}
+                    title="Share Knowledge Guides link"
+                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     id="btn-footer-vendor-portal"
                     onClick={() => handleOpenPortal('vendor')}
-                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold"
+                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">🏪</span>
                     <span>Product Vendor Registration &amp; Login</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('vendor')}
+                    title="Share Vendor Portal link"
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     id="btn-footer-host-portal"
                     onClick={() => handleOpenPortal('host')}
-                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold"
+                    className="hover:text-amber-700 transition flex items-center gap-2 cursor-pointer text-slate-700 font-semibold text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">🎪</span>
                     <span>Event, Classes &amp; Host Registration</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('host')}
+                    title="Share Host Portal link"
+                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
                   </button>
                 </li>
               </ul>
@@ -4774,139 +5076,244 @@ export default function App() {
                 Trust &amp; Governance
               </h4>
               <ul className="space-y-2.5 text-xs">
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => setShowChildComplianceModal(true)}
-                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    onClick={() => {
+                      setShowChildComplianceModal(true);
+                      window.history.pushState({}, '', '/safety');
+                    }}
+                    className="hover:text-emerald-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🛡️</span>
                     <span>COPPA &amp; DPDP Safety Protocols</span>
                   </button>
-                </li>
-                <li>
                   <button
                     type="button"
-                    onClick={() => setShowContactsPrivacyModal(true)}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    onClick={() => handleOpenShare('child-safety')}
+                    title="Share COPPA Protocols link"
+                    className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
+                </li>
+                <li className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactsPrivacyModal(true);
+                      window.history.pushState({}, '', '/privacy-mode');
+                    }}
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center text-xs shrink-0">🔒</span>
                     <span>Contacts Privacy &amp; Ghost Mode</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('contacts-privacy')}
+                    title="Share Contacts Privacy link"
+                    className="p-1 text-slate-400 hover:text-slate-900 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     id="btn-footer-tac-toggle"
                     onClick={() => {
                       setLegalModalTab('terms');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/terms');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">📄</span>
                     <span>Terms &amp; Conditions (Safe Harbor)</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('terms')}
+                    title="Share Terms & Conditions link"
+                    className="p-1 text-slate-400 hover:text-amber-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('privacy');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/privacy');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs shrink-0">🔒</span>
                     <span>Privacy Policy (DPDP Act 2023)</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('privacy')}
+                    title="Share Privacy Policy link"
+                    className="p-1 text-slate-400 hover:text-emerald-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('safety');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/safety');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center text-xs shrink-0">🛡️</span>
                     <span>Safety &amp; Meetup Release</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('safety')}
+                    title="Share Safety Release link"
+                    className="p-1 text-slate-400 hover:text-rose-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('shipping');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/shipping');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center text-xs shrink-0">🚚</span>
                     <span>Shipping &amp; Logistics Policy</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('shipping')}
+                    title="Share Shipping Policy link"
+                    className="p-1 text-slate-400 hover:text-blue-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('refund');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/refund');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-purple-50 text-purple-700 flex items-center justify-center text-xs shrink-0">🔄</span>
                     <span>Returns &amp; Refund Policy</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('refund')}
+                    title="Share Returns & Refund link"
+                    className="p-1 text-slate-400 hover:text-purple-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('child-safety');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/child-safety');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-red-50 text-red-700 flex items-center justify-center text-xs shrink-0">🚨</span>
                     <span>POCSO &amp; Child Protection</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('child-safety')}
+                    title="Share POCSO Protection link"
+                    className="p-1 text-slate-400 hover:text-red-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('seller-terms');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/seller-terms');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-700 flex items-center justify-center text-xs shrink-0">🏪</span>
                     <span>Marketplace Seller Indemnity</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('seller-terms')}
+                    title="Share Seller Indemnity link"
+                    className="p-1 text-slate-400 hover:text-teal-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
                 </li>
-                <li>
+                <li className="flex items-center justify-between">
                   <button
                     type="button"
                     onClick={() => {
                       setLegalModalTab('groups-privacy');
                       setShowLegalModal(true);
+                      window.history.pushState({}, '', '/legal/groups-privacy');
                     }}
-                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    className="hover:text-slate-900 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">💬</span>
                     <span>Groups &amp; Chat Safe Harbor</span>
                   </button>
-                </li>
-                <li>
                   <button
                     type="button"
-                    onClick={() => setShowContactUsModal(true)}
-                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-600"
+                    onClick={() => handleOpenShare('groups-privacy')}
+                    title="Share Groups Harbor link"
+                    className="p-1 text-slate-400 hover:text-amber-700 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
+                  </button>
+                </li>
+                <li className="flex items-center justify-between">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowContactUsModal(true);
+                      window.history.pushState({}, '', '/contact');
+                    }}
+                    className="hover:text-rose-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
                   >
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">💬</span>
                     <span>Help &amp; Support Hub</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenShare('contact')}
+                    title="Share Help Desk link"
+                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
+                  >
+                    <Share2 className="w-3 h-3" />
                   </button>
                 </li>
               </ul>
@@ -4928,7 +5335,17 @@ export default function App() {
                     <Smartphone className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-900">Vernunt Android</span>
                   </div>
-                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">v1.0.0</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">v1.0.0</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenShare('android-apk')}
+                      title="Share Android App link"
+                      className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <a
@@ -4958,7 +5375,17 @@ export default function App() {
                     <Apple className="w-4 h-4 text-slate-800" />
                     <span className="text-xs font-bold text-slate-900">Vernunt iOS</span>
                   </div>
-                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">Web App</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">Web App</span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenShare('ios-app')}
+                      title="Share iOS App link"
+                      className="p-1 text-slate-400 hover:text-slate-900 rounded transition cursor-pointer"
+                    >
+                      <Share2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <button
                   type="button"
@@ -4985,38 +5412,61 @@ export default function App() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-5 gap-y-2 text-xs font-semibold text-slate-600">
+            <div className="flex flex-wrap items-center justify-center md:justify-end gap-x-4 gap-y-2 text-xs font-semibold text-slate-600">
               <button
                 type="button"
                 id="footer-link-terms"
-                onClick={() => setShowLegalModal(true)}
-                className="hover:text-rose-700 hover:underline transition cursor-pointer"
+                onClick={() => {
+                  setLegalModalTab('terms');
+                  setShowLegalModal(true);
+                  window.history.pushState({}, '', '/legal/terms');
+                }}
+                className="hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-1"
               >
-                Terms and Conditions
+                <span>Terms and Conditions</span>
               </button>
               <button
                 type="button"
                 id="footer-link-privacy"
-                onClick={() => setShowLegalModal(true)}
-                className="hover:text-rose-700 hover:underline transition cursor-pointer"
+                onClick={() => {
+                  setLegalModalTab('privacy');
+                  setShowLegalModal(true);
+                  window.history.pushState({}, '', '/legal/privacy');
+                }}
+                className="hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-1"
               >
-                Privacy Policy
+                <span>Privacy Policy</span>
               </button>
               <button
                 type="button"
                 id="footer-link-child-safety"
-                onClick={() => setShowChildComplianceModal(true)}
-                className="hover:text-rose-700 hover:underline transition cursor-pointer"
+                onClick={() => {
+                  setShowChildComplianceModal(true);
+                  window.history.pushState({}, '', '/safety');
+                }}
+                className="hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-1"
               >
-                Child Safety
+                <span>Child Safety</span>
               </button>
               <button
                 type="button"
                 id="footer-link-contact-support"
-                onClick={() => setShowContactUsModal(true)}
-                className="hover:text-rose-700 hover:underline transition cursor-pointer"
+                onClick={() => {
+                  setShowContactUsModal(true);
+                  window.history.pushState({}, '', '/contact');
+                }}
+                className="hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-1"
               >
-                Contact Support
+                <span>Contact Support</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleOpenShare()}
+                className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
+                title="Share link"
+              >
+                <Share2 className="w-3 h-3" />
+                <span>Share 🔗</span>
               </button>
             </div>
           </div>
@@ -5088,6 +5538,7 @@ export default function App() {
           initialTab={legalModalTab}
           onClose={() => setShowLegalModal(false)}
           onKeepClose={() => setShowLegalModal(false)}
+          onOpenShare={(tab) => handleOpenShare(tab)}
         />
       )}
 
@@ -5894,8 +6345,17 @@ export default function App() {
           onClose={() => setShowAboutUsModal(false)}
           onOpenContactUs={() => setShowContactUsModal(true)}
           onOpenSafetyCompliance={() => setShowChildComplianceModal(true)}
+          onOpenShare={() => handleOpenShare('about')}
         />
       )}
+
+      {/* Universal Social Share Modal for All Pages & Footer Links */}
+      <UniversalSocialShareModal
+        isOpen={showSocialShareModal}
+        onClose={() => setShowSocialShareModal(false)}
+        initialItem={activeShareItem}
+        onNavigateToItem={handleNavigateFromShare}
+      />
 
       {/* Multilingual AI Voice Calling Agent & Telephony Enquiry Assistant */}
       {showKannadaVoiceModal && (

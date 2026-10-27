@@ -4845,13 +4845,12 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     console.log("[Vernunt Full-Stack Server] Serving Static Files from Production Build");
   }
 
-  // Determine port:
-  // 1. If --port argument is passed (AI Studio dev server launcher), use it.
-  // 2. If running on Cloud Run (K_SERVICE or K_REVISION), honor process.env.PORT (defaults to 8080).
-  // 3. In AI Studio local dev environment, port 3000 is required because Nginx proxies 8080 -> 3000.
+  // Port configuration:
+  // In the AI Studio environment, Nginx listens on 8080 and reverse-proxies all traffic to port 3000.
+  // The server must listen on port 3000 (or CLI --port if provided). Never attempt port 8080.
   const portArgIndex = process.argv.indexOf("--port");
   const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? parseInt(process.argv[portArgIndex + 1], 10) : null;
-  const port = cliPort || (isCloudRun && process.env.PORT ? parseInt(process.env.PORT, 10) : 3000);
+  const port = cliPort || 3000;
 
   const server = app.listen(port, "0.0.0.0", () => {
     console.log(`[Vernunt Full-Stack Server] Operating securely at http://0.0.0.0:${port}`);

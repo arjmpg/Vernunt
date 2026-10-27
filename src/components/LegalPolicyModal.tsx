@@ -19,6 +19,7 @@ import {
   ShieldAlert,
   Store,
   MessageSquare,
+  Share2
 } from 'lucide-react';
 import VernuntLogo from './VernuntLogo.tsx';
 import { VERNUNT_SLA_DEFINITIONS } from '../data/slaAgreements.ts';
@@ -30,13 +31,15 @@ interface LegalPolicyModalProps {
   initialTab?: LegalPolicyTab;
   onClose?: () => void;
   onKeepClose?: () => void;
+  onOpenShare?: (tab: LegalPolicyTab) => void;
 }
 
 export default function LegalPolicyModal({ 
   isOpen = true, 
   initialTab = 'terms', 
   onClose,
-  onKeepClose
+  onKeepClose,
+  onOpenShare
 }: LegalPolicyModalProps) {
   const [activeTab, setActiveTab] = useState<LegalPolicyTab>(initialTab);
 
@@ -89,6 +92,15 @@ export default function LegalPolicyModal({
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onOpenShare ? onOpenShare(activeTab) : undefined}
+              title="Share this legal policy"
+              className="px-2.5 py-1.5 text-indigo-200 hover:text-white rounded-lg bg-white/10 hover:bg-white/20 transition cursor-pointer flex items-center gap-1.5 text-xs font-bold"
+            >
+              <Share2 className="w-3.5 h-3.5 text-indigo-300" />
+              <span>Share</span>
+            </button>
             <button
               type="button"
               onClick={handlePrint}

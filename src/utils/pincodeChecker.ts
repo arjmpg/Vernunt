@@ -167,7 +167,10 @@ export function calculateCartDimensionalShipping(
     }
 
     const isProdFreeShipping = Boolean(
-      prod?.isFreeShipping ||
+      prod?.isFreeShipping === true ||
+      prod?.shippingFee === 0 ||
+      prod?.defaultShippingFee === 0 ||
+      (prod as any)?.freeShipping === true ||
       prod?.badges?.some(b => b.toLowerCase().includes('free shipping'))
     );
 
@@ -504,26 +507,53 @@ export function validateCartForDelivery(
     const vendorProfile = vendorMap.get(group.vendorId);
     const freeThreshold = vendorProfile?.freeShippingThreshold ?? 499;
 
-    if (group.subtotal >= freeThreshold) {
+    const allGroupItemsFree = group.items.length > 0 && group.items.every(it => {
+      const p = it.product;
+      return Boolean(
+        p?.isFreeShipping === true ||
+        p?.shippingFee === 0 ||
+        p?.defaultShippingFee === 0 ||
+        (p as any)?.freeShipping === true ||
+        p?.badges?.some(b => b.toLowerCase().includes('free shipping'))
+      );
+    });
+
+    if (group.subtotal >= freeThreshold || allGroupItemsFree) {
       group.isFreeDelivery = true;
       group.shippingFee = 0;
     } else {
-      // Find highest product shipping fee or vendor default
-      let maxFee = vendorProfile?.defaultShippingFee ?? 49;
-      if (vendorProfile?.pincodeShippingOverrides?.[pin] !== undefined) {
-        maxFee = vendorProfile.pincodeShippingOverrides[pin];
-      }
-
-      group.items.forEach(it => {
-        if (it.product?.pincodeShippingRates?.[pin] !== undefined) {
-          maxFee = Math.max(maxFee, it.product.pincodeShippingRates[pin]);
-        } else if (it.product?.defaultShippingFee !== undefined) {
-          maxFee = Math.max(maxFee, it.product.defaultShippingFee);
-        }
+      // Find highest product shipping fee among non-free items
+      const nonFreeItems = group.items.filter(it => {
+        const p = it.product;
+        return !(
+          p?.isFreeShipping === true ||
+          p?.shippingFee === 0 ||
+          p?.defaultShippingFee === 0 ||
+          (p as any)?.freeShipping === true ||
+          p?.badges?.some(b => b.toLowerCase().includes('free shipping'))
+        );
       });
 
-      group.shippingFee = maxFee;
-      totalShippingFee += maxFee;
+      if (nonFreeItems.length === 0) {
+        group.isFreeDelivery = true;
+        group.shippingFee = 0;
+      } else {
+        let maxFee = vendorProfile?.defaultShippingFee ?? 49;
+        if (vendorProfile?.pincodeShippingOverrides?.[pin] !== undefined) {
+          maxFee = vendorProfile.pincodeShippingOverrides[pin];
+        }
+
+        nonFreeItems.forEach(it => {
+          if (it.product?.pincodeShippingRates?.[pin] !== undefined) {
+            maxFee = Math.max(maxFee, it.product.pincodeShippingRates[pin]);
+          } else if (it.product?.defaultShippingFee !== undefined) {
+            maxFee = Math.max(maxFee, it.product.defaultShippingFee);
+          }
+        });
+
+        group.shippingFee = maxFee;
+        totalShippingFee += maxFee;
+      }
     }
   });
 
