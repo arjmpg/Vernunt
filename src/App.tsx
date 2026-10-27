@@ -116,6 +116,8 @@ import { auth } from './utils/firebase.ts';
 import { sendAdminKycPendingNotification } from './utils/notifications.ts';
 const AdminVisualPageEditor = React.lazy(() => import('./components/admin/visual/AdminVisualPageEditor.tsx').then(m => ({ default: m.AdminVisualPageEditor })));
 import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlocksSection.tsx';
+import { AboutUsModal } from './components/about/AboutUsModal.tsx';
+import { AboutUsTab } from './components/about/AboutUsTab.tsx';
 
 // Icons
 import { 
@@ -477,7 +479,7 @@ export default function App() {
     'specialists' | 'knowledge' | 'business' | 'portfolio' | 'admin' | 
     'referrals' | 'billing' | 'affiliate' | 'store' | 'kid_stories' | 
     'groups' | 'community' | 'pages' |
-    'vendor' | 'host' | 'care' | 'help'
+    'vendor' | 'host' | 'care' | 'help' | 'about'
   >(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -485,6 +487,9 @@ export default function App() {
         const path = window.location.pathname.toLowerCase();
         if (params.get('portal') === 'admin' || params.get('tab') === 'admin' || path.startsWith('/admin')) {
           return 'admin';
+        }
+        if (params.get('tab') === 'about' || path.startsWith('/about') || params.get('page') === 'about') {
+          return 'about';
         }
         if (params.get('tab') === 'home' || path.startsWith('/home')) {
           return 'home';
@@ -2778,6 +2783,7 @@ export default function App() {
   const [showGoogleSeoModal, setShowGoogleSeoModal] = useState(false);
   const [showKannadaVoiceModal, setShowKannadaVoiceModal] = useState<boolean>(false);
   const [showContactUsModal, setShowContactUsModal] = useState<boolean>(false);
+  const [showAboutUsModal, setShowAboutUsModal] = useState<boolean>(false);
   const [showInstagramFlyerModal, setShowInstagramFlyerModal] = useState<boolean>(false);
   const [showEventBuyerRegModal, setShowEventBuyerRegModal] = useState<boolean>(false);
   const [showWriteStoryModal, setShowWriteStoryModal] = useState<boolean>(false);
@@ -4555,6 +4561,14 @@ export default function App() {
                 onNavigateToPortal={(p) => handleOpenPortal(p)}
               />
             )}
+
+            {/* Dedicated Page: About Us & Leadership Team */}
+            {activeTab === 'about' && (
+              <AboutUsTab
+                onOpenSafetyCompliance={() => setShowChildComplianceModal(true)}
+                onOpenContactUs={() => setShowContactUsModal(true)}
+              />
+            )}
             </Suspense>
 
           </div>
@@ -4608,11 +4622,32 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="pt-1">
+              <div className="pt-1.5 flex flex-col items-start gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAboutUsModal(true)}
+                  className="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Meet Our Leadership Team</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('about');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-xs font-medium text-slate-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>About Vernunt &amp; Our Story</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowChildComplianceModal(true)}
-                  className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer pt-0.5"
                 >
                   <span>Safety &amp; Compliance Standards</span>
                   <ArrowRight className="w-3 h-3" />
@@ -5443,6 +5478,19 @@ export default function App() {
               {isDrawerToolsExpanded && (
                 <div className="space-y-1.5 pt-1.5 border-t border-slate-200/80 max-h-48 overflow-y-auto animate-fadeIn pr-1">
                   <button 
+                    id="btn-drawer-about-us"
+                    type="button"
+                    onClick={() => {
+                      setIsSideMenuOpen(false);
+                      setShowAboutUsModal(true);
+                    }}
+                    className="w-full py-2 px-3 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 font-bold rounded-xl text-xs transition cursor-pointer flex items-center justify-between text-left"
+                  >
+                    <span className="flex items-center gap-1.5">👥 <span>About Us &amp; Leadership Team</span></span>
+                    <ArrowRight className="w-3.5 h-3.5 text-indigo-700" />
+                  </button>
+
+                  <button 
                     id="btn-drawer-contact-us"
                     type="button"
                     onClick={() => {
@@ -5836,6 +5884,16 @@ export default function App() {
             setVoiceInitialLanguage(lang || 'en-IN');
             setShowKannadaVoiceModal(true);
           }}
+        />
+      )}
+
+      {/* About Us & Leadership Team Modal */}
+      {showAboutUsModal && (
+        <AboutUsModal
+          isOpen={showAboutUsModal}
+          onClose={() => setShowAboutUsModal(false)}
+          onOpenContactUs={() => setShowContactUsModal(true)}
+          onOpenSafetyCompliance={() => setShowChildComplianceModal(true)}
         />
       )}
 

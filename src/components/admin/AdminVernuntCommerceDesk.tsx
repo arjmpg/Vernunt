@@ -5,7 +5,7 @@ import {
   DollarSign, Sparkles, Check, X, Printer, ShieldCheck, Box, RefreshCw, BarChart2,
   Store, ToggleLeft, ToggleRight, CreditCard, Send, AlertTriangle, Building,
   ArrowUpRight, Users, ChevronRight, Settings, Sliders, Bell, Layers, Palette,
-  Scale
+  Scale, Upload, Image as ImageIcon, Link as LinkIcon, HardDrive, HelpCircle
 } from 'lucide-react';
 import { StoreOrder, StoreProduct, StoreCoupon, ProductOrderStatus, StoreSettings, StoreCategory, StoreAttribute, StoreAttributeTerm, DimensionalShippingRules } from '../../types/store.ts';
 import { VendorProfile, VendorWithdrawal, VendorAnnouncement } from '../../types/vendor.ts';
@@ -29,6 +29,62 @@ import { AdminProductSearchesDesk } from './AdminProductSearchesDesk.tsx';
 import { AdminCommerceEngineDesk } from './AdminCommerceEngineDesk.tsx';
 import { AdminShippingRulesModal } from '../store/AdminShippingRulesModal.tsx';
 import { saveStoredShippingRules } from '../../utils/pincodeChecker.ts';
+
+/**
+ * Client-side image compression utility.
+ * Guarantees the compressed base64 data URL remains strictly below 2 MB (2,000,000 bytes).
+ */
+const compressImageFile = (file: File): Promise<{ dataUrl: string; sizeKB: number; originalSizeKB: number }> => {
+  return new Promise((resolve, reject) => {
+    const originalSizeKB = Math.round(file.size / 1024);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxDimension = 1600;
+
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Canvas context could not be created'));
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Iteratively compress below 2MB (2,097,152 bytes)
+        let quality = 0.85;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        let approxBytes = Math.round((dataUrl.length * 3) / 4);
+
+        while (approxBytes > 1.95 * 1024 * 1024 && quality > 0.25) {
+          quality -= 0.12;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          approxBytes = Math.round((dataUrl.length * 3) / 4);
+        }
+
+        const sizeKB = Math.round(approxBytes / 1024);
+        resolve({ dataUrl, sizeKB, originalSizeKB });
+      };
+      img.onerror = () => reject(new Error('Invalid image file format'));
+      img.src = event.target?.result as string;
+    };
+    reader.onerror = () => reject(new Error('Failed to read image file from device'));
+    reader.readAsDataURL(file);
+  });
+};
 
 interface AdminVernuntCommerceDeskProps {
   onRefresh?: () => void;
@@ -161,6 +217,44 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
     }
   };
 
+  // Image upload & compression states (< 2 MB)
+  const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
+  const [isCompressingImage, setIsCompressingImage] = useState<boolean>(false);
+  const [imageCompressionMsg, setImageCompressionMsg] = useState<string>('');
+  const [imageCompressionError, setImageCompressionError] = useState<string>('');
+  const imageFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Image file handler with auto-compression below 2MB
+  const handleImageFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImageCompressionError('');
+    setImageCompressionMsg('');
+    setIsCompressingImage(true);
+
+    try {
+      if (!file.type.startsWith('image/')) {
+        throw new Error('Please select an image file (JPEG, PNG, WEBP).');
+      }
+
+      const { dataUrl, sizeKB, originalSizeKB } = await compressImageFile(file);
+      setProductFormData(prev => ({ ...prev, featuredImage: dataUrl }));
+      setImageCompressionMsg(
+        originalSizeKB > 2000
+          ? `✓ Compressed from ${(originalSizeKB / 1024).toFixed(1)} MB to ${sizeKB} KB (Strictly below 2 MB limit)`
+          : `✓ Ready: ${sizeKB} KB (Under 2 MB limit)`
+      );
+    } catch (err: any) {
+      setImageCompressionError(err?.message || 'Failed to process image');
+    } finally {
+      setIsCompressingImage(false);
+      if (imageFileInputRef.current) {
+        imageFileInputRef.current.value = '';
+      }
+    }
+  };
+
   // Forms
   const [productFormData, setProductFormData] = useState<Partial<StoreProduct>>({
     name: '',
@@ -179,8 +273,10 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
     sku: 'VRN-NEW-' + Math.floor(100 + Math.random() * 900),
     hsnCode: '950300',
     gstRate: 12,
-    weightGrams: 450,
-    dimensionsCm: { length: 22, width: 16, height: 8 },
+    weightGrams: undefined,
+    dimensionsCm: undefined,
+    isFreeShipping: false,
+    shippingFee: 49,
     badges: ['100% Safe', 'BIS Certified'],
     isFeatured: true,
     isBestSeller: false,
@@ -364,8 +460,36 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
     e.preventDefault();
     if (!productFormData.name?.trim()) return;
 
+    const isFree = Boolean(productFormData.isFreeShipping);
+    const weightVal = productFormData.weightGrams ? Number(productFormData.weightGrams) : undefined;
+    const hasDimensions = Boolean(
+      (productFormData.dimensionsCm?.length && Number(productFormData.dimensionsCm.length) > 0) ||
+      (productFormData.dimensionsCm?.width && Number(productFormData.dimensionsCm.width) > 0) ||
+      (productFormData.dimensionsCm?.height && Number(productFormData.dimensionsCm.height) > 0)
+    );
+    const dims = hasDimensions ? {
+      length: Number(productFormData.dimensionsCm?.length || 0),
+      width: Number(productFormData.dimensionsCm?.width || 0),
+      height: Number(productFormData.dimensionsCm?.height || 0),
+    } : undefined;
+
+    const baseBadges = (productFormData.badges || ['100% Safe', 'BIS Certified']).filter(
+      b => !b.toLowerCase().includes('free shipping')
+    );
+    const finalBadges = isFree ? [...baseBadges, 'Free Shipping'] : baseBadges;
+    const fee = isFree ? 0 : Number(productFormData.shippingFee ?? 49);
+
     if (editingProduct) {
-      const updated = products.map(p => p.id === editingProduct.id ? ({ ...p, ...productFormData } as StoreProduct) : p);
+      const updated = products.map(p => p.id === editingProduct.id ? ({
+        ...p,
+        ...productFormData,
+        weightGrams: weightVal,
+        dimensionsCm: dims,
+        isFreeShipping: isFree,
+        shippingFee: fee,
+        defaultShippingFee: fee,
+        badges: finalBadges
+      } as StoreProduct) : p);
       setProducts(updated);
       saveStoredProducts(updated);
     } else {
@@ -389,11 +513,14 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
         sku: productFormData.sku || 'VRN-SKU-' + Date.now().toString().slice(-4),
         hsnCode: productFormData.hsnCode || '950300',
         gstRate: Number(productFormData.gstRate || 12),
-        weightGrams: productFormData.weightGrams ? Number(productFormData.weightGrams) : 450,
-        dimensionsCm: productFormData.dimensionsCm || { length: 22, width: 16, height: 8 },
+        weightGrams: weightVal,
+        dimensionsCm: dims,
+        isFreeShipping: isFree,
+        shippingFee: fee,
+        defaultShippingFee: fee,
         rating: 5.0,
         reviewCount: 1,
-        badges: productFormData.badges || ['BIS Certified', '100% Non-Toxic'],
+        badges: finalBadges,
         isFeatured: productFormData.isFeatured ?? true,
         isHighlighted: Boolean(productFormData.isHighlighted),
         isBestSeller: Boolean(productFormData.isBestSeller),
@@ -692,6 +819,38 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
             type="button"
             onClick={() => {
               setEditingProduct(null);
+              setProductFormData({
+                name: '',
+                brand: 'Vernunt Playgear',
+                category: 'Montessori & STEM',
+                price: 999,
+                regularPrice: 1299,
+                ageGroup: '3-6y',
+                ageLabel: 'Ages 3 - 6 Yrs',
+                featuredImage: '',
+                shortDescription: '',
+                description: '',
+                stockQuantity: 25,
+                stockStatus: 'instock',
+                manageStock: true,
+                sku: 'VRN-NEW-' + Math.floor(100 + Math.random() * 900),
+                hsnCode: '950300',
+                gstRate: 12,
+                weightGrams: undefined,
+                dimensionsCm: undefined,
+                isFreeShipping: false,
+                shippingFee: 49,
+                badges: ['100% Safe', 'BIS Certified'],
+                isFeatured: true,
+                isHighlighted: false,
+                isBestSeller: false,
+                onSale: true,
+                discountPercentage: 23,
+                deliveryDaysEstimate: 2
+              });
+              setImageCompressionMsg('');
+              setImageCompressionError('');
+              setImageInputMode('upload');
               setIsProductModalOpen(true);
             }}
             className="px-3.5 py-2 bg-teal-700 hover:bg-teal-800 text-white text-xs font-bold rounded-lg transition shadow-xs flex items-center gap-1.5 cursor-pointer"
@@ -1075,7 +1234,14 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                           type="button"
                           onClick={() => {
                             setEditingProduct(prod);
-                            setProductFormData(prod);
+                            setProductFormData({
+                              ...prod,
+                              isFreeShipping: prod.isFreeShipping ?? prod.badges?.some(b => b.toLowerCase().includes('free shipping')),
+                              shippingFee: prod.shippingFee ?? prod.defaultShippingFee ?? 49,
+                            });
+                            setImageCompressionMsg('');
+                            setImageCompressionError('');
+                            setImageInputMode(prod.featuredImage?.startsWith('data:') ? 'upload' : (prod.featuredImage ? 'url' : 'upload'));
                             setIsProductModalOpen(true);
                           }}
                           className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
@@ -1946,15 +2112,133 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                 </div>
               </div>
 
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Featured Image URL</label>
-                <input
-                  type="url"
-                  value={productFormData.featuredImage || ''}
-                  onChange={(e) => setProductFormData({ ...productFormData, featuredImage: e.target.value })}
-                  placeholder="https://..."
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden font-mono"
-                />
+              {/* Featured Image with URL or Device/Mobile/GDrive Upload (< 2MB) */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Product Image Artwork</span>
+                  </label>
+                  <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 text-[10.5px]">
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('upload')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 ${
+                        imageInputMode === 'upload'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Upload className="w-3 h-3" />
+                      <span>Upload (Device/GDrive)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setImageInputMode('url')}
+                      className={`px-2 py-0.5 rounded-md font-bold transition flex items-center gap-1 ${
+                        imageInputMode === 'url'
+                          ? 'bg-teal-700 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <LinkIcon className="w-3 h-3" />
+                      <span>Web URL</span>
+                    </button>
+                  </div>
+                </div>
+
+                {imageInputMode === 'upload' ? (
+                  <div className="space-y-2">
+                    <input
+                      ref={imageFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageFileSelect}
+                      className="hidden"
+                      id="catalog-product-file-input"
+                    />
+
+                    <div
+                      onClick={() => imageFileInputRef.current?.click()}
+                      className="border-2 border-dashed border-teal-300 hover:border-teal-500 bg-teal-50/40 hover:bg-teal-50/70 rounded-xl p-3.5 text-center cursor-pointer transition flex flex-col items-center justify-center space-y-1"
+                    >
+                      <div className="w-9 h-9 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mb-0.5">
+                        <Upload className="w-4 h-4" />
+                      </div>
+                      <p className="font-bold text-xs text-slate-800">
+                        Click to upload from Device, Mobile or Google Drive
+                      </p>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        Supports JPEG, PNG, WEBP • Automatically compressed below 2 MB
+                      </p>
+                    </div>
+
+                    {isCompressingImage && (
+                      <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-2 text-xs text-amber-800 font-medium animate-pulse">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-600" />
+                        <span>Compressing image below 2 MB...</span>
+                      </div>
+                    )}
+
+                    {imageCompressionMsg && (
+                      <div className="p-2 bg-emerald-50 border border-emerald-200 rounded-lg flex items-center gap-2 text-xs text-emerald-800 font-medium">
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>{imageCompressionMsg}</span>
+                      </div>
+                    )}
+
+                    {imageCompressionError && (
+                      <div className="p-2 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-xs text-rose-800 font-medium">
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>{imageCompressionError}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="url"
+                      value={productFormData.featuredImage || ''}
+                      onChange={(e) => setProductFormData({ ...productFormData, featuredImage: e.target.value })}
+                      placeholder="https://images.unsplash.com/..."
+                      className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs outline-hidden font-mono"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Paste a direct HTTPS image URL, or switch to Upload tab to choose a local or Google Drive file.
+                    </p>
+                  </div>
+                )}
+
+                {/* Preview if image is present */}
+                {productFormData.featuredImage && (
+                  <div className="flex items-center gap-3 bg-white p-2 rounded-lg border border-slate-200">
+                    <img
+                      src={productFormData.featuredImage}
+                      alt="Product preview"
+                      className="w-14 h-14 rounded-lg object-cover border border-slate-200 shadow-2xs"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <span className="font-bold text-[11px] text-slate-800 block truncate">
+                        Active Image Artwork
+                      </span>
+                      <span className="text-[9.5px] text-slate-400 block truncate">
+                        {productFormData.featuredImage.startsWith('data:')
+                          ? `Local File (${Math.round((productFormData.featuredImage.length * 3) / 4 / 1024)} KB - Under 2 MB)`
+                          : productFormData.featuredImage}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductFormData({ ...productFormData, featuredImage: '' });
+                        setImageCompressionMsg('');
+                      }}
+                      className="px-2 py-1 text-[10.5px] text-rose-600 hover:bg-rose-50 rounded-md font-bold transition"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div>
@@ -1988,12 +2272,12 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                 </div>
               </div>
 
-              {/* Product Weight & Dimensions (L × B × H) for Automated Shipping Calculations */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+              {/* Product Weight & Dimensions (Optional Logistics Engine) */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-xs text-slate-800 flex items-center gap-1.5">
                     <Scale className="w-3.5 h-3.5 text-indigo-600" />
-                    Package Weight &amp; Dimensions (Logistics Engine)
+                    Package Weight &amp; Dimensions (Optional)
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono">
                     Used for PIN code dynamic rates
@@ -2003,92 +2287,110 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   <div>
                     <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
-                      Dead Weight (g) *
+                      Dead Weight (g) <span className="font-normal text-slate-400">(Optional)</span>
                     </label>
                     <input
                       type="number"
-                      min={10}
+                      min={0}
                       step={10}
-                      value={productFormData.weightGrams ?? 450}
-                      onChange={(e) => setProductFormData({ ...productFormData, weightGrams: Number(e.target.value) })}
-                      placeholder="e.g. 500"
+                      value={productFormData.weightGrams ?? ''}
+                      onChange={(e) => setProductFormData({
+                        ...productFormData,
+                        weightGrams: e.target.value === '' ? undefined : Number(e.target.value)
+                      })}
+                      placeholder="e.g. 450"
                       className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
                     />
                     <span className="text-[9.5px] text-slate-400 block mt-0.5">
-                      {((productFormData.weightGrams || 450) / 1000).toFixed(2)} kg
+                      {productFormData.weightGrams ? `${(productFormData.weightGrams / 1000).toFixed(2)} kg` : 'None (Optional)'}
                     </span>
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
-                      Length (cm) *
+                      Length (cm) <span className="font-normal text-slate-400">(Optional)</span>
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       step={0.5}
-                      value={productFormData.dimensionsCm?.length ?? 22}
+                      value={productFormData.dimensionsCm?.length ?? ''}
                       onChange={(e) => setProductFormData({
                         ...productFormData,
                         dimensionsCm: {
-                          length: Number(e.target.value),
-                          width: productFormData.dimensionsCm?.width ?? 16,
-                          height: productFormData.dimensionsCm?.height ?? 8
+                          length: e.target.value === '' ? 0 : Number(e.target.value),
+                          width: productFormData.dimensionsCm?.width ?? 0,
+                          height: productFormData.dimensionsCm?.height ?? 0
                         }
                       })}
+                      placeholder="e.g. 22"
                       className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
                     />
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
-                      Breadth / Width (cm) *
+                      Breadth (cm) <span className="font-normal text-slate-400">(Optional)</span>
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       step={0.5}
-                      value={productFormData.dimensionsCm?.width ?? 16}
+                      value={productFormData.dimensionsCm?.width ?? ''}
                       onChange={(e) => setProductFormData({
                         ...productFormData,
                         dimensionsCm: {
-                          length: productFormData.dimensionsCm?.length ?? 22,
-                          width: Number(e.target.value),
-                          height: productFormData.dimensionsCm?.height ?? 8
+                          length: productFormData.dimensionsCm?.length ?? 0,
+                          width: e.target.value === '' ? 0 : Number(e.target.value),
+                          height: productFormData.dimensionsCm?.height ?? 0
                         }
                       })}
+                      placeholder="e.g. 16"
                       className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
                     />
                   </div>
 
                   <div>
                     <label className="font-bold text-slate-600 text-[10.5px] block mb-1">
-                      Height (cm) *
+                      Height (cm) <span className="font-normal text-slate-400">(Optional)</span>
                     </label>
                     <input
                       type="number"
-                      min={1}
+                      min={0}
                       step={0.5}
-                      value={productFormData.dimensionsCm?.height ?? 8}
+                      value={productFormData.dimensionsCm?.height ?? ''}
                       onChange={(e) => setProductFormData({
                         ...productFormData,
                         dimensionsCm: {
-                          length: productFormData.dimensionsCm?.length ?? 22,
-                          width: productFormData.dimensionsCm?.width ?? 16,
-                          height: Number(e.target.value)
+                          length: productFormData.dimensionsCm?.length ?? 0,
+                          width: productFormData.dimensionsCm?.width ?? 0,
+                          height: e.target.value === '' ? 0 : Number(e.target.value)
                         }
                       })}
+                      placeholder="e.g. 8"
                       className="w-full bg-white border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold"
                     />
                   </div>
                 </div>
 
                 {(() => {
-                  const l = productFormData.dimensionsCm?.length || 22;
-                  const w = productFormData.dimensionsCm?.width || 16;
-                  const h = productFormData.dimensionsCm?.height || 8;
+                  const hasWeight = typeof productFormData.weightGrams === 'number' && productFormData.weightGrams > 0;
+                  const l = productFormData.dimensionsCm?.length || 0;
+                  const w = productFormData.dimensionsCm?.width || 0;
+                  const h = productFormData.dimensionsCm?.height || 0;
+                  const hasDimensions = l > 0 && w > 0 && h > 0;
+
+                  if (!hasWeight && !hasDimensions) {
+                    return (
+                      <div className="pt-2 border-t border-slate-200 text-[10.5px] text-slate-500 flex items-center gap-1.5">
+                        <HelpCircle className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>Weight &amp; dimensions are optional. When omitted, the shipping fee configured below will be applied.</span>
+                      </div>
+                    );
+                  }
+
                   const volKg = Number(((l * w * h) / 5000).toFixed(2));
-                  const deadKg = Number(((productFormData.weightGrams || 450) / 1000).toFixed(2));
+                  const deadKg = Number(((productFormData.weightGrams || 0) / 1000).toFixed(2));
                   const chargeableKg = Math.max(deadKg, volKg);
 
                   return (
@@ -2102,6 +2404,68 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                     </div>
                   );
                 })()}
+              </div>
+
+              {/* Shipping Charges Configuration & Free Shipping Option */}
+              <div className="p-3 bg-gradient-to-r from-teal-50/70 to-emerald-50/70 border border-teal-200/80 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-teal-950 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-teal-700" />
+                    <span>Shipping Charges &amp; Free Shipping for this Product</span>
+                  </span>
+                  {productFormData.isFreeShipping && (
+                    <span className="bg-emerald-600 text-white font-extrabold text-[9.5px] px-2 py-0.5 rounded-full uppercase tracking-wider">
+                      Free Shipping Active
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-teal-950 bg-white p-2.5 rounded-lg border border-teal-200 cursor-pointer shadow-2xs hover:bg-teal-50/30 transition">
+                    <input
+                      type="checkbox"
+                      checked={productFormData.isFreeShipping || false}
+                      onChange={(e) => setProductFormData({
+                        ...productFormData,
+                        isFreeShipping: e.target.checked,
+                        shippingFee: e.target.checked ? 0 : (productFormData.shippingFee ?? 49)
+                      })}
+                      className="rounded text-teal-600 w-4 h-4 cursor-pointer"
+                    />
+                    <div>
+                      <span className="block font-black text-teal-900">🌟 Offer Free Shipping for this particular product</span>
+                      <span className="block text-[10px] text-teal-700 font-normal">
+                        Customer pays ₹0 delivery charges at checkout for this item regardless of weight.
+                      </span>
+                    </div>
+                  </label>
+
+                  {!productFormData.isFreeShipping && (
+                    <div className="bg-white p-2.5 rounded-lg border border-teal-200 space-y-1">
+                      <label className="font-bold text-slate-700 text-[11px] block">
+                        Shipping Charges for this product (₹)
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-sm text-slate-500 font-mono">₹</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={productFormData.shippingFee ?? 49}
+                          onChange={(e) => setProductFormData({
+                            ...productFormData,
+                            shippingFee: Number(e.target.value)
+                          })}
+                          placeholder="e.g. 49"
+                          className="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs font-mono font-bold outline-hidden focus:border-teal-500"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Charged when package weight and dimensions are omitted (or as a fallback flat rate).
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-100">

@@ -543,6 +543,7 @@ export async function sendEmailMessage(options: {
   htmlContent: string;
   textContent: string;
   otpCode?: string;
+  attachments?: any[];
   adminInstance?: any;
 }): Promise<{ success: boolean; messageId?: string; previewUrl?: string; error?: string }> {
   try {
@@ -556,7 +557,8 @@ export async function sendEmailMessage(options: {
       to: cleanTo,
       subject: options.subject,
       text: options.textContent,
-      html: options.htmlContent
+      html: options.htmlContent,
+      attachments: options.attachments
     });
 
     const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;

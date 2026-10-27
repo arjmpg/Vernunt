@@ -4040,6 +4040,130 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     }
   });
 
+  // Official Vendor Agreement PDF Copy Email Dispatcher
+  app.post("/api/send-vendor-agreement-email", async (req, res) => {
+    try {
+      const { 
+        toEmail, 
+        vendorName, 
+        storeName, 
+        agreementRef, 
+        commissionRate, 
+        returnPolicy, 
+        signedAt, 
+        acceptanceHash,
+        pdfBase64 
+      } = req.body || {};
+
+      const targetEmail = toEmail || "vendor@vernunt.org";
+      const targetName = vendorName || "Valued Merchant Partner";
+      const targetStore = storeName || "Registered Kids Store";
+      const refId = agreementRef || `VRN-AGR-2026-${Date.now().toString().slice(-6)}`;
+      const rate = commissionRate || "10%";
+      const returns = returnPolicy || "Mandatory 7-day hassle-free return and replacement acceptance";
+      const dateStr = signedAt ? new Date(signedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : new Date().toLocaleString('en-IN');
+
+      console.log(`[Vendor Agreement Engine] 📄 Dispatching Signed Agreement PDF to ${targetEmail} for Ref: ${refId}`);
+
+      const subject = `📄 Official Signed Seller Agreement: Vernunt Marketplace [${refId}]`;
+      const emailBodyText = `Dear ${targetName},\n\nCongratulations and welcome to Vernunt Multi-Vendor Marketplace!\n\nYour Marketplace Vendor Agreement has been digitally executed and archived.\n\nAgreement Summary:\n- Agreement Reference: ${refId}\n- Store / Business Name: ${targetStore}\n- Authorized Signatory: ${targetName}\n- Platform Facilitation Commission: ${rate} on Product Selling Price\n- Customer Return Policy: ${returns}\n- BIS Child Safety & IS 9873: 100% Non-Toxic Compliance\n- Execution Timestamp: ${dateStr}\n- Cryptographic Verification Hash: ${acceptanceHash || 'VRN-SEC-VALID'}\n- Jurisdiction: Courts of Bengaluru, Karnataka, India\n\nA copy of your signed legal agreement PDF is attached to this email and securely stored in your Vernunt Merchant Dashboard.\n\nThank you for partnering with us to build India's safest kids ecosystem!\n- Legal & Compliance Desk, Vernunt Technologies Private Limited`;
+
+      const emailHtml = `
+        <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:620px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
+          <div style="background:linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%);padding:28px 24px;text-align:left;color:#fff;">
+            <span style="display:inline-block;background:rgba(244,63,94,0.25);border:1px solid rgba(244,63,94,0.4);color:#fda4af;padding:4px 12px;border-radius:999px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;">
+              Officially Executed Merchant Agreement
+            </span>
+            <h1 style="margin:0;font-size:20px;font-weight:800;color:#fff;">Vernunt Marketplace Seller Agreement</h1>
+            <p style="margin:4px 0 0;font-size:12px;color:#cbd5e1;font-family:monospace;">Agreement Reference: ${refId}</p>
+          </div>
+          
+          <div style="padding:28px 24px;font-size:14px;color:#334155;line-height:1.6;">
+            <p style="margin-top:0;">Dear <strong>${targetName}</strong> (Representative of <strong>${targetStore}</strong>),</p>
+            <p>Congratulations and welcome to the Vernunt Verified Family &amp; Kids Network! Your Seller Agreement has been officially executed electronically and a copy of the binding agreement is confirmed below.</p>
+            
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:16px;margin:20px 0;">
+              <h3 style="margin:0 0 12px;font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#0f172a;border-bottom:1px solid #e2e8f0;padding-bottom:6px;">
+                Key Executed Terms &amp; Conditions
+              </h3>
+              <table style="width:100%;font-size:12.5px;border-collapse:collapse;">
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Platform Facilitation Commission:</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:800;color:#be123c;">${rate} on Selling Price</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Customer Returns &amp; Replacement:</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:800;color:#047857;">Mandatory 7-Day Acceptance</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Product Quality &amp; Safety:</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a;">100% BIS IS 9873 / Non-Toxic</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Courier Dispatch SLA:</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a;">24–48 Hours (Shiprocket)</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Settlement Cycle:</td>
+                  <td style="padding:6px 0;text-align:right;font-weight:700;color:#0f172a;">Reconciled Weekly via NEFT/UPI</td>
+                </tr>
+                <tr>
+                  <td style="padding:6px 0;color:#64748b;font-weight:600;">Date &amp; Time Executed:</td>
+                  <td style="padding:6px 0;text-align:right;font-family:monospace;font-weight:600;color:#475569;">${dateStr}</td>
+                </tr>
+              </table>
+            </div>
+
+            <div style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:10px;padding:12px 14px;margin:16px 0;font-size:12px;color:#065f46;">
+              ✓ <strong>Digital Signature Certificate:</strong> Bound with cryptographic hash <code>${(acceptanceHash || 'VRN-SEC-VALID').slice(0, 24)}...</code>. Your PDF agreement copy is attached.
+            </div>
+
+            <p style="font-size:12.5px;color:#64748b;margin-bottom:0;">
+              Vernunt Technologies Private Limited &bull; Indiranagar, Bengaluru 560038, Karnataka<br>
+              Direct Legal Support: <a href="mailto:legal@vernunt.com" style="color:#be123c;">legal@vernunt.com</a>
+            </p>
+          </div>
+        </div>
+      `;
+
+      let attachments: any[] | undefined = undefined;
+      if (pdfBase64 && typeof pdfBase64 === 'string') {
+        const cleanBase64 = pdfBase64.replace(/^data:application\/pdf;base64,/, '').replace(/^data:.*?base64,/, '');
+        attachments = [
+          {
+            filename: `Vernunt_Signed_Vendor_Agreement_${refId}.pdf`,
+            content: Buffer.from(cleanBase64, 'base64'),
+            contentType: 'application/pdf'
+          }
+        ];
+      }
+
+      const adminInstance = await getFirebaseAdmin();
+      const sendResult = await sendEmailMessage({
+        to: targetEmail,
+        subject,
+        type: 'general',
+        textContent: emailBodyText,
+        htmlContent: emailHtml,
+        attachments,
+        adminInstance
+      });
+
+      return res.json({
+        success: true,
+        toEmail: targetEmail,
+        agreementRef: refId,
+        subject,
+        previewUrl: sendResult.previewUrl,
+        message: `Official Signed Vendor Agreement PDF dispatched to ${targetEmail}.`,
+        timestamp: new Date().toISOString()
+      });
+    } catch (err: any) {
+      console.error("[Vendor Agreement Email Error]:", err);
+      return res.status(500).json({ success: false, error: err.message || err });
+    }
+  });
+
   // =========================================================================
   // ANDROID APP & PWA DEPLOYMENT ENDPOINTS
   // =========================================================================

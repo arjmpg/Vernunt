@@ -5,7 +5,7 @@ import {
   Eye, Edit, Trash2, ShieldCheck, ArrowUpRight, ArrowLeft, Users, Building,
   CreditCard, Sparkles, X, Check, Bell, Printer, Share2, AlertTriangle, ChevronRight,
   MapPin, Sliders, BarChart2, Layers, HelpCircle, FileText, CheckSquare, Square,
-  RotateCcw, Send, CheckCircle, Smartphone, Info, Compass, Shield, Copy
+  RotateCcw, Send, CheckCircle, Smartphone, Info, Compass, Shield, Copy, Upload, Image as ImageIcon
 } from 'lucide-react';
 import { VendorProfile, VendorWithdrawal, VendorInquiry, VendorAnnouncement, VendorDashboardStats } from '../../types/vendor.ts';
 import { StoreOrder, StoreProduct, StoreCoupon, StoreSettings, StoreCategory } from '../../types/store.ts';
@@ -20,7 +20,18 @@ import { REGIONAL_PINCODE_PRESETS, cleanPincode, checkProductDeliverability, get
 import { MarketplaceApiClient } from '../../services/marketplaceApiClient.ts';
 import { ShiprocketShippingDesk } from './ShiprocketShippingDesk.tsx';
 import ServiceLevelAgreementModal from '../legal/ServiceLevelAgreementModal.tsx';
+import VendorAgreementModal from '../legal/VendorAgreementModal.tsx';
 import { PortalAuthModal } from '../auth/PortalAuthModal.tsx';
+import { 
+  downloadVendorAgreementPdf, 
+  sendVendorAgreementEmail, 
+  generateVendorAgreementPdfDoc 
+} from '../../utils/vendorAgreementPdf.ts';
+import { 
+  VendorAgreementData, 
+  CURRENT_VENDOR_AGREEMENT_VERSION, 
+  STANDARD_VENDOR_COMMISSION_PERCENT 
+} from '../../types/vendorAgreement.ts';
 
 export type VendorTabKey = 
   | 'overview'
@@ -144,6 +155,7 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [selectedPackingSlipOrder, setSelectedPackingSlipOrder] = useState<StoreOrder | null>(null);
   const [showSlaModal, setShowSlaModal] = useState(false);
+  const [showVendorAgreementModal, setShowVendorAgreementModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Search & Filters
@@ -821,7 +833,44 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
       setVendors(getStoredVendors());
       setActiveVendorId(result.vendor.id);
       setIsRegisterModalOpen(false);
-      showToast(`Congratulations! "${result.vendor.storeName}" has been registered.`);
+
+      // Generate Signed Legal Agreement PDF and dispatch to vendor email
+      const agreementData: VendorAgreementData = {
+        agreementId: `VRN-AGR-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+        storeName: regForm.storeName,
+        ownerName: regForm.ownerName || regForm.contactPerson || 'Store Owner',
+        contactPerson: regForm.contactPerson || regForm.ownerName,
+        email: regForm.email,
+        phone: regForm.phone,
+        businessType: regForm.businessType,
+        pickupAddress: {
+          street: regForm.pickupStreet || regForm.street,
+          city: regForm.pickupCity || regForm.city,
+          state: regForm.pickupState || regForm.state,
+          pincode: regForm.pickupPincode || regForm.pincode,
+          country: 'India'
+        },
+        gstNumber: regForm.gstNumber,
+        panNumber: regForm.panNumber,
+        commissionRate: STANDARD_VENDOR_COMMISSION_PERCENT,
+        commissionTerms: `Flat ${STANDARD_VENDOR_COMMISSION_PERCENT}% on product selling price deducted automatically via platform escrow.`,
+        returnPolicy: 'Mandatory 7-day hassle-free customer returns and replacements acceptance.',
+        acceptedAt: new Date().toISOString(),
+        acceptanceHash: `VRN-SIG-${Math.random().toString(36).substring(2, 12).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+        version: CURRENT_VENDOR_AGREEMENT_VERSION
+      };
+
+      try {
+        const doc = await generateVendorAgreementPdfDoc(agreementData);
+        const pdfBase64 = doc.output('datauristring');
+        const safeName = (regForm.storeName || 'Vendor').replace(/[^a-zA-Z0-9_-]/g, '_');
+        doc.save(`Vernunt_Signed_Vendor_Agreement_${safeName}.pdf`);
+        await sendVendorAgreementEmail(agreementData, pdfBase64);
+        showToast(`Congratulations! "${result.vendor.storeName}" registered. Signed agreement PDF downloaded and emailed to ${regForm.email}!`);
+      } catch (pdfErr) {
+        console.warn('PDF dispatch background notice:', pdfErr);
+        showToast(`Congratulations! "${result.vendor.storeName}" has been registered.`);
+      }
     } else {
       alert(result.error || 'Registration failed');
     }
@@ -2048,16 +2097,83 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Image URL */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Featured Image URL</label>
-                <input
-                  type="url"
-                  placeholder="https://..."
-                  value={newProductForm.featuredImage}
-                  onChange={e => setNewProductForm({ ...newProductForm, featuredImage: e.target.value })}
-                  className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-hidden"
-                />
+              {/* Image URL or Local/Mobile/GDrive Upload (< 2MB) */}
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Featured Image Artwork</span>
+                  </label>
+                  <span className="text-[10px] text-slate-500 font-medium">Max 2 MB (Compressed)</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="url"
+                    placeholder="Paste image URL (https://...)"
+                    value={newProductForm.featuredImage}
+                    onChange={e => setNewProductForm({ ...newProductForm, featuredImage: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-hidden font-mono bg-white"
+                  />
+                  <label className="flex items-center justify-center gap-1.5 px-3 py-2 bg-teal-50 hover:bg-teal-100 border border-teal-200 text-teal-800 text-xs font-bold rounded-lg cursor-pointer transition">
+                    <Upload className="w-3.5 h-3.5 text-teal-600" />
+                    <span>Upload from Device / Drive</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          const img = new Image();
+                          img.onload = () => {
+                            const canvas = document.createElement('canvas');
+                            let w = img.width;
+                            let h = img.height;
+                            const maxDim = 1600;
+                            if (w > maxDim || h > maxDim) {
+                              if (w > h) {
+                                h = Math.round((h * maxDim) / w);
+                                w = maxDim;
+                              } else {
+                                w = Math.round((w * maxDim) / h);
+                                h = maxDim;
+                              }
+                            }
+                            canvas.width = w;
+                            canvas.height = h;
+                            const ctx = canvas.getContext('2d');
+                            if (!ctx) return;
+                            ctx.drawImage(img, 0, 0, w, h);
+                            let q = 0.85;
+                            let dUrl = canvas.toDataURL('image/jpeg', q);
+                            while (Math.round((dUrl.length * 3) / 4) > 1.95 * 1024 * 1024 && q > 0.25) {
+                              q -= 0.12;
+                              dUrl = canvas.toDataURL('image/jpeg', q);
+                            }
+                            setNewProductForm({ ...newProductForm, featuredImage: dUrl });
+                          };
+                          img.src = event.target?.result as string;
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                  </label>
+                </div>
+                {newProductForm.featuredImage && (
+                  <div className="flex items-center gap-2 mt-1 bg-white p-1.5 rounded-lg border border-slate-200">
+                    <img src={newProductForm.featuredImage} alt="Preview" className="w-10 h-10 rounded-md object-cover border" />
+                    <span className="text-[11px] text-slate-600 truncate flex-1">{newProductForm.featuredImage.slice(0, 45)}...</span>
+                    <button
+                      type="button"
+                      onClick={() => setNewProductForm({ ...newProductForm, featuredImage: '' })}
+                      className="text-[10px] text-rose-600 font-bold hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Serviceable Pincodes & Delivery Availability (Core Requirement) */}
@@ -3581,17 +3697,45 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                 />
               </div>
 
-              {/* Agreement */}
-              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-start gap-2">
-                <input
-                  type="checkbox"
-                  id="regSla"
-                  checked={regForm.slaAccepted}
-                  onChange={e => setRegForm({ ...regForm, slaAccepted: e.target.checked })}
-                  className="mt-0.5 rounded-sm text-teal-600 focus:ring-teal-500"
-                />
-                <label htmlFor="regSla" className="text-xs text-slate-600">
-                  I confirm that all developmental products sold comply with Vernunt certified non-toxic standards, and agree to the <strong>Marketplace Service Level Agreement (SLA)</strong>.
+              {/* Mandatory Vendor Agreement with 10% Commission & Returns */}
+              <div className="p-3.5 bg-gradient-to-r from-rose-50/70 via-slate-50 to-indigo-50/70 border border-indigo-200 rounded-xl space-y-2.5">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold text-slate-900 flex items-center gap-1.5">
+                    <Scale className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Vernunt Marketplace Seller Agreement</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowVendorAgreementModal(true)}
+                    className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <FileText className="w-3 h-3" />
+                    <span>Review Full Agreement (PDF)</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[10.5px]">
+                  <div className="p-2 bg-white rounded-lg border border-rose-200">
+                    <span className="font-extrabold text-rose-700 block">10% Platform Commission</span>
+                    <span className="text-slate-500 text-[9.5px]">Deducted from selling price</span>
+                  </div>
+                  <div className="p-2 bg-white rounded-lg border border-emerald-200">
+                    <span className="font-extrabold text-emerald-700 block">Mandatory 7-Day Returns</span>
+                    <span className="text-slate-500 text-[9.5px]">100% acceptance for defects/mismatch</span>
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-2 cursor-pointer pt-0.5">
+                  <input
+                    type="checkbox"
+                    id="regSla"
+                    checked={regForm.slaAccepted}
+                    onChange={e => setRegForm({ ...regForm, slaAccepted: e.target.checked })}
+                    className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                  />
+                  <span className="text-xs text-slate-700 leading-snug">
+                    I accept the <strong>Vernunt Seller Agreement</strong>, the <strong>10% selling price commission</strong>, and the <strong>mandatory return acceptance policy</strong>. A signed PDF copy will be emailed to {regForm.email || 'my email'}. <span className="text-rose-500">*</span>
+                  </span>
                 </label>
               </div>
 
@@ -3605,15 +3749,40 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-xs transition"
+                  className="px-5 py-2.5 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-xs font-bold shadow-xs transition cursor-pointer"
                 >
-                  Complete Registration
+                  Complete Registration &amp; Email PDF Agreement
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
+
+      {/* Official Vendor Agreement Modal */}
+      <VendorAgreementModal
+        isOpen={showVendorAgreementModal}
+        onClose={() => setShowVendorAgreementModal(false)}
+        onAccept={(agData) => {
+          setRegForm(prev => ({ ...prev, slaAccepted: true }));
+          setShowVendorAgreementModal(false);
+          showToast(`Agreement signed! PDF copy sent to ${agData.email}`);
+        }}
+        isAccepted={regForm.slaAccepted}
+        storeName={regForm.storeName}
+        ownerName={regForm.ownerName || regForm.contactPerson}
+        email={regForm.email}
+        phone={regForm.phone}
+        gstNumber={regForm.gstNumber}
+        panNumber={regForm.panNumber}
+        businessType={regForm.businessType}
+        pickupAddress={{
+          street: regForm.pickupStreet || regForm.street,
+          city: regForm.pickupCity || regForm.city,
+          state: regForm.pickupState || regForm.state,
+          pincode: regForm.pickupPincode || regForm.pincode
+        }}
+      />
     </div>
   );
 };

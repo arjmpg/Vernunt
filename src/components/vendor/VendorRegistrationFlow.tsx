@@ -3,9 +3,10 @@ import {
   Store, Building, Truck, ShieldCheck, Check, Sparkles, 
   MapPin, Phone, Mail, CreditCard, Award, FileText, 
   AlertCircle, Upload, CheckCircle2, ChevronRight, Barcode,
-  Lock, Calendar, Package, Scale
+  Lock, Calendar, Package, Scale, Percent, RotateCcw, Download
 } from 'lucide-react';
 import ServiceLevelAgreementModal from '../legal/ServiceLevelAgreementModal.tsx';
+import VendorAgreementModal from '../legal/VendorAgreementModal.tsx';
 
 interface VendorRegistrationFlowProps {
   step: number;
@@ -150,6 +151,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = (pr
   } = props;
 
   const [showSlaModal, setShowSlaModal] = useState<boolean>(false);
+  const [showVendorAgreementModal, setShowVendorAgreementModal] = useState<boolean>(false);
 
   const toggleCategory = (cat: string) => {
     if (selectedCategories.includes(cat)) {
@@ -693,58 +695,94 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = (pr
             </div>
           </div>
 
-          {/* Vernunt Marketplace & Shiprocket Logistics Agreement */}
-          <div className="p-4.5 bg-gradient-to-r from-indigo-50/90 via-slate-50 to-blue-50/90 border-2 border-indigo-200 rounded-2xl space-y-3.5 shadow-2xs">
+          {/* Vernunt Official Marketplace Seller Agreement with 10% Commission & Mandatory Returns */}
+          <div className="p-4.5 bg-gradient-to-r from-rose-50/70 via-slate-50 to-indigo-50/70 border-2 border-indigo-200 rounded-2xl space-y-4 shadow-2xs">
             <div className="flex items-start justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-600 to-slate-900 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Scale className="w-4 h-4 text-amber-300" />
                 </div>
                 <div>
-                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                    Vernunt Marketplace Seller Agreement &amp; Logistics SLA
+                  <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Vernunt Marketplace Seller Agreement</span>
+                    <span className="px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[9px] font-bold border border-rose-200 uppercase">
+                      10% Commission &bull; Returns Mandatory
+                    </span>
                   </h4>
-                  <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider">
-                    Statutory BIS Toy Safety &bull; 24–48h Dispatch &bull; 7-Day Customer Replacement
+                  <p className="text-[10px] text-indigo-700 font-bold uppercase tracking-wider mt-0.5">
+                    10% Platform Fee &bull; 100% Mandatory Return Acceptance &bull; BIS Toy Safety
                   </p>
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowSlaModal(true)}
-                className="px-3 py-1.5 bg-white hover:bg-indigo-50 border border-indigo-300 text-indigo-700 font-bold text-xs rounded-xl shadow-2xs transition flex items-center gap-1.5 cursor-pointer ml-auto"
-              >
-                <FileText className="w-3.5 h-3.5 text-indigo-600" />
-                <span>Review Full Logistics SLA</span>
-              </button>
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setShowVendorAgreementModal(true)}
+                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Review &amp; Sign Agreement (PDF)</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Core Non-Negotiable Terms Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div className="p-3 bg-white rounded-xl border border-rose-200 shadow-2xs space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-rose-700 flex items-center gap-1">
+                  <Percent className="w-3 h-3 text-rose-600" />
+                  <span>10% Platform Commission</span>
+                </span>
+                <p className="text-[11px] text-slate-700 font-bold">
+                  Deducted directly from product selling price.
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Automatic escrow deduction on sales. Reconciled weekly bank settlements (90% net).
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-1">
+                <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 flex items-center gap-1">
+                  <RotateCcw className="w-3 h-3 text-emerald-600" />
+                  <span>Mandatory Return Acceptance</span>
+                </span>
+                <p className="text-[11px] text-slate-700 font-bold">
+                  100% sellers must accept 7-day returns.
+                </p>
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Unconditional replacement for transit damages, defects, or age mismatches via Shiprocket.
+                </p>
+              </div>
             </div>
 
             {/* SLA Metrics Chips */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10.5px]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5 text-[10.5px]">
+              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                <span className="font-mono font-bold text-indigo-900 block">10.0% Flat</span>
+                <span className="text-slate-500 text-[9.5px]">Platform Commission</span>
+              </div>
+              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                <span className="font-mono font-bold text-emerald-700 block">7 Days</span>
+                <span className="text-slate-500 text-[9.5px]">Mandatory Return Window</span>
+              </div>
+              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
+                <span className="font-mono font-bold text-emerald-700 block">BIS IS 9873</span>
+                <span className="text-slate-500 text-[9.5px]">100% Non-Toxic Standard</span>
+              </div>
               <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
                 <span className="font-mono font-bold text-indigo-900 block">24–48 Hours</span>
                 <span className="text-slate-500 text-[9.5px]">Courier Dispatch SLA</span>
               </div>
-              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
-                <span className="font-mono font-bold text-emerald-700 block">100% BIS Certified</span>
-                <span className="text-slate-500 text-[9.5px]">Non-Toxic Toys IS 9873</span>
-              </div>
-              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
-                <span className="font-mono font-bold text-indigo-900 block">&lt; 1.5%</span>
-                <span className="text-slate-500 text-[9.5px]">Max Stockout Rate</span>
-              </div>
-              <div className="p-2 bg-white rounded-xl border border-indigo-100 text-center shadow-2xs">
-                <span className="font-mono font-bold text-emerald-700 block">7 Days</span>
-                <span className="text-slate-500 text-[9.5px]">Hassle-Free Return</span>
-              </div>
             </div>
-            
+
+            {/* Agreement Clauses Summary */}
             <div className="space-y-1.5 text-xs text-slate-600 leading-relaxed max-h-32 overflow-y-auto p-2.5 bg-white border border-slate-200 rounded-xl text-[11px]">
-              <p>1. <strong>Child Safety Standards:</strong> Seller certifies that all toys, books, and child care products are 100% non-toxic, BPA-free, lead-free, and comply with BIS (Bureau of Indian Standards IS 9873) and FSSAI regulations.</p>
-              <p>2. <strong>Shiprocket Dispatch SLA:</strong> Orders must be packed and ready for Shiprocket/Delhivery courier pickup within 24–48 hours of order confirmation.</p>
-              <p>3. <strong>Commission &amp; Settlements:</strong> Enjoy 60-day Zero Commission trial. Reconciled weekly settlements are transferred directly to your registered bank account via NEFT/UPI.</p>
-              <p>4. <strong>Customer Returns:</strong> Seller agrees to accept returns for defective, damaged, or mismatched items within 7 days of delivery.</p>
+              <p>1. <strong>10% Platform Commission:</strong> Seller irrevocably agrees to pay a flat 10% platform facilitation fee computed on the product selling price for each completed transaction, deducted via platform escrow before weekly bank disbursements.</p>
+              <p>2. <strong>Mandatory Return Acceptance:</strong> Every Seller MUST accept returns and replacements within 7 days of delivery for any damaged, defective, or mismatched items without arbitrary refusal.</p>
+              <p>3. <strong>Child Safety Standards:</strong> Seller certifies that all toys, books, and child care products are 100% non-toxic, BPA-free, lead-free, and comply with BIS IS 9873 and FSSAI regulations.</p>
+              <p>4. <strong>Shiprocket Courier Dispatch:</strong> Orders must be securely packed and ready for courier pickup within 24–48 hours of order confirmation.</p>
+              <p>5. <strong>PDF Agreement Delivery:</strong> Upon acceptance, an official signed legal copy in PDF format will be emailed to your registered email address ({email || 'your email'}) and stored in your dashboard.</p>
             </div>
 
             <label className="flex items-start gap-2.5 cursor-pointer pt-1">
@@ -753,7 +791,7 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = (pr
                 id="vendor-terms-checkbox"
                 checked={agreementAccepted}
                 onChange={(e) => setAgreementAccepted(e.target.checked)}
-                className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500"
+                className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
               />
               <span className="text-xs font-bold text-slate-800 leading-snug">
                 I accept the{' '}
@@ -762,13 +800,13 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = (pr
                   onClick={(ev) => {
                     ev.preventDefault();
                     ev.stopPropagation();
-                    setShowSlaModal(true);
+                    setShowVendorAgreementModal(true);
                   }}
-                  className="text-indigo-600 underline font-black hover:text-indigo-800"
+                  className="text-indigo-600 underline font-black hover:text-indigo-800 cursor-pointer"
                 >
-                  Vernunt Marketplace Seller Terms &amp; Logistics SLA
+                  Vernunt Marketplace Seller Agreement
                 </button>
-                , 60-day free trial, and Shiprocket Courier Dispatch SLA. <span className="text-rose-500">*</span>
+                , the <strong>10% platform commission on selling price</strong>, and the <strong>mandatory return acceptance policy</strong>. A signed PDF copy will be sent to my email. <span className="text-rose-500">*</span>
               </span>
             </label>
             {errors.vendorAgreement && <p className="text-xs font-bold text-rose-600">{errors.vendorAgreement}</p>}
@@ -776,6 +814,37 @@ export const VendorRegistrationFlow: React.FC<VendorRegistrationFlowProps> = (pr
 
         </div>
       )}
+
+      {/* Official Vendor Agreement Modal */}
+      <VendorAgreementModal
+        isOpen={showVendorAgreementModal}
+        onClose={() => setShowVendorAgreementModal(false)}
+        onAccept={(agData) => {
+          setAgreementAccepted(true);
+          setShowVendorAgreementModal(false);
+        }}
+        isAccepted={agreementAccepted}
+        storeName={storeName}
+        ownerName={ownerName}
+        email={email}
+        phone={phoneNumber}
+        gstNumber={gstin}
+        panNumber={pan}
+        businessType={businessType}
+        pickupAddress={{
+          street: warehouseStreet,
+          city: warehouseCity,
+          state: warehouseState,
+          pincode: warehousePincode
+        }}
+        bankDetails={{
+          accountHolder,
+          bankName,
+          accountNumber,
+          ifscCode,
+          upiId
+        }}
+      />
 
       {/* Seller SLA Modal */}
       <ServiceLevelAgreementModal

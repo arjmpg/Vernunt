@@ -55,3 +55,6 @@ export default function VernuntLogo({
     </div>
   );
 }
+
+export { VernuntLogo };
+

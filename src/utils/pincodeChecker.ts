@@ -148,40 +148,73 @@ export function calculateCartDimensionalShipping(
   const rules = rulesOverride || getStoredShippingRules();
   const cleanPin = cleanPincode(pincode);
 
-  // 1. Calculate Total Dead Weight from products
+  // 1. Calculate Dead Weight & Dimensions from products that use dynamic logistics
   let totalDeadWeightGrams = 0;
   let maxLength = 0;
   let maxWidth = 0;
   let totalHeight = 0;
   let totalSubtotal = cartSubtotalOverride ?? 0;
+  let fixedCustomShippingTotal = 0;
+  let hasDynamicWeightItems = false;
+  let nonFreeItemsCount = 0;
 
   cart.forEach(item => {
     const qty = item.quantity || 1;
     const prod = item.product;
-    const weightPerUnit = prod?.weightGrams && prod.weightGrams > 0 ? prod.weightGrams : 450;
-    totalDeadWeightGrams += (weightPerUnit * qty);
-
-    const l = prod?.dimensionsCm?.length || 20;
-    const w = prod?.dimensionsCm?.width || 15;
-    const h = prod?.dimensionsCm?.height || 8;
-
-    maxLength = Math.max(maxLength, l);
-    maxWidth = Math.max(maxWidth, w);
-    totalHeight += (h * qty);
 
     if (cartSubtotalOverride === undefined) {
       totalSubtotal += (item.totalPrice || (item.unitPrice * qty));
     }
+
+    const isProdFreeShipping = Boolean(
+      prod?.isFreeShipping ||
+      prod?.badges?.some(b => b.toLowerCase().includes('free shipping'))
+    );
+
+    if (isProdFreeShipping) {
+      // Free shipping for this product - no shipping charges or weight added
+      return;
+    }
+
+    nonFreeItemsCount += qty;
+
+    const hasDeadWeight = typeof prod?.weightGrams === 'number' && prod.weightGrams > 0;
+    const hasDimensions = Boolean(
+      prod?.dimensionsCm &&
+      (prod.dimensionsCm.length > 0 || prod.dimensionsCm.width > 0 || prod.dimensionsCm.height > 0)
+    );
+
+    if (hasDeadWeight || hasDimensions) {
+      hasDynamicWeightItems = true;
+      const weightPerUnit = hasDeadWeight ? prod.weightGrams! : 450;
+      totalDeadWeightGrams += (weightPerUnit * qty);
+
+      const l = prod?.dimensionsCm?.length || 20;
+      const w = prod?.dimensionsCm?.width || 15;
+      const h = prod?.dimensionsCm?.height || 8;
+
+      maxLength = Math.max(maxLength, l);
+      maxWidth = Math.max(maxWidth, w);
+      totalHeight += (h * qty);
+    } else {
+      // No weight/dimensions provided: use product's custom flat shipping charge
+      const itemCustomFee = typeof prod?.shippingFee === 'number'
+        ? prod.shippingFee
+        : (typeof prod?.defaultShippingFee === 'number' ? prod.defaultShippingFee : 49);
+      fixedCustomShippingTotal += (itemCustomFee * qty);
+    }
   });
 
-  if (maxLength === 0) maxLength = 20;
-  if (maxWidth === 0) maxWidth = 15;
-  if (totalHeight === 0) totalHeight = 10;
-  if (totalDeadWeightGrams === 0) totalDeadWeightGrams = 500;
+  if (hasDynamicWeightItems) {
+    if (maxLength === 0) maxLength = 20;
+    if (maxWidth === 0) maxWidth = 15;
+    if (totalHeight === 0) totalHeight = 10;
+    if (totalDeadWeightGrams === 0) totalDeadWeightGrams = 500;
+  }
 
   // 2. Volumetric Weight (cm³ / 5000 = kg)
   const divisor = rules.volumetricDivisor || 5000;
-  const volWeightKg = (maxLength * maxWidth * totalHeight) / divisor;
+  const volWeightKg = hasDynamicWeightItems ? (maxLength * maxWidth * totalHeight) / divisor : 0;
   const volumetricWeightGrams = Math.round(volWeightKg * 1000);
 
   // 3. Chargeable Weight is max of dead weight vs volumetric
@@ -189,49 +222,51 @@ export function calculateCartDimensionalShipping(
   const chargeableWeightKg = Number((chargeableWeightGrams / 1000).toFixed(2));
 
   // 4. Determine Zone and Base Charge from PIN Code
-  let baseCharge = rules.baseRateNational;
-  let zoneName = 'National Zone';
-  let zoneDescription = 'Rest of India Standard Surface';
+  let baseCharge = hasDynamicWeightItems ? rules.baseRateNational : 0;
+  let zoneName = hasDynamicWeightItems ? 'National Zone' : 'Standard Shipping';
+  let zoneDescription = hasDynamicWeightItems ? 'Rest of India Standard Surface' : 'Flat Product Shipping';
   let isCustomPincodeRate = false;
 
-  if (rules.customPincodeRates && cleanPin && rules.customPincodeRates[cleanPin] !== undefined) {
-    baseCharge = rules.customPincodeRates[cleanPin];
-    zoneName = `Custom PIN (${cleanPin})`;
-    zoneDescription = `Special Admin Configured Rate for PIN ${cleanPin}`;
-    isCustomPincodeRate = true;
-  } else if (cleanPin.startsWith('560')) {
-    baseCharge = rules.baseRateLocal;
-    zoneName = 'Local Bengaluru Hub';
-    zoneDescription = 'Local Hub Delivery (Within 24 Hours)';
-  } else if (
-    cleanPin.startsWith('57') || cleanPin.startsWith('58') || // Karnataka
-    (Number(cleanPin.slice(0, 2)) >= 60 && Number(cleanPin.slice(0, 2)) <= 64) || // Tamil Nadu
-    (Number(cleanPin.slice(0, 2)) >= 50 && Number(cleanPin.slice(0, 2)) <= 53) || // Telangana / AP
-    (Number(cleanPin.slice(0, 2)) >= 67 && Number(cleanPin.slice(0, 2)) <= 69)    // Kerala
-  ) {
-    baseCharge = rules.baseRateRegional;
-    zoneName = 'South India Regional';
-    zoneDescription = 'Regional Priority Surface & Air';
-  } else if (
-    cleanPin.startsWith('110') || // Delhi
-    cleanPin.startsWith('400') || // Mumbai
-    cleanPin.startsWith('700') || // Kolkata
-    cleanPin.startsWith('411') || // Pune
-    cleanPin.startsWith('380')    // Ahmedabad
-  ) {
-    baseCharge = rules.baseRateMetro;
-    zoneName = 'Tier-1 Metro Network';
-    zoneDescription = 'Priority Metro Air Dispatch';
-  } else if (
-    cleanPin.startsWith('79') || cleanPin.startsWith('19') || cleanPin.startsWith('18') || cleanPin.startsWith('737')
-  ) {
-    baseCharge = rules.baseRateSpecial;
-    zoneName = 'Remote / Hills / NE Zone';
-    zoneDescription = 'Special Terrain Logistics';
-  } else {
-    baseCharge = rules.baseRateNational;
-    zoneName = 'National Interstate';
-    zoneDescription = 'Standard All-India Express Transport';
+  if (hasDynamicWeightItems) {
+    if (rules.customPincodeRates && cleanPin && rules.customPincodeRates[cleanPin] !== undefined) {
+      baseCharge = rules.customPincodeRates[cleanPin];
+      zoneName = `Custom PIN (${cleanPin})`;
+      zoneDescription = `Special Admin Configured Rate for PIN ${cleanPin}`;
+      isCustomPincodeRate = true;
+    } else if (cleanPin.startsWith('560')) {
+      baseCharge = rules.baseRateLocal;
+      zoneName = 'Local Bengaluru Hub';
+      zoneDescription = 'Local Hub Delivery (Within 24 Hours)';
+    } else if (
+      cleanPin.startsWith('57') || cleanPin.startsWith('58') || // Karnataka
+      (Number(cleanPin.slice(0, 2)) >= 60 && Number(cleanPin.slice(0, 2)) <= 64) || // Tamil Nadu
+      (Number(cleanPin.slice(0, 2)) >= 50 && Number(cleanPin.slice(0, 2)) <= 53) || // Telangana / AP
+      (Number(cleanPin.slice(0, 2)) >= 67 && Number(cleanPin.slice(0, 2)) <= 69)    // Kerala
+    ) {
+      baseCharge = rules.baseRateRegional;
+      zoneName = 'South India Regional';
+      zoneDescription = 'Regional Priority Surface & Air';
+    } else if (
+      cleanPin.startsWith('110') || // Delhi
+      cleanPin.startsWith('400') || // Mumbai
+      cleanPin.startsWith('700') || // Kolkata
+      cleanPin.startsWith('411') || // Pune
+      cleanPin.startsWith('380')    // Ahmedabad
+    ) {
+      baseCharge = rules.baseRateMetro;
+      zoneName = 'Tier-1 Metro Network';
+      zoneDescription = 'Priority Metro Air Dispatch';
+    } else if (
+      cleanPin.startsWith('79') || cleanPin.startsWith('19') || cleanPin.startsWith('18') || cleanPin.startsWith('737')
+    ) {
+      baseCharge = rules.baseRateSpecial;
+      zoneName = 'Remote / Hills / NE Zone';
+      zoneDescription = 'Special Terrain Logistics';
+    } else {
+      baseCharge = rules.baseRateNational;
+      zoneName = 'National Interstate';
+      zoneDescription = 'Standard All-India Express Transport';
+    }
   }
 
   // 5. Incremental Weight Charge
@@ -240,7 +275,7 @@ export function calculateCartDimensionalShipping(
   const stepGrams = rules.additionalWeightStepGrams || 500;
   const stepRate = rules.additionalRatePerStep || 25;
 
-  if (chargeableWeightGrams > baseWeightGrams) {
+  if (hasDynamicWeightItems && chargeableWeightGrams > baseWeightGrams) {
     const extraGrams = chargeableWeightGrams - baseWeightGrams;
     const steps = Math.ceil(extraGrams / stepGrams);
     weightCharge = steps * stepRate;
@@ -249,14 +284,17 @@ export function calculateCartDimensionalShipping(
   // 6. Oversize Dimension Surcharge
   let oversizeCharge = 0;
   const oversizeThreshold = rules.oversizeLengthThresholdCm || 40;
-  if (maxLength > oversizeThreshold || maxWidth > oversizeThreshold || totalHeight > oversizeThreshold) {
+  if (hasDynamicWeightItems && (maxLength > oversizeThreshold || maxWidth > oversizeThreshold || totalHeight > oversizeThreshold)) {
     oversizeCharge = rules.oversizeSurcharge || 30;
   }
 
-  // 7. Free Shipping Check
+  // 7. Free Shipping & Final Total Check
   const freeThreshold = rules.freeShippingThreshold || 499;
-  const isFreeShipping = totalSubtotal >= freeThreshold;
-  const rawTotal = baseCharge + weightCharge + oversizeCharge;
+  const reachesFreeThreshold = totalSubtotal >= freeThreshold;
+  const allItemsFree = cart.length > 0 && nonFreeItemsCount === 0;
+  const isFreeShipping = allItemsFree || reachesFreeThreshold;
+
+  const rawTotal = (hasDynamicWeightItems ? (baseCharge + weightCharge + oversizeCharge) : 0) + fixedCustomShippingTotal;
   const totalShippingFee = isFreeShipping ? 0 : rawTotal;
 
   return {
@@ -336,8 +374,17 @@ export function checkProductDeliverability(
   }
 
   // Calculate Shipping Fee
+  const isExplicitFreeShipping = Boolean(
+    product.isFreeShipping ||
+    product.badges?.some(b => b.toLowerCase().includes('free shipping'))
+  );
+
   let fee = 49; // Standard fallback
-  if (product.pincodeShippingRates && product.pincodeShippingRates[pin] !== undefined) {
+  if (isExplicitFreeShipping) {
+    fee = 0;
+  } else if (typeof product.shippingFee === 'number') {
+    fee = product.shippingFee;
+  } else if (product.pincodeShippingRates && product.pincodeShippingRates[pin] !== undefined) {
     fee = product.pincodeShippingRates[pin];
   } else if (vendor?.pincodeShippingOverrides && vendor.pincodeShippingOverrides[pin] !== undefined) {
     fee = vendor.pincodeShippingOverrides[pin];
@@ -349,7 +396,7 @@ export function checkProductDeliverability(
 
   // Check Free Shipping Threshold
   const freeThreshold = vendor?.freeShippingThreshold || 499;
-  const isFreeDelivery = product.price >= freeThreshold || fee === 0;
+  const isFreeDelivery = isExplicitFreeShipping || product.price >= freeThreshold || fee === 0;
   const finalFee = isFreeDelivery ? 0 : fee;
 
   // Estimate delivery days

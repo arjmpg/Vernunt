@@ -90,6 +90,8 @@ export interface StoreProduct {
   serviceablePincodes?: string[];
   pincodeShippingRates?: Record<string, number>;
   defaultShippingFee?: number;
+  isFreeShipping?: boolean;
+  shippingFee?: number;
 }
 
 export interface CartItem {
