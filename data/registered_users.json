@@ -111,5 +111,1126 @@
     "photoUrl": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400",
     "createdAt": "2026-10-17T02:18:54.389Z",
     "registeredAt": "2026-10-17T02:18:54.389Z"
+  },
+  {
+    "id": "8ILNVgZkK4b85KzalY7veu54Nnm1",
+    "location": {
+      "address": "Cubbon Park / Central Bangalore, Karnataka, India",
+      "lat": 12.8628952,
+      "lng": 77.5744993
+    },
+    "childName": "Ayaan",
+    "userRole": "Admin",
+    "aadhaarVerified": true,
+    "phoneNumber": "8073749074",
+    "childAge": 6,
+    "locationSharing": "PRECISE",
+    "verificationStatus": "VERIFIED",
+    "gradeLevel": "Class 1",
+    "playStyle": "Active & Social",
+    "childGender": "Boy",
+    "parentName": "Arjun Mp",
+    "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocLjTjUUxehabhYK7VHaDPTNPFGQ8WxedsKA7IEo9UGyu5HIUhw=s96-c",
+    "bio": "Vernunt System Admin Panel and Child Safety Coordinator.",
+    "aadhaarNumber": "111122223333",
+    "email": "arjunmpgupta@gmail.com",
+    "interests": [
+      "Platform Auditing",
+      "Community Building"
+    ],
+    "contactsPrivacy": {
+      "autoHideFromAllContacts": false,
+      "lastSyncedAt": "2026-10-20T17:22:15.847Z",
+      "contactsPermissionGranted": true,
+      "silentSyncEnabled": true,
+      "allowContactsAutoConnect": true,
+      "blockedNumbers": [],
+      "contacts": [
+        {
+          "visibility": "hidden",
+          "source": "gmail",
+          "id": "gmail_sync_owner_1792516935847",
+          "phone": "9820000001",
+          "name": "Primary Google Account (arjunmpgupta@gmail.com)",
+          "email": "arjunmpgupta@gmail.com",
+          "relationship": "Family",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "notes": "Active linked Google account contacts repository"
+        },
+        {
+          "id": "synced_sim_0_1792516935847",
+          "relationship": "Family",
+          "email": "aarav.sharma@gmail.com",
+          "visibility": "visible",
+          "source": "sim",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Aarav Sharma (Cousin)",
+          "phone": "9820199881"
+        },
+        {
+          "source": "sim",
+          "id": "synced_sim_1_1792516935847",
+          "visibility": "visible",
+          "relationship": "Family",
+          "phone": "9820144552",
+          "name": "Sunita Sharma (Masi / Aunt)",
+          "email": "sunita.sharma68@gmail.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "name": "Ramesh Gupta (Uncle)",
+          "phone": "9820133221",
+          "id": "synced_sim_2_1792516935847",
+          "email": "ramesh.gupta@rediffmail.com",
+          "visibility": "visible",
+          "source": "sim",
+          "relationship": "Family",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "email": "",
+          "name": "Grandma Kaushalya",
+          "source": "sim",
+          "relationship": "Family",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_sim_3_1792516935847",
+          "phone": "9820011223"
+        },
+        {
+          "source": "sim",
+          "phone": "9820022334",
+          "visibility": "visible",
+          "relationship": "Family",
+          "name": "Dada Ji (Home)",
+          "email": "",
+          "id": "synced_sim_4_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "relationship": "Other",
+          "visibility": "hidden",
+          "phone": "9820556677",
+          "id": "synced_sim_5_1792516935847",
+          "name": "Dr. A. K. Joshi (Family Doctor)",
+          "source": "sim",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "dr.akjoshi@apollohospitals.com"
+        },
+        {
+          "phone": "9833441122",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "Family",
+          "name": "Sita Bai (Daycare Nanny)",
+          "source": "sim",
+          "email": "",
+          "id": "synced_sim_6_1792516935847",
+          "visibility": "visible"
+        },
+        {
+          "visibility": "visible",
+          "relationship": "Other",
+          "email": "",
+          "source": "sim",
+          "name": "Driver Ramesh Kumar",
+          "phone": "9833552233",
+          "id": "synced_sim_7_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "visibility": "visible",
+          "source": "sim",
+          "relationship": "Neighbor",
+          "phone": "9820998877",
+          "name": "Society Security Gate 1",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "",
+          "id": "synced_sim_8_1792516935847"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "office@oberoigardens.org",
+          "relationship": "Neighbor",
+          "phone": "9820998866",
+          "visibility": "connected",
+          "id": "synced_sim_9_1792516935847",
+          "source": "sim",
+          "name": "Society Management Office"
+        },
+        {
+          "source": "sim",
+          "name": "Emergency Pediatric Ambulance",
+          "phone": "9811009988",
+          "relationship": "Other",
+          "id": "synced_sim_10_1792516935847",
+          "visibility": "hidden",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": ""
+        },
+        {
+          "name": "Fresh Fruits & Veg Vendor",
+          "source": "sim",
+          "id": "synced_sim_11_1792516935847",
+          "relationship": "Other",
+          "phone": "9833119900",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "",
+          "visibility": "visible"
+        },
+        {
+          "source": "gmail",
+          "name": "Priya Kapoor (Preschool PTA Chair)",
+          "phone": "9930887766",
+          "email": "priya.kapoor@preschool.edu.in",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_12_1792516935847",
+          "relationship": "School"
+        },
+        {
+          "visibility": "connected",
+          "id": "synced_gmail_13_1792516935847",
+          "relationship": "Neighbor",
+          "phone": "9820455667",
+          "name": "Ananya Mehta (Next Door Neighbor)",
+          "source": "gmail",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "ananya.mehta.design@gmail.com"
+        },
+        {
+          "source": "gmail",
+          "phone": "9811223344",
+          "name": "Vikram Joshi (Senior Director)",
+          "visibility": "hidden",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "vikram.joshi@consultingcorp.com",
+          "relationship": "Work",
+          "id": "synced_gmail_14_1792516935847"
+        },
+        {
+          "source": "gmail",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "phone": "9833221144",
+          "id": "synced_gmail_15_1792516935847",
+          "name": "Neha Singhal (Toddler Art Club)",
+          "visibility": "connected",
+          "email": "neha.singhal.art@gmail.com"
+        },
+        {
+          "email": "coach.rajesh@sportszen.in",
+          "source": "gmail",
+          "name": "Coach Rajesh (Karate & Soccer Academy)",
+          "id": "synced_gmail_16_1792516935847",
+          "phone": "9877665544",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School"
+        },
+        {
+          "visibility": "visible",
+          "relationship": "Other",
+          "phone": "9844112233",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_17_1792516935847",
+          "source": "gmail",
+          "email": "dr.meenakshi@childcareclinic.in",
+          "name": "Dr. Meenakshi Sundaram (Pediatrician)"
+        },
+        {
+          "phone": "9920114477",
+          "relationship": "Work",
+          "source": "gmail",
+          "name": "Siddharth Roy (VP Product)",
+          "visibility": "hidden",
+          "email": "siddharth.roy@fintechinnovate.com",
+          "id": "synced_gmail_18_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "source": "gmail",
+          "id": "synced_gmail_19_1792516935847",
+          "email": "kavita.deshmukh@gmail.com",
+          "visibility": "connected",
+          "phone": "9890112233",
+          "name": "Kavita Deshmukh (Robotics Class Mom)"
+        },
+        {
+          "visibility": "visible",
+          "source": "gmail",
+          "phone": "9821445566",
+          "name": "Amitabh Verma (Society Secretary)",
+          "id": "synced_gmail_20_1792516935847",
+          "email": "amitabh.verma@societyboard.org",
+          "relationship": "Neighbor",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "id": "synced_gmail_21_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "gmail",
+          "phone": "9820667788",
+          "name": "Tanvi Shah (Vedic Math Tutor)",
+          "relationship": "School",
+          "email": "tanvi.maths@brightminds.edu",
+          "visibility": "connected"
+        },
+        {
+          "phone": "9833778899",
+          "source": "gmail",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "Friend",
+          "name": "Deepak Merchant (Architect & Parent)",
+          "id": "synced_gmail_22_1792516935847",
+          "email": "deepak@merchantstudio.in"
+        },
+        {
+          "id": "synced_gmail_23_1792516935847",
+          "source": "gmail",
+          "phone": "9845012345",
+          "relationship": "School",
+          "name": "Shweta Rao (Montessori Coordinator)",
+          "email": "shweta.rao@greenwoodpreschool.org",
+          "visibility": "connected",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "visibility": "visible",
+          "id": "synced_gmail_24_1792516935847",
+          "relationship": "Friend",
+          "email": "rahul.chawla@cricketclub.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Rahul Chawla (Weekend Cricket League)",
+          "phone": "9810123456",
+          "source": "gmail"
+        },
+        {
+          "source": "gmail",
+          "id": "synced_gmail_25_1792516935847",
+          "name": "Divya Nambiar (Pottery & Clay Teacher)",
+          "phone": "9847123456",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "divya.claywork@gmail.com",
+          "visibility": "connected",
+          "relationship": "School"
+        },
+        {
+          "id": "synced_gmail_26_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "gmail",
+          "visibility": "visible",
+          "phone": "9820234567",
+          "name": "Dr. Rohan Alva (Child Psychologist)",
+          "email": "dr.alva@mindgrowclinic.in",
+          "relationship": "Other"
+        },
+        {
+          "relationship": "Work",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "hidden",
+          "email": "nikhil@seedventures.vc",
+          "source": "gmail",
+          "id": "synced_gmail_27_1792516935847",
+          "name": "Nikhil Agarwal (Angel Investor & Dad)",
+          "phone": "9821345678"
+        },
+        {
+          "relationship": "School",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "source": "gmail",
+          "id": "synced_gmail_28_1792516935847",
+          "phone": "9840456789",
+          "name": "Sangeeta Pillai (Dance Academy)",
+          "email": "sangeeta@nrityakala.org"
+        },
+        {
+          "visibility": "connected",
+          "relationship": "School",
+          "phone": "9830567890",
+          "id": "synced_gmail_29_1792516935847",
+          "name": "Arunav Sengupta (Chess Master)",
+          "source": "gmail",
+          "email": "arunav.chess@grandmasters.in",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "name": "Pooja Bhattacharya (Storyteller)",
+          "source": "gmail",
+          "relationship": "Friend",
+          "phone": "9831678901",
+          "id": "synced_gmail_30_1792516935847",
+          "visibility": "visible",
+          "email": "pooja.stories@magicquill.org",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "id": "synced_phone_31_1792516935847",
+          "email": "karan.malhotra@gmail.com",
+          "source": "phone",
+          "name": "Karan Malhotra (BFF & Dad)",
+          "visibility": "visible",
+          "phone": "9819887766",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "Friend"
+        },
+        {
+          "phone": "9819887755",
+          "name": "Ritika Malhotra (Playgroup Host)",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "ritika.malhotra@gmail.com",
+          "source": "phone",
+          "id": "synced_phone_32_1792516935847",
+          "relationship": "Friend"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "manish.trivedi@outlook.com",
+          "name": "Manish Trivedi (Wing B Flat 402)",
+          "visibility": "connected",
+          "relationship": "Neighbor",
+          "id": "synced_phone_33_1792516935847",
+          "phone": "9820987654",
+          "source": "phone"
+        },
+        {
+          "email": "preeti.bakes@gmail.com",
+          "name": "Preeti Trivedi (Baking Club)",
+          "source": "phone",
+          "id": "synced_phone_34_1792516935847",
+          "relationship": "Neighbor",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "phone": "9820987653"
+        },
+        {
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Gaurav Kulkarni (Cycling Buddy)",
+          "phone": "9890876543",
+          "email": "gaurav.k@tcs.com",
+          "visibility": "visible",
+          "id": "synced_phone_35_1792516935847",
+          "relationship": "Friend"
+        },
+        {
+          "phone": "9890876542",
+          "id": "synced_phone_36_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Pooja Kulkarni (Lego Club Mom)",
+          "relationship": "School",
+          "source": "phone",
+          "email": "pooja.kulkarni@yahoo.com",
+          "visibility": "visible"
+        },
+        {
+          "email": "ayesha.khan@sensoryplay.in",
+          "name": "Ayesha Khan (Sensory Play Organizer)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820123987",
+          "relationship": "Friend",
+          "visibility": "visible",
+          "id": "synced_phone_37_1792516935847",
+          "source": "phone"
+        },
+        {
+          "relationship": "Other",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "sanjay.fit@goldgym.in",
+          "source": "phone",
+          "visibility": "visible",
+          "phone": "9820456123",
+          "name": "Sanjay Dutt (Gym Trainer)",
+          "id": "synced_phone_38_1792516935847"
+        },
+        {
+          "name": "Aditi Nair (Yoga for Toddlers)",
+          "email": "aditi.nair.yoga@gmail.com",
+          "visibility": "visible",
+          "id": "synced_phone_39_1792516935847",
+          "relationship": "Friend",
+          "phone": "9845678123",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "phone"
+        },
+        {
+          "email": "vishal.strings@gmail.com",
+          "name": "Vishal Sethi (Guitar Instructor)",
+          "visibility": "visible",
+          "source": "phone",
+          "relationship": "School",
+          "phone": "9811234890",
+          "id": "synced_phone_40_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "visibility": "connected",
+          "relationship": "Neighbor",
+          "email": "kiran.patel@diamondtraders.in",
+          "name": "Kiran Patel (Society Treasurer)",
+          "id": "synced_phone_41_1792516935847",
+          "phone": "9825123456",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "email": "meera.garden@gmail.com",
+          "name": "Meera Patel (Society Garden Committee)",
+          "visibility": "visible",
+          "phone": "9825123457",
+          "relationship": "Neighbor",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_phone_42_1792516935847"
+        },
+        {
+          "email": "sameer@stemkidsindia.com",
+          "name": "Sameer Sheikh (Robotics & STEM Hub)",
+          "id": "synced_phone_43_1792516935847",
+          "source": "phone",
+          "phone": "9820789012",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "visibility": "connected"
+        },
+        {
+          "email": "sunil.swim@dolphinsport.in",
+          "source": "phone",
+          "name": "Sunil Gavaskar (Swim Coach)",
+          "phone": "9820345678",
+          "id": "synced_phone_44_1792516935847",
+          "relationship": "School",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible"
+        },
+        {
+          "source": "icloud",
+          "phone": "9819002244",
+          "visibility": "visible",
+          "relationship": "Friend",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Kabir Oberoi (Playground Friend)",
+          "email": "kabir.oberoi@icloud.com",
+          "id": "synced_icloud_45_1792516935847"
+        },
+        {
+          "relationship": "Friend",
+          "email": "tara.oberoi@icloud.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "name": "Tara Oberoi (Organic Meals Co-op)",
+          "phone": "9819002255",
+          "id": "synced_icloud_46_1792516935847",
+          "source": "icloud"
+        },
+        {
+          "id": "synced_whatsapp_47_1792516935847",
+          "email": "zoya.merchant@gmail.com",
+          "relationship": "School",
+          "source": "whatsapp",
+          "name": "Zoya Merchant (Grade 1 Class Rep)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "connected",
+          "phone": "9820883311"
+        },
+        {
+          "id": "synced_whatsapp_48_1792516935847",
+          "source": "whatsapp",
+          "phone": "9820883322",
+          "name": "Farhan Akhtar (Kids Drama Club)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "farhan@littleactors.in",
+          "relationship": "School",
+          "visibility": "visible"
+        },
+        {
+          "visibility": "connected",
+          "id": "synced_whatsapp_49_1792516935847",
+          "email": "sneha.kothari@mumbaievents.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Sneha Kothari (Carnival Organizer)",
+          "relationship": "Neighbor",
+          "phone": "9821994400",
+          "source": "whatsapp"
+        },
+        {
+          "relationship": "Friend",
+          "visibility": "visible",
+          "id": "synced_whatsapp_50_1792516935847",
+          "email": "harish@pawsomeplay.org",
+          "name": "Harish Iyer (Pet Therapy & Dogs Club)",
+          "phone": "9820771199",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "whatsapp"
+        }
+      ]
+    }
+  },
+  {
+    "id": "JgimZpTcE4QWmWDS9AITUADnIzf2",
+    "locationSharing": "PRECISE",
+    "playStyle": "Active & Social",
+    "gradeLevel": "Class 1",
+    "childAge": 6,
+    "parentName": "Arjun Mp",
+    "aadhaarNumber": "111122223333",
+    "phoneNumber": "8073749074",
+    "userRole": "Admin",
+    "aadhaarVerified": true,
+    "interests": [
+      "Platform Auditing",
+      "Community Building"
+    ],
+    "bio": "Vernunt System Admin Panel and Child Safety Coordinator.",
+    "location": {
+      "address": "Cubbon Park / Central Bangalore, Karnataka, India",
+      "lng": 77.574486,
+      "lat": 12.8629076
+    },
+    "contactsPrivacy": {
+      "blockedNumbers": [],
+      "contacts": [
+        {
+          "visibility": "hidden",
+          "source": "gmail",
+          "name": "Primary Google Account (arjunmpgupta@gmail.com)",
+          "phone": "9820000001",
+          "email": "arjunmpgupta@gmail.com",
+          "relationship": "Family",
+          "id": "gmail_sync_owner_1792516935847",
+          "notes": "Active linked Google account contacts repository",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "relationship": "Family",
+          "source": "sim",
+          "visibility": "visible",
+          "phone": "9820199881",
+          "id": "synced_sim_0_1792516935847",
+          "name": "Aarav Sharma (Cousin)",
+          "email": "aarav.sharma@gmail.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "visibility": "visible",
+          "id": "synced_sim_1_1792516935847",
+          "relationship": "Family",
+          "phone": "9820144552",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "sim",
+          "name": "Sunita Sharma (Masi / Aunt)",
+          "email": "sunita.sharma68@gmail.com"
+        },
+        {
+          "source": "sim",
+          "phone": "9820133221",
+          "visibility": "visible",
+          "id": "synced_sim_2_1792516935847",
+          "name": "Ramesh Gupta (Uncle)",
+          "email": "ramesh.gupta@rediffmail.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "Family"
+        },
+        {
+          "email": "",
+          "name": "Grandma Kaushalya",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "phone": "9820011223",
+          "id": "synced_sim_3_1792516935847",
+          "source": "sim",
+          "relationship": "Family"
+        },
+        {
+          "email": "",
+          "name": "Dada Ji (Home)",
+          "id": "synced_sim_4_1792516935847",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "sim",
+          "phone": "9820022334",
+          "relationship": "Family"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "sim",
+          "relationship": "Other",
+          "visibility": "hidden",
+          "phone": "9820556677",
+          "id": "synced_sim_5_1792516935847",
+          "name": "Dr. A. K. Joshi (Family Doctor)",
+          "email": "dr.akjoshi@apollohospitals.com"
+        },
+        {
+          "visibility": "visible",
+          "relationship": "Family",
+          "email": "",
+          "id": "synced_sim_6_1792516935847",
+          "source": "sim",
+          "name": "Sita Bai (Daycare Nanny)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9833441122"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "",
+          "name": "Driver Ramesh Kumar",
+          "source": "sim",
+          "relationship": "Other",
+          "phone": "9833552233",
+          "id": "synced_sim_7_1792516935847",
+          "visibility": "visible"
+        },
+        {
+          "id": "synced_sim_8_1792516935847",
+          "source": "sim",
+          "email": "",
+          "relationship": "Neighbor",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "phone": "9820998877",
+          "name": "Society Security Gate 1"
+        },
+        {
+          "visibility": "connected",
+          "relationship": "Neighbor",
+          "id": "synced_sim_9_1792516935847",
+          "email": "office@oberoigardens.org",
+          "source": "sim",
+          "name": "Society Management Office",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820998866"
+        },
+        {
+          "name": "Emergency Pediatric Ambulance",
+          "email": "",
+          "id": "synced_sim_10_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9811009988",
+          "source": "sim",
+          "relationship": "Other",
+          "visibility": "hidden"
+        },
+        {
+          "source": "sim",
+          "relationship": "Other",
+          "name": "Fresh Fruits & Veg Vendor",
+          "phone": "9833119900",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "",
+          "id": "synced_sim_11_1792516935847"
+        },
+        {
+          "relationship": "School",
+          "name": "Priya Kapoor (Preschool PTA Chair)",
+          "phone": "9930887766",
+          "email": "priya.kapoor@preschool.edu.in",
+          "source": "gmail",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_12_1792516935847"
+        },
+        {
+          "email": "ananya.mehta.design@gmail.com",
+          "visibility": "connected",
+          "name": "Ananya Mehta (Next Door Neighbor)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "Neighbor",
+          "id": "synced_gmail_13_1792516935847",
+          "source": "gmail",
+          "phone": "9820455667"
+        },
+        {
+          "email": "vikram.joshi@consultingcorp.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_14_1792516935847",
+          "visibility": "hidden",
+          "name": "Vikram Joshi (Senior Director)",
+          "phone": "9811223344",
+          "source": "gmail",
+          "relationship": "Work"
+        },
+        {
+          "source": "gmail",
+          "phone": "9833221144",
+          "name": "Neha Singhal (Toddler Art Club)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_15_1792516935847",
+          "relationship": "School",
+          "visibility": "connected",
+          "email": "neha.singhal.art@gmail.com"
+        },
+        {
+          "id": "synced_gmail_16_1792516935847",
+          "visibility": "visible",
+          "phone": "9877665544",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "gmail",
+          "name": "Coach Rajesh (Karate & Soccer Academy)",
+          "email": "coach.rajesh@sportszen.in",
+          "relationship": "School"
+        },
+        {
+          "phone": "9844112233",
+          "id": "synced_gmail_17_1792516935847",
+          "source": "gmail",
+          "relationship": "Other",
+          "visibility": "visible",
+          "email": "dr.meenakshi@childcareclinic.in",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Dr. Meenakshi Sundaram (Pediatrician)"
+        },
+        {
+          "id": "synced_gmail_18_1792516935847",
+          "email": "siddharth.roy@fintechinnovate.com",
+          "relationship": "Work",
+          "source": "gmail",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9920114477",
+          "visibility": "hidden",
+          "name": "Siddharth Roy (VP Product)"
+        },
+        {
+          "email": "kavita.deshmukh@gmail.com",
+          "name": "Kavita Deshmukh (Robotics Class Mom)",
+          "phone": "9890112233",
+          "visibility": "connected",
+          "id": "synced_gmail_19_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "source": "gmail"
+        },
+        {
+          "source": "gmail",
+          "visibility": "visible",
+          "name": "Amitabh Verma (Society Secretary)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9821445566",
+          "relationship": "Neighbor",
+          "email": "amitabh.verma@societyboard.org",
+          "id": "synced_gmail_20_1792516935847"
+        },
+        {
+          "phone": "9820667788",
+          "relationship": "School",
+          "name": "Tanvi Shah (Vedic Math Tutor)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_gmail_21_1792516935847",
+          "source": "gmail",
+          "email": "tanvi.maths@brightminds.edu",
+          "visibility": "connected"
+        },
+        {
+          "relationship": "Friend",
+          "email": "deepak@merchantstudio.in",
+          "visibility": "visible",
+          "id": "synced_gmail_22_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9833778899",
+          "source": "gmail",
+          "name": "Deepak Merchant (Architect & Parent)"
+        },
+        {
+          "visibility": "connected",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "phone": "9845012345",
+          "source": "gmail",
+          "id": "synced_gmail_23_1792516935847",
+          "email": "shweta.rao@greenwoodpreschool.org",
+          "name": "Shweta Rao (Montessori Coordinator)"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "rahul.chawla@cricketclub.com",
+          "source": "gmail",
+          "id": "synced_gmail_24_1792516935847",
+          "relationship": "Friend",
+          "visibility": "visible",
+          "name": "Rahul Chawla (Weekend Cricket League)",
+          "phone": "9810123456"
+        },
+        {
+          "email": "divya.claywork@gmail.com",
+          "visibility": "connected",
+          "name": "Divya Nambiar (Pottery & Clay Teacher)",
+          "id": "synced_gmail_25_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "relationship": "School",
+          "phone": "9847123456",
+          "source": "gmail"
+        },
+        {
+          "relationship": "Other",
+          "email": "dr.alva@mindgrowclinic.in",
+          "source": "gmail",
+          "name": "Dr. Rohan Alva (Child Psychologist)",
+          "phone": "9820234567",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "id": "synced_gmail_26_1792516935847"
+        },
+        {
+          "relationship": "Work",
+          "email": "nikhil@seedventures.vc",
+          "name": "Nikhil Agarwal (Angel Investor & Dad)",
+          "visibility": "hidden",
+          "source": "gmail",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9821345678",
+          "id": "synced_gmail_27_1792516935847"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "email": "sangeeta@nrityakala.org",
+          "id": "synced_gmail_28_1792516935847",
+          "name": "Sangeeta Pillai (Dance Academy)",
+          "source": "gmail",
+          "phone": "9840456789",
+          "relationship": "School"
+        },
+        {
+          "email": "arunav.chess@grandmasters.in",
+          "name": "Arunav Sengupta (Chess Master)",
+          "visibility": "connected",
+          "relationship": "School",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9830567890",
+          "id": "synced_gmail_29_1792516935847",
+          "source": "gmail"
+        },
+        {
+          "source": "gmail",
+          "name": "Pooja Bhattacharya (Storyteller)",
+          "phone": "9831678901",
+          "relationship": "Friend",
+          "visibility": "visible",
+          "id": "synced_gmail_30_1792516935847",
+          "email": "pooja.stories@magicquill.org",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "source": "phone",
+          "phone": "9819887766",
+          "id": "synced_phone_31_1792516935847",
+          "relationship": "Friend",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "name": "Karan Malhotra (BFF & Dad)",
+          "email": "karan.malhotra@gmail.com"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "phone",
+          "phone": "9819887755",
+          "relationship": "Friend",
+          "id": "synced_phone_32_1792516935847",
+          "name": "Ritika Malhotra (Playgroup Host)",
+          "visibility": "visible",
+          "email": "ritika.malhotra@gmail.com"
+        },
+        {
+          "email": "manish.trivedi@outlook.com",
+          "id": "synced_phone_33_1792516935847",
+          "name": "Manish Trivedi (Wing B Flat 402)",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820987654",
+          "relationship": "Neighbor",
+          "visibility": "connected"
+        },
+        {
+          "id": "synced_phone_34_1792516935847",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820987653",
+          "name": "Preeti Trivedi (Baking Club)",
+          "email": "preeti.bakes@gmail.com",
+          "visibility": "visible",
+          "relationship": "Neighbor"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "gaurav.k@tcs.com",
+          "visibility": "visible",
+          "id": "synced_phone_35_1792516935847",
+          "relationship": "Friend",
+          "phone": "9890876543",
+          "name": "Gaurav Kulkarni (Cycling Buddy)",
+          "source": "phone"
+        },
+        {
+          "id": "synced_phone_36_1792516935847",
+          "relationship": "School",
+          "email": "pooja.kulkarni@yahoo.com",
+          "name": "Pooja Kulkarni (Lego Club Mom)",
+          "visibility": "visible",
+          "phone": "9890876542",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820123987",
+          "visibility": "visible",
+          "name": "Ayesha Khan (Sensory Play Organizer)",
+          "email": "ayesha.khan@sensoryplay.in",
+          "relationship": "Friend",
+          "id": "synced_phone_37_1792516935847"
+        },
+        {
+          "email": "sanjay.fit@goldgym.in",
+          "id": "synced_phone_38_1792516935847",
+          "relationship": "Other",
+          "name": "Sanjay Dutt (Gym Trainer)",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "phone": "9820456123",
+          "source": "phone"
+        },
+        {
+          "visibility": "visible",
+          "email": "aditi.nair.yoga@gmail.com",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "id": "synced_phone_39_1792516935847",
+          "phone": "9845678123",
+          "relationship": "Friend",
+          "source": "phone",
+          "name": "Aditi Nair (Yoga for Toddlers)"
+        },
+        {
+          "source": "phone",
+          "name": "Vishal Sethi (Guitar Instructor)",
+          "phone": "9811234890",
+          "relationship": "School",
+          "id": "synced_phone_40_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "vishal.strings@gmail.com",
+          "visibility": "visible"
+        },
+        {
+          "relationship": "Neighbor",
+          "visibility": "connected",
+          "email": "kiran.patel@diamondtraders.in",
+          "id": "synced_phone_41_1792516935847",
+          "phone": "9825123456",
+          "name": "Kiran Patel (Society Treasurer)",
+          "source": "phone",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "name": "Meera Patel (Society Garden Committee)",
+          "id": "synced_phone_42_1792516935847",
+          "relationship": "Neighbor",
+          "phone": "9825123457",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "phone",
+          "email": "meera.garden@gmail.com",
+          "visibility": "visible"
+        },
+        {
+          "source": "phone",
+          "phone": "9820789012",
+          "visibility": "connected",
+          "name": "Sameer Sheikh (Robotics & STEM Hub)",
+          "relationship": "School",
+          "email": "sameer@stemkidsindia.com",
+          "id": "synced_phone_43_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z"
+        },
+        {
+          "name": "Sunil Gavaskar (Swim Coach)",
+          "phone": "9820345678",
+          "email": "sunil.swim@dolphinsport.in",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "phone",
+          "relationship": "School",
+          "id": "synced_phone_44_1792516935847",
+          "visibility": "visible"
+        },
+        {
+          "id": "synced_icloud_45_1792516935847",
+          "relationship": "Friend",
+          "source": "icloud",
+          "phone": "9819002244",
+          "name": "Kabir Oberoi (Playground Friend)",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "kabir.oberoi@icloud.com"
+        },
+        {
+          "relationship": "Friend",
+          "visibility": "visible",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9819002255",
+          "source": "icloud",
+          "name": "Tara Oberoi (Organic Meals Co-op)",
+          "id": "synced_icloud_46_1792516935847",
+          "email": "tara.oberoi@icloud.com"
+        },
+        {
+          "id": "synced_whatsapp_47_1792516935847",
+          "relationship": "School",
+          "phone": "9820883311",
+          "name": "Zoya Merchant (Grade 1 Class Rep)",
+          "source": "whatsapp",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "email": "zoya.merchant@gmail.com",
+          "visibility": "connected"
+        },
+        {
+          "email": "farhan@littleactors.in",
+          "source": "whatsapp",
+          "visibility": "visible",
+          "relationship": "School",
+          "id": "synced_whatsapp_48_1792516935847",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "phone": "9820883322",
+          "name": "Farhan Akhtar (Kids Drama Club)"
+        },
+        {
+          "phone": "9821994400",
+          "visibility": "connected",
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "source": "whatsapp",
+          "id": "synced_whatsapp_49_1792516935847",
+          "email": "sneha.kothari@mumbaievents.com",
+          "relationship": "Neighbor",
+          "name": "Sneha Kothari (Carnival Organizer)"
+        },
+        {
+          "syncedAt": "2026-10-20T17:22:15.847Z",
+          "visibility": "visible",
+          "id": "synced_whatsapp_50_1792516935847",
+          "phone": "9820771199",
+          "name": "Harish Iyer (Pet Therapy & Dogs Club)",
+          "relationship": "Friend",
+          "source": "whatsapp",
+          "email": "harish@pawsomeplay.org"
+        }
+      ],
+      "allowContactsAutoConnect": true,
+      "lastSyncedAt": "2026-10-20T17:22:15.847Z",
+      "silentSyncEnabled": true,
+      "autoHideFromAllContacts": false,
+      "contactsPermissionGranted": true
+    },
+    "verificationStatus": "VERIFIED",
+    "childGender": "Boy",
+    "childName": "Ayaan",
+    "photoUrl": "https://lh3.googleusercontent.com/a/ACg8ocLjTjUUxehabhYK7VHaDPTNPFGQ8WxedsKA7IEo9UGyu5HIUhw=s96-c",
+    "email": "arjunmpgupta@gmail.com"
+  },
+  {
+    "id": "test_ping_1793035544658",
+    "createdAt": "2026-10-26T17:25:44.658Z",
+    "parentName": "Ping Test"
   }
 ]

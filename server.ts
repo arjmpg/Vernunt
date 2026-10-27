@@ -11,6 +11,8 @@ import { registerMarketplaceRoutes } from "./server/marketplaceService.ts";
 import { registerEmailRoutes, sendEmailMessage } from "./server/emailService.ts";
 import { registerBackupRoutes } from "./server/backupService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
+import { initializeApp as initializeClientApp, getApps as getClientApps } from "firebase/app";
+import { initializeFirestore as initializeClientFirestore, collection as clientCollection, getDocs as clientGetDocs, doc as clientDoc, setDoc as clientSetDoc } from "firebase/firestore";
 
 // 100% FREE OFFLINE/LOCAL ARCHITECTURE: Zero external API calls, zero billed tokens.
 // Playdates, Daycare, KYC matching, and Multilingual Voice assistance run completely on-device/locally.
@@ -577,6 +579,52 @@ async function startServer() {
     return defaultPendingUsers;
   }
 
+  // Server-side Firestore client for permanent cloud persistence across container rebuilds/git pushes
+  let serverFirestoreDb: any = null;
+  function getServerFirestore() {
+    if (serverFirestoreDb) return serverFirestoreDb;
+    try {
+      const configPath = path.join(process.cwd(), "firebase-applet-config.json");
+      if (fs.existsSync(configPath)) {
+        const config = JSON.parse(fs.readFileSync(configPath, "utf-8"));
+        const existingApp = getClientApps().find((a: any) => a.name === "vernunt_server_sync");
+        const serverApp = existingApp || initializeClientApp(config, "vernunt_server_sync");
+        serverFirestoreDb = initializeClientFirestore(serverApp, {}, config.firestoreDatabaseId);
+      }
+    } catch (e) {
+      console.warn("[Server Firestore] Lazy init note:", e);
+    }
+    return serverFirestoreDb;
+  }
+
+  async function syncUsersFromFirestore(): Promise<any[]> {
+    try {
+      const dbInstance = getServerFirestore();
+      if (!dbInstance) return [];
+      const snap = await clientGetDocs(clientCollection(dbInstance, "users"));
+      const firestoreUsers: any[] = [];
+      snap.forEach((d: any) => {
+        firestoreUsers.push({ id: d.id, ...d.data() });
+      });
+      return firestoreUsers;
+    } catch (err: any) {
+      console.warn("[Users Sync] Note syncing from Firestore:", err?.message || err);
+      return [];
+    }
+  }
+
+  async function persistUserToFirestore(user: any): Promise<void> {
+    try {
+      if (!user || !user.id) return;
+      const dbInstance = getServerFirestore();
+      if (!dbInstance) return;
+      await clientSetDoc(clientDoc(dbInstance, "users", user.id), user, { merge: true });
+      console.log(`[Users Cloud Sync] User '${user.id}' saved permanently to Firestore cloud.`);
+    } catch (err: any) {
+      console.warn(`[Users Cloud Sync] Error saving user '${user?.id}' to Firestore:`, err?.message || err);
+    }
+  }
+
   function saveRegisteredUsers(users: any[]) {
     try {
       fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
@@ -585,17 +633,44 @@ async function startServer() {
     }
   }
 
-  // API Endpoints for Users & KYC Submissions
-  app.get("/api/users", (req, res) => {
+  // Pre-seed and background sync Firestore users on server boot
+  setTimeout(async () => {
     try {
-      const users = loadRegisteredUsers();
-      res.json({ success: true, users });
+      const fsUsers = await syncUsersFromFirestore();
+      if (fsUsers.length > 0) {
+        const local = loadRegisteredUsers();
+        const map = new Map<string, any>();
+        local.forEach((u: any) => { if (u?.id) map.set(u.id, u); });
+        fsUsers.forEach((u: any) => { if (u?.id) map.set(u.id, { ...(map.get(u.id) || {}), ...u }); });
+        saveRegisteredUsers(Array.from(map.values()));
+        console.log(`[Users Startup Sync] Successfully synchronized ${fsUsers.length} live users from Firestore into server cache.`);
+      }
+    } catch (bootSyncErr) {
+      console.debug("[Users Startup Sync] Boot note:", bootSyncErr);
+    }
+  }, 2000);
+
+  // API Endpoints for Users & KYC Submissions
+  app.get("/api/users", async (req, res) => {
+    try {
+      const localUsers = loadRegisteredUsers();
+      const firestoreUsers = await syncUsersFromFirestore();
+      
+      const map = new Map<string, any>();
+      localUsers.forEach((u: any) => { if (u?.id) map.set(u.id, u); });
+      firestoreUsers.forEach((u: any) => { if (u?.id) map.set(u.id, { ...(map.get(u.id) || {}), ...u }); });
+      
+      const merged = Array.from(map.values());
+      if (firestoreUsers.length > 0) {
+        saveRegisteredUsers(merged);
+      }
+      res.json({ success: true, users: merged });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.post("/api/users/register", (req, res) => {
+  app.post("/api/users/register", async (req, res) => {
     try {
       const profile = req.body;
       if (!profile || !profile.id) {
@@ -603,20 +678,25 @@ async function startServer() {
       }
       const users = loadRegisteredUsers();
       const existingIdx = users.findIndex(u => u.id === profile.id);
+      let savedUser: any;
       if (existingIdx >= 0) {
-        users[existingIdx] = { ...users[existingIdx], ...profile, updatedAt: new Date().toISOString() };
+        savedUser = { ...users[existingIdx], ...profile, updatedAt: new Date().toISOString() };
+        users[existingIdx] = savedUser;
       } else {
-        users.unshift({ ...profile, registeredAt: profile.registeredAt || new Date().toISOString() });
+        savedUser = { ...profile, registeredAt: profile.registeredAt || new Date().toISOString() };
+        users.unshift(savedUser);
       }
       saveRegisteredUsers(users);
+      // Persist permanently to Firestore cloud database so GitHub redeploy never erases it
+      await persistUserToFirestore(savedUser);
       console.log(`[Users Engine] Registered user '${profile.parentName || profile.id}' saved successfully. Total users: ${users.length}`);
-      res.json({ success: true, user: profile });
+      res.json({ success: true, user: savedUser });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }
   });
 
-  app.post("/api/users/kyc-submit", (req, res) => {
+  app.post("/api/users/kyc-submit", async (req, res) => {
     try {
       const { userId, ...kycData } = req.body || {};
       if (!userId) {
@@ -649,6 +729,8 @@ async function startServer() {
         users.unshift(updatedUser);
       }
       saveRegisteredUsers(users);
+      // Persist permanently to Firestore cloud database
+      await persistUserToFirestore(updatedUser);
       console.log(`[KYC Engine] KYC submission recorded for user '${userId}'. Total users: ${users.length}`);
       res.json({ success: true, user: updatedUser });
     } catch (err: any) {
@@ -656,7 +738,7 @@ async function startServer() {
     }
   });
 
-  app.post("/api/users/kyc-review", (req, res) => {
+  app.post("/api/users/kyc-review", async (req, res) => {
     try {
       const { userId, verificationStatus, aadhaarVerified, adminNotes } = req.body || {};
       if (!userId) {
@@ -681,6 +763,8 @@ async function startServer() {
       if (adminNotes) user.adminNotes = adminNotes;
       user.updatedAt = now;
       saveRegisteredUsers(users);
+      // Persist permanently to Firestore cloud database
+      await persistUserToFirestore(user);
       console.log(`[KYC Engine] Admin updated KYC for '${user.parentName}' to '${user.verificationStatus}'`);
       res.json({ success: true, user });
     } catch (err: any) {

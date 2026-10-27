@@ -44,6 +44,10 @@ export const AdminVisualCmsDesk: React.FC = () => {
   const [newBlockButtonLink, setNewBlockButtonLink] = useState<string>('');
   const [toast, setToast] = useState<string | null>(null);
 
+  const [toolbarEnabled, setToolbarEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('vernunt_admin_visual_toolbar_hidden') === 'false';
+  });
+
   useEffect(() => {
     const handleUpdate = () => {
       setBlocks(getAllVisualBlocks());
@@ -63,6 +67,17 @@ export const AdminVisualCmsDesk: React.FC = () => {
     setVisualEditModeActive(next);
     setIsEditMode(next);
     showToastMsg(next ? '✓ Visual Edit Mode is now active across all frontend pages!' : 'Preview mode enabled.');
+  };
+
+  const handleToggleToolbar = () => {
+    const next = !toolbarEnabled;
+    setToolbarEnabled(next);
+    localStorage.setItem('vernunt_admin_visual_toolbar_hidden', next ? 'false' : 'true');
+    if (next) {
+      localStorage.removeItem('vernunt_admin_visual_toolbar_dismissed');
+    }
+    window.dispatchEvent(new CustomEvent('vernunt_admin_toolbar_toggle', { detail: { hidden: !next } }));
+    showToastMsg(next ? '✓ Floating Admin Toolbar enabled on frontend pages.' : '✓ Floating Admin Toolbar is now hidden.');
   };
 
   const handleDelete = (blockId: string, pageId: string) => {
@@ -161,6 +176,16 @@ export const AdminVisualCmsDesk: React.FC = () => {
           >
             <Plus className="w-4 h-4" />
             <span>Add Block to Page</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleToggleToolbar}
+            className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer border border-white/20 shadow-xs"
+            title="Toggle floating Admin CMS toolbar visibility on frontend pages"
+          >
+            {toolbarEnabled ? <EyeOff className="w-4 h-4 text-amber-300" /> : <Eye className="w-4 h-4 text-slate-300" />}
+            <span>{toolbarEnabled ? 'Hide Floating Toolbar' : 'Show Floating Toolbar'}</span>
           </button>
         </div>
       </div>

@@ -27,22 +27,24 @@ const TabLoadingFallback = () => (
   </div>
 );
 
-const PlaydatePlanner = React.lazy(() => import('./components/PlaydatePlanner.tsx'));
-const EventsTab = React.lazy(() => import('./components/EventsTab.tsx'));
-const SpecialistsTab = React.lazy(() => import('./components/SpecialistsTab.tsx'));
-const BusinessDashboard = React.lazy(() => import('./components/BusinessDashboard.tsx'));
-const AdminDashboard = React.lazy(() => import('./components/AdminDashboard.tsx'));
-const PortfoliosTab = React.lazy(() => import('./components/PortfoliosTab.tsx'));
-const ReferralPortal = React.lazy(() => import('./components/ReferralPortal.tsx'));
-const BillingPortal = React.lazy(() => import('./components/BillingPortal.tsx'));
-const KnowledgeHub = React.lazy(() => import('./components/KnowledgeHub.tsx').then(m => ({ default: m.KnowledgeHub })));
-const AffiliateDashboard = React.lazy(() => import('./components/events/AffiliateDashboard.tsx'));
-const DaycareSittingTab = React.lazy(() => import('./components/DaycareSittingTab.tsx'));
-const VernuntStore = React.lazy(() => import('./components/store/VernuntStore.tsx').then(m => ({ default: m.VernuntStore })));
-const VendorDashboard = React.lazy(() => import('./components/vendor/VendorDashboard.tsx').then(m => ({ default: m.VendorDashboard })));
-const HostDashboard = React.lazy(() => import('./components/host/HostDashboard.tsx').then(m => ({ default: m.HostDashboard })));
-const HelpCenterAndSopDesk = React.lazy(() => import('./components/help/HelpCenterAndSopDesk.tsx').then(m => ({ default: m.HelpCenterAndSopDesk })));
-const BangaloreParksHub = React.lazy(() => import('./components/parks/BangaloreParksHub.tsx'));
+import { lazyWithRetry } from './utils/lazyWithRetry.ts';
+
+const PlaydatePlanner = lazyWithRetry(() => import('./components/PlaydatePlanner.tsx'));
+const EventsTab = lazyWithRetry(() => import('./components/EventsTab.tsx'));
+const SpecialistsTab = lazyWithRetry(() => import('./components/SpecialistsTab.tsx'));
+const BusinessDashboard = lazyWithRetry(() => import('./components/BusinessDashboard.tsx'));
+const AdminDashboard = lazyWithRetry(() => import('./components/AdminDashboard.tsx'));
+const PortfoliosTab = lazyWithRetry(() => import('./components/PortfoliosTab.tsx'));
+const ReferralPortal = lazyWithRetry(() => import('./components/ReferralPortal.tsx'));
+const BillingPortal = lazyWithRetry(() => import('./components/BillingPortal.tsx'));
+const KnowledgeHub = lazyWithRetry(() => import('./components/KnowledgeHub.tsx').then(m => ({ default: m.KnowledgeHub })));
+const AffiliateDashboard = lazyWithRetry(() => import('./components/events/AffiliateDashboard.tsx'));
+const DaycareSittingTab = lazyWithRetry(() => import('./components/DaycareSittingTab.tsx'));
+const VernuntStore = lazyWithRetry(() => import('./components/store/VernuntStore.tsx').then(m => ({ default: m.VernuntStore })));
+const VendorDashboard = lazyWithRetry(() => import('./components/vendor/VendorDashboard.tsx').then(m => ({ default: m.VendorDashboard })));
+const HostDashboard = lazyWithRetry(() => import('./components/host/HostDashboard.tsx').then(m => ({ default: m.HostDashboard })));
+const HelpCenterAndSopDesk = lazyWithRetry(() => import('./components/help/HelpCenterAndSopDesk.tsx').then(m => ({ default: m.HelpCenterAndSopDesk })));
+const BangaloreParksHub = lazyWithRetry(() => import('./components/parks/BangaloreParksHub.tsx'));
 import { PortalAuthModal, PortalType } from './components/auth/PortalAuthModal.tsx';
 import GlobalUniversalSearch from './components/GlobalUniversalSearch.tsx';
 
@@ -6048,8 +6050,8 @@ export default function App() {
         </nav>
       )}
 
-      {/* Admin Visual Frontend CMS & In-Place Page Editor (Available ONLY to authorized administrators) */}
-      {isSuperAdmin && (
+      {/* Admin Visual Frontend CMS & In-Place Page Editor (Available ONLY to authorized administrators, and NEVER inside admin dashboard itself) */}
+      {isSuperAdmin && activeTab !== 'admin' && (
         <Suspense fallback={null}>
           <AdminVisualPageEditor 
             currentPageId={activeTab || 'home'} 

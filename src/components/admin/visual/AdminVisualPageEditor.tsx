@@ -28,7 +28,13 @@ export function AdminVisualPageEditor({
   onNavigateTab
 }: AdminVisualPageEditorProps) {
   const [isEditMode, setIsEditMode] = useState<boolean>(() => isVisualEditModeActive());
-  const [isBarExpanded, setIsBarExpanded] = useState<boolean>(true);
+  const [isBarHidden, setIsBarHidden] = useState<boolean>(() => {
+    // Default to hidden so it never blocks background content or modals
+    return localStorage.getItem('vernunt_admin_visual_toolbar_hidden') !== 'false';
+  });
+  const [isDismissedCompletely, setIsDismissedCompletely] = useState<boolean>(() => {
+    return localStorage.getItem('vernunt_admin_visual_toolbar_dismissed') === 'true';
+  });
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
   const [exportData, setExportData] = useState<string>('');
@@ -49,8 +55,20 @@ export function AdminVisualPageEditor({
     const handleCmsChange = () => {
       setIsEditMode(isVisualEditModeActive());
     };
+    const handleToolbarToggle = (e: any) => {
+      if (typeof e.detail?.hidden === 'boolean') {
+        setIsBarHidden(e.detail.hidden);
+        if (!e.detail.hidden) {
+          setIsDismissedCompletely(false);
+        }
+      }
+    };
     window.addEventListener('vernunt_visual_cms_change', handleCmsChange);
-    return () => window.removeEventListener('vernunt_visual_cms_change', handleCmsChange);
+    window.addEventListener('vernunt_admin_toolbar_toggle', handleToolbarToggle);
+    return () => {
+      window.removeEventListener('vernunt_visual_cms_change', handleCmsChange);
+      window.removeEventListener('vernunt_admin_toolbar_toggle', handleToolbarToggle);
+    };
   }, []);
 
   const showToast = (msg: string) => {
@@ -105,8 +123,8 @@ export function AdminVisualPageEditor({
     showToast(`✓ New ${newBlockType.toUpperCase()} block added to ${currentPageId}!`);
   };
 
-  // Only render if verified system administrator
-  if (!isAdmin) {
+  // Only render if verified system administrator, and never inside admin dashboard or if dismissed
+  if (!isAdmin || currentPageId === 'admin' || isDismissedCompletely) {
     return null;
   }
 
@@ -120,76 +138,119 @@ export function AdminVisualPageEditor({
         </div>
       )}
 
-      {/* Floating Admin Toolbar */}
-      <div 
-        id="vernunt-admin-visual-toolbar"
-        className="fixed bottom-4 right-4 z-[99998] font-sans transition-all duration-300"
-      >
-        <div className="bg-slate-950/90 backdrop-blur-md text-white border-2 border-amber-500/80 rounded-3xl shadow-2xl p-2 sm:p-2.5 flex items-center gap-2">
-          
-          {/* Admin Badge */}
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/20 text-amber-300 rounded-2xl border border-amber-500/30">
-            <ShieldCheck className="w-4 h-4 text-amber-400" />
-            <span className="text-xs font-extrabold tracking-wide uppercase">Admin CMS</span>
-          </div>
-
-          {/* Current Page Tag */}
-          <div className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-white/10 rounded-xl text-xs font-mono text-slate-200">
-            <span>Page:</span>
-            <span className="text-amber-400 font-bold">{currentPageId}</span>
-          </div>
-
-          {/* Toggle Edit Mode Switch */}
-          <button
-            type="button"
-            onClick={toggleEditMode}
-            className={`px-3 py-1.5 rounded-2xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs ${
-              isEditMode
-                ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse'
-                : 'bg-white/15 hover:bg-white/25 text-white'
-            }`}
-            title="Toggle Live Visual Edit Mode on all pages"
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>{isEditMode ? 'Edit Mode: ON' : 'Edit Mode: OFF'}</span>
-          </button>
-
-          {/* Add Block Button */}
-          <button
-            type="button"
-            onClick={() => setShowAddModal(true)}
-            className="p-2 sm:px-3 sm:py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow-xs"
-            title="Add a custom visual block to this page"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Add Block</span>
-          </button>
-
-          {/* Reset Page Overrides */}
-          <button
-            type="button"
-            onClick={handleResetPage}
-            className="p-2 sm:px-3 sm:py-1.5 bg-rose-600/30 hover:bg-rose-600/60 text-rose-300 hover:text-white rounded-2xl text-xs font-bold flex items-center gap-1 transition cursor-pointer"
-            title="Reset this page's visual changes to factory defaults"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Reset</span>
-          </button>
-
-          {/* Backup / Export */}
+      {/* Floating Admin Toolbar or Minimal Unobtrusive Chip */}
+      {isBarHidden ? (
+        <div className="fixed bottom-24 right-3 z-30 flex items-center gap-1 group">
           <button
             type="button"
             onClick={() => {
-              setExportData(exportVisualCmsJson());
-              setShowExportModal(true);
+              setIsBarHidden(false);
+              localStorage.setItem('vernunt_admin_visual_toolbar_hidden', 'false');
             }}
-            className="p-2 text-slate-400 hover:text-white rounded-xl hover:bg-white/10 transition cursor-pointer"
-            title="Export or Import CMS Config"
+            className="px-2.5 py-1 bg-slate-900/85 hover:bg-slate-900 text-amber-300 text-[10px] font-bold rounded-full border border-amber-500/30 shadow-lg backdrop-blur-xs opacity-60 group-hover:opacity-100 transition-all flex items-center gap-1 cursor-pointer"
+            title="Open Admin Visual CMS toolbar"
           >
-            <Download className="w-4 h-4" />
+            <ShieldCheck className="w-3 h-3 text-amber-400" />
+            <span>CMS</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsDismissedCompletely(true);
+              localStorage.setItem('vernunt_admin_visual_toolbar_dismissed', 'true');
+              showToast('Admin CMS badge hidden completely.');
+            }}
+            className="p-1 text-slate-400 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            title="Hide completely"
+          >
+            <X className="w-3 h-3" />
           </button>
         </div>
-      </div>
+      ) : (
+        <div 
+          id="vernunt-admin-visual-toolbar"
+          className="fixed bottom-4 right-3 sm:right-4 z-30 max-w-[calc(100vw-24px)] font-sans transition-all duration-300"
+        >
+          <div className="bg-slate-950/95 backdrop-blur-md text-white border-2 border-amber-500/80 rounded-2xl sm:rounded-3xl shadow-2xl p-1.5 sm:p-2.5 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar">
+            
+            {/* Admin Badge */}
+            <div className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 text-amber-300 rounded-xl border border-amber-500/30 shrink-0">
+              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+              <span className="text-[11px] font-extrabold tracking-wide uppercase">Admin CMS</span>
+            </div>
+
+            {/* Current Page Tag */}
+            <div className="hidden md:flex items-center gap-1 px-2 py-1 bg-white/10 rounded-xl text-[11px] font-mono text-slate-200 shrink-0">
+              <span>Page:</span>
+              <span className="text-amber-400 font-bold">{currentPageId}</span>
+            </div>
+
+            {/* Toggle Edit Mode Switch */}
+            <button
+              type="button"
+              onClick={toggleEditMode}
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs shrink-0 ${
+                isEditMode
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 animate-pulse'
+                  : 'bg-white/15 hover:bg-white/25 text-white'
+              }`}
+              title="Toggle Live Visual Edit Mode on all pages"
+            >
+              <Edit3 className="w-3 h-3" />
+              <span>{isEditMode ? 'Edit Mode: ON' : 'Edit Mode: OFF'}</span>
+            </button>
+
+            {/* Add Block Button */}
+            <button
+              type="button"
+              onClick={() => setShowAddModal(true)}
+              className="p-1.5 sm:px-2.5 sm:py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shadow-xs shrink-0"
+              title="Add a custom visual block to this page"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Add Block</span>
+            </button>
+
+            {/* Reset Page Overrides */}
+            <button
+              type="button"
+              onClick={handleResetPage}
+              className="p-1.5 sm:px-2.5 sm:py-1 bg-rose-600/30 hover:bg-rose-600/60 text-rose-300 hover:text-white rounded-xl text-[11px] font-bold flex items-center gap-1 transition cursor-pointer shrink-0"
+              title="Reset this page's visual changes to factory defaults"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Reset</span>
+            </button>
+
+            {/* Backup / Export */}
+            <button
+              type="button"
+              onClick={() => {
+                setExportData(exportVisualCmsJson());
+                setShowExportModal(true);
+              }}
+              className="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/10 transition cursor-pointer shrink-0"
+              title="Export or Import CMS Config"
+            >
+              <Download className="w-3.5 h-3.5" />
+            </button>
+
+            {/* Close / Hide Toolbar */}
+            <button
+              type="button"
+              onClick={() => {
+                setIsBarHidden(true);
+                localStorage.setItem('vernunt_admin_visual_toolbar_hidden', 'true');
+                showToast('Admin CMS toolbar hidden. Click [CMS] chip anytime to reopen.');
+              }}
+              className="p-1.5 ml-1 text-slate-400 hover:text-rose-400 hover:bg-white/10 rounded-lg transition cursor-pointer shrink-0"
+              title="Hide Admin CMS toolbar"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Modal: Add Custom Block to Page */}
       {showAddModal && (
