@@ -341,7 +341,7 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
                     </h5>
                   </div>
                   <p className="text-xs text-slate-600">
-                    Vernunt Technologies Private Limited &bull; Indiranagar, Bengaluru, Karnataka 560038
+                    Vernunt Ventures Pvt. Ltd. &bull; Indiranagar, Bengaluru, Karnataka 560038
                   </p>
                   <p className="text-[11px] text-slate-500">
                     Compliant with DPDP Act 2023, MeitY Guidelines, and DigiLocker Govt of India ID Verification.

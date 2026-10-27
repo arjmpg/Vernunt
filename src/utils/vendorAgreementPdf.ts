@@ -47,7 +47,7 @@ export async function generateVendorAgreementPdfDoc(data: VendorAgreementData): 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(14);
     doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-    doc.text('VERNUNT TECHNOLOGIES PRIVATE LIMITED', margin, 16);
+    doc.text('VERNUNT VENTURES PRIVATE LIMITED', margin, 16);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
@@ -125,7 +125,7 @@ export async function generateVendorAgreementPdfDoc(data: VendorAgreementData): 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8.5);
   doc.setTextColor(textDark[0], textDark[1], textDark[2]);
-  const preamble = `This Marketplace Vendor Agreement ("Agreement") is legally executed on ${formattedDate} at ${formattedTime} IST by and between VERNUNT TECHNOLOGIES PRIVATE LIMITED (hereinafter referred to as "Vernunt", "Platform", or "Company") AND the registered business entity whose particulars are set out below (hereinafter referred to as the "Seller", "Vendor", or "Merchant").`;
+  const preamble = `This Marketplace Vendor Agreement ("Agreement") is legally executed on ${formattedDate} at ${formattedTime} IST by and between VERNUNT VENTURES PRIVATE LIMITED (hereinafter referred to as "Vernunt", "Platform", or "Company") AND the registered business entity whose particulars are set out below (hereinafter referred to as the "Seller", "Vendor", or "Merchant").`;
   const splitPreamble = doc.splitTextToSize(preamble, contentWidth);
   doc.text(splitPreamble, margin, y);
   y += splitPreamble.length * 4.2 + 3;
@@ -375,7 +375,7 @@ export async function generateVendorAgreementPdfDoc(data: VendorAgreementData): 
   doc.text(`Hash: ${(data.acceptanceHash || 'VRN-HASH-849201948').slice(0, 30)}...`, col1X + 5, sigY + 51);
   doc.text(`Terms: 10% Commission • Returns Accepted`, col1X + 5, sigY + 56);
 
-  // Right Column: Vernunt Technologies Pvt Ltd
+  // Right Column: Vernunt Ventures Pvt Ltd
   doc.setFillColor(255, 255, 255);
   doc.setDrawColor(borderColor[0], borderColor[1], borderColor[2]);
   doc.roundedRect(col2X, sigY, colW, 64, 2, 2, 'FD');
@@ -383,7 +383,7 @@ export async function generateVendorAgreementPdfDoc(data: VendorAgreementData): 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(brandRed[0], brandRed[1], brandRed[2]);
-  doc.text('FOR VERNUNT TECHNOLOGIES PVT LTD:', col2X + 3, sigY + 6);
+  doc.text('FOR VERNUNT VENTURES PVT LTD:', col2X + 3, sigY + 6);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -391,7 +391,7 @@ export async function generateVendorAgreementPdfDoc(data: VendorAgreementData): 
   doc.text('Operating Entity:', col2X + 3, sigY + 12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.text('Vernunt Technologies Private Limited', col2X + 3, sigY + 16);
+  doc.text('Vernunt Ventures Private Limited', col2X + 3, sigY + 16);
 
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(textMuted[0], textMuted[1], textMuted[2]);

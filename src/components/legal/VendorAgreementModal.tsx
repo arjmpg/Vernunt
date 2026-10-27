@@ -310,7 +310,7 @@ export const VendorAgreementModal: React.FC<VendorAgreementModalProps> = ({
                 </div>
                 <div className="space-y-2.5 text-xs text-slate-700 leading-relaxed">
                   <p>
-                    <strong>1.1 Statutory Covenant:</strong> The Seller irrevocably agrees and covenants to pay Vernunt Technologies Private Limited a non-negotiable platform fee of <strong>10.0% (ten percent)</strong> computed on the gross Selling Price of each developmental toy, book, kit, or childcare essential listed and sold through the Vernunt Marketplace platform.
+                    <strong>1.1 Statutory Covenant:</strong> The Seller irrevocably agrees and covenants to pay Vernunt Ventures Pvt. Ltd. a non-negotiable platform fee of <strong>10.0% (ten percent)</strong> computed on the gross Selling Price of each developmental toy, book, kit, or childcare essential listed and sold through the Vernunt Marketplace platform.
                   </p>
                   <p>
                     <strong>1.2 Automated Escrow Deduction:</strong> The 10% platform fee is automatically deducted at the time of transaction settlement by the Vernunt escrow engine. The remaining 90% (net of any applicable logistics fees or statutory TCS/TDS) is credited to the Seller's registered bank account.
@@ -415,7 +415,7 @@ export const VendorAgreementModal: React.FC<VendorAgreementModalProps> = ({
                 FULL TEXT: VERNUNT MARKETPLACE MERCHANT SERVICE &amp; SELLER AGREEMENT
               </h4>
               <p>
-                This Agreement is between <strong>Vernunt Technologies Private Limited</strong>, having its registered office in Indiranagar, Bengaluru 560038, Karnataka ("Vernunt") AND the registered Seller specified below ("Merchant").
+                This Agreement is between <strong>Vernunt Ventures Pvt. Ltd.</strong>, having its registered office in Indiranagar, Bengaluru 560038, Karnataka ("Vernunt") AND the registered Seller specified below ("Merchant").
               </p>
               <p>
                 <strong>1. Non-Exclusive Listing:</strong> Vernunt grants the Merchant a non-exclusive license to list and sell approved child-centric products on the Vernunt Marketplace platform.

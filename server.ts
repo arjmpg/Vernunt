@@ -4066,7 +4066,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       console.log(`[Vendor Agreement Engine] 📄 Dispatching Signed Agreement PDF to ${targetEmail} for Ref: ${refId}`);
 
       const subject = `📄 Official Signed Seller Agreement: Vernunt Marketplace [${refId}]`;
-      const emailBodyText = `Dear ${targetName},\n\nCongratulations and welcome to Vernunt Multi-Vendor Marketplace!\n\nYour Marketplace Vendor Agreement has been digitally executed and archived.\n\nAgreement Summary:\n- Agreement Reference: ${refId}\n- Store / Business Name: ${targetStore}\n- Authorized Signatory: ${targetName}\n- Platform Facilitation Commission: ${rate} on Product Selling Price\n- Customer Return Policy: ${returns}\n- BIS Child Safety & IS 9873: 100% Non-Toxic Compliance\n- Execution Timestamp: ${dateStr}\n- Cryptographic Verification Hash: ${acceptanceHash || 'VRN-SEC-VALID'}\n- Jurisdiction: Courts of Bengaluru, Karnataka, India\n\nA copy of your signed legal agreement PDF is attached to this email and securely stored in your Vernunt Merchant Dashboard.\n\nThank you for partnering with us to build India's safest kids ecosystem!\n- Legal & Compliance Desk, Vernunt Technologies Private Limited`;
+      const emailBodyText = `Dear ${targetName},\n\nCongratulations and welcome to Vernunt Multi-Vendor Marketplace!\n\nYour Marketplace Vendor Agreement has been digitally executed and archived.\n\nAgreement Summary:\n- Agreement Reference: ${refId}\n- Store / Business Name: ${targetStore}\n- Authorized Signatory: ${targetName}\n- Platform Facilitation Commission: ${rate} on Product Selling Price\n- Customer Return Policy: ${returns}\n- BIS Child Safety & IS 9873: 100% Non-Toxic Compliance\n- Execution Timestamp: ${dateStr}\n- Cryptographic Verification Hash: ${acceptanceHash || 'VRN-SEC-VALID'}\n- Jurisdiction: Courts of Bengaluru, Karnataka, India\n\nA copy of your signed legal agreement PDF is attached to this email and securely stored in your Vernunt Merchant Dashboard.\n\nThank you for partnering with us to build India's safest kids ecosystem!\n- Legal & Compliance Desk, Vernunt Ventures Private Limited`;
 
       const emailHtml = `
         <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:620px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;box-shadow:0 4px 20px rgba(0,0,0,0.06);">
@@ -4119,7 +4119,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
             </div>
 
             <p style="font-size:12.5px;color:#64748b;margin-bottom:0;">
-              Vernunt Technologies Private Limited &bull; Indiranagar, Bengaluru 560038, Karnataka<br>
+              Vernunt Ventures Private Limited &bull; Indiranagar, Bengaluru 560038, Karnataka<br>
               Direct Legal Support: <a href="mailto:legal@vernunt.com" style="color:#be123c;">legal@vernunt.com</a>
             </p>
           </div>
@@ -4599,7 +4599,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       contentHtml: `
         <div class="alert-box">
           <h4>STATUTORY INTERMEDIARY SAFE HARBOR (IT ACT SEC 79)</h4>
-          <p>VERNUNT TECHNOLOGIES PRIVATE LIMITED operates strictly as an <strong>Intermediary Platform</strong> under Section 79 of the Information Technology Act, 2000 (India). All playmates, daycares, groups, activities, and merchant listings are third-party user-generated discovery services provided strictly "AS IS" and "AS AVAILABLE".</p>
+          <p>VERNUNT VENTURES PRIVATE LIMITED operates strictly as an <strong>Intermediary Platform</strong> under Section 79 of the Information Technology Act, 2000 (India). All playmates, daycares, groups, activities, and merchant listings are third-party user-generated discovery services provided strictly "AS IS" and "AS AVAILABLE".</p>
         </div>
         <h3>1. Mandatory Parental Custody &amp; Zero Platform Supervision</h3>
         <p>Vernunt is a digital connection technology and DOES NOT provide daycare supervision, guardianship, child transportation, or background guarantee. Parents and legal guardians retain 100% legal custody, duty of care, and physical oversight of their children at all times.</p>
@@ -4679,7 +4679,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       contentHtml: `
         <div class="alert-box">
           <h4>APPOINTED STATUTORY GRIEVANCE OFFICER</h4>
-          <p>Nodal Grievance Redressal Officer, Vernunt Technologies Pvt Ltd<br/>
+          <p>Nodal Grievance Redressal Officer, Vernunt Ventures Pvt. Ltd.<br/>
           Corporate Address: Indiranagar 100ft Road, Bengaluru, Karnataka 560038, India<br/>
           Official Email: <strong>grievance@vernunt.com</strong> &bull; <strong>legal@vernunt.com</strong></p>
         </div>
@@ -4756,7 +4756,7 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
     "url": "${canonicalUrl}",
     "publisher": {
       "@type": "Organization",
-      "name": "Vernunt Technologies Private Limited",
+      "name": "Vernunt Ventures Private Limited",
       "url": "https://app.vernunt.com"
     }
   }

@@ -4978,7 +4978,7 @@ export default function App() {
           <div className="border-t border-slate-200/90 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-slate-500">
             <div className="text-center md:text-left space-y-1">
               <p className="font-medium text-slate-600">
-                &copy; {new Date().getFullYear()} <strong className="text-slate-900">Vernunt Technologies</strong> (vernunt.com &bull; app.vernunt.com). All Rights Reserved.
+                &copy; {new Date().getFullYear()} <strong className="text-slate-900">Vernunt Ventures Pvt. Ltd.</strong> (vernunt.com &bull; app.vernunt.com). All Rights Reserved.
               </p>
               <p className="text-[11px] text-slate-400">
                 India's Verified Kids Playmate Radar &amp; Childcare Network. Protected by Indian copyright &amp; trademark laws.

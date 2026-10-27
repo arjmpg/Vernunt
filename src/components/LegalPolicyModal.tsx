@@ -283,7 +283,7 @@ export default function LegalPolicyModal({
                   <span>Statutory Intermediary Safe Harbor &bull; Section 79 Information Technology Act, 2000</span>
                 </div>
                 <p className="text-xs text-amber-950 leading-relaxed">
-                  <strong>VERNUNT TECHNOLOGIES PRIVATE LIMITED</strong> ("Vernunt", "Platform", "We", "Us") operates strictly as an <strong>Intermediary Telecommunications &amp; Software Platform</strong> under Section 79 of the Information Technology Act, 2000 (India) and the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. Vernunt provides a peer-to-peer digital discovery technology connecting independent parents, activity organizers, daycare operators, and merchant vendors.
+                  <strong>VERNUNT VENTURES PRIVATE LIMITED</strong> ("Vernunt", "Platform", "We", "Us") operates strictly as an <strong>Intermediary Telecommunications &amp; Software Platform</strong> under Section 79 of the Information Technology Act, 2000 (India) and the Information Technology (Intermediary Guidelines and Digital Media Ethics Code) Rules, 2021. Vernunt provides a peer-to-peer digital discovery technology connecting independent parents, activity organizers, daycare operators, and merchant vendors.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1 text-[11.5px]">
                   <div className="bg-white/80 p-3 rounded-xl border border-amber-200 space-y-1">
@@ -308,7 +308,7 @@ export default function LegalPolicyModal({
                 <div>
                   <h4 className="font-extrabold text-slate-900 text-sm font-serif">2. Absolute Release &amp; Limitation of Liability</h4>
                   <p className="mt-1">
-                    To the maximum extent permissible under applicable law, in no event shall Vernunt Technologies Pvt Ltd, its founders, directors, officers, employees, affiliates, investors, or licensors be liable for any direct, indirect, punitive, incidental, special, consequential, or exemplary damages, including but not limited to damages for personal injury, pain and suffering, emotional distress, loss of child supervision, illness, accident, loss of profits, goodwill, data, or other intangible losses arising from:
+                    To the maximum extent permissible under applicable law, in no event shall Vernunt Ventures Pvt. Ltd., its founders, directors, officers, employees, affiliates, investors, or licensors be liable for any direct, indirect, punitive, incidental, special, consequential, or exemplary damages, including but not limited to damages for personal injury, pain and suffering, emotional distress, loss of child supervision, illness, accident, loss of profits, goodwill, data, or other intangible losses arising from:
                   </p>
                   <ul className="list-disc list-inside space-y-1.5 pl-2 mt-2 text-slate-600">
                     <li>Any in-person interactions, meetings, playdates, neighborhood groups, rides, or travel arranged via the platform.</li>
@@ -695,7 +695,7 @@ export default function LegalPolicyModal({
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3">
                 <h4 className="font-bold text-slate-900 text-sm">Designated Grievance &amp; Compliance Officer</h4>
                 <div className="space-y-1.5 text-xs text-slate-700">
-                  <p><strong>Name / Designation:</strong> Nodal Grievance Redressal Officer, Vernunt Technologies Pvt Ltd</p>
+                  <p><strong>Name / Designation:</strong> Nodal Grievance Redressal Officer, Vernunt Ventures Pvt. Ltd.</p>
                   <p><strong>Corporate Address:</strong> Indiranagar 100ft Road, Bengaluru, Karnataka 560038, India</p>
                   <p><strong>Customer Care Support:</strong> <a href="mailto:support@vernunt.com" className="text-rose-600 font-bold underline">support@vernunt.com</a></p>
                   <p><strong>Grievance Redressal Contact:</strong> <a href="mailto:grievance@vernunt.com" className="text-indigo-600 font-bold underline">grievance@vernunt.com</a> &bull; <a href="mailto:legal@vernunt.com" className="text-indigo-600 font-bold underline">legal@vernunt.com</a></p>

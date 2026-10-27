@@ -70,7 +70,7 @@ export const StoreInvoiceModal: React.FC<StoreInvoiceModalProps> = ({ order, onC
                 </div>
               </div>
               <div className="mt-2 text-[11px] text-slate-600 space-y-0.5">
-                <p className="font-semibold text-slate-800">Vernunt Technologies Pvt. Ltd.</p>
+                <p className="font-semibold text-slate-800">Vernunt Ventures Pvt. Ltd.</p>
                 <p>Ground Floor, HSR Layout, Sector 2, Bengaluru, Karnataka 560102</p>
                 <p><strong className="text-slate-700">GSTIN:</strong> 29AAACV2026R1ZM | <strong className="text-slate-700">CIN:</strong> U72900KA2026PTC198234</p>
                 <p><strong className="text-slate-700">Support:</strong> support@vernunt.com | WhatsApp: +91 8073749074</p>
@@ -237,7 +237,7 @@ export const StoreInvoiceModal: React.FC<StoreInvoiceModalProps> = ({ order, onC
               <span>This is a computer generated tax invoice and does not require physical signature.</span>
             </div>
             <div className="text-right">
-              <p className="font-bold text-slate-700">For Vernunt Technologies Pvt. Ltd.</p>
+              <p className="font-bold text-slate-700">For Vernunt Ventures Pvt. Ltd.</p>
               <p className="italic text-slate-400">Authorized Signatory</p>
             </div>
           </div>

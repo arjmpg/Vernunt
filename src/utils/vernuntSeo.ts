@@ -397,7 +397,7 @@ export function generateVernuntJsonLd(meta: SeoPageMetadata): string {
       '@type': 'Organization',
       '@id': `${baseUrl}/#organization`,
       name: 'Vernunt',
-      alternateName: ['vernunt.com', 'app.vernunt.com', 'Vernunt Technologies'],
+      alternateName: ['vernunt.com', 'app.vernunt.com', 'Vernunt Ventures', 'Vernunt Ventures Pvt Ltd'],
       url: baseUrl,
       logo: {
         '@type': 'ImageObject',

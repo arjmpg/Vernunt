@@ -321,7 +321,7 @@ export const ContactUsModal: React.FC<ContactUsModalProps> = ({
                   <p className="text-xs text-slate-600">Karnataka Technology & Child Safety Hub</p>
                 </div>
                 <p className="text-xs text-slate-700 font-medium leading-relaxed bg-white p-2 rounded-xl border border-slate-200">
-                  Vernunt Kids Connect Technologies Pvt. Ltd., 100 Feet Road, Indiranagar, Bengaluru, Karnataka 560038
+                  Vernunt Ventures Pvt. Ltd., 100 Feet Road, Indiranagar, Bengaluru, Karnataka 560038
                 </p>
               </div>
               <div className="pt-2 border-t border-slate-200 flex items-center gap-1.5 text-[10px] text-emerald-700 font-bold">

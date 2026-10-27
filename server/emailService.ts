@@ -250,7 +250,7 @@ function buildVernuntEmailTemplate(options: {
     <div class="footer">
       <p><strong>Vernunt Safety &amp; Trust Assurance</strong></p>
       <p>${options.footerNote || 'This email was dispatched via Vernunt Firebase Child Safety &amp; Notification Engine. Never share sensitive OTPs or security codes.'}</p>
-      <p>© ${new Date().getFullYear()} Vernunt Technologies Pvt Ltd • Bangalore, India • <a href="https://app.vernunt.com">app.vernunt.com</a></p>
+      <p>© ${new Date().getFullYear()} Vernunt Ventures Pvt. Ltd. • Bangalore, India • <a href="https://app.vernunt.com">app.vernunt.com</a></p>
     </div>
   </div>
 </body>
@@ -376,7 +376,7 @@ export function buildPaymentReceiptHtml(order: any, details?: any): string {
     </div>
 
     <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;font-size:12px;color:#475569;margin-top:16px;">
-      <strong>🏢 Issued By:</strong> Vernunt Technologies Private Limited, Sector 2, HSR Layout, Bengaluru, Karnataka 560102.<br>
+      <strong>🏢 Issued By:</strong> Vernunt Ventures Pvt. Ltd., Sector 2, HSR Layout, Bengaluru, Karnataka 560102.<br>
       <em>Note: This is a system-generated electronic tax invoice and proof of receipt under the Indian Goods and Services Tax Act, 2017.</em>
     </div>
   `;
