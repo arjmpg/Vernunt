@@ -78,7 +78,7 @@ export function SyncStatusBadge({ onClick, isOffline }: { onClick: () => void; i
         type="button"
         onClick={onClick}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-900 border border-blue-200 hover:bg-blue-100 transition shadow-2xs cursor-pointer"
-        title="Syncing outbox to Firebase Cloud..."
+        title="Syncing outbox to Vernuntbase Cloud..."
       >
         <RefreshCw className="w-3.5 h-3.5 text-blue-700 animate-spin" />
         <span className="font-mono">Syncing {pending.length}...</span>
@@ -108,7 +108,7 @@ export function SyncStatusBadge({ onClick, isOffline }: { onClick: () => void; i
         type="button"
         onClick={onClick}
         className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-orange-900 border border-orange-200 hover:bg-orange-100 transition shadow-2xs cursor-pointer"
-        title={`${pending.length} action(s) queued for Firebase cloud sync`}
+        title={`${pending.length} action(s) queued for Vernuntbase cloud sync`}
       >
         <Cloud className="w-3.5 h-3.5 text-orange-600" />
         <span className="font-mono">{pending.length} Outbox</span>
@@ -122,7 +122,7 @@ export function SyncStatusBadge({ onClick, isOffline }: { onClick: () => void; i
       type="button"
       onClick={onClick}
       className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition shadow-2xs cursor-pointer"
-      title="All messages, requests & updates synced to Firebase"
+      title="All messages, requests & updates synced to Vernuntbase"
     >
       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
       <span>Cloud Synced</span>
@@ -157,11 +157,11 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
     try {
       const res = await triggerBackgroundSync(true);
       if (res.successCount > 0) {
-        setSyncFeedback(`Successfully pushed ${res.successCount} action(s) to Firebase!`);
+        setSyncFeedback(`Successfully pushed ${res.successCount} action(s) to Vernuntbase!`);
       } else if (res.failedCount > 0) {
         setSyncFeedback(`Sync completed with ${res.failedCount} retry item(s).`);
       } else {
-        setSyncFeedback('Outbox is already fully up to date with Firebase Cloud!');
+        setSyncFeedback('Outbox is already fully up to date with Vernuntbase Cloud!');
       }
     } catch (err: any) {
       setSyncFeedback(`Sync note: ${err?.message || 'Check network connection'}`);
@@ -173,11 +173,11 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
 
   const handleRetryAllFailed = async () => {
     setIsManualSyncing(true);
-    setSyncFeedback('Auto-retrying all failed Firebase write operations...');
+    setSyncFeedback('Auto-retrying all failed Vernuntbase write operations...');
     try {
       const res = await retryAllFailedOutboxItems();
       if (res.successCount > 0) {
-        setSyncFeedback(`Successfully retried and pushed ${res.successCount} action(s) to Firebase!`);
+        setSyncFeedback(`Successfully retried and pushed ${res.successCount} action(s) to Vernuntbase!`);
       } else {
         setSyncFeedback(`Retry finished: ${res.failedCount} item(s) pending or queued.`);
       }
@@ -221,7 +221,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
       case 'synced':
         return (
           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-mono">
-            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Synced to Firebase
+            <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Synced to Vernuntbase
           </span>
         );
       case 'syncing':
@@ -269,7 +269,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
                 </span>
               </h3>
               <p className="text-[11px] text-slate-300">
-                {isOffline ? 'Offline mode active • Local queue enabled' : 'Connected to Firebase Cloud'}
+                {isOffline ? 'Offline mode active • Local queue enabled' : 'Connected to Vernuntbase Cloud'}
               </p>
             </div>
           </div>
@@ -301,7 +301,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
               <>
                 <Wifi className="w-4 h-4 text-emerald-700 shrink-0" />
                 <span className="font-medium">
-                  <strong>Online</strong>: Changes push automatically to Firebase in real-time.
+                  <strong>Online</strong>: Changes push automatically to Vernuntbase in real-time.
                 </span>
               </>
             )}
@@ -326,7 +326,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
           </div>
 
           <p className="text-[11px] text-slate-600 leading-relaxed">
-            Automatically retries failed Firebase write operations when network connectivity is regained, even if the tab was minimized.
+            Automatically retries failed Vernuntbase write operations when network connectivity is regained, even if the tab was minimized.
           </p>
 
           <div className="flex items-center justify-between pt-1 gap-2 flex-wrap">
@@ -392,7 +392,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
               </div>
               <h4 className="font-serif font-bold text-slate-800 text-sm">Sync Outbox is Empty</h4>
               <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                All connection requests, chat messages, and care bookings are fully synced and persisted to Firebase Firestore.
+                All connection requests, chat messages, and care bookings are fully synced and persisted to Vernuntbase Firestore.
               </p>
             </div>
           ) : (
@@ -468,7 +468,7 @@ export default function SyncOutboxDrawer({ isOpen, onClose, isOffline }: SyncOut
               className="flex-1 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white text-xs font-black rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs disabled:cursor-not-allowed"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isManualSyncing ? 'animate-spin' : ''}`} />
-              <span>{isManualSyncing ? 'Pushing to Firebase...' : 'Force Sync Outbox Now'}</span>
+              <span>{isManualSyncing ? 'Pushing to Vernuntbase...' : 'Force Sync Outbox Now'}</span>
             </button>
 
             {syncedCount > 0 && (

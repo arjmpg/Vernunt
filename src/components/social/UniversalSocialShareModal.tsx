@@ -21,8 +21,8 @@ export const PLATFORM_SHAREABLE_LINKS: ShareableItem[] = [
   // Platform Pages
   {
     id: 'home',
-    title: 'Vernunt - Verified Neighborhood Kids & Playmates',
-    description: "India's verified neighborhood kids playmate radar, safe childcare network, and verified parent community.",
+    title: 'Vernunt - Find Play Time Partners & Kids Products',
+    description: 'Find verified play time partners for your children and shop safe, non-toxic kids products and Montessori toys on Vernunt.',
     path: '/home',
     url: 'https://app.vernunt.com/home',
     category: 'Platform Pages',

@@ -252,7 +252,7 @@ export default function PushNotificationModal({
                 {isLoading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    Connecting to Firebase Cloud Messaging...
+                    Connecting to Vernuntbase Cloud Messaging...
                   </>
                 ) : (
                   <>
@@ -420,7 +420,7 @@ export default function PushNotificationModal({
         <div className="p-4 border-t border-slate-100 bg-slate-50 rounded-b-3xl flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs text-slate-500">
             <Shield className="w-3.5 h-3.5 text-emerald-600" />
-            End-to-End Encrypted via Firebase Cloud Messaging
+            End-to-End Encrypted via Vernuntbase Cloud Messaging
           </div>
           <button
             onClick={onClose}

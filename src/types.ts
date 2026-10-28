@@ -1230,6 +1230,8 @@ export interface SocialShareRecord {
 
 export type BangaloreParkZone = 'Central' | 'South' | 'North' | 'East' | 'West' | 'Outer / Greater';
 
+export type ParkSpaceCategory = 'all' | 'parks_playgrounds' | 'community_centers' | 'indoor_paid';
+
 export interface BangalorePark {
   id: string;
   name: string;
@@ -1240,6 +1242,9 @@ export interface BangalorePark {
   pincode: string;
   lat: number;
   lng: number;
+  category?: 'parks_playgrounds' | 'community_centers' | 'indoor_paid';
+  playTip?: string;
+  googlePlaceId?: string;
   areaAcres?: number;
   timings: string;
   entryFee: string;

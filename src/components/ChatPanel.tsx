@@ -384,10 +384,10 @@ export default function ChatPanel({
                   }`}
                   title={
                     !syncStatus.isOnline
-                      ? 'Offline Mode: Messages are saved securely in local device database (IndexedDB) and will auto-sync with Firebase upon reconnection.'
+                      ? 'Offline Mode: Messages are saved securely in local device database (IndexedDB) and will auto-sync with Vernuntbase upon reconnection.'
                       : syncStatus.pendingCount > 0
-                      ? `${syncStatus.pendingCount} message(s) stored locally pending Firebase cloud sync.`
-                      : 'Local database active & fully synchronized with Firebase.'
+                      ? `${syncStatus.pendingCount} message(s) stored locally pending Vernuntbase cloud sync.`
+                      : 'Local database active & fully synchronized with Vernuntbase.'
                   }
                 >
                   <div className="flex items-center gap-1">

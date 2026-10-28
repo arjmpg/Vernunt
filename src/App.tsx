@@ -666,7 +666,7 @@ export default function App() {
 
     // Auto-complete Firebase Passwordless Email Link authentication if user opened link from inbox
     checkAndCompleteEmailLinkSignIn((user) => {
-      triggerToast(`✓ Welcome back! Signed in securely via Firebase email link (${user.email || 'Parent'}).`, "Email Verified");
+      triggerToast(`✓ Welcome back! Signed in securely via Vernuntbase email link (${user.email || 'Parent'}).`, "Email Verified");
     });
 
     return () => {
@@ -4715,79 +4715,6 @@ export default function App() {
               <VernuntLogo size="sm" />
               <span className="text-[11px] font-bold text-slate-500 hidden sm:inline">&bull; India's Child-Safe Community</span>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleOpenShare()}
-                className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Share current page URL"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Share App / Link</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Universal Social Share & Community Spread Bar */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-4 shadow-md border border-indigo-900/50">
-            <div className="flex items-center gap-3.5 text-center md:text-left">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-xl shrink-0 border border-white/10">
-                <Share2 className="w-5 h-5 text-indigo-300" />
-              </div>
-              <div>
-                <h4 className="font-bold text-sm text-white flex items-center gap-2 justify-center md:justify-start">
-                  <span>Spread Safe Play with Vernunt</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">Shareable URLs</span>
-                </h4>
-                <p className="text-xs text-indigo-200/80">
-                  Share verified playdates, growth guides, or legal policies with parents &amp; school groups
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleOpenShare()}
-                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition cursor-pointer"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>Share Page</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const url = typeof window !== 'undefined' ? window.location.href : 'https://app.vernunt.com';
-                  if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(url);
-                  }
-                  alert('Link copied to clipboard! 📋\n' + url);
-                }}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-white/10"
-              >
-                <Copy className="w-3.5 h-3.5" />
-                <span>Copy URL</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOpenShare('home')}
-                className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition cursor-pointer"
-                title="Share via WhatsApp"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span>WhatsApp</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveShareItem(null);
-                  setShowSocialShareModal(true);
-                }}
-                className="px-3 py-2 bg-white/10 hover:bg-white/20 text-indigo-200 hover:text-white rounded-xl text-xs font-bold transition cursor-pointer border border-white/10"
-              >
-                <span>Browse All Links ({PLATFORM_SHAREABLE_LINKS.length})</span>
-              </button>
-            </div>
           </div>
 
           {/* Structured 4-Column Navigation & Info Grid */}
@@ -4818,72 +4745,42 @@ export default function App() {
               </div>
 
               <div className="pt-1.5 flex flex-col items-start gap-2">
-                <div className="flex items-center justify-between w-full">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAboutUsModal(true);
-                      window.history.pushState({}, '', '/about');
-                    }}
-                    className="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
-                  >
-                    <Users className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>Meet Our Leadership Team</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('about')}
-                    title="Share Leadership Team link"
-                    className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAboutUsModal(true);
+                    window.history.pushState({}, '', '/about');
+                  }}
+                  className="text-xs font-bold text-indigo-700 hover:text-indigo-900 hover:underline inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Users className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>Meet Our Leadership Team</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
 
-                <div className="flex items-center justify-between w-full">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setActiveTab('about');
-                      window.history.pushState({}, '', '/about');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
-                    className="text-xs font-medium text-slate-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
-                  >
-                    <span>About Vernunt &amp; Our Story</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('about')}
-                    title="Share About link"
-                    className="p-1 text-slate-400 hover:text-indigo-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('about');
+                    window.history.pushState({}, '', '/about');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="text-xs font-medium text-slate-600 hover:text-indigo-700 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                >
+                  <span>About Vernunt &amp; Our Story</span>
+                </button>
 
-                <div className="flex items-center justify-between w-full">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowChildComplianceModal(true);
-                      window.history.pushState({}, '', '/safety');
-                    }}
-                    className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer pt-0.5"
-                  >
-                    <span>Safety &amp; Compliance Standards</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('child-safety')}
-                    title="Share Safety Standards link"
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChildComplianceModal(true);
+                    window.history.pushState({}, '', '/safety');
+                  }}
+                  className="text-xs font-bold text-rose-700 hover:text-rose-800 hover:underline inline-flex items-center gap-1 cursor-pointer pt-0.5"
+                >
+                  <span>Safety &amp; Compliance Standards</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
               </div>
             </div>
 
@@ -4893,7 +4790,7 @@ export default function App() {
                 Platform Features
               </h4>
               <ul className="space-y-2.5 text-xs">
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -4907,16 +4804,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🎯</span>
                     <span>Playmate Radar (Nearby Match)</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('radar')}
-                    title="Share Playmate Radar link"
-                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -4930,16 +4819,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🌳</span>
                     <span>Bangalore Parks &amp; Play</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('parks')}
-                    title="Share Bangalore Parks link"
-                    className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -4952,16 +4833,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-orange-50 text-orange-600 flex items-center justify-center text-xs shrink-0">🎉</span>
                     <span>Events, Workshops &amp; Camps</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('events')}
-                    title="Share Events link"
-                    className="p-1 text-slate-400 hover:text-orange-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -4974,16 +4847,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🌸</span>
                     <span>Vernunt Groups &amp; Neighborhood Pods</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('groups')}
-                    title="Share Groups link"
-                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -4996,16 +4861,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-[#6D3FE8]/10 text-[#6D3FE8] flex items-center justify-center text-xs shrink-0">🛍️</span>
                     <span>Vernunt Store &amp; Play Gear</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('store')}
-                    title="Share Store link"
-                    className="p-1 text-slate-400 hover:text-[#6D3FE8] rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5020,16 +4877,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">📚</span>
                     <span>1,000+ Child Growth Guides</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('knowledge')}
-                    title="Share Knowledge Guides link"
-                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     id="btn-footer-vendor-portal"
@@ -5039,16 +4888,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">🏪</span>
                     <span>Product Vendor Registration &amp; Login</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('vendor')}
-                    title="Share Vendor Portal link"
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     id="btn-footer-host-portal"
@@ -5057,14 +4898,6 @@ export default function App() {
                   >
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-600 flex items-center justify-center text-xs shrink-0">🎪</span>
                     <span>Event, Classes &amp; Host Registration</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('host')}
-                    title="Share Host Portal link"
-                    className="p-1 text-slate-400 hover:text-amber-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
                   </button>
                 </li>
               </ul>
@@ -5076,7 +4909,7 @@ export default function App() {
                 Trust &amp; Governance
               </h4>
               <ul className="space-y-2.5 text-xs">
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5088,16 +4921,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs shrink-0">🛡️</span>
                     <span>COPPA &amp; DPDP Safety Protocols</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('child-safety')}
-                    title="Share COPPA Protocols link"
-                    className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5109,16 +4934,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center text-xs shrink-0">🔒</span>
                     <span>Contacts Privacy &amp; Ghost Mode</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('contacts-privacy')}
-                    title="Share Contacts Privacy link"
-                    className="p-1 text-slate-400 hover:text-slate-900 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     id="btn-footer-tac-toggle"
@@ -5132,16 +4949,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">📄</span>
                     <span>Terms &amp; Conditions (Safe Harbor)</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('terms')}
-                    title="Share Terms & Conditions link"
-                    className="p-1 text-slate-400 hover:text-amber-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5154,16 +4963,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs shrink-0">🔒</span>
                     <span>Privacy Policy (DPDP Act 2023)</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('privacy')}
-                    title="Share Privacy Policy link"
-                    className="p-1 text-slate-400 hover:text-emerald-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5176,16 +4977,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-700 flex items-center justify-center text-xs shrink-0">🛡️</span>
                     <span>Safety &amp; Meetup Release</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('safety')}
-                    title="Share Safety Release link"
-                    className="p-1 text-slate-400 hover:text-rose-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5198,16 +4991,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center text-xs shrink-0">🚚</span>
                     <span>Shipping &amp; Logistics Policy</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('shipping')}
-                    title="Share Shipping Policy link"
-                    className="p-1 text-slate-400 hover:text-blue-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5220,16 +5005,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-purple-50 text-purple-700 flex items-center justify-center text-xs shrink-0">🔄</span>
                     <span>Returns &amp; Refund Policy</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('refund')}
-                    title="Share Returns & Refund link"
-                    className="p-1 text-slate-400 hover:text-purple-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5242,16 +5019,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-red-50 text-red-700 flex items-center justify-center text-xs shrink-0">🚨</span>
                     <span>POCSO &amp; Child Protection</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('child-safety')}
-                    title="Share POCSO Protection link"
-                    className="p-1 text-slate-400 hover:text-red-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5264,16 +5033,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-teal-50 text-teal-700 flex items-center justify-center text-xs shrink-0">🏪</span>
                     <span>Marketplace Seller Indemnity</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('seller-terms')}
-                    title="Share Seller Indemnity link"
-                    className="p-1 text-slate-400 hover:text-teal-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5286,16 +5047,8 @@ export default function App() {
                     <span className="w-5 h-5 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center text-xs shrink-0">💬</span>
                     <span>Groups &amp; Chat Safe Harbor</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('groups-privacy')}
-                    title="Share Groups Harbor link"
-                    className="p-1 text-slate-400 hover:text-amber-700 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
-                  </button>
                 </li>
-                <li className="flex items-center justify-between">
+                <li>
                   <button
                     type="button"
                     onClick={() => {
@@ -5306,14 +5059,6 @@ export default function App() {
                   >
                     <span className="w-5 h-5 rounded-md bg-rose-50 text-rose-600 flex items-center justify-center text-xs shrink-0">💬</span>
                     <span>Help &amp; Support Hub</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenShare('contact')}
-                    title="Share Help Desk link"
-                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition cursor-pointer"
-                  >
-                    <Share2 className="w-3 h-3" />
                   </button>
                 </li>
               </ul>
@@ -5335,17 +5080,7 @@ export default function App() {
                     <Smartphone className="w-4 h-4 text-emerald-600" />
                     <span className="text-xs font-bold text-slate-900">Vernunt Android</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">v1.0.0</span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenShare('android-apk')}
-                      title="Share Android App link"
-                      className="p-1 text-slate-400 hover:text-emerald-600 rounded transition cursor-pointer"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">v1.0.0</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <a
@@ -5375,17 +5110,7 @@ export default function App() {
                     <Apple className="w-4 h-4 text-slate-800" />
                     <span className="text-xs font-bold text-slate-900">Vernunt iOS</span>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">Web App</span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenShare('ios-app')}
-                      title="Share iOS App link"
-                      className="p-1 text-slate-400 hover:text-slate-900 rounded transition cursor-pointer"
-                    >
-                      <Share2 className="w-3 h-3" />
-                    </button>
-                  </div>
+                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 px-2 py-0.5 rounded-full">Web App</span>
                 </div>
                 <button
                   type="button"
@@ -5458,15 +5183,6 @@ export default function App() {
                 className="hover:text-rose-700 hover:underline transition cursor-pointer flex items-center gap-1"
               >
                 <span>Contact Support</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleOpenShare()}
-                className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg font-bold flex items-center gap-1 transition cursor-pointer"
-                title="Share link"
-              >
-                <Share2 className="w-3 h-3" />
-                <span>Share 🔗</span>
               </button>
             </div>
           </div>

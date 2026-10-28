@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import {
   X,
   ShieldCheck,
@@ -20,7 +19,16 @@ import {
   ArrowRight,
   ExternalLink,
   Users,
-  Share2
+  Share2,
+  Baby,
+  Activity,
+  Brain,
+  Compass,
+  Trees,
+  Smile,
+  BookOpen,
+  Clock,
+  SlidersHorizontal
 } from 'lucide-react';
 import VernuntLogo from '../VernuntLogo.tsx';
 
@@ -147,7 +155,7 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
   onOpenShare
 }) => {
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
-  const [activeTab, setActiveTab] = useState<'leadership' | 'mission' | 'compliance'>('leadership');
+  const [activeTab, setActiveTab] = useState<'leadership' | 'ecd' | 'mission' | 'compliance'>('leadership');
 
   if (!isOpen) return null;
 
@@ -209,6 +217,18 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
           >
             <Users className="w-4 h-4" />
             <span>Leadership Team ({LEADERSHIP_TEAM.length})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('ecd')}
+            className={`px-4 py-2 rounded-xl transition flex items-center gap-2 cursor-pointer ${
+              activeTab === 'ecd'
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+            }`}
+          >
+            <Baby className="w-4 h-4" />
+            <span>ECD Pediatric Science</span>
           </button>
           <button
             type="button"
@@ -375,6 +395,191 @@ export const AboutUsModal: React.FC<AboutUsModalProps> = ({
                     Contact Leadership Desk
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: EARLY CHILDHOOD DEVELOPMENT (ECD) SCIENCE */}
+          {activeTab === 'ecd' && (
+            <div className="space-y-8 animate-fadeIn max-w-4xl mx-auto">
+              {/* Introduction Banner */}
+              <div className="bg-gradient-to-br from-indigo-900 via-slate-900 to-indigo-950 text-white p-6 sm:p-8 rounded-3xl space-y-4 shadow-lg border border-white/10">
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-indigo-300 text-xs font-semibold backdrop-blur-md border border-white/15">
+                  <Baby className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>Early Childhood Development (ECD) Science</span>
+                </div>
+                <h3 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">
+                  How Vernunt Empowers Early Childhood Development (ECD)
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-normal">
+                  Between birth and age 8, 90% of human brain architecture is formed. The World Health Organization (WHO) and leading pediatric associations warn that passive screen exposure crowds out vital sensory-motor feedback, peer communication, and outdoor exploration. Vernunt was engineered from ground-up to substitute isolating screen time with active, real-world development.
+                </p>
+                <div className="flex flex-wrap items-center gap-3 pt-2 text-xs">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    <span>WHO Screen Guidelines Aligned</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md">
+                    <Trees className="w-4 h-4 text-emerald-400" />
+                    <span>Nature &amp; Gross Motor Focus</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md">
+                    <Heart className="w-4 h-4 text-rose-400" />
+                    <span>Peer Social-Emotional Learning</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* The 4 Pediatric Pillars of Vernunt */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-400">Pillar 1 of 2</span>
+                  <h4 className="text-lg font-bold text-slate-900">The 4 Pediatric Pillars of Vernunt</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                  {/* 1. Reduces Screen Time */}
+                  <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                        <Clock className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600">Reduces Screen Time</span>
+                        <h5 className="text-sm font-bold text-slate-900">
+                          Mitigation of Passive Sedentary Behavior &amp; Cognitive Crowding Out
+                        </h5>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Directly addresses <strong className="text-slate-800">World Health Organization (WHO)</strong> and pediatric guidelines by actively substituting passive media exposure with physical reality. Screens over-stimulate rapid visual dopamine loops while starving sensory motor development; Vernunt replaces sedentary hours with rich physical interaction.
+                    </p>
+                  </div>
+
+                  {/* 2. Connects Kids for Play Time */}
+                  <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                        <Smile className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">Connects Kids for Play</span>
+                        <h5 className="text-sm font-bold text-slate-900">
+                          Peer-to-Peer Prosocial Socialization &amp; Peer-Led Co-Regulation
+                        </h5>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Builds essential non-cognitive skills like turn-taking, empathetic communication, active listening, and peer conflict resolution. Through real-world playdates, children practice <strong className="text-slate-800">co-regulation</strong>—calming down with help, sharing, empathy, and making genuine neighborhood friends.
+                    </p>
+                  </div>
+
+                  {/* 3. Finds Outdoor Activities */}
+                  <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                        <Trees className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Finds Outdoor Activities</span>
+                        <h5 className="text-sm font-bold text-slate-900">
+                          Gross Motor Skill Acquisition &amp; Nature-Based Experiential Learning
+                        </h5>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Moving freely outdoors stimulates <strong className="text-slate-800">vestibulo-ocular and sensory-rich neural pathways</strong> that screens cannot replicate. Climbing, balancing, and running across Bangalore's curated parks strengthens balance, spatial proprioception, and protects against juvenile myopia.
+                    </p>
+                  </div>
+
+                  {/* 4. Parent Control Panel */}
+                  <div className="bg-slate-50/70 p-5 rounded-2xl border border-slate-200 space-y-3 shadow-2xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                        <SlidersHorizontal className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Parent Control Panel</span>
+                        <h5 className="text-sm font-bold text-slate-900">
+                          Caregiver Habit Mapping &amp; Family Media Agreement Systems
+                        </h5>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      Empowers parents to co-view and actively monitor developmental milestones rather than relying on strict, isolating policing. Parents can collaboratively set positive family media agreements, coordinate play sessions, and celebrate real-world offline milestones.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* The 5 Pillars of the ECD Framework */}
+              <div className="space-y-4 pt-4 border-t border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black uppercase tracking-wider text-indigo-600">Pillar 2 of 2</span>
+                    <h4 className="text-lg font-bold text-slate-900">The 5 Pillars of an ECD Framework</h4>
+                  </div>
+                  <span className="text-xs text-slate-500 font-medium hidden sm:inline">
+                    International Child Growth Model
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                  {/* Pillar 1 */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+                      <Activity className="w-3.5 h-3.5" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">Physical &amp; Motor</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      How kids develop muscle control. Includes <strong className="text-slate-800">gross motor skills</strong> (running, balancing) and <strong className="text-slate-800">fine motor skills</strong> (holding crayons, stacking wooden blocks).
+                    </p>
+                  </div>
+
+                  {/* Pillar 2 */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-700 flex items-center justify-center font-bold">
+                      <Heart className="w-3.5 h-3.5" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">Social &amp; Emotional</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      How children understand feelings and interact with others. Covers <strong className="text-slate-800">co-regulation</strong> (calming down with help), sharing, empathy, and making friends.
+                    </p>
+                  </div>
+
+                  {/* Pillar 3 */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold">
+                      <Brain className="w-3.5 h-3.5" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">Cognitive Development</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      How the brain processes information. Includes problem-solving, imagination, memory, and exploring the 3D physical world.
+                    </p>
+                  </div>
+
+                  {/* Pillar 4 */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold">
+                      <BookOpen className="w-3.5 h-3.5" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">Language &amp; Literacy</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      How children communicate. Covers active listening, speaking, vocabulary, and early narrative storytelling during peer play.
+                    </p>
+                  </div>
+
+                  {/* Pillar 5 */}
+                  <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2 shadow-2xs">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
+                      <Compass className="w-3.5 h-3.5" />
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">Approaches to Learning</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      A child's natural curiosity, persistence, and focus when tackling new real-world activities without algorithmic distraction.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           )}

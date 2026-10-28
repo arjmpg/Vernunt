@@ -60,6 +60,7 @@ export default function BangaloreParksHub({
   const [sortBy, setSortBy] = useState<'distance' | 'popular' | 'rating' | 'visits'>('distance');
   const [activeTab, setActiveTab] = useState<'all_parks' | 'today_schedule' | 'my_broadcasts'>('all_parks');
   const [amenityFilter, setAmenityFilter] = useState<'all' | 'verified' | 'accessible' | 'cafeteria'>('all');
+  const [spaceCategoryFilter, setSpaceCategoryFilter] = useState<'all' | 'parks_playgrounds' | 'community_centers' | 'indoor_paid'>('all');
 
   // Helper amenities evaluators
   const isParkVerified = (p: BangalorePark) => {
@@ -276,6 +277,25 @@ export default function BangaloreParksHub({
     return { verified, accessible, cafeteria };
   }, [allParks]);
 
+  // Compute counts for space categories (Parks & Playgrounds, Community Centers, Indoor/Paid)
+  const categoryCounts = useMemo(() => {
+    let parks = 0;
+    let community = 0;
+    let indoor = 0;
+    allParks.forEach(p => {
+      const cat = p.category || 'parks_playgrounds';
+      if (cat === 'community_centers') community++;
+      else if (cat === 'indoor_paid') indoor++;
+      else parks++;
+    });
+    return {
+      all: allParks.length,
+      parks_playgrounds: parks,
+      community_centers: community,
+      indoor_paid: indoor
+    };
+  }, [allParks]);
+
   // Filtered and sorted parks
   const filteredParks = useMemo(() => {
     return allParks.filter(p => {
@@ -283,6 +303,14 @@ export default function BangaloreParksHub({
       if (!isAdmin) {
         const isSelfSubmitted = userProfile?.id && p.submittedByUserId === userProfile.id;
         if (!p.isApproved && !isSelfSubmitted) {
+          return false;
+        }
+      }
+
+      // Space category subcategory filter (Parks & Playgrounds, Community Centers, Indoor / Paid)
+      if (spaceCategoryFilter !== 'all') {
+        const pCat = p.category || 'parks_playgrounds';
+        if (pCat !== spaceCategoryFilter) {
           return false;
         }
       }
@@ -336,7 +364,7 @@ export default function BangaloreParksHub({
       // popular
       return (b.reviewsCount || 0) - (a.reviewsCount || 0);
     });
-  }, [allParks, amenityFilter, selectedZone, selectedFacilities, searchQuery, sortBy]);
+  }, [allParks, spaceCategoryFilter, amenityFilter, selectedZone, selectedFacilities, searchQuery, sortBy, isAdmin, userProfile?.id]);
 
   // Get visits for a specific park and filtered by selected date and time
   const getFilteredVisitsForPark = (parkId: string, date: string, timeSlotId: string) => {
@@ -462,6 +490,11 @@ export default function BangaloreParksHub({
   // Add custom park with mandatory latitude and longitude, and Admin approval requirement
   const handleAddNewPark = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      showToast('⚠️ Access restricted: Only platform administrators can add or scrape parks.');
+      setIsAddParkModalOpen(false);
+      return;
+    }
     if (!newParkName.trim()) {
       showToast('⚠️ Park name is mandatory.');
       return;
@@ -625,15 +658,155 @@ export default function BangaloreParksHub({
               <span>📢 My Kid is Going to the Park (Broadcast)</span>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setIsAddParkModalOpen(true)}
-              className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center gap-2 border border-white/20 transition cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-emerald-300" />
-              <span>Add / Scrape Any Park from Google Maps</span>
-            </button>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setIsAddParkModalOpen(true)}
+                className="px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center gap-2 border border-white/20 transition cursor-pointer"
+              >
+                <Plus className="w-4 h-4 text-emerald-300" />
+                <span>Add / Scrape Any Park (Admin)</span>
+              </button>
+            )}
           </div>
+        </div>
+      </div>
+
+      {/* Medium-Sized Round Sub-Categories Selector */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/90 space-y-3">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-700">
+              Browse Play Space Sub-Categories
+            </h2>
+          </div>
+          <span className="text-[11px] font-bold text-slate-500">
+            {filteredParks.length} locations available
+          </span>
+        </div>
+
+        {/* Medium-Size Round Category Buttons */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Sub-Category: All Spaces */}
+          <button
+            type="button"
+            onClick={() => setSpaceCategoryFilter('all')}
+            className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
+              spaceCategoryFilter === 'all'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-400/40'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-2xs'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base font-bold transition-colors ${
+                spaceCategoryFilter === 'all' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-800'
+              }`}>
+                🌟
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-black block truncate">All Play Spaces</span>
+                <span className={`text-[10px] block truncate ${spaceCategoryFilter === 'all' ? 'text-slate-300' : 'text-slate-400'}`}>
+                  Parks, centers &amp; indoor
+                </span>
+              </div>
+            </div>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-black shrink-0 ${
+              spaceCategoryFilter === 'all' ? 'bg-white text-slate-900' : 'bg-slate-100 text-slate-700'
+            }`}>
+              {categoryCounts.all}
+            </span>
+          </button>
+
+          {/* Sub-Category 1: Parks & Playgrounds */}
+          <button
+            type="button"
+            onClick={() => setSpaceCategoryFilter('parks_playgrounds')}
+            className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
+              spaceCategoryFilter === 'parks_playgrounds'
+                ? 'bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300/40'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/40 shadow-2xs'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base font-bold transition-colors ${
+                spaceCategoryFilter === 'parks_playgrounds' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                🌳
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-black block truncate">Parks &amp; Playgrounds</span>
+                <span className={`text-[10px] block truncate ${spaceCategoryFilter === 'parks_playgrounds' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                  Outdoor public green
+                </span>
+              </div>
+            </div>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-black shrink-0 ${
+              spaceCategoryFilter === 'parks_playgrounds' ? 'bg-white text-emerald-800' : 'bg-emerald-50 text-emerald-800'
+            }`}>
+              {categoryCounts.parks_playgrounds}
+            </span>
+          </button>
+
+          {/* Sub-Category 2: Community & Recreation Centers */}
+          <button
+            type="button"
+            onClick={() => setSpaceCategoryFilter('community_centers')}
+            className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
+              spaceCategoryFilter === 'community_centers'
+                ? 'bg-indigo-700 text-white border-indigo-700 shadow-md ring-2 ring-indigo-300/40'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-indigo-300 hover:bg-indigo-50/40 shadow-2xs'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base font-bold transition-colors ${
+                spaceCategoryFilter === 'community_centers' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-800'
+              }`}>
+                🏫
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-black block truncate">Community &amp; Recreation</span>
+                <span className={`text-[10px] block truncate ${spaceCategoryFilter === 'community_centers' ? 'text-indigo-100' : 'text-slate-400'}`}>
+                  Turfs &amp; sports complexes
+                </span>
+              </div>
+            </div>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-black shrink-0 ${
+              spaceCategoryFilter === 'community_centers' ? 'bg-white text-indigo-800' : 'bg-indigo-50 text-indigo-800'
+            }`}>
+              {categoryCounts.community_centers}
+            </span>
+          </button>
+
+          {/* Sub-Category 3: Indoor / Paid Play Spaces */}
+          <button
+            type="button"
+            onClick={() => setSpaceCategoryFilter('indoor_paid')}
+            className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
+              spaceCategoryFilter === 'indoor_paid'
+                ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-300/40'
+                : 'bg-white text-slate-700 border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 shadow-2xs'
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 text-base font-bold transition-colors ${
+                spaceCategoryFilter === 'indoor_paid' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900'
+              }`}>
+                🎟️
+              </div>
+              <div className="min-w-0">
+                <span className="text-xs sm:text-sm font-black block truncate">Indoor / Paid Play Spaces</span>
+                <span className={`text-[10px] block truncate ${spaceCategoryFilter === 'indoor_paid' ? 'text-amber-100' : 'text-slate-400'}`}>
+                  Soft play &amp; trampolines
+                </span>
+              </div>
+            </div>
+            <span className={`px-2.5 py-1 rounded-full text-xs font-black shrink-0 ${
+              spaceCategoryFilter === 'indoor_paid' ? 'bg-white text-amber-900' : 'bg-amber-50 text-amber-900'
+            }`}>
+              {categoryCounts.indoor_paid}
+            </span>
+          </button>
         </div>
       </div>
 
@@ -913,6 +1086,21 @@ export default function BangaloreParksHub({
                       
                       {/* Top Badges */}
                       <div className="absolute top-3 left-3 flex items-center gap-1.5 flex-wrap">
+                        {/* Sub-Category Badge */}
+                        {park.category === 'community_centers' ? (
+                          <span className="bg-indigo-600/95 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-xs flex items-center gap-1">
+                            <span>🏫 Community &amp; Recreation</span>
+                          </span>
+                        ) : park.category === 'indoor_paid' ? (
+                          <span className="bg-amber-600/95 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-xs flex items-center gap-1">
+                            <span>🎟️ Indoor / Paid Space</span>
+                          </span>
+                        ) : (
+                          <span className="bg-emerald-700/95 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-xs flex items-center gap-1">
+                            <span>🌳 Park &amp; Playground</span>
+                          </span>
+                        )}
+
                         <span className="bg-emerald-600/90 text-white font-bold text-[10px] px-2.5 py-0.5 rounded-full shadow-sm backdrop-blur-xs">
                           {park.zone} Bangalore
                         </span>
@@ -997,6 +1185,17 @@ export default function BangaloreParksHub({
                           </span>
                         )}
                       </div>
+
+                      {/* Vernunt Play Tip */}
+                      {park.playTip && (
+                        <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5 text-[11px] text-emerald-950 font-medium flex items-start gap-2 shadow-2xs">
+                          <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="leading-snug">
+                            <strong className="text-emerald-900 font-bold">Play Tip: </strong>
+                            {park.playTip.replace(/^Vernunt Play Tip:\s*/i, '')}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Highlights */}
                       {park.highlights && park.highlights.length > 0 && (
@@ -1820,8 +2019,8 @@ export default function BangaloreParksHub({
         </div>
       )}
 
-      {/* MODAL: Add / Scrape Park from Google Maps */}
-      {isAddParkModalOpen && (
+      {/* MODAL: Add / Scrape Park from Google Maps (Admin Only) */}
+      {isAddParkModalOpen && isAdmin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 animate-scale-up">
             <div className="p-5 bg-gradient-to-r from-emerald-900 to-slate-900 text-white flex items-center justify-between">

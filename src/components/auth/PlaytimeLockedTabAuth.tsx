@@ -500,7 +500,7 @@ export const PlaytimeLockedTabAuth: React.FC<PlaytimeLockedTabAuthProps> = ({
               <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-center gap-2.5">
                 <span className="text-base">📲</span>
                 <div>
-                  <p className="font-bold">SMS Sent via Firebase</p>
+                  <p className="font-bold">SMS Sent via Vernuntbase</p>
                   <p className="text-[11px] text-indigo-700">
                     Verification code dispatched to {method === 'phone' ? `+91 ${cleanPhone}` : cleanEmail}. Enter below.
                   </p>

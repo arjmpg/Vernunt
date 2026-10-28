@@ -476,7 +476,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                   </div>
                   <div className="text-left min-w-0">
                     <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
-                      SMS Sent via Firebase
+                      SMS Sent via Vernuntbase
                     </span>
                     <p className="text-xs font-semibold text-slate-700 leading-tight truncate">
                       6-digit code dispatched to {method === 'phone' ? `+91 ${cleanPhone}` : cleanEmail}
