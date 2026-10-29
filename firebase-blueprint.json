@@ -390,6 +390,30 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["id", "customerEmail", "totalAmount", "paymentStatus"]
+    },
+    "CashfreeTransaction": {
+      "title": "CashfreeTransaction",
+      "description": "User payment transactions processed through Cashfree gateway",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderId": { "type": "string" },
+        "cfOrderId": { "type": "string" },
+        "paymentId": { "type": "string" },
+        "status": { "type": "string", "enum": ["PENDING", "SUCCESS", "FAILED", "USER_DROPPED", "FREE_COMPLETED", "CANCELLED"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "customerName": { "type": "string" },
+        "userId": { "type": "string" },
+        "orderType": { "type": "string" },
+        "itemTitle": { "type": "string" },
+        "paymentMethod": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "orderId", "status", "amount"]
     }
   },
   "firestore": {
@@ -488,6 +512,10 @@
     "/orders/{orderId}": {
       "schema": "StoreOrder",
       "description": "Vernunt store product orders synchronized across client, server, and Cashfree webhooks"
+    },
+    "/cashfree_payments/{paymentId}": {
+      "schema": "CashfreeTransaction",
+      "description": "Stores user payment transaction history processed via Cashfree gateway"
     }
   }
 }

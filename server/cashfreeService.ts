@@ -184,6 +184,44 @@ export function getCashfreeConfig() {
 }
 
 /**
+ * Persist Cashfree transaction record to Firestore database
+ */
+export async function syncCashfreeRecordToFirestore(record: CashfreePaymentRecord) {
+  try {
+    const adminModule = await import('firebase-admin').catch(() => null);
+    const admin = (adminModule as any)?.default || adminModule;
+    if (admin && admin.apps.length > 0) {
+      const db = admin.firestore(
+        process.env.FIRESTORE_DATABASE_ID || 'ai-studio-vernunt-c6e46d49-7bd7-4206-a7d2-664cd30cdee5'
+      );
+      const cleanDoc = {
+        id: record.orderId,
+        orderId: record.orderId,
+        cfOrderId: record.cfOrderId || '',
+        paymentSessionId: record.paymentSessionId || '',
+        paymentId: record.paymentId || '',
+        status: record.status,
+        amount: record.amount,
+        currency: record.currency || 'INR',
+        gateway: 'Cashfree',
+        customerEmail: record.customer?.customer_email || '',
+        customerPhone: record.customer?.customer_phone || '',
+        customerName: record.customer?.customer_name || '',
+        userId: record.customer?.customer_id || '',
+        orderType: record.orderType || 'store_order',
+        itemTitle: record.itemTitle || 'Vernunt Montessori & Kids Gear',
+        paymentMethod: record.paymentMethod || 'Cashfree Web Checkout',
+        createdAt: record.createdAt || new Date().toISOString(),
+        updatedAt: record.updatedAt || new Date().toISOString()
+      };
+      await db.collection('cashfree_payments').doc(record.orderId).set(cleanDoc, { merge: true });
+    }
+  } catch (err: any) {
+    console.debug('[Cashfree Firestore Sync Notice]:', err?.message || err);
+  }
+}
+
+/**
  * Creates Cashfree Order or completes zero-amount transaction directly
  */
 export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): Promise<{
@@ -330,6 +368,7 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
           environment: config.isProd ? 'production' : 'sandbox'
         };
         paymentLedger.set(orderId, record);
+        syncCashfreeRecordToFirestore(record).catch(console.debug);
 
         return {
           success: true,
@@ -375,6 +414,7 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
     environment: config.isProd ? 'production' : 'sandbox'
   };
   paymentLedger.set(orderId, record);
+  syncCashfreeRecordToFirestore(record).catch(console.debug);
 
   return {
     success: true,
@@ -447,6 +487,7 @@ export async function verifyCashfreePayment(orderId: string): Promise<{
             existingRecord.paymentMethod = latest.payment_group || 'Cashfree';
             existingRecord.paymentTime = latest.payment_completion_time || new Date().toISOString();
             existingRecord.updatedAt = new Date().toISOString();
+            syncCashfreeRecordToFirestore(existingRecord).catch(console.debug);
           }
 
           return {
@@ -618,6 +659,120 @@ export function registerCashfreeRoutes(app: Express) {
       return res.status(404).json({ success: false, error: 'Payment transaction record not found.' });
     }
     return res.json({ success: true, payment: record });
+  });
+
+  // 4B. Fetch User's Cashfree Payment History from Firestore
+  app.get('/api/user/payment-history', async (req: Request, res: Response) => {
+    try {
+      const { userId, email, phone } = req.query;
+      const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+      const cleanUserId = userId ? String(userId).trim() : '';
+      const cleanPhone = phone ? String(phone).replace(/\D/g, '').slice(-10) : '';
+
+      const resultsMap = new Map<string, any>();
+
+      // 1. Fetch from Firestore `cashfree_payments` and `orders`
+      try {
+        const adminModule = await import('firebase-admin').catch(() => null);
+        const admin = (adminModule as any)?.default || adminModule;
+        if (admin && admin.apps.length > 0) {
+          const db = admin.firestore(
+            process.env.FIRESTORE_DATABASE_ID || 'ai-studio-vernunt-c6e46d49-7bd7-4206-a7d2-664cd30cdee5'
+          );
+
+          // Query cashfree_payments collection
+          const cashfreeSnap = await db.collection('cashfree_payments').get();
+          cashfreeSnap.forEach((doc: any) => {
+            const data = doc.data();
+            const matchUser = cleanUserId && (data.userId === cleanUserId || data.customer?.customer_id === cleanUserId);
+            const matchEmail = cleanEmail && (data.customerEmail?.toLowerCase() === cleanEmail || data.customer?.customer_email?.toLowerCase() === cleanEmail);
+            const matchPhone = cleanPhone && (data.customerPhone?.includes(cleanPhone) || data.customer?.customer_phone?.includes(cleanPhone));
+
+            if (!cleanUserId && !cleanEmail && !cleanPhone || matchUser || matchEmail || matchPhone) {
+              resultsMap.set(data.orderId || doc.id, data);
+            }
+          });
+
+          // Query orders collection for Cashfree transactions
+          const ordersSnap = await db.collection('orders').get();
+          ordersSnap.forEach((doc: any) => {
+            const data = doc.data();
+            const isCashfree = data.paymentMethod?.toLowerCase().includes('cashfree') || data.cashfreePaymentId || data.cashfreeOrderId || data.paymentAudit?.gateway === 'Cashfree';
+            if (isCashfree) {
+              const matchUser = cleanUserId && (data.userId === cleanUserId || data.customer?.customer_id === cleanUserId);
+              const matchEmail = cleanEmail && (data.customerEmail?.toLowerCase() === cleanEmail || data.shippingAddress?.email?.toLowerCase() === cleanEmail);
+              const matchPhone = cleanPhone && (data.customerPhone?.includes(cleanPhone) || data.shippingAddress?.phone?.includes(cleanPhone));
+
+              if (!cleanUserId && !cleanEmail && !cleanPhone || matchUser || matchEmail || matchPhone) {
+                const oid = data.orderNumber || data.cashfreeOrderId || data.id || doc.id;
+                resultsMap.set(oid, {
+                  id: oid,
+                  orderId: oid,
+                  cfOrderId: data.cashfreeOrderId || '',
+                  paymentId: data.cashfreePaymentId || data.paymentReferenceId || '',
+                  status: data.paymentStatus ? data.paymentStatus.toUpperCase() : (data.status === 'paid' ? 'SUCCESS' : 'PENDING'),
+                  amount: data.totalAmount || data.amount || 0,
+                  currency: data.currency || 'INR',
+                  gateway: 'Cashfree',
+                  customerEmail: data.customerEmail || data.shippingAddress?.email || '',
+                  customerPhone: data.customerPhone || data.shippingAddress?.phone || '',
+                  customerName: data.customerName || data.shippingAddress?.fullName || '',
+                  orderType: 'store_order',
+                  itemTitle: (data.items && data.items[0]?.name) || 'Vernunt Montessori & Kids Gear',
+                  paymentMethod: data.paymentMethod || 'Cashfree Web Checkout',
+                  createdAt: data.placedAt || data.createdAt || new Date().toISOString(),
+                  updatedAt: data.updatedAt || new Date().toISOString()
+                });
+              }
+            }
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn('[Payment History Firestore Fetch Notice]:', dbErr?.message || dbErr);
+      }
+
+      // 2. Also merge in-memory ledger
+      paymentLedger.forEach((record, orderId) => {
+        const matchUser = cleanUserId && record.customer?.customer_id === cleanUserId;
+        const matchEmail = cleanEmail && record.customer?.customer_email?.toLowerCase() === cleanEmail;
+        const matchPhone = cleanPhone && record.customer?.customer_phone?.includes(cleanPhone);
+        if (!cleanUserId && !cleanEmail && !cleanPhone || matchUser || matchEmail || matchPhone) {
+          if (!resultsMap.has(orderId)) {
+            resultsMap.set(orderId, {
+              id: orderId,
+              orderId,
+              cfOrderId: record.cfOrderId || '',
+              paymentId: record.paymentId || '',
+              status: record.status,
+              amount: record.amount,
+              currency: record.currency || 'INR',
+              gateway: 'Cashfree',
+              customerEmail: record.customer?.customer_email || '',
+              customerPhone: record.customer?.customer_phone || '',
+              customerName: record.customer?.customer_name || '',
+              orderType: record.orderType || 'store_order',
+              itemTitle: record.itemTitle || 'Vernunt Kids Gear',
+              paymentMethod: record.paymentMethod || 'Cashfree Web Checkout',
+              createdAt: record.createdAt,
+              updatedAt: record.updatedAt
+            });
+          }
+        }
+      });
+
+      const transactions = Array.from(resultsMap.values()).sort((a, b) => {
+        return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      });
+
+      return res.json({
+        success: true,
+        count: transactions.length,
+        transactions
+      });
+    } catch (err: any) {
+      console.error('[Payment History Controller Error]:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
   });
 
   // 5. Cashfree Configuration Check & Sandbox Status

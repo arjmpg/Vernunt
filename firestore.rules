@@ -444,9 +444,17 @@ service cloud.firestore {
     // Vernunt Store Orders Collection: read for owner/admin, create with validation, update by admin or server webhook
     match /orders/{orderId} {
       allow get: if true;
-      allow list: if isSignedIn() || isAdmin();
+      allow list: if true;
       allow create: if isValidStoreOrder(incoming());
       allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Cashfree Payments Transaction History Collection
+    match /cashfree_payments/{paymentId} {
+      allow get: if true;
+      allow list: if true;
+      allow create, update: if true;
       allow delete: if isAdmin();
     }
   }

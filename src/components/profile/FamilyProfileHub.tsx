@@ -3,9 +3,11 @@ import {
   User, ShieldCheck, ShieldAlert, Award, Sparkles, Heart, 
   MapPin, Phone, Mail, Edit3, Plus, Calendar, ShoppingBag, 
   Lock, MessageSquare, AlertCircle, LogOut, CheckCircle2, 
-  ChevronRight, ExternalLink, Gift, Wallet, HelpCircle, FileText
+  ChevronRight, ExternalLink, Gift, Wallet, HelpCircle, FileText,
+  CreditCard
 } from 'lucide-react';
 import type { ChildProfile, Booking } from '../../types.ts';
+import { PaymentHistorySection } from './PaymentHistorySection.tsx';
 
 export interface FamilyProfileHubProps {
   userProfile: ChildProfile;
@@ -38,7 +40,7 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
   onOpenSupport,
   onSignOut
 }) => {
-  const [activeSubSection, setActiveSubSection] = useState<'overview' | 'safety' | 'activity'>('overview');
+  const [activeSubSection, setActiveSubSection] = useState<'overview' | 'safety' | 'activity' | 'payments'>('overview');
   const isAadhaarVerified = userProfile.verificationStatus === 'VERIFIED';
 
   return (
@@ -118,7 +120,7 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
         </div>
 
         {/* Quick Family Highlights */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-slate-100">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 pt-5 mt-5 border-t border-slate-100">
           <div 
             onClick={() => setActiveSubSection('activity')}
             className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-indigo-300 transition cursor-pointer"
@@ -150,15 +152,26 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
             <span className="block text-lg font-black text-purple-600">VIP Club</span>
             <span className="text-[11px] font-semibold text-slate-600">Free Proximity</span>
           </div>
+
+          <div 
+            onClick={() => setActiveSubSection('payments')}
+            className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 hover:border-rose-300 transition cursor-pointer col-span-2 sm:col-span-1"
+          >
+            <span className="block text-lg font-black text-rose-600 flex items-center gap-1">
+              <CreditCard className="w-4 h-4 text-rose-500" />
+              <span>History</span>
+            </span>
+            <span className="text-[11px] font-semibold text-slate-600">Cashfree Payments</span>
+          </div>
         </div>
       </section>
 
       {/* Navigation Tabs inside Profile */}
-      <div className="flex items-center gap-2 border-b border-slate-200/90 pb-2">
+      <div className="flex items-center gap-2 border-b border-slate-200/90 pb-2 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveSubSection('overview')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeSubSection === 'overview'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -169,7 +182,7 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
         <button
           type="button"
           onClick={() => setActiveSubSection('safety')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeSubSection === 'safety'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
@@ -180,13 +193,25 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
         <button
           type="button"
           onClick={() => setActiveSubSection('activity')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
             activeSubSection === 'activity'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
           My Bookings &amp; Connections
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubSection('payments')}
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
+            activeSubSection === 'payments'
+              ? 'bg-rose-600 text-white shadow-xs'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+          }`}
+        >
+          <CreditCard className="w-3.5 h-3.5" />
+          <span>Payment History</span>
         </button>
       </div>
 
@@ -402,6 +427,14 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
           </div>
 
         </div>
+      )}
+
+      {/* SECTION D: Payment History & Cashfree Transactions */}
+      {activeSubSection === 'payments' && (
+        <PaymentHistorySection
+          userProfile={userProfile}
+          onNavigateToStore={() => onNavigateToTab('store')}
+        />
       )}
 
       {/* Footer Support & Policy Actions */}
