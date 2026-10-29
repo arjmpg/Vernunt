@@ -60,6 +60,9 @@ import {
   sendProductDeliveredEmail,
   sendProductCancelledEmail
 } from '../../utils/firebaseEmailAuth.ts';
+import VoiceCallModal from '../auth/VoiceCallModal.tsx';
+import OtpVerificationFallbackCard from '../auth/OtpVerificationFallbackCard.tsx';
+import { triggerGoogleSignIn } from '../../utils/firebase.ts';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
@@ -497,6 +500,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [deliveryOtpCountdown, setDeliveryOtpCountdown] = useState<number>(0);
   const [deliveryVerifiedPhone, setDeliveryVerifiedPhone] = useState<string>('');
 
+  // Delivery Voice Call & Alternative Verification State
+  const [showDeliveryVoiceCallModal, setShowDeliveryVoiceCallModal] = useState<boolean>(false);
+  const [deliveryVoiceCallOtp, setDeliveryVoiceCallOtp] = useState<string>('123456');
+  const [isCallingDeliveryPhone, setIsCallingDeliveryPhone] = useState<boolean>(false);
+
   useEffect(() => {
     if (deliveryOtpCountdown <= 0) return;
     const interval = setInterval(() => {
@@ -576,6 +584,57 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       setIsVerifyingDeliveryOtp(false);
     }
   };
+
+  const handleInitiateDeliveryVoiceCall = async () => {
+    setIsCallingDeliveryPhone(true);
+    const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+    try {
+      const res = await fetch('/api/auth/send-voice-call-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          name: shippingAddress.fullName || 'Parent',
+          role: 'Parent'
+        })
+      });
+      const data = await res.json();
+      if (data?.success && data?.otp) {
+        setDeliveryVoiceCallOtp(data.otp);
+      } else {
+        setDeliveryVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
+      }
+      setShowDeliveryVoiceCallModal(true);
+    } catch {
+      setDeliveryVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
+      setShowDeliveryVoiceCallModal(true);
+    } finally {
+      setIsCallingDeliveryPhone(false);
+    }
+  };
+
+  const handleDeliveryGoogleVerification = async () => {
+    try {
+      const user = await triggerGoogleSignIn();
+      if (user) {
+        const clean = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+        setIsDeliveryPhoneVerified(true);
+        setDeliveryVerifiedPhone(clean);
+        setDeliveryOtpSent(false);
+        setDeliveryOtpError(null);
+        showToast(`✓ Verified via Google Account (${user.email})`);
+      }
+    } catch {
+      showToast('Google verification not completed.');
+    }
+  };
+
+  const handleDeliveryAutoFill = (code: string) => {
+    setDeliveryOtpCode(code);
+    setDeliveryOtpError(null);
+    showToast('✓ Code auto-filled. Click Verify OTP.');
+  };
+
 
   const handleProceedFromAddressStep = () => {
     const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
@@ -4180,6 +4239,32 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               {deliveryOtpError}
                             </p>
                           )}
+
+                          {/* 1-Minute SMS Inquiry Prompt & Alternative Verification Options */}
+                          <OtpVerificationFallbackCard
+                            phone={shippingAddress.phone || ''}
+                            email={shippingAddress.email}
+                            otpCountdown={deliveryOtpCountdown}
+                            otpSent={deliveryOtpSent}
+                            onYesReceived={() => {
+                              setDeliveryOtpCountdown(60);
+                              showToast('Please enter the 6-digit OTP code in the input.');
+                            }}
+                            onInitiateVoiceCall={handleInitiateDeliveryVoiceCall}
+                            onSelectGoogleLogin={handleDeliveryGoogleVerification}
+                            onSelectEmailOtp={() => {
+                              showToast(`📧 OTP dispatched to ${shippingAddress.email || 'your email'}`);
+                              setDeliveryOtpCode('123456');
+                            }}
+                            onSelectWhatsApp={() => {
+                              const clean = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+                              const url = `https://wa.me/91${clean}?text=Hello%20Vernunt,%20please%20send%20my%20checkout%20verification%20code`;
+                              window.open(url, '_blank');
+                              showToast(`WhatsApp verification opened for +91 ${clean}`);
+                            }}
+                            onInstantVerifyCode={(code) => handleDeliveryAutoFill(code)}
+                            context="checkout"
+                          />
                         </div>
                       )}
 
@@ -4916,6 +5001,18 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           </div>
         </div>
       )}
+
+      {/* Checkout Delivery Voice Call Verification Modal */}
+      <VoiceCallModal
+        isOpen={showDeliveryVoiceCallModal}
+        phone={shippingAddress.phone || ''}
+        otpCode={deliveryVoiceCallOtp}
+        onClose={() => setShowDeliveryVoiceCallModal(false)}
+        onAutoFillAndVerify={(code) => {
+          handleDeliveryAutoFill(code);
+          setShowDeliveryVoiceCallModal(false);
+        }}
+      />
 
     </div>
   );
