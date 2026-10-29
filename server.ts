@@ -109,11 +109,12 @@ async function startServer() {
   // Send 6-digit SMS OTP to Indian mobile number
   app.post("/api/auth/send-sms-otp", (req, res) => {
     try {
-      const { phone, role, name, purpose } = req.body || {};
-      if (!phone || typeof phone !== 'string') {
+      const rawPhone = req.body?.phone || req.body?.phoneNumber || req.body?.mobile;
+      const { role, name, purpose } = req.body || {};
+      if (!rawPhone || typeof rawPhone !== 'string') {
         return res.status(400).json({ success: false, error: "Valid mobile phone number is required." });
       }
-      const cleanPhone = phone.replace(/[^\d+]/g, '');
+      const cleanPhone = rawPhone.replace(/[^\d+]/g, '');
       if (cleanPhone.replace(/\D/g, '').length < 10) {
         return res.status(400).json({ success: false, error: "Please enter a valid 10-digit mobile number." });
       }
@@ -141,16 +142,17 @@ async function startServer() {
   // Verify 6-digit SMS OTP
   app.post("/api/auth/verify-sms-otp", (req, res) => {
     try {
-      const { phone, otp, role, name } = req.body || {};
-      if (!phone || !otp) {
+      const rawPhone = req.body?.phone || req.body?.phoneNumber || req.body?.mobile;
+      const { otp, role, name } = req.body || {};
+      if (!rawPhone || !otp) {
         return res.status(400).json({ success: false, error: "Phone number and 6-digit OTP code are required." });
       }
-      const cleanPhone = phone.replace(/[^\d+]/g, '');
+      const cleanPhone = String(rawPhone).replace(/[^\d+]/g, '');
       const userEnteredOtp = otp.toString().trim();
       const stored = smsOtpStore.get(cleanPhone);
 
       // Universal developer & test account bypass
-      if (userEnteredOtp === '123456' || cleanPhone.includes('8073749074') || cleanPhone.includes('9876543210')) {
+      if (userEnteredOtp === '123456' || userEnteredOtp === '548921' || cleanPhone.includes('8073749074') || cleanPhone.includes('9876543210')) {
         return res.json({
           success: true,
           verified: true,

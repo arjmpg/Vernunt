@@ -480,9 +480,118 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   }, [cart, shippingAddress.pincode, vendors]);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('OnlineGateway');
+  // Cash on Delivery is strictly hidden until an online payment attempt fails or has balance/technical issues
+  const [isCodOffered, setIsCodOffered] = useState<boolean>(false);
+  const [paymentFailureModal, setPaymentFailureModal] = useState<{ show: boolean; reason: string } | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<StoreOrder | null>(null);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
   const [completedOrder, setCompletedOrder] = useState<StoreOrder | null>(null);
+
+  // Delivery Mobile Real-Time SMS OTP Verification (Step 1 Address)
+  const [isDeliveryPhoneVerified, setIsDeliveryPhoneVerified] = useState<boolean>(false);
+  const [deliveryOtpSent, setDeliveryOtpSent] = useState<boolean>(false);
+  const [deliveryOtpCode, setDeliveryOtpCode] = useState<string>('');
+  const [isSendingDeliveryOtp, setIsSendingDeliveryOtp] = useState<boolean>(false);
+  const [isVerifyingDeliveryOtp, setIsVerifyingDeliveryOtp] = useState<boolean>(false);
+  const [deliveryOtpError, setDeliveryOtpError] = useState<string | null>(null);
+  const [deliveryOtpCountdown, setDeliveryOtpCountdown] = useState<number>(0);
+  const [deliveryVerifiedPhone, setDeliveryVerifiedPhone] = useState<string>('');
+
+  useEffect(() => {
+    if (deliveryOtpCountdown <= 0) return;
+    const interval = setInterval(() => {
+      setDeliveryOtpCountdown(prev => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [deliveryOtpCountdown]);
+
+  const handleSendDeliveryOtp = async (customPhone?: string) => {
+    const rawTarget = customPhone || shippingAddress.phone;
+    const clean = (rawTarget || '').replace(/\D/g, '').slice(-10);
+    if (!clean || clean.length < 10) {
+      setDeliveryOtpError('Please enter a valid 10-digit Indian mobile number first.');
+      return;
+    }
+    setIsSendingDeliveryOtp(true);
+    setDeliveryOtpError(null);
+    try {
+      const res = await fetch('/api/auth/send-sms-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: clean,
+          purpose: 'delivery_address_verification',
+          name: shippingAddress.fullName || 'Parent',
+          role: 'Parent'
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDeliveryOtpSent(true);
+        setDeliveryOtpCountdown(60);
+        showToast(`📲 6-Digit SMS OTP dispatched to +91 ${clean}`);
+      } else {
+        setDeliveryOtpError(data.error || 'Failed to dispatch SMS OTP. Please try again.');
+      }
+    } catch (err: any) {
+      setDeliveryOtpError(err.message || 'SMS service temporary network error.');
+    } finally {
+      setIsSendingDeliveryOtp(false);
+    }
+  };
+
+  const handleVerifyDeliveryOtp = async () => {
+    const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+    const cleanOtp = deliveryOtpCode.trim();
+    if (!cleanOtp || cleanOtp.length !== 6) {
+      setDeliveryOtpError('Please enter the full 6-digit OTP code sent to your mobile.');
+      return;
+    }
+    setIsVerifyingDeliveryOtp(true);
+    setDeliveryOtpError(null);
+    try {
+      const res = await fetch('/api/auth/verify-sms-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: cleanPhone,
+          otp: cleanOtp,
+          role: 'Parent'
+        })
+      });
+      const data = await res.json();
+      if (data.success && data.verified) {
+        setIsDeliveryPhoneVerified(true);
+        setDeliveryVerifiedPhone(cleanPhone);
+        setDeliveryOtpSent(false);
+        setDeliveryOtpCode('');
+        setDeliveryOtpError(null);
+        showToast('✓ Mobile successfully verified for delivery!');
+      } else {
+        setDeliveryOtpError(data.error || 'Incorrect OTP code. Please check SMS and try again.');
+      }
+    } catch (err: any) {
+      setDeliveryOtpError(err.message || 'Verification service error. Please try again.');
+    } finally {
+      setIsVerifyingDeliveryOtp(false);
+    }
+  };
+
+  const handleProceedFromAddressStep = () => {
+    const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length < 10) {
+      showToast('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+    if (!isDeliveryPhoneVerified || deliveryVerifiedPhone !== cleanPhone) {
+      setDeliveryOtpError('Please verify your mobile number with the SMS OTP to proceed.');
+      if (!deliveryOtpSent) {
+        handleSendDeliveryOtp(cleanPhone);
+      }
+      return;
+    }
+    setCheckoutStep(2);
+  };
 
   // Shiprocket Logistics States
   const [pincodeServiceability, setPincodeServiceability] = useState<ShiprocketServiceabilityResult | null>(null);
@@ -823,6 +932,16 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     }
   }, [isCheckoutOpen, checkoutStep, shippingAddress.pincode, paymentMethod]);
 
+  // Strictly reset COD visibility whenever checkout is newly opened so it is never shown upfront
+  useEffect(() => {
+    if (isCheckoutOpen) {
+      setIsCodOffered(false);
+      setPaymentMethod('OnlineGateway');
+      setPaymentFailureModal(null);
+    }
+  }, [isCheckoutOpen]);
+
+
   // Submit Product Review
   const handleSubmitReview = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1103,7 +1222,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         isProd: orderData.isProd ?? (orderData.environment === 'production'),
         amount: cartGrandTotal,
         onSuccess: async (details) => {
-          // Verify on backend before confirming order
+          // Strictly verify on backend that money was actually deducted before confirming order
           try {
             const verifyRes = await fetch('/api/cashfree/verify-payment', {
               method: 'POST',
@@ -1111,6 +1230,9 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               body: JSON.stringify({ orderId: orderData.orderId })
             });
             const verifyData = await verifyRes.json();
+            if (!verifyData.success || verifyData.status !== 'SUCCESS') {
+              throw new Error(verifyData.message || 'Bank payment deduction could not be confirmed.');
+            }
             const confirmedPayId = verifyData.paymentId || details.payment_id || orderData.orderId;
             completeOrder(
               'Cashfree',
@@ -1118,21 +1240,23 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               'paid',
               'Verified via Online Gateway'
             );
-          } catch (vErr) {
-            console.warn('Verification fallback note:', vErr);
-            completeOrder(
-              'Cashfree',
-              details.payment_id || orderData.orderId,
-              'paid',
-              'Payment authorized via Online Gateway'
-            );
+          } catch (vErr: any) {
+            console.warn('Real bank deduction check incomplete:', vErr);
+            setIsProcessingPayment(false);
+            setPaymentFailureModal({
+              show: true,
+              reason: vErr?.message || 'Payment deduction was not confirmed by your bank or payment app.'
+            });
           } finally {
             setIsProcessingPayment(false);
           }
         },
         onFailure: (err) => {
           setIsProcessingPayment(false);
-          showToast(`Online payment not completed: ${err?.message || 'Cancelled by user'}`);
+          setPaymentFailureModal({
+            show: true,
+            reason: err?.message || 'Online payment failed or declined by bank (insufficient balance or technical issue).'
+          });
         },
         onClose: () => {
           setIsProcessingPayment(false);
@@ -1141,7 +1265,10 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       setIsProcessingPayment(false);
-      showToast(error.message || 'Unable to open online payment gateway. Please try again.');
+      setPaymentFailureModal({
+        show: true,
+        reason: error.message || 'Unable to open online payment gateway due to network or technical issue.'
+      });
     }
   };
 
@@ -3972,13 +4099,97 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="font-bold text-slate-700 block mb-1">Mobile Phone (for delivery SMS / OTP) *</label>
-                      <input
-                        type="text"
-                        value={shippingAddress.phone}
-                        onChange={(e) => setShippingAddress({ ...shippingAddress, phone: e.target.value })}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium font-mono"
-                      />
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="font-bold text-slate-700 block">Mobile Phone (for delivery SMS / OTP) *</label>
+                        {isDeliveryPhoneVerified && deliveryVerifiedPhone === (shippingAddress.phone || '').replace(/\D/g, '').slice(-10) ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            OTP Verified
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={shippingAddress.phone}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setShippingAddress({ ...shippingAddress, phone: val });
+                            if (isDeliveryPhoneVerified && val.replace(/\D/g, '').slice(-10) !== deliveryVerifiedPhone) {
+                              setIsDeliveryPhoneVerified(false);
+                            }
+                          }}
+                          placeholder="+91 9876543210"
+                          className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium font-mono"
+                        />
+                        {!isDeliveryPhoneVerified && (
+                          <button
+                            type="button"
+                            onClick={() => handleSendDeliveryOtp()}
+                            disabled={isSendingDeliveryOtp || deliveryOtpCountdown > 0}
+                            className="px-3 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-[11px] font-bold transition shrink-0 flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                          >
+                            <Smartphone className="w-3.5 h-3.5 text-rose-600" />
+                            <span>
+                              {isSendingDeliveryOtp
+                                ? 'Sending...'
+                                : deliveryOtpCountdown > 0
+                                ? `${deliveryOtpCountdown}s`
+                                : deliveryOtpSent
+                                ? 'Resend OTP'
+                                : 'Send OTP'}
+                            </span>
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Real-Time SMS OTP Verification Card */}
+                      {deliveryOtpSent && !isDeliveryPhoneVerified && (
+                        <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 animate-fadeIn">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                              <Smartphone className="w-3.5 h-3.5 text-amber-600" />
+                              Enter 6-Digit SMS Code
+                            </span>
+                            <span className="text-[10px] text-amber-700 font-mono">
+                              Sent to +91 {(shippingAddress.phone || '').replace(/\D/g, '').slice(-10)}
+                            </span>
+                          </div>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              maxLength={6}
+                              value={deliveryOtpCode}
+                              onChange={(e) => setDeliveryOtpCode(e.target.value.replace(/\D/g, ''))}
+                              placeholder="• • • • • •"
+                              className="flex-1 tracking-widest text-center font-mono font-black text-sm bg-white border border-amber-300 rounded-lg py-1.5 outline-hidden focus:border-rose-600"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleVerifyDeliveryOtp}
+                              disabled={isVerifyingDeliveryOtp || deliveryOtpCode.length !== 6}
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1 disabled:opacity-50 shadow-xs cursor-pointer"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{isVerifyingDeliveryOtp ? 'Verifying...' : 'Verify OTP'}</span>
+                            </button>
+                          </div>
+                          {deliveryOtpError && (
+                            <p className="text-[10px] text-rose-600 font-bold flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-rose-500 shrink-0" />
+                              {deliveryOtpError}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Verified Badge */}
+                      {isDeliveryPhoneVerified && (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Delivery mobile verified via real-time SMS</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -4068,7 +4279,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   <button
                     type="button"
                     disabled={!cartDeliverability.isValid}
-                    onClick={() => setCheckoutStep(2)}
+                    onClick={handleProceedFromAddressStep}
                     className={`w-full py-3 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 ${
                       cartDeliverability.isValid
                         ? 'bg-slate-900 hover:bg-rose-700 text-white cursor-pointer'
@@ -4077,7 +4288,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   >
                     <span>
                       {cartDeliverability.isValid
-                        ? 'Proceed to Delivery Speed'
+                        ? (isDeliveryPhoneVerified ? 'Proceed to Delivery Speed' : 'Verify Mobile OTP & Proceed')
                         : `Items Not Deliverable to PIN ${cleanPincode(shippingAddress.pincode)}`}
                     </span>
                     <ArrowRight className="w-4 h-4" />
@@ -4300,13 +4511,13 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       )}
                     </div>
 
-                    {/* Cash on Delivery Option */}
-                    {storeSettings?.enableCashOnDelivery !== false && (
+                    {/* Cash on Delivery Option - STRICTLY HIDDEN until online payment fails or encounters balance/technical issue */}
+                    {isCodOffered && (
                       <div
                         onClick={() => setPaymentMethod('COD')}
-                        className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 ${
+                        className={`p-4 rounded-2xl border transition cursor-pointer space-y-2 animate-fade-in ${
                           paymentMethod === 'COD'
-                            ? 'bg-rose-50/70 border-rose-500 ring-1 ring-rose-500/20 shadow-xs'
+                            ? 'bg-amber-50/80 border-amber-500 ring-1 ring-amber-500/20 shadow-xs'
                             : 'bg-white border-slate-200 hover:border-slate-300'
                         }`}
                       >
@@ -4316,11 +4527,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               <DollarSign className="w-5 h-5" />
                             </div>
                             <div>
-                              <span className="font-bold text-slate-900 text-xs block">Cash on Delivery (COD)</span>
-                              <span className="text-[10.5px] text-slate-500">Pay cash or scan QR when logistics associate arrives</span>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-slate-900 text-xs block">Cash on Delivery (COD)</span>
+                                <span className="bg-amber-100 text-amber-900 text-[9px] font-bold px-1.5 py-0.5 rounded-sm">Fallback Activated</span>
+                              </div>
+                              <span className="text-[10.5px] text-slate-500">Pay cash or scan QR when logistics associate arrives at your doorstep</span>
                             </div>
                           </div>
-                          <span className="text-[10px] text-slate-500 font-mono">Doorstep OTP</span>
+                          <span className="text-[10px] text-slate-500 font-mono">Doorstep Payment</span>
                         </div>
                       </div>
                     )}
@@ -4640,6 +4854,67 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           product={editingDimensionProduct}
           onSave={handleSaveProductDimensions}
         />
+      )}
+
+      {/* Payment Failure & COD Fallback Offer Modal */}
+      {paymentFailureModal?.show && (
+        <div className="fixed inset-0 z-[999999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-rose-100 text-center space-y-4 animate-scale-up">
+            <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto text-3xl shadow-xs">
+              ⚠️
+            </div>
+            <div>
+              <h4 className="font-serif font-black text-lg text-slate-900">Payment Failed or Incomplete</h4>
+              <p className="text-xs text-rose-600 font-semibold mt-1">
+                {paymentFailureModal.reason || 'Payment could not be confirmed by bank (insufficient balance or technical issue).'}
+              </p>
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Your order amount has not been deducted. Would you like to place this order using <strong>Cash on Delivery (COD)</strong> instead? You can pay cash or scan QR when your package is delivered to your doorstep.
+              </p>
+            </div>
+
+            <div className="pt-2 space-y-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCodOffered(true);
+                  setPaymentMethod('COD');
+                  setPaymentFailureModal(null);
+                  completeOrder(
+                    'COD',
+                    `COD-${Date.now().toString().slice(-6)}`,
+                    'pending',
+                    'Customer opted into Cash on Delivery following online payment failure.'
+                  );
+                }}
+                className="w-full py-3.5 px-4 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white rounded-xl text-xs font-black shadow-md flex items-center justify-center gap-2 transition cursor-pointer active:scale-95"
+              >
+                <span>📦 Switch to Cash on Delivery (COD) &amp; Place Order</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCodOffered(true);
+                  setPaymentMethod('COD');
+                  setPaymentFailureModal(null);
+                  showToast('Cash on Delivery unlocked! You can review shipping and confirm order.');
+                }}
+                className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition cursor-pointer"
+              >
+                Select COD &amp; Review Order Details
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPaymentFailureModal(null)}
+                className="w-full py-2 text-slate-400 hover:text-slate-600 text-xs font-medium cursor-pointer"
+              >
+                Try Online Payment (UPI / Cards) Again
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
     </div>

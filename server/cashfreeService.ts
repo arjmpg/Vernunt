@@ -161,7 +161,7 @@ export function getCashfreeConfig() {
   const apiVersion = (
     process.env.CASHFREE_API_VERSION ||
     stored.apiVersion ||
-    '2023-08-01'
+    '2025-01-01'
   ).trim();
 
   const webhookSecret = (
@@ -261,6 +261,7 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
       const response = await fetch(`${config.apiEndpoint}/orders`, {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
           'x-client-id': config.appId,
           'x-client-secret': config.secretKey,
@@ -278,12 +279,28 @@ export async function createCashfreeOrder(payload: CashfreeCreateOrderPayload): 
           },
           order_meta: {
             return_url: payload.returnUrl || `https://app.vernunt.com/?order_id=${orderId}&status={order_status}`,
-            notify_url: 'https://app.vernunt.com/api/cashfree/webhook'
+            notify_url: 'https://app.vernunt.com/api/cashfree/webhook',
+            payment_methods: 'cc,dc,upi'
           },
+          cart_details: {
+            cart_items: [
+              {
+                item_id: (payload.itemId || `vnt_${orderId}`).slice(0, 50),
+                item_name: (payload.itemTitle || payload.orderType || 'Vernunt Play Item').slice(0, 100),
+                item_description: `Vernunt Early Childhood Development - ${payload.itemTitle || payload.orderType || 'Montessori Play'}`,
+                item_image_url: 'https://cashfreelogo.cashfree.com/website/landings-cache/landings/occ/brownShoe.png',
+                item_original_unit_price: roundedAmount,
+                item_discounted_unit_price: roundedAmount,
+                item_quantity: 1,
+                item_currency: currency
+              }
+            ]
+          },
+          order_expiry_time: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           order_note: `${payload.itemTitle || payload.orderType} on Vernunt Playdates`,
           order_tags: {
-            type: payload.orderType,
-            itemId: payload.itemId || 'general'
+            name: customerName,
+            company: 'Vernunt'
           }
         })
       });
@@ -494,38 +511,30 @@ export async function verifyCashfreePayment(orderId: string): Promise<{
     };
   }
 
-  // Developer simulation & manual verification fallback:
+  // Strict Real Bank Deduction Enforcement:
+  // If payment has NOT been confirmed by Cashfree live API, Firestore webhook, or ledger SUCCESS:
+  // DO NOT confirm order! Return status PENDING or FAILED with clear message.
   if (existingRecord) {
-    existingRecord.status = 'SUCCESS';
-    existingRecord.paymentId = `cf_pay_sim_${Date.now().toString().slice(-8)}`;
-    existingRecord.paymentMethod = 'Cashfree UPI (Google Pay)';
-    existingRecord.paymentTime = new Date().toISOString();
-    existingRecord.updatedAt = new Date().toISOString();
-
-
+    const isFailed = existingRecord.status === 'FAILED' || existingRecord.status === 'USER_DROPPED' || existingRecord.status === 'CANCELLED';
     return {
-      success: true,
+      success: false,
       orderId,
-      status: 'SUCCESS',
+      status: isFailed ? 'FAILED' : 'PENDING',
       amount: existingRecord.amount,
       currency: existingRecord.currency,
-      paymentId: existingRecord.paymentId,
-      paymentMethod: 'UPI (Test Sandbox)',
-      paymentTime: existingRecord.paymentTime,
-      message: '✓ Payment successfully verified in Cashfree Sandbox environment.'
+      message: isFailed
+        ? 'Payment transaction failed or declined by issuing bank (insufficient balance or technical issue).'
+        : 'Payment deduction has not been confirmed by bank yet. Please authorize in Google Pay or your banking app.'
     };
   }
 
   return {
-    success: true,
+    success: false,
     orderId,
-    status: 'SUCCESS',
+    status: 'PENDING',
     amount: 0,
     currency: 'INR',
-    paymentId: `cf_pay_${Date.now().toString().slice(-8)}`,
-    paymentMethod: 'Online Gateway',
-    paymentTime: new Date().toISOString(),
-    message: '✓ Payment successfully verified.'
+    message: 'Payment record not found or transaction incomplete with bank.'
   };
 }
 
