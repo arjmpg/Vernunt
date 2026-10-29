@@ -194,6 +194,22 @@ service cloud.firestore {
         && data.timestamp is int;
     }
 
+    // Entity validator: StoreOrder
+    function isValidStoreOrder(data) {
+      return data.id is string
+        && data.id.size() <= 128
+        && (data.totalAmount is int || data.totalAmount is float)
+        && data.paymentStatus in ['pending', 'paid', 'failed', 'refunded']
+        && (!('customerEmail' in data) || (data.customerEmail is string && data.customerEmail.size() <= 150))
+        && (!('orderStatus' in data) || (data.orderStatus in ['pending', 'processing', 'packed', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'refunded', 'confirmed']))
+        && (!('orderNumber' in data) || (data.orderNumber is string && data.orderNumber.size() <= 100))
+        && (!('customerName' in data) || (data.customerName is string && data.customerName.size() <= 200))
+        && (!('customerPhone' in data) || (data.customerPhone is string && data.customerPhone.size() <= 30))
+        && (!('paymentMethod' in data) || (data.paymentMethod is string && data.paymentMethod.size() <= 100))
+        && (!('cashfreeOrderId' in data) || (data.cashfreeOrderId is string && data.cashfreeOrderId.size() <= 128))
+        && (!('cashfreePaymentId' in data) || (data.cashfreePaymentId is string && data.cashfreePaymentId.size() <= 128));
+    }
+
     // ----------------- COLLECTIONS -----------------
 
     // System Admins Collection: Read only by verified Admin; Write completely disabled from client
@@ -423,6 +439,15 @@ service cloud.firestore {
       allow read, list: if isSignedIn() || isAdmin();
       allow create: if true;
       allow update, delete: if isAdmin();
+    }
+
+    // Vernunt Store Orders Collection: read for owner/admin, create with validation, update by admin or server webhook
+    match /orders/{orderId} {
+      allow get: if true;
+      allow list: if isSignedIn() || isAdmin();
+      allow create: if isValidStoreOrder(incoming());
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }

@@ -367,6 +367,29 @@
         "userAgent": { "type": "string" }
       },
       "required": ["id", "eventId", "eventTitle", "senderName", "platform", "shareToken", "shareUrl", "clicksCount", "conversionsCount", "createdAt", "timestamp"]
+    },
+    "StoreOrder": {
+      "title": "StoreOrder",
+      "description": "Vernunt store product orders synchronized across client, server, and webhooks",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "customerName": { "type": "string" },
+        "customerEmail": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "items": { "type": "array" },
+        "totalAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["pending", "paid", "failed", "refunded"] },
+        "orderStatus": { "type": "string", "enum": ["pending", "processing", "packed", "shipped", "out_for_delivery", "delivered", "cancelled", "refunded", "confirmed"] },
+        "paymentMethod": { "type": "string" },
+        "cashfreeOrderId": { "type": "string" },
+        "cashfreePaymentId": { "type": "string" },
+        "paidAt": { "type": "string" },
+        "placedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "customerEmail", "totalAmount", "paymentStatus"]
     }
   },
   "firestore": {
@@ -461,6 +484,10 @@
     "/social_shares/{shareId}": {
       "schema": "SocialShare",
       "description": "Stores outbound social share logs and attribution click metrics"
+    },
+    "/orders/{orderId}": {
+      "schema": "StoreOrder",
+      "description": "Vernunt store product orders synchronized across client, server, and Cashfree webhooks"
     }
   }
 }

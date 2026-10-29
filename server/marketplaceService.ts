@@ -729,3 +729,29 @@ export function registerMarketplaceRoutes(app: Express) {
     }
   });
 }
+
+export function getMarketplaceOrdersList() {
+  return ordersList;
+}
+
+export function updateMarketplaceOrderStatus(
+  orderIdOrNum: string,
+  paymentStatus: 'paid' | 'pending' | 'failed' | 'refunded',
+  orderStatus?: OrderStatus,
+  paymentRef?: string
+) {
+  const order = ordersList.find(o => o.id === orderIdOrNum || o.orderNumber === orderIdOrNum);
+  if (order) {
+    order.paymentStatus = paymentStatus;
+    if (orderStatus) order.orderStatus = orderStatus;
+    if (paymentRef) order.paymentReferenceId = paymentRef;
+    order.statusHistory.push({
+      status: order.orderStatus,
+      timestamp: new Date().toLocaleString('en-IN'),
+      note: `Payment status updated to ${paymentStatus.toUpperCase()} via Cashfree Webhook. Ref: ${paymentRef || 'N/A'}`
+    });
+    return order;
+  }
+  return null;
+}
+

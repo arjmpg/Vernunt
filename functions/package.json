@@ -1,0 +1,26 @@
+{
+  "name": "vernunt-functions",
+  "version": "1.0.0",
+  "description": "Vernunt Firebase Cloud Functions - Cashfree Webhooks & Notifications",
+  "scripts": {
+    "lint": "eslint --ext .js,.ts .",
+    "build": "tsc",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions"
+  },
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
+  "dependencies": {
+    "firebase-admin": "^14.3.0",
+    "firebase-functions": "^6.3.2",
+    "nodemailer": "^10.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  },
+  "private": true
+}
