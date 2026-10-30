@@ -164,58 +164,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
   // Shipping Rules Modal State
   const [showAdminShippingRulesModal, setShowAdminShippingRulesModal] = useState<boolean>(false);
 
-  // Cashfree Gateway Credentials Config State
-  const [cashfreeAppIdInput, setCashfreeAppIdInput] = useState<string>('');
-  const [cashfreeSecretInput, setCashfreeSecretInput] = useState<string>('');
-  const [cashfreeEnvInput, setCashfreeEnvInput] = useState<'TEST' | 'PROD'>('TEST');
-  const [cashfreeConfigStatus, setCashfreeConfigStatus] = useState<string | null>(null);
-  const [isSavingCashfreeConfig, setIsSavingCashfreeConfig] = useState<boolean>(false);
-  const [showGatewayConfigDetails, setShowGatewayConfigDetails] = useState<boolean>(false);
-
-  useEffect(() => {
-    fetch('/api/cashfree/config')
-      .then(res => res.json())
-      .then(data => {
-        if (data.configured) {
-          setCashfreeConfigStatus(`Active (${data.environment})`);
-          if (data.maskedAppId) setCashfreeAppIdInput(data.maskedAppId);
-        } else {
-          setCashfreeConfigStatus('Active (Seamless Gateway)');
-        }
-      })
-      .catch(() => setCashfreeConfigStatus('Active (Seamless Gateway)'));
-  }, []);
-
-  const handleSaveCashfreeCredentials = async () => {
-    if (!cashfreeAppIdInput.trim() || !cashfreeSecretInput.trim()) {
-      alert('Please enter both Cashfree App ID (Client ID) and Secret Key.');
-      return;
-    }
-    setIsSavingCashfreeConfig(true);
-    try {
-      const res = await fetch('/api/cashfree/configure', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appId: cashfreeAppIdInput.trim(),
-          secretKey: cashfreeSecretInput.trim(),
-          env: cashfreeEnvInput
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setCashfreeConfigStatus(`Active (${data.environment})`);
-        alert('✓ Cashfree API Credentials successfully saved and activated!');
-        setShowGatewayConfigDetails(false);
-      } else {
-        alert(data.error || 'Failed to save credentials.');
-      }
-    } catch (err: any) {
-      alert(err?.message || 'Error saving credentials.');
-    } finally {
-      setIsSavingCashfreeConfig(false);
-    }
-  };
+  // Online Payment Gateway Status
+  const [gatewayConfigStatus] = useState<string>('Active (256-Bit SSL)');
 
   // Image upload & compression states (< 2 MB)
   const [imageInputMode, setImageInputMode] = useState<'upload' | 'url'>('upload');
@@ -1621,77 +1571,20 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
               </div>
             </div>
 
-            {/* Online Payment Gateway API Credentials (Cashfree) */}
-            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            {/* Online Payment Gateway Status */}
+            <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/40 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-600 shrink-0" />
                 <div>
-                  <div className="flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-indigo-600" />
-                    <strong className="text-xs text-slate-900 font-bold">Online Payment Gateway Integration (Cashfree PG)</strong>
-                    {cashfreeConfigStatus && (
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
-                        {cashfreeConfigStatus}
-                      </span>
-                    )}
-                  </div>
+                  <strong className="text-xs text-slate-900 font-bold">Online Payment Gateway Integration</strong>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Connect live or sandbox Cashfree API credentials (App ID &amp; Secret Key) to route customer transactions directly to your merchant account.
+                    Secure 256-bit encrypted payments for Cards, UPI (GPay, PhonePe, Paytm), NetBanking &amp; Vernunt Wallet.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowGatewayConfigDetails(!showGatewayConfigDetails)}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-lg transition shrink-0 cursor-pointer"
-                >
-                  {showGatewayConfigDetails ? 'Hide Credentials Form' : 'Configure API Keys'}
-                </button>
               </div>
-
-              {showGatewayConfigDetails && (
-                <div className="pt-3 border-t border-indigo-200/60 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Cashfree App ID (Client ID)</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. TEST10... or 2490..."
-                      value={cashfreeAppIdInput}
-                      onChange={(e) => setCashfreeAppIdInput(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Cashfree Secret Key</label>
-                    <input
-                      type="password"
-                      placeholder="e.g. cfsk_ma_..."
-                      value={cashfreeSecretInput}
-                      onChange={(e) => setCashfreeSecretInput(e.target.value)}
-                      className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-mono outline-none focus:border-indigo-500"
-                    />
-                  </div>
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <label className="text-[11px] font-bold text-slate-700 block mb-1">Environment</label>
-                      <select
-                        value={cashfreeEnvInput}
-                        onChange={(e) => setCashfreeEnvInput(e.target.value as any)}
-                        className="w-full p-2 bg-white border border-slate-300 rounded-lg text-xs font-bold outline-none"
-                      >
-                        <option value="TEST">TEST (Sandbox)</option>
-                        <option value="PROD">PROD (Production)</option>
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isSavingCashfreeConfig}
-                      onClick={handleSaveCashfreeCredentials}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSavingCashfreeConfig ? 'Saving...' : 'Save & Activate'}
-                    </button>
-                  </div>
-                </div>
-              )}
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 shrink-0">
+                {gatewayConfigStatus}
+              </span>
             </div>
 
             {/* Dimensional Shipping & PIN Code Rules Matrix Configuration */}

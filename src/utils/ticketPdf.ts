@@ -23,7 +23,7 @@ export async function generateTicketPdfDoc({ booking, event, qrCodeDataUrl }: Ti
   const tierName = booking.ticketTierName || 'Standard Admission';
   const isFree = !booking.amountPaid || booking.amountPaid === 0;
   const amountStr = isFree ? 'FREE (Complimentary Entry)' : `₹${booking.amountPaid || 0}.00 (Paid Online • Verified)`;
-  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.cashfreePaymentId || booking.paymentId || booking.id);
+  const paymentRef = isFree ? 'COMMUNITY_VERIFIED' : (booking.paymentId || booking.id);
 
   // Ensure high-res QR code
   let finalQr = qrCodeDataUrl;

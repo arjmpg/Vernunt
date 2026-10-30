@@ -198,16 +198,6 @@ export async function verifyFirebaseOtp(
     throw new Error('Please enter the 6-digit verification code received on your phone.');
   }
 
-  // Universal test & developer phone accounts
-  if (trimmedOtp === '123456' && (cleanDigits === '9876543210' || cleanDigits === '8073749074')) {
-    return {
-      success: true,
-      userId: `user-${cleanDigits}`,
-      phone: fullPhone,
-      message: '✓ Mobile number successfully verified.'
-    };
-  }
-
   // A. If Firebase Auth ConfirmationResult is active, verify via Firebase Auth
   const activeConfirmation = confirmationResult || window.confirmationResult;
   if (activeConfirmation) {

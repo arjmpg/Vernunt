@@ -719,9 +719,7 @@ export interface Booking {
   dateStr: string;
   timeSelected: string;
   paymentId?: string;
-  cashfreePaymentId?: string;
-  cashfreeOrderId?: string;
-  paymentGateway?: 'Cashfree' | 'VernuntWallet' | 'Free' | 'COD' | 'OnlineGateway' | 'Hybrid';
+  paymentGateway?: 'OnlineGateway' | 'VernuntWallet' | 'Free' | 'COD' | 'Hybrid';
   paymentStatus?: 'NOT_REQUIRED' | 'PAID' | 'PENDING' | 'FAILED';
   status: 'Paid' | 'Refunded';
   // WooCommerce Affiliate Tracking & Attribution

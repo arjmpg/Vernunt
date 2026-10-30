@@ -161,7 +161,7 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
               <CreditCard className="w-4 h-4 text-rose-500" />
               <span>History</span>
             </span>
-            <span className="text-[11px] font-semibold text-slate-600">Cashfree Payments</span>
+            <span className="text-[11px] font-semibold text-slate-600">Order &amp; Payments</span>
           </div>
         </div>
       </section>
@@ -429,7 +429,7 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
         </div>
       )}
 
-      {/* SECTION D: Payment History & Cashfree Transactions */}
+      {/* SECTION D: Payment History & Verified Orders */}
       {activeSubSection === 'payments' && (
         <PaymentHistorySection
           userProfile={userProfile}

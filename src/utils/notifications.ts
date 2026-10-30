@@ -87,7 +87,7 @@ export function generateBookingEmailHtml(booking: Booking, event?: CommunityEven
           ${!isFree ? `
           <tr>
             <td style="padding: 6px 0; color: #64748b;">🔒 Reference ID:</td>
-            <td style="padding: 6px 0; font-family: monospace; font-size: 11px; color: #475569;">${booking.cashfreePaymentId || booking.paymentId || booking.id}</td>
+            <td style="padding: 6px 0; font-family: monospace; font-size: 11px; color: #475569;">${booking.paymentId || booking.id}</td>
           </tr>
           ` : `
           <tr>

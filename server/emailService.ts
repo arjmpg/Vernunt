@@ -343,8 +343,8 @@ export function buildPaymentReceiptHtml(order: any, details?: any): string {
   const orderId = order.orderNumber || order.id || `VRN-${Date.now().toString().slice(-6)}`;
   const invId = order.invoiceNumber || `INV-${orderId}`;
   const totalPaid = order.totalAmount || details?.amount || 0;
-  const payMethod = order.paymentMethod || details?.paymentMethod || 'Cashfree / UPI';
-  const txnRef = order.paymentReferenceId || details?.transactionId || `PAY-CF-${Date.now().toString().slice(-8)}`;
+  const payMethod = order.paymentMethod || details?.paymentMethod || 'Online Gateway / UPI';
+  const txnRef = order.paymentReferenceId || details?.transactionId || `PAY-GW-${Date.now().toString().slice(-8)}`;
   const dateStr = order.placedAt || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
   const taxableVal = Math.round(totalPaid / 1.12);
@@ -718,17 +718,6 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
       const cleanEmail = email.trim().toLowerCase();
       const userEnteredOtp = otp.toString().trim();
 
-      // Universal developer & test account bypass for preview / UAT verification
-      if (userEnteredOtp === '123456' || userEnteredOtp === '548921' || cleanEmail.includes('parent.uat') || cleanEmail.includes('vernunt.com')) {
-        console.log(`[EmailService] ✓ Verified via test/bypass OTP for: ${cleanEmail}`);
-        return res.json({
-          success: true,
-          verified: true,
-          email: cleanEmail,
-          message: '✓ Email address verified successfully!'
-        });
-      }
-
       // 1. Check in memory
       let stored = emailOtpMemoryStore.get(cleanEmail);
 
@@ -927,7 +916,7 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
             invoiceNumber: details?.invoiceNumber || `INV-${orderId}`,
             customerName: targetName,
             totalAmount: amount,
-            paymentMethod: details?.paymentMethod || 'Cashfree / UPI Gateway',
+            paymentMethod: details?.paymentMethod || 'Online Gateway / UPI',
             paymentReferenceId: details?.transactionId || details?.paymentReferenceId || `PAY-CF-${Date.now().toString().slice(-8)}`,
             placedAt: details?.placedAt || new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }),
             taxAmountGst: details?.taxAmountGst || Math.round(amount * 0.12)
@@ -1283,7 +1272,7 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
         appliedCouponCode: 'VERNUNT150',
         taxAmountGst: 173,
         totalAmount: 1447,
-        paymentMethod: 'Cashfree UPI (GPay)',
+        paymentMethod: 'Online Gateway / UPI (GPay)',
         paymentStatus: 'paid',
         paymentReferenceId: 'CF-TXN-98471203',
         courierPartner: 'BlueDart Express Air (via Shiprocket)',

@@ -251,7 +251,7 @@ export interface CustomerAddress {
   isDefault?: boolean;
 }
 
-export type PaymentMethod = 'OnlineGateway' | 'COD' | 'VernuntWallet' | 'Cards' | 'UPI' | 'NetBanking' | 'Cashfree' | 'Complimentary';
+export type PaymentMethod = 'OnlineGateway' | 'COD' | 'VernuntWallet' | 'Cards' | 'UPI' | 'NetBanking' | 'Complimentary';
 
 export type OrderStatus = 
   | 'pending'

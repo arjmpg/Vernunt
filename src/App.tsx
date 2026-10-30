@@ -1527,7 +1527,6 @@ export default function App() {
       dateStr: '2026-06-03',
       timeSelected: '14:05',
       paymentId: 'pay_EVT_K9X8P3L2Q1',
-      cashfreePaymentId: 'pay_EVT_K9X8P3L2Q1',
       status: 'Paid'
     },
     {
@@ -1544,7 +1543,6 @@ export default function App() {
       dateStr: '2026-06-05',
       timeSelected: '11:00',
       paymentId: 'pay_SPC_A4Z7M1Y9V2',
-      cashfreePaymentId: 'pay_SPC_A4Z7M1Y9V2',
       status: 'Paid'
     }
   ]);

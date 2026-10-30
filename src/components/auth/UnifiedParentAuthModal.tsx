@@ -49,7 +49,7 @@ export default function UnifiedParentAuthModal({
 
   // Voice Call & Alternative verification state
   const [showVoiceCallModal, setShowVoiceCallModal] = useState(false);
-  const [voiceCallOtp, setVoiceCallOtp] = useState('123456');
+  const [voiceCallOtp, setVoiceCallOtp] = useState('');
   const [isInitiatingVoiceCall, setIsInitiatingVoiceCall] = useState(false);
 
 
@@ -868,7 +868,14 @@ export default function UnifiedParentAuthModal({
                       window.open(url, '_blank');
                       setInfoMessage(`WhatsApp verification initiated for +91 ${clean}`);
                     }}
-                    onInstantVerifyCode={(code) => handleAutoFillCode(code)}
+                    onPnvSuccess={(result) => {
+                      setInfoMessage(result.message || '✓ Phone verified via SIM Carrier (Firebase PNV).');
+                      if (accountStatus === 'registered' && registeredProfile) {
+                        completeLogin(registeredProfile);
+                      } else {
+                        setStep('parent_child_details');
+                      }
+                    }}
                     context="auth"
                   />
                 </div>

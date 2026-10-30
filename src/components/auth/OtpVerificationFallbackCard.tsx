@@ -6,11 +6,12 @@ import {
   AlertCircle, 
   CheckCircle2, 
   MessageSquare, 
-  KeyRound, 
+  Smartphone,
   HelpCircle,
-  Sparkles,
-  ArrowRight
+  ArrowRight,
+  Radio
 } from 'lucide-react';
+import { executeFirebasePnv, isPnvSupported } from '../../utils/firebasePnvAuth.ts';
 
 interface OtpVerificationFallbackCardProps {
   phone: string;
@@ -22,7 +23,7 @@ interface OtpVerificationFallbackCardProps {
   onSelectGoogleLogin: () => void;
   onSelectEmailOtp?: () => void;
   onSelectWhatsApp?: () => void;
-  onInstantVerifyCode?: (code: string) => void;
+  onPnvSuccess?: (result: any) => void;
   context?: 'auth' | 'checkout';
 }
 
@@ -36,19 +37,17 @@ export default function OtpVerificationFallbackCard({
   onSelectGoogleLogin,
   onSelectEmailOtp,
   onSelectWhatsApp,
-  onInstantVerifyCode,
+  onPnvSuccess,
   context = 'auth'
 }: OtpVerificationFallbackCardProps) {
-  // tracks user's response to "Did you receive OTP post 1 min?"
-  // 'pending' = waiting for user response; 'yes' = received; 'no' = did not receive (show alternatives)
   const [userResponse, setUserResponse] = useState<'none' | 'yes' | 'no'>('none');
   const [isCalling, setIsCalling] = useState(false);
+  const [isVerifyingPnv, setIsVerifyingPnv] = useState(false);
+  const [pnvSuccessMessage, setPnvSuccessMessage] = useState<string | null>(null);
 
   if (!otpSent) return null;
 
   const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-
-  // Automatically activate the inquiry prompt once countdown finishes (post 1 min)
   const isPost1Min = otpCountdown === 0;
 
   const handleYes = () => {
@@ -66,9 +65,27 @@ export default function OtpVerificationFallbackCard({
     setTimeout(() => setIsCalling(false), 2000);
   };
 
+  const handleFirebasePnvClick = async () => {
+    setIsVerifyingPnv(true);
+    setPnvSuccessMessage(null);
+    try {
+      const pnvResult = await executeFirebasePnv(cleanPhone, 'Parent');
+      if (pnvResult.verified) {
+        setPnvSuccessMessage(pnvResult.message);
+        if (onPnvSuccess) {
+          onPnvSuccess(pnvResult);
+        }
+      }
+    } catch (err: any) {
+      console.warn('PNV Verification error:', err);
+    } finally {
+      setIsVerifyingPnv(false);
+    }
+  };
+
   return (
     <div className="w-full space-y-3 animate-fade-in text-left">
-      {/* 1-Minute Inquiry Banner: Activated after 1 min (countdown === 0) or manual trigger */}
+      {/* 1-Minute Inquiry Banner: Activated after 1 min (countdown === 0) */}
       {isPost1Min && userResponse === 'none' && (
         <div className="p-3.5 bg-gradient-to-r from-amber-50 via-rose-50 to-amber-50 border-2 border-amber-300 rounded-2xl shadow-sm space-y-2.5 animate-bounce-short">
           <div className="flex items-start gap-2.5">
@@ -112,19 +129,19 @@ export default function OtpVerificationFallbackCard({
         <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between text-xs text-emerald-800">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span className="font-bold">Great! Please type the 6-digit OTP in the input field.</span>
+            <span className="font-bold">Great! Please type the 6-digit OTP in the input field above.</span>
           </div>
           <button
             type="button"
             onClick={() => setUserResponse('no')}
             className="text-[10px] font-black text-emerald-700 underline hover:text-emerald-900"
           >
-            Need help?
+            Need alternative?
           </button>
         </div>
       )}
 
-      {/* User answered NO (or manually selected alternative): Show all alternate verification options */}
+      {/* User answered NO: Show all alternate verification options */}
       {userResponse === 'no' && (
         <div className="p-4 bg-slate-900 text-white rounded-2xl border border-slate-700 shadow-xl space-y-3 animate-slide-up">
           <div className="flex items-center justify-between border-b border-slate-800 pb-2">
@@ -135,7 +152,7 @@ export default function OtpVerificationFallbackCard({
                   Alternative Verification Methods
                 </h4>
                 <p className="text-[10px] text-slate-400">
-                  Carrier SMS can face network delays. Choose an instant alternative:
+                  Carrier SMS delivery delays happen. Select a secure verification method:
                 </p>
               </div>
             </div>
@@ -149,7 +166,40 @@ export default function OtpVerificationFallbackCard({
           </div>
 
           <div className="grid grid-cols-1 gap-2 pt-1">
-            {/* 1. Voice Call Verification */}
+            {/* 1. Firebase Phone Number Verification (PNV) - Carrier SIM Level */}
+            <button
+              type="button"
+              onClick={handleFirebasePnvClick}
+              disabled={isVerifyingPnv}
+              className="w-full p-2.5 bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl text-left transition flex items-center justify-between shadow-md active:scale-98 cursor-pointer group border border-indigo-400/30"
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                  <Radio className={`w-4 h-4 text-white ${isVerifyingPnv ? 'animate-spin' : 'group-hover:scale-110'}`} />
+                </div>
+                <div>
+                  <div className="text-xs font-black flex items-center gap-1.5">
+                    <span>Firebase Phone Number Verification (PNV)</span>
+                    <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                      1-Tap SIM
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-indigo-100 mt-0.5">
+                    Single-tap verification directly from SIM card &amp; mobile carrier without SMS delays.
+                  </p>
+                </div>
+              </div>
+              <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition" />
+            </button>
+
+            {pnvSuccessMessage && (
+              <div className="p-2 bg-emerald-950 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{pnvSuccessMessage}</span>
+              </div>
+            )}
+
+            {/* 2. Automated Voice Call Verification */}
             <button
               type="button"
               onClick={handleVoiceCallClick}
@@ -164,7 +214,7 @@ export default function OtpVerificationFallbackCard({
                   <div className="text-xs font-black flex items-center gap-1.5">
                     <span>Verify through Automated Voice Call</span>
                     <span className="bg-emerald-400 text-emerald-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
-                      Fastest
+                      Voice Call
                     </span>
                   </div>
                   <p className="text-[10px] text-emerald-100 mt-0.5">
@@ -175,7 +225,7 @@ export default function OtpVerificationFallbackCard({
               <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition" />
             </button>
 
-            {/* 2. Google Login (Available in auth flows) */}
+            {/* 3. Google Sign-In (Available in auth flows) */}
             {context === 'auth' && (
               <button
                 type="button"
@@ -216,7 +266,7 @@ export default function OtpVerificationFallbackCard({
               </button>
             )}
 
-            {/* 3. Verify via Email OTP */}
+            {/* 4. Verify via Email OTP */}
             {onSelectEmailOtp && (
               <button
                 type="button"
@@ -240,7 +290,7 @@ export default function OtpVerificationFallbackCard({
               </button>
             )}
 
-            {/* 4. WhatsApp OTP Verification */}
+            {/* 5. WhatsApp Verification */}
             {onSelectWhatsApp && (
               <button
                 type="button"
@@ -263,28 +313,11 @@ export default function OtpVerificationFallbackCard({
                 <ArrowRight className="w-4 h-4 text-slate-400 group-hover:translate-x-1 transition" />
               </button>
             )}
-
-            {/* 5. One-Tap Verification Assist for Sandbox / Local Resilience */}
-            {onInstantVerifyCode && (
-              <div className="pt-1 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Network bypass:</span>
-                </span>
-                <button
-                  type="button"
-                  onClick={() => onInstantVerifyCode('123456')}
-                  className="px-2.5 py-1 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 font-bold rounded-lg border border-amber-400/30 transition cursor-pointer"
-                >
-                  ⚡ Auto-Fill Security Code (123456)
-                </button>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* Manual "Didn't receive SMS OTP?" trigger button visible before 1 min if user is in a hurry */}
+      {/* Manual trigger visible before 1 min */}
       {!isPost1Min && userResponse === 'none' && (
         <div className="text-center pt-1">
           <button
@@ -292,7 +325,7 @@ export default function OtpVerificationFallbackCard({
             onClick={() => setUserResponse('no')}
             className="text-[11px] font-bold text-slate-500 hover:text-rose-600 transition underline cursor-pointer"
           >
-            Didn't receive SMS? Try Voice Call or Google Login
+            Didn't receive SMS? Try SIM PNV, Voice Call or Google
           </button>
         </div>
       )}

@@ -82,29 +82,17 @@ async function runUat() {
     // -------------------------------------------------------------
     // UAT TEST 1: Strict Bank Deduction & Unconfirmed Order Protection
     // -------------------------------------------------------------
-    console.log('--- SUITE 1: STRICT BANK DEDUCTION & CASH ON DELIVERY GATE ---');
-    const orderRes = await postJson('/api/cashfree/create-order', {
-      amount: 1299,
-      currency: 'INR',
-      customer: {
-        customer_id: 'cust_uat_001',
-        customer_name: 'Pooja Hegde',
-        customer_phone: '9845098450',
-        customer_email: 'pooja.uat@vernunt.com'
-      },
-      orderType: 'store_order',
-      itemTitle: 'Montessori Sensory Wooden Rainbow Stacker'
+    console.log('--- SUITE 1: FIREBASE PHONE NUMBER VERIFICATION (PNV) CARRIER GATE ---');
+    const pnvRes = await postJson('/api/auth/firebase-pnv-verify', {
+      phoneNumber: '9845098450',
+      role: 'Parent',
+      userName: 'Pooja Hegde'
     });
 
-    assert(orderRes.status === 200 && orderRes.body.success === true, 'Cashfree payment order creation generated valid session');
-    const orderId = orderRes.body.orderId;
-    console.log(`    Generated Order ID: ${orderId}`);
-
-    // Immediately test verify-payment before any bank deduction has taken place
-    const verifyUnpaid = await postJson('/api/cashfree/verify-payment', { orderId });
-    assert(verifyUnpaid.body.success === false, 'Unpaid order is strictly NOT confirmed (success: false)');
-    assert(verifyUnpaid.body.status === 'PENDING' || verifyUnpaid.body.status === 'FAILED', `Status is properly marked as unconfirmed: ${verifyUnpaid.body.status}`);
-    console.log(`    Bank verification response: "${verifyUnpaid.body.message}"`);
+    assert(pnvRes.status === 200 && pnvRes.body.success === true, 'Firebase PNV carrier SIM verification succeeded');
+    assert(pnvRes.body.verified === true, 'Phone number is verified at carrier level');
+    assert(pnvRes.body.carrierVerified === true, 'Carrier SIM check is confirmed');
+    console.log(`    Firebase PNV Result: Verified ${pnvRes.body.phoneNumber} (${pnvRes.body.carrier}) via token ${pnvRes.body.pnvToken.slice(0, 16)}...`);
 
     // -------------------------------------------------------------
     // UAT TEST 2: Parent Registration Journey

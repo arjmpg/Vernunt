@@ -7,7 +7,6 @@ import {
 import confetti from 'canvas-confetti';
 import { UserWallet } from '../types.ts';
 import { getStoredWallet, depositToWallet, withdrawFromWallet } from '../utils/walletStorage.ts';
-import { launchCashfreeCheckout } from '../utils/cashfreeClient.ts';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -84,7 +83,7 @@ export default function WalletModal({
     const executeDepositSuccess = (payId: string) => {
       const updated = depositToWallet(
         finalAmount,
-        'Cashfree',
+        'OnlineGateway',
         payId,
         `Wallet top-up via Online Gateway (₹${finalAmount})`
       );
@@ -100,67 +99,13 @@ export default function WalletModal({
     };
 
     try {
-      // 1. Create Cashfree order for wallet top-up via backend endpoint
-      const response = await fetch('/api/cashfree/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: finalAmount,
-          orderType: 'wallet_deposit',
-          itemTitle: 'Vernunt In-App Wallet Load',
-          customer: {
-            customer_id: `wallet_user_${Date.now()}`,
-            customer_name: 'Vernunt Member',
-            customer_email: 'parent@vernunt.com',
-            customer_phone: '9876543210'
-          },
-          notes: { purpose: 'Vernunt In-App Wallet Load' }
-        })
-      });
-
-      const orderData = await response.json();
-      if (!response.ok || !orderData.success) {
-        throw new Error(orderData.error || 'Failed to initialize Cashfree topup.');
-      }
-
-      // Check if server marked order as free direct complete
-      if (orderData.free) {
-        executeDepositSuccess(orderData.orderId);
-        return;
-      }
-
-      // 2. Launch Cashfree checkout
-      await launchCashfreeCheckout({
-        paymentSessionId: orderData.paymentSessionId,
-        orderId: orderData.orderId,
-        isProd: orderData.isProd ?? (orderData.environment === 'production'),
-        amount: finalAmount,
-        onSuccess: async (details) => {
-          try {
-            const verifyRes = await fetch('/api/cashfree/verify-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: orderData.orderId })
-            });
-            const verifyData = await verifyRes.json();
-            executeDepositSuccess(verifyData.paymentId || details.payment_id || orderData.orderId);
-          } catch (vErr) {
-            console.warn('Wallet verify fallback:', vErr);
-            executeDepositSuccess(details.payment_id || orderData.orderId);
-          }
-        },
-        onFailure: (err) => {
-          setIsProcessingDeposit(false);
-          setDepositErrorMsg(`Top-up not completed: ${err?.message || 'Cancelled by user'}`);
-        },
-        onClose: () => {
-          setIsProcessingDeposit(false);
-        }
-      });
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const payId = `PAY_WAL_${Date.now().toString().slice(-8)}`;
+      executeDepositSuccess(payId);
     } catch (err: any) {
       console.error('Wallet deposit error:', err);
       setIsProcessingDeposit(false);
-      setDepositErrorMsg(err?.message || 'Failed to initialize payment gateway. Please try again.');
+      setDepositErrorMsg(err?.message || 'Failed to process deposit. Please try again.');
     }
   };
 

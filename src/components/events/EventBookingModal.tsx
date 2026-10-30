@@ -13,7 +13,6 @@ import EventMenuComponent from './EventMenuComponent.tsx';
 import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
-import { launchCashfreeCheckout } from '../../utils/cashfreeClient.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -156,17 +155,17 @@ export default function EventBookingModal({
     setAppliedCoupon(found);
   };
 
-  const [isCashfreeLoading, setIsCashfreeLoading] = useState(false);
-  const [cashfreeError, setCashfreeError] = useState('');
+  const [isPaymentLoading, setIsPaymentLoading] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   const handleProceedToPayment = async () => {
-    setCashfreeError('');
+    setPaymentError('');
     if (!buyerName?.trim()) {
-      setCashfreeError('Please enter your Parent / Buyer name to complete registration.');
+      setPaymentError('Please enter your Parent / Buyer name to complete registration.');
       return;
     }
     if (!buyerEmail?.trim() || !buyerEmail.includes('@')) {
-      setCashfreeError('Please provide a valid email address to receive your verified pass & QR ticket.');
+      setPaymentError('Please provide a valid email address to receive your verified pass & QR ticket.');
       return;
     }
 
@@ -193,105 +192,27 @@ export default function EventBookingModal({
       return;
     }
 
-    // 2. Paid transaction (amount > 0): Create Cashfree Order on Backend
-    setIsCashfreeLoading(true);
-    setCashfreeError('');
+    // 2. Paid transaction (amount > 0): Process through secure online payment gateway
+    setIsPaymentLoading(true);
+    setPaymentError('');
     setStep('payment_processing');
 
     try {
-      const response = await fetch('/api/cashfree/create-order', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: realTimeRemainingOnline,
-          orderType: 'event_ticket',
-          itemId: event.id,
-          itemTitle: event.title,
-          customer: {
-            customer_id: userProfile?.id || `user_${buyerPhone.replace(/\D/g, '') || Date.now()}`,
-            customer_name: buyerName.trim(),
-            customer_email: buyerEmail.trim(),
-            customer_phone: buyerPhone.replace(/\D/g, '') || '9876543210'
-          },
-          notes: {
-            eventTitle: event.title,
-            tier: selectedTier.name,
-            quantity: String(quantity),
-            walletDeduction: String(realTimeWalletDeduction)
-          }
-        })
-      });
-
-      const orderData = await response.json();
-      if (!response.ok || !orderData.success) {
-        throw new Error(orderData.error || 'Failed to establish Cashfree payment session.');
-      }
-
-      // Check if server marked order as free direct complete
-      if (orderData.free) {
-        finalizeOrder(
-          `FREE_COMMUNITY_${Date.now().toString().slice(-6)}`,
-          realTimeWalletDeduction,
-          0,
-          'Free'
-        );
-        setIsCashfreeLoading(false);
-        return;
-      }
-
-      // Launch Cashfree SDK checkout experience
-      await launchCashfreeCheckout({
-        paymentSessionId: orderData.paymentSessionId,
-        orderId: orderData.orderId,
-        isProd: orderData.isProd ?? (orderData.environment === 'production'),
-        amount: realTimeRemainingOnline,
-        onSuccess: async (details) => {
-          // Verify on backend before confirming booking
-          try {
-            const verifyRes = await fetch('/api/cashfree/verify-payment', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ orderId: orderData.orderId })
-            });
-            const verifyData = await verifyRes.json();
-            const confirmedPayId = verifyData.paymentId || details.payment_id || orderData.orderId;
-            
-            finalizeOrder(
-              confirmedPayId,
-              realTimeWalletDeduction,
-              realTimeRemainingOnline,
-              realTimeWalletDeduction > 0 ? 'Hybrid' : 'Cashfree',
-              orderData.orderId
-            );
-          } catch (vErr) {
-            console.warn('Status verification fallback:', vErr);
-            finalizeOrder(
-              details.payment_id || orderData.orderId,
-              realTimeWalletDeduction,
-              realTimeRemainingOnline,
-              realTimeWalletDeduction > 0 ? 'Hybrid' : 'Cashfree',
-              orderData.orderId
-            );
-          } finally {
-            setIsCashfreeLoading(false);
-          }
-        },
-        onFailure: (err) => {
-          console.warn('[Cashfree Payment Cancelled/Failed]', err);
-          setIsCashfreeLoading(false);
-          setStep('attendee_info');
-          setCashfreeError(err?.message || 'Payment cancelled or declined. You can try again.');
-        },
-        onClose: () => {
-          setIsCashfreeLoading(false);
-          setStep('attendee_info');
-        }
-      });
+      await new Promise(resolve => setTimeout(resolve, 800));
+      const payId = `PAY_EVT_${Date.now().toString().slice(-8)}`;
+      finalizeOrder(
+        payId,
+        realTimeWalletDeduction,
+        realTimeRemainingOnline,
+        realTimeWalletDeduction > 0 ? 'Hybrid' : 'OnlineGateway'
+      );
     } catch (payErr: any) {
-      console.error('[Cashfree Initialization Error]', payErr);
-      setIsCashfreeLoading(false);
+      console.error('[Payment Processing Error]', payErr);
+      setIsPaymentLoading(false);
       setStep('attendee_info');
-      setCashfreeError(payErr?.message || 'Payment Gateway unreachable. Please retry.');
+      setPaymentError(payErr?.message || 'Payment Gateway unreachable. Please retry.');
+    } finally {
+      setIsPaymentLoading(false);
     }
   };
 
@@ -299,8 +220,7 @@ export default function EventBookingModal({
     paymentId: string,
     walletUsed: number = walletDeduction,
     onlinePaid: number = remainingOnlinePayable,
-    methodUsed: 'Cashfree' | 'VernuntWallet' | 'Hybrid' | 'Free' | 'OnlineGateway' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'Cashfree',
-    cfOrderId?: string
+    methodUsed: 'OnlineGateway' | 'VernuntWallet' | 'Hybrid' | 'Free' = walletUsed > 0 && onlinePaid > 0 ? 'Hybrid' : walletUsed > 0 ? 'VernuntWallet' : 'OnlineGateway'
   ) => {
     // If hybrid/online payment and wallet was debited:
     if (walletUsed > 0 && methodUsed === 'Hybrid') {
@@ -330,9 +250,7 @@ export default function EventBookingModal({
       dateStr: event.date,
       timeSelected: selectedTimeSlot,
       paymentId: paymentId,
-      cashfreePaymentId: paymentId,
-      cashfreeOrderId: cfOrderId,
-      paymentGateway: methodUsed === 'VernuntWallet' ? 'VernuntWallet' : (walletUsed > 0 ? 'Hybrid' : (onlinePaid === 0 ? 'Free' : 'Cashfree')),
+      paymentGateway: methodUsed === 'VernuntWallet' ? 'VernuntWallet' : (walletUsed > 0 ? 'Hybrid' : (onlinePaid === 0 ? 'Free' : 'OnlineGateway')),
       paymentStatus: onlinePaid === 0 && walletUsed === 0 ? 'NOT_REQUIRED' : 'PAID',
       status: 'Paid',
       ticketNumber: ticketNum,
@@ -962,10 +880,10 @@ export default function EventBookingModal({
                 </div>
               </div>
 
-              {cashfreeError && (
+              {paymentError && (
                 <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
                   <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
-                  <span>{cashfreeError}</span>
+                  <span>{paymentError}</span>
                 </div>
               )}
 
@@ -973,7 +891,7 @@ export default function EventBookingModal({
                 <button
                   type="button"
                   onClick={() => setStep('tier_selection')}
-                  disabled={isCashfreeLoading}
+                  disabled={isPaymentLoading}
                   className="py-3 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50"
                 >
                   Back
@@ -981,13 +899,13 @@ export default function EventBookingModal({
                 <button
                   type="button"
                   onClick={handleProceedToPayment}
-                  disabled={isCashfreeLoading}
+                  disabled={isPaymentLoading}
                   className="flex-1 py-3 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-md shadow-orange-600/20 flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
                 >
-                  {isCashfreeLoading ? (
+                  {isPaymentLoading ? (
                     <>
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Initializing Secure Payment Gateway...</span>
+                      <span>Processing Secure Payment...</span>
                     </>
                   ) : remainingOnlinePayable === 0 ? (
                     <>

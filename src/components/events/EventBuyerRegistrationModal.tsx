@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { ChildProfile, VerificationStatus, LocationSharing, Booking, CommunityEvent, UserWallet } from '../../types.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { saveEventPurchase } from '../../data/eventPurchases.ts';
+import { executeFirebasePnv } from '../../utils/firebasePnvAuth.ts';
 
 export type RegistrationStatus = 'Upcoming' | 'Checking In' | 'Completed';
 
@@ -63,6 +64,7 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
   const [generalError, setGeneralError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCompletedSuccess, setIsCompletedSuccess] = useState(false);
+  const [isPnvLoading, setIsPnvLoading] = useState(false);
 
   // User Wallet State for 1-Click Quick Booking
   const [wallet, setWallet] = useState<UserWallet>(() => getStoredWallet());
@@ -147,6 +149,31 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
       setPhoneOtpError('');
     } else {
       setPhoneOtpError('Please enter the 6-digit OTP sent to your phone.');
+    }
+  };
+
+  // Firebase Phone Number Verification (PNV) 1-Tap Carrier SIM check
+  const handlePnvCarrierVerify = async () => {
+    const cleanPhone = mobileNumber.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setPhoneOtpError('Please enter your 10-digit mobile number first.');
+      return;
+    }
+    setIsPnvLoading(true);
+    setPhoneOtpError('');
+    try {
+      const pnvRes = await executeFirebasePnv(cleanPhone, 'Parent', fullName || 'Event Attendee');
+      if (pnvRes.success) {
+        setPhoneVerified(true);
+        setPhoneOtpSent(false);
+        confetti({ particleCount: 50, spread: 60 });
+      } else {
+        setPhoneOtpError(pnvRes.error || 'Carrier SIM verification failed. Use SMS OTP below.');
+      }
+    } catch (e: any) {
+      setPhoneOtpError(e?.message || 'PNV check failed. Please use SMS OTP.');
+    } finally {
+      setIsPnvLoading(false);
     }
   };
 
@@ -268,7 +295,6 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
       dateStr: event?.date || new Date().toISOString().split('T')[0],
       timeSelected: event?.time || '10:00 AM',
       paymentId: `WALLET_QUICK_${Date.now().toString().slice(-8)}`,
-      cashfreePaymentId: `WALLET_QUICK_${Date.now().toString().slice(-8)}`,
       status: 'Paid',
       ticketNumber: ticketCode,
       ticketTierName: (event?.tiers && event.tiers[0]?.name) || 'Quick Book Pass',
@@ -780,14 +806,26 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
                 className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-rose-200 outline-none font-mono"
               />
               {!phoneVerified && (
-                <button
-                  type="button"
-                  onClick={handleSendPhoneOtp}
-                  disabled={isSendingPhoneOtp || mobileNumber.length < 10}
-                  className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition shrink-0 whitespace-nowrap cursor-pointer"
-                >
-                  {isSendingPhoneOtp ? 'Sending...' : phoneOtpSent ? 'Resend' : 'Send OTP'}
-                </button>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handlePnvCarrierVerify}
+                    disabled={isPnvLoading || mobileNumber.length < 10}
+                    className="px-2.5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 disabled:opacity-40 text-white text-[11px] font-black rounded-xl transition flex items-center gap-1 cursor-pointer shadow-xs"
+                    title="Firebase Phone Number Verification (PNV) via carrier SIM"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>{isPnvLoading ? 'Verifying SIM...' : '1-Tap SIM (PNV)'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSendPhoneOtp}
+                    disabled={isSendingPhoneOtp || mobileNumber.length < 10}
+                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white text-xs font-bold rounded-xl transition shrink-0 whitespace-nowrap cursor-pointer"
+                  >
+                    {isSendingPhoneOtp ? 'Sending...' : phoneOtpSent ? 'Resend' : 'Send OTP'}
+                  </button>
+                </div>
               )}
             </div>
 

@@ -1377,7 +1377,7 @@ export default function BusinessDashboard({
                     {bookingsList.map((log) => (
                       <tr key={log.id} className="hover:bg-slate-50/50">
                         <td className="py-3.5 px-3 font-mono font-bold text-[10px] text-slate-800">
-                          {log.cashfreePaymentId || log.paymentId || log.id}
+                          {log.paymentId || log.id}
                           {log.paymentGateway && (
                             <span className="block text-[9px] font-normal text-slate-400">{log.paymentGateway}</span>
                           )}

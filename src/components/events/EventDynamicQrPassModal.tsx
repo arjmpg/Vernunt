@@ -951,7 +951,7 @@ export default function EventDynamicQrPassModal({
       const bTicket = (b.ticketNumber || '').toLowerCase();
       const bId = (b.id || '').toLowerCase();
       const bQr = (b.qrPayload || '').toLowerCase();
-      const bPay = (b.cashfreePaymentId || b.paymentId || '').toLowerCase();
+      const bPay = (b.paymentId || '').toLowerCase();
       const bChild = (b.childName || '').toLowerCase();
       const bBuyer = (b.buyerName || '').toLowerCase();
       const bPhone = (b.buyerPhone || '').replace(/\D/g, '');

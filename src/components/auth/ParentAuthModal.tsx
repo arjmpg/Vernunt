@@ -49,7 +49,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
 
   // Voice Call & Alternative verification state
   const [showVoiceCallModal, setShowVoiceCallModal] = useState<boolean>(false);
-  const [voiceCallOtp, setVoiceCallOtp] = useState<string>('123456');
+  const [voiceCallOtp, setVoiceCallOtp] = useState<string>('');
   const [isInitiatingVoiceCall, setIsInitiatingVoiceCall] = useState<boolean>(false);
 
 
@@ -626,7 +626,19 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                     window.open(url, '_blank');
                     setInfoMessage(`WhatsApp verification initiated for +91 ${cleanPhone}`);
                   }}
-                  onInstantVerifyCode={(code) => handleAutoFillCode(code)}
+                  onPnvSuccess={(result) => {
+                    setInfoMessage(result.message || '✓ Phone verified via SIM Carrier (Firebase PNV).');
+                    if (isRegistered && registeredProfile) {
+                      onSuccessLogin(registeredProfile);
+                      onClose();
+                    } else {
+                      onStartSignup({
+                        phone: cleanPhone,
+                        phoneVerified: true
+                      });
+                      onClose();
+                    }
+                  }}
                   context="auth"
                 />
               </div>

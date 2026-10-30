@@ -748,7 +748,7 @@ export function updateMarketplaceOrderStatus(
     order.statusHistory.push({
       status: order.orderStatus,
       timestamp: new Date().toLocaleString('en-IN'),
-      note: `Payment status updated to ${paymentStatus.toUpperCase()} via Cashfree Webhook. Ref: ${paymentRef || 'N/A'}`
+      note: `Payment status updated to ${paymentStatus.toUpperCase()} via Online Payment Gateway. Ref: ${paymentRef || 'N/A'}`
     });
     return order;
   }
