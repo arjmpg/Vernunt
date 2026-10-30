@@ -67,6 +67,7 @@ import { triggerGoogleSignIn } from '../../utils/firebase.ts';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
+  selectedLocality?: { name: string; pincode: string; city: string; lat?: number; lng?: number };
   onNavigateToTab?: (tab: string) => void;
   onContactSupport?: () => void;
   onOpenGoogleMerchantModal?: () => void;
@@ -80,6 +81,7 @@ const STORAGE_KEY_WISHLIST = 'vernunt_store_wishlist_v1';
 
 export const VernuntStore: React.FC<VernuntStoreProps> = ({
   userProfile,
+  selectedLocality,
   onNavigateToTab,
   onContactSupport,
   onOpenGoogleMerchantModal,
@@ -272,8 +274,22 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   };
 
   // Easy Shipping Quick-Check State
-  const [quickPinInput, setQuickPinInput] = useState<string>('560102');
-  const [quickPinResult, setQuickPinResult] = useState<string>('⚡ Delivery by Tomorrow 2 PM · Express Logistics · Free Shipping on ₹499+');
+  const [quickPinInput, setQuickPinInput] = useState<string>(() => selectedLocality?.pincode || '560102');
+  const [quickPinResult, setQuickPinResult] = useState<string>(() => 
+    selectedLocality?.name 
+      ? `⚡ Express local delivery to ${selectedLocality.name} (${selectedLocality.pincode}) available` 
+      : '⚡ Delivery by Tomorrow 2 PM · Express Logistics · Free Shipping on ₹499+'
+  );
+
+  // Sync locality when changed externally
+  useEffect(() => {
+    if (selectedLocality?.pincode) {
+      setQuickPinInput(selectedLocality.pincode);
+      setPincodeCheck(selectedLocality.pincode);
+      setQuickPinResult(`⚡ Fast local delivery to ${selectedLocality.name} (${selectedLocality.pincode}) · Express dispatch available`);
+      setPincodeResult(`🚚 Express delivery to ${selectedLocality.name} (${selectedLocality.pincode}) available!`);
+    }
+  }, [selectedLocality?.pincode, selectedLocality?.name]);
 
   // Toggle Featured & Highlighted handlers with instant sync & storage
   const handleToggleProductFeatured = (productId: string, e?: React.MouseEvent) => {
@@ -1376,12 +1392,19 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       if (sortBy === 'price-high') return b.price - a.price;
       if (sortBy === 'rating') return b.rating - a.rating;
       if (sortBy === 'bestselling') return (b.reviewCount || 0) - (a.reviewCount || 0);
+      if (selectedLocality?.pincode || selectedLocality?.name) {
+        const pin = selectedLocality?.pincode || '';
+        const locName = (selectedLocality?.name || '').toLowerCase();
+        const aMatches = (a.vendorLocality && a.vendorLocality.toLowerCase().includes(locName)) || (a.deliverablePincodes && a.deliverablePincodes.includes(pin)) ? 1 : 0;
+        const bMatches = (b.vendorLocality && b.vendorLocality.toLowerCase().includes(locName)) || (b.deliverablePincodes && b.deliverablePincodes.includes(pin)) ? 1 : 0;
+        if (bMatches !== aMatches) return bMatches - aMatches;
+      }
       return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
     });
-  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe, filterOnlyFeatured, filterOnlyHighlighted]);
+  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe, filterOnlyFeatured, filterOnlyHighlighted, selectedLocality]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 pb-20 relative" id="vernunt-store-container">
+    <div className="w-full bg-slate-50 text-slate-900 pb-4 relative" id="vernunt-store-container">
       {/* Toast */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2 text-xs font-bold animate-bounce-short border border-slate-700">

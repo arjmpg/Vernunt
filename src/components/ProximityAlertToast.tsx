@@ -69,8 +69,24 @@ export default function ProximityAlertToast({
   onDismiss,
   onView
 }: ProximityAlertToastProps) {
-  // Show up to 2 active alerts at once to keep it compact and non-intrusive
-  const visibleAlerts = alerts.slice(0, 2);
+  // Strictly deduplicate alerts by targetId AND title so no duplicate profile/child name ever repeats,
+  // and strictly show at most two different profiles at once
+  const uniqueAlerts: ProximityAlert[] = [];
+  const seenIds = new Set<string>();
+  const seenNames = new Set<string>();
+
+  for (const alert of alerts) {
+    const idKey = alert.targetId || alert.id;
+    // Extract base name or normalized title to ensure different kids' profiles
+    const normTitle = alert.title.trim().toLowerCase();
+    if (!seenIds.has(idKey) && !seenNames.has(normTitle)) {
+      seenIds.add(idKey);
+      seenNames.add(normTitle);
+      uniqueAlerts.push(alert);
+    }
+  }
+
+  const visibleAlerts = uniqueAlerts.slice(0, 2);
 
   if (visibleAlerts.length === 0) return null;
 

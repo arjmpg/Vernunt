@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  BangalorePark, ParkVisitBroadcast, ParkVisitRsvp, ChildProfile 
+  BangalorePark, ParkVisitBroadcast, ParkVisitRsvp, ChildProfile, ParkCheckinRecord 
 } from '../../types.ts';
 import { 
   BANGALORE_PARKS, BANGALORE_PARK_ZONES, PARK_FACILITY_OPTIONS, 
@@ -11,12 +11,15 @@ import {
   Search, MapPin, Navigation, Calendar, Clock, Users, Plus, 
   Sparkles, ExternalLink, Share2, Check, X, ShieldCheck, 
   ChevronRight, Heart, MessageSquare, AlertCircle, Info,
-  Filter, Layers, ArrowUpDown, Trees, Footprints, Baby
+  Filter, Layers, ArrowUpDown, Trees, Footprints, Baby,
+  CheckCircle2, Crosshair, Radio, LocateFixed, LogOut, Compass
 } from 'lucide-react';
 import { db } from '../../utils/firebase.ts';
 import { 
-  collection, onSnapshot, doc, setDoc, updateDoc, arrayUnion, query, orderBy 
+  collection, onSnapshot, doc, setDoc, updateDoc, arrayUnion, query, orderBy,
+  increment, serverTimestamp 
 } from 'firebase/firestore';
+import confetti from 'canvas-confetti';
 
 interface BangaloreParksHubProps {
   userProfile: ChildProfile | null;
@@ -61,6 +64,43 @@ export default function BangaloreParksHub({
   const [activeTab, setActiveTab] = useState<'all_parks' | 'today_schedule' | 'my_broadcasts'>('all_parks');
   const [amenityFilter, setAmenityFilter] = useState<'all' | 'verified' | 'accessible' | 'cafeteria'>('all');
   const [spaceCategoryFilter, setSpaceCategoryFilter] = useState<'all' | 'parks_playgrounds' | 'community_centers' | 'indoor_paid'>('all');
+
+  // Geolocation state for parent device (refined on mount and on refresh)
+  const [deviceLat, setDeviceLat] = useState<number>(userLat);
+  const [deviceLng, setDeviceLng] = useState<number>(userLng);
+  const [isLocatingUser, setIsLocatingUser] = useState(false);
+  const [hasRefinedGps, setHasRefinedGps] = useState(false);
+
+  // Real-time live visitor counts from Firestore 'parks' collection
+  const [liveVisitorCounts, setLiveVisitorCounts] = useState<Record<string, number>>({});
+
+  // Check-in tracking state
+  const [checkedInParkId, setCheckedInParkId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem('vernunt_checked_in_park_id');
+    } catch {
+      return null;
+    }
+  });
+  const [checkingInParkId, setCheckingInParkId] = useState<string | null>(null);
+
+  // Boundary verification modal (when parent is outside park boundary)
+  const [boundaryModalData, setBoundaryModalData] = useState<{
+    park: BangalorePark;
+    distanceMeters: number;
+    distanceKm: number;
+    boundaryMeters: number;
+    userCoords: { lat: number; lng: number };
+  } | null>(null);
+
+  // Celebration success modal upon verified check-in
+  const [checkinSuccessData, setCheckinSuccessData] = useState<{
+    park: BangalorePark;
+    distanceMeters: number;
+    boundaryMeters: number;
+    isSimulated: boolean;
+    liveCount: number;
+  } | null>(null);
 
   // Helper amenities evaluators
   const isParkVerified = (p: BangalorePark) => {
@@ -171,6 +211,66 @@ export default function BangaloreParksHub({
     );
   };
 
+  // Device location auto-refinement
+  const requestDeviceLocation = (showNotification = false) => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      if (showNotification) showToast('⚠️ Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocatingUser(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setDeviceLat(pos.coords.latitude);
+        setDeviceLng(pos.coords.longitude);
+        setHasRefinedGps(true);
+        setIsLocatingUser(false);
+        if (showNotification) {
+          showToast(`📍 GPS refined to your live location (${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)})`);
+        }
+      },
+      (err) => {
+        setIsLocatingUser(false);
+        if (showNotification) {
+          showToast(`📍 Location note: using Bangalore center. (${err.message})`);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+    );
+  };
+
+  useEffect(() => {
+    requestDeviceLocation(false);
+  }, []);
+
+  useEffect(() => {
+    if (userLat && userLng) {
+      setDeviceLat(userLat);
+      setDeviceLng(userLng);
+    }
+  }, [userLat, userLng]);
+
+  // Sync with Firestore collection `parks` in real-time for live visitor counts
+  useEffect(() => {
+    try {
+      const q = collection(db, 'parks');
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const counts: Record<string, number> = {};
+        snapshot.forEach((docSnap) => {
+          const data = docSnap.data();
+          if (data && typeof data.live_visitor_count === 'number') {
+            counts[docSnap.id] = data.live_visitor_count;
+          }
+        });
+        setLiveVisitorCounts(counts);
+      }, (err) => {
+        console.debug('Firestore parks live counts listener note:', err);
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.debug('Parks live count listener setup note:', err);
+    }
+  }, []);
+
   // Sync with Firestore collection `park_visits` in real-time
   useEffect(() => {
     try {
@@ -229,14 +329,26 @@ export default function BangaloreParksHub({
 
   const isAdmin = userProfile?.userRole === 'Admin';
 
+  // Boundary verification helper: calculates physical perimeter radius in meters
+  const calculateParkBoundaryMeters = (park: BangalorePark): number => {
+    if (park.boundaryRadiusMeters && park.boundaryRadiusMeters > 0) {
+      return park.boundaryRadiusMeters;
+    }
+    const acres = park.areaAcres || 2.5;
+    // 1 acre = ~4047 sq. meters. Circular equivalent radius = sqrt(acres * 4047 / PI)
+    // 150m buffer covers entry gates, car parks, perimeter walking tracks and GPS drift
+    const computed = Math.round(Math.sqrt((acres * 4047) / Math.PI) + 150);
+    return Math.max(450, computed); // Minimum 450m radius
+  };
+
   // Combine pre-seeded Bangalore parks with custom added parks
   const allParks = useMemo(() => {
     const combined = [...customParks, ...BANGALORE_PARKS];
     const map = new Map<string, BangalorePark>();
     combined.forEach(p => {
       if (!map.has(p.id)) {
-        // Calculate distance from parent
-        const distanceKm = getHaversineDistance(userLat, userLng, p.lat, p.lng);
+        // Calculate distance from parent using detected deviceLat & deviceLng
+        const distanceKm = getHaversineDistance(deviceLat, deviceLng, p.lat, p.lng);
         // Calculate how many active visits are scheduled today
         const todayStr = new Date().toISOString().split('T')[0];
         const visitsToday = parkVisits.filter(v => v.parkId === p.id && v.visitDate === todayStr);
@@ -247,17 +359,22 @@ export default function BangaloreParksHub({
           : (p.isCustomAdded ? false : true);
         const approvalStatus = p.approvalStatus || (isApproved ? 'APPROVED' : 'PENDING_APPROVAL');
 
+        const liveCount = liveVisitorCounts[p.id] ?? p.live_visitor_count ?? 0;
+        const boundaryRadius = p.boundaryRadiusMeters || calculateParkBoundaryMeters(p);
+
         map.set(p.id, {
           ...p,
           isApproved,
           approvalStatus,
           distanceKm: Number(distanceKm.toFixed(1)),
-          activeVisitsCount: visitsToday.length
+          activeVisitsCount: visitsToday.length,
+          live_visitor_count: liveCount,
+          boundaryRadiusMeters: boundaryRadius
         });
       }
     });
     return Array.from(map.values());
-  }, [customParks, userLat, userLng, parkVisits]);
+  }, [customParks, deviceLat, deviceLng, parkVisits, liveVisitorCounts]);
 
   // Pending parks count for admin
   const pendingParks = useMemo(() => {
@@ -352,19 +469,30 @@ export default function BangaloreParksHub({
       }
       return true;
     }).sort((a, b) => {
+      // User requirement: Always sort nearest ones to user as first
       if (sortBy === 'distance') {
-        return (a.distanceKm ?? 999) - (b.distanceKm ?? 999);
+        return (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999);
       }
       if (sortBy === 'visits') {
-        return (b.activeVisitsCount || 0) - (a.activeVisitsCount || 0);
+        const diff = (b.activeVisitsCount || 0) - (a.activeVisitsCount || 0);
+        return diff !== 0 ? diff : (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999);
       }
       if (sortBy === 'rating') {
-        return (b.placeRating || 0) - (a.placeRating || 0);
+        const diff = (b.placeRating || 0) - (a.placeRating || 0);
+        return diff !== 0 ? diff : (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999);
       }
       // popular
-      return (b.reviewsCount || 0) - (a.reviewsCount || 0);
+      const diff = (b.reviewsCount || 0) - (a.reviewsCount || 0);
+      return diff !== 0 ? diff : (a.distanceKm ?? 9999) - (b.distanceKm ?? 9999);
     });
   }, [allParks, spaceCategoryFilter, amenityFilter, selectedZone, selectedFacilities, searchQuery, sortBy, isAdmin, userProfile?.id]);
+
+  // Handler for space categories ensuring nearest sort priority is preserved
+  const handleSelectSpaceCategory = (category: 'all' | 'parks_playgrounds' | 'community_centers' | 'indoor_paid') => {
+    setSpaceCategoryFilter(category);
+    // User requirement: For playtime park and play always sort nearest ones to user as first
+    setSortBy('distance');
+  };
 
   // Get visits for a specific park and filtered by selected date and time
   const getFilteredVisitsForPark = (parkId: string, date: string, timeSlotId: string) => {
@@ -591,8 +719,189 @@ export default function BangaloreParksHub({
     showToast(`❌ "${park.name}" rejected and removed from listings.`);
   };
 
+  // Execute check-in: increments live_visitor_count in Firestore and logs checkin document
+  const executeCheckin = async (
+    park: BangalorePark,
+    userCoords: { lat: number; lng: number },
+    distanceMeters: number,
+    boundaryMeters: number,
+    isSimulated = false
+  ) => {
+    try {
+      // 1. Atomically increment live_visitor_count in Firestore
+      const parkRef = doc(db, 'parks', park.id);
+      await setDoc(parkRef, {
+        id: park.id,
+        name: park.name,
+        locality: park.locality,
+        zone: park.zone,
+        lat: park.lat,
+        lng: park.lng,
+        live_visitor_count: increment(1),
+        last_checkin_at: serverTimestamp(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      // 2. Write check-in audit record to park_checkins
+      const checkinId = `checkin-${park.id}-${userProfile?.id || 'guest'}-${Date.now()}`;
+      await setDoc(doc(db, 'park_checkins', checkinId), {
+        id: checkinId,
+        parkId: park.id,
+        parkName: park.name,
+        userId: userProfile?.id || 'guest-parent',
+        parentName: userProfile?.parentName || 'Parent',
+        childName: userProfile?.childName || 'Child',
+        lat: userCoords.lat,
+        lng: userCoords.lng,
+        distanceMeters,
+        boundaryMeters,
+        isSimulated,
+        timestamp: new Date().toISOString()
+      }).catch(err => console.debug('Checkin log note:', err));
+
+      // 3. Update local state & storage
+      setCheckedInParkId(park.id);
+      try {
+        localStorage.setItem('vernunt_checked_in_park_id', park.id);
+        localStorage.setItem('vernunt_checked_in_park_name', park.name);
+      } catch (storageErr) {
+        console.debug('Storage note:', storageErr);
+      }
+
+      const currentCount = liveVisitorCounts[park.id] ?? park.live_visitor_count ?? 0;
+      const newLiveCount = currentCount + 1;
+      setLiveVisitorCounts(prev => ({ ...prev, [park.id]: newLiveCount }));
+
+      // 4. Trigger celebration confetti
+      try {
+        confetti({
+          particleCount: 85,
+          spread: 75,
+          origin: { y: 0.6 }
+        });
+      } catch (confettiErr) {
+        console.debug('Confetti note:', confettiErr);
+      }
+
+      // 5. Open check-in success modal
+      setCheckinSuccessData({
+        park,
+        distanceMeters,
+        boundaryMeters,
+        isSimulated,
+        liveCount: newLiveCount
+      });
+
+      showToast(`🎉 Verified & Checked In at ${park.name}! Live visitor count updated.`);
+    } catch (err: any) {
+      console.error('Checkin error:', err);
+      setCheckedInParkId(park.id);
+      try {
+        localStorage.setItem('vernunt_checked_in_park_id', park.id);
+      } catch (storageErr) {
+        console.debug('Storage fallback note:', storageErr);
+      }
+      showToast(`✅ Checked in at ${park.name}!`);
+    } finally {
+      setCheckingInParkId(null);
+      setBoundaryModalData(null);
+    }
+  };
+
+  // Check-in at Park: Uses device geolocation to verify parent is within park boundary
+  const handleCheckinAtPark = (park: BangalorePark, forceSimulated = false) => {
+    if (forceSimulated) {
+      setCheckingInParkId(park.id);
+      const boundary = calculateParkBoundaryMeters(park);
+      executeCheckin(park, { lat: park.lat, lng: park.lng }, 45, boundary, true);
+      return;
+    }
+
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      showToast('⚠️ Geolocation not available on device. Simulating check-in for preview.');
+      const boundary = calculateParkBoundaryMeters(park);
+      executeCheckin(park, { lat: park.lat, lng: park.lng }, 50, boundary, true);
+      return;
+    }
+
+    setCheckingInParkId(park.id);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userLatActual = pos.coords.latitude;
+        const userLngActual = pos.coords.longitude;
+        setDeviceLat(userLatActual);
+        setDeviceLng(userLngActual);
+        setHasRefinedGps(true);
+
+        const distanceKm = getHaversineDistance(userLatActual, userLngActual, park.lat, park.lng);
+        const distanceMeters = Math.round(distanceKm * 1000);
+        const boundaryMeters = calculateParkBoundaryMeters(park);
+
+        if (distanceMeters <= boundaryMeters) {
+          // Inside boundary - verified!
+          executeCheckin(park, { lat: userLatActual, lng: userLngActual }, distanceMeters, boundaryMeters, false);
+        } else {
+          // Outside boundary
+          setCheckingInParkId(null);
+          setBoundaryModalData({
+            park,
+            distanceMeters,
+            distanceKm: Number(distanceKm.toFixed(2)),
+            boundaryMeters,
+            userCoords: { lat: userLatActual, lng: userLngActual }
+          });
+        }
+      },
+      (err) => {
+        setCheckingInParkId(null);
+        const boundaryMeters = calculateParkBoundaryMeters(park);
+        const distanceKm = getHaversineDistance(deviceLat, deviceLng, park.lat, park.lng);
+        const distanceMeters = Math.round(distanceKm * 1000);
+        setBoundaryModalData({
+          park,
+          distanceMeters,
+          distanceKm: Number(distanceKm.toFixed(2)),
+          boundaryMeters,
+          userCoords: { lat: deviceLat, lng: deviceLng }
+        });
+        showToast(`📍 Geolocation Note: ${err.message}. You can retry or simulate check-in.`);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 }
+    );
+  };
+
+  // Check out of park: decrements live visitor count in Firestore
+  const handleCheckoutOfPark = async (park: BangalorePark) => {
+    try {
+      const current = liveVisitorCounts[park.id] ?? park.live_visitor_count ?? 1;
+      const parkRef = doc(db, 'parks', park.id);
+      await setDoc(parkRef, {
+        live_visitor_count: increment(current > 0 ? -1 : 0),
+        last_checkout_at: serverTimestamp(),
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+
+      setLiveVisitorCounts(prev => ({
+        ...prev,
+        [park.id]: Math.max(0, (prev[park.id] ?? park.live_visitor_count ?? 1) - 1)
+      }));
+    } catch (err) {
+      console.debug('Checkout error note:', err);
+    } finally {
+      setCheckedInParkId(null);
+      try {
+        localStorage.removeItem('vernunt_checked_in_park_id');
+        localStorage.removeItem('vernunt_checked_in_park_name');
+      } catch (storageErr) {
+        console.debug('Storage note:', storageErr);
+      }
+      showToast(`👋 You checked out of ${park.name}. Hope you and your child had a great time!`);
+    }
+  };
+
   return (
-    <div className="w-full bg-slate-50 min-h-screen py-6 px-3 sm:px-6 lg:px-8 space-y-8 animate-fade-in">
+    <div className="w-full bg-slate-50 py-4 sm:py-6 px-3 sm:px-6 lg:px-8 space-y-6 sm:space-y-8 animate-fade-in">
       {/* Toast Announcement */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-50 bg-slate-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 border border-slate-700 animate-slide-up text-sm font-semibold max-w-md">
@@ -672,8 +981,59 @@ export default function BangaloreParksHub({
         </div>
       </div>
 
+      {/* Checked-In Active Status Bar */}
+      {checkedInParkId && (() => {
+        const activePark = allParks.find(p => p.id === checkedInParkId);
+        return (
+          <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-3xl p-4 sm:p-5 shadow-lg border border-emerald-400/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0 text-xl backdrop-blur-xs">
+                📍
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-300 animate-ping" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-emerald-200">
+                    Live Visit Active Now
+                  </span>
+                </div>
+                <h3 className="text-sm sm:text-base font-black">
+                  You are checked in at {activePark?.name || 'Bangalore Park'}
+                </h3>
+                <p className="text-xs text-emerald-100 font-medium">
+                  Your live visit increments the visitor counter for nearby parents. Tap Check Out when leaving.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center">
+              {activePark && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInspectingPark(activePark);
+                    setSelectedDate(new Date().toISOString().split('T')[0]);
+                  }}
+                  className="px-3 py-2 bg-white/15 hover:bg-white/25 text-white font-bold text-xs rounded-xl transition cursor-pointer backdrop-blur-xs"
+                >
+                  View Details
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => activePark && handleCheckoutOfPark(activePark)}
+                className="px-4 py-2 bg-white text-emerald-950 font-black text-xs rounded-xl shadow-md hover:bg-emerald-50 transition active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <LogOut className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Check Out</span>
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Medium-Sized Round Sub-Categories Selector */}
-      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/90 space-y-3">
+      <div className="bg-white rounded-3xl p-4 sm:p-5 shadow-xs border border-slate-200/90 space-y-3.5">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -681,9 +1041,11 @@ export default function BangaloreParksHub({
               Browse Play Space Sub-Categories
             </h2>
           </div>
-          <span className="text-[11px] font-bold text-slate-500">
-            {filteredParks.length} locations available
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500">
+              {filteredParks.length} locations available
+            </span>
+          </div>
         </div>
 
         {/* Medium-Size Round Category Buttons */}
@@ -691,7 +1053,7 @@ export default function BangaloreParksHub({
           {/* Sub-Category: All Spaces */}
           <button
             type="button"
-            onClick={() => setSpaceCategoryFilter('all')}
+            onClick={() => handleSelectSpaceCategory('all')}
             className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
               spaceCategoryFilter === 'all'
                 ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-400/40'
@@ -721,7 +1083,7 @@ export default function BangaloreParksHub({
           {/* Sub-Category 1: Parks & Playgrounds */}
           <button
             type="button"
-            onClick={() => setSpaceCategoryFilter('parks_playgrounds')}
+            onClick={() => handleSelectSpaceCategory('parks_playgrounds')}
             className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
               spaceCategoryFilter === 'parks_playgrounds'
                 ? 'bg-emerald-700 text-white border-emerald-700 shadow-md ring-2 ring-emerald-300/40'
@@ -751,7 +1113,7 @@ export default function BangaloreParksHub({
           {/* Sub-Category 2: Community & Recreation Centers */}
           <button
             type="button"
-            onClick={() => setSpaceCategoryFilter('community_centers')}
+            onClick={() => handleSelectSpaceCategory('community_centers')}
             className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
               spaceCategoryFilter === 'community_centers'
                 ? 'bg-indigo-700 text-white border-indigo-700 shadow-md ring-2 ring-indigo-300/40'
@@ -781,7 +1143,7 @@ export default function BangaloreParksHub({
           {/* Sub-Category 3: Indoor / Paid Play Spaces */}
           <button
             type="button"
-            onClick={() => setSpaceCategoryFilter('indoor_paid')}
+            onClick={() => handleSelectSpaceCategory('indoor_paid')}
             className={`py-3 px-4 rounded-full transition-all duration-200 flex items-center justify-between gap-3 text-left cursor-pointer border-2 ${
               spaceCategoryFilter === 'indoor_paid'
                 ? 'bg-amber-600 text-white border-amber-600 shadow-md ring-2 ring-amber-300/40'
@@ -1132,12 +1494,20 @@ export default function BangaloreParksHub({
                         )}
                       </div>
 
-                      {/* Active Visits Count Alert Banner */}
-                      {activeVisits.length > 0 && (
-                        <div className="absolute top-3 right-3 bg-rose-600 text-white font-black text-[10px] px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1 animate-pulse">
-                          <span>🔥 {activeVisits.length} Playdate{activeVisits.length > 1 ? 's' : ''} Today</span>
-                        </div>
-                      )}
+                      {/* Live Visitor Count Alert & Scheduled Visits Badges */}
+                      <div className="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-10">
+                        {park.live_visitor_count !== undefined && park.live_visitor_count > 0 && (
+                          <div className="bg-emerald-600/95 text-white font-black text-[10px] px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5 backdrop-blur-xs border border-emerald-400/40 animate-pulse">
+                            <span className="w-2 h-2 rounded-full bg-emerald-300 animate-ping shrink-0" />
+                            <span>🟢 {park.live_visitor_count} Parent{park.live_visitor_count > 1 ? 's' : ''} Live</span>
+                          </div>
+                        )}
+                        {activeVisits.length > 0 && (
+                          <div className="bg-rose-600/95 text-white font-black text-[10px] px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1">
+                            <span>🔥 {activeVisits.length} Playdate{activeVisits.length > 1 ? 's' : ''} Today</span>
+                          </div>
+                        )}
+                      </div>
 
                       {/* Bottom Title on Image */}
                       <div className="absolute bottom-3 left-3 right-3 text-white">
@@ -1155,6 +1525,23 @@ export default function BangaloreParksHub({
                         </span>
                       </div>
                     </div>
+
+                    {/* Active Checked-In Banner */}
+                    {checkedInParkId === park.id && (
+                      <div className="bg-emerald-600 text-white font-bold text-xs py-2 px-3.5 flex items-center justify-between shadow-inner">
+                        <div className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-200 shrink-0" />
+                          <span className="truncate">You&apos;re Checked In Here!</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleCheckoutOfPark(park)}
+                          className="bg-white hover:bg-emerald-50 text-emerald-950 font-black text-[10.5px] px-2.5 py-0.5 rounded-md transition cursor-pointer shadow-2xs shrink-0"
+                        >
+                          Check Out
+                        </button>
+                      </div>
+                    )}
 
                     {/* Park Info Body */}
                     <div className="p-4 space-y-3">
@@ -1208,6 +1595,46 @@ export default function BangaloreParksHub({
 
                   {/* Actions Bar */}
                   <div className="p-4 pt-0 space-y-2.5">
+                    {/* Primary Check-in Feature Button */}
+                    {checkedInParkId === park.id ? (
+                      <button
+                        type="button"
+                        onClick={() => handleCheckoutOfPark(park)}
+                        className="w-full py-2.5 px-3 bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs border border-emerald-600"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                        <span>You&apos;re Checked In • Tap to Check Out</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={checkingInParkId === park.id}
+                        onClick={() => handleCheckinAtPark(park)}
+                        className="w-full py-2.5 px-3.5 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-700 hover:to-teal-800 active:scale-98 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-md disabled:opacity-60"
+                      >
+                        {checkingInParkId === park.id ? (
+                          <>
+                            <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            <span>Verifying Geofence &amp; Boundary...</span>
+                          </>
+                        ) : (
+                          <>
+                            <MapPin className="w-4 h-4 text-amber-300" />
+                            <span>Check-in at Park</span>
+                            {park.live_visitor_count !== undefined && park.live_visitor_count > 0 ? (
+                              <span className="bg-emerald-950/70 text-emerald-200 text-[10px] font-mono px-2 py-0.5 rounded-full font-bold">
+                                🟢 {park.live_visitor_count} Live
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-medium text-emerald-100 hidden sm:inline">
+                                (~{park.boundaryRadiusMeters || 450}m boundary)
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </button>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2">
                       {/* Who is Going Inspector Button */}
                       <button
@@ -1245,10 +1672,10 @@ export default function BangaloreParksHub({
                       href={`https://www.google.com/maps/dir/?api=1&destination=${park.lat},${park.lng}&destination_place_id=&travelmode=walking&dir_action=navigate`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full py-2.5 px-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs group/dir"
+                      className="w-full py-2 px-3.5 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-black text-xs rounded-xl transition flex items-center justify-center gap-2 cursor-pointer shadow-xs group/dir"
                       title={`Get directions to ${park.name} on Google Maps`}
                     >
-                      <Navigation className="w-4 h-4 text-white group-hover/dir:rotate-45 transition-transform" />
+                      <Navigation className="w-3.5 h-3.5 text-white group-hover/dir:rotate-45 transition-transform" />
                       <span>Get Directions</span>
                       <span className="text-[11px] font-bold text-blue-100">
                         ({park.distanceKm !== undefined ? `${park.distanceKm} km` : 'Google Maps'})
@@ -1551,9 +1978,17 @@ export default function BangaloreParksHub({
             {/* Header */}
             <div className="p-5 bg-gradient-to-r from-emerald-900 to-slate-900 text-white flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
-                  {inspectingPark.locality} • {inspectingPark.zone} Bangalore
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300">
+                    {inspectingPark.locality} • {inspectingPark.zone} Bangalore
+                  </span>
+                  {(liveVisitorCounts[inspectingPark.id] ?? inspectingPark.live_visitor_count ?? 0) > 0 && (
+                    <span className="bg-emerald-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-950 shrink-0" />
+                      <span>🟢 {liveVisitorCounts[inspectingPark.id] ?? inspectingPark.live_visitor_count} Here Now</span>
+                    </span>
+                  )}
+                </div>
                 <h3 className="text-xl font-black font-serif leading-tight mt-0.5">
                   {inspectingPark.name}
                 </h3>
@@ -1744,19 +2179,42 @@ export default function BangaloreParksHub({
             </div>
 
             {/* Footer */}
-            <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  setBroadcastTargetPark(inspectingPark);
-                  setBroadcastDate(selectedDate);
-                  setIsBroadcastModalOpen(true);
-                }}
-                className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-              >
-                <Plus className="w-4 h-4 text-amber-300" />
-                <span>My Kid is Going Too!</span>
-              </button>
+            <div className="p-4 bg-slate-100 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                {checkedInParkId === inspectingPark.id ? (
+                  <button
+                    type="button"
+                    onClick={() => handleCheckoutOfPark(inspectingPark)}
+                    className="px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-emerald-300" />
+                    <span>Checked In • Check Out</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={checkingInParkId === inspectingPark.id}
+                    onClick={() => handleCheckinAtPark(inspectingPark)}
+                    className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white font-black text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    <MapPin className="w-4 h-4 text-amber-300" />
+                    <span>{checkingInParkId === inspectingPark.id ? 'Verifying Boundary...' : 'Check-in at Park'}</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBroadcastTargetPark(inspectingPark);
+                    setBroadcastDate(selectedDate);
+                    setIsBroadcastModalOpen(true);
+                  }}
+                  className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus className="w-4 h-4 text-amber-300" />
+                  <span>Broadcast Playdate</span>
+                </button>
+              </div>
 
               <button
                 type="button"
@@ -2208,6 +2666,197 @@ export default function BangaloreParksHub({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Outside Park Boundary Alert with Directions & Preview Simulation */}
+      {boundaryModalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 animate-scale-up">
+            {/* Header */}
+            <div className="p-5 bg-gradient-to-r from-amber-600 via-orange-600 to-rose-700 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center font-bold text-lg backdrop-blur-xs">
+                  📍
+                </div>
+                <div>
+                  <h3 className="text-base font-black font-serif">
+                    Outside Park Boundary
+                  </h3>
+                  <span className="text-xs text-amber-100">
+                    Geolocation perimeter verification
+                  </span>
+                </div>
+              </div>
+              <button 
+                onClick={() => setBoundaryModalData(null)}
+                className="p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Park details summary */}
+              <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-2xl">
+                <img 
+                  src={boundaryModalData.park.imageUrl} 
+                  alt={boundaryModalData.park.name}
+                  className="w-14 h-14 rounded-xl object-cover shrink-0"
+                />
+                <div className="min-w-0">
+                  <h4 className="text-sm font-black text-slate-900 truncate">
+                    {boundaryModalData.park.name}
+                  </h4>
+                  <p className="text-xs text-slate-500 truncate">
+                    {boundaryModalData.park.locality} • {boundaryModalData.park.zone} Bangalore
+                  </p>
+                  <span className="text-[11px] font-bold text-emerald-700">
+                    Perimeter Boundary: ~{boundaryModalData.boundaryMeters}m radius
+                  </span>
+                </div>
+              </div>
+
+              {/* Distance comparison callout */}
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-xs space-y-2 text-amber-950">
+                <div className="flex items-center gap-2 font-bold text-amber-900">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>You are currently {boundaryModalData.distanceKm} km ({boundaryModalData.distanceMeters}m) away</span>
+                </div>
+                <p className="text-amber-800 leading-relaxed text-[11.5px]">
+                  To protect accurate live visitor counts for all parents, &ldquo;Check-in at Park&rdquo; verifies that your device is within the park perimeter (~{boundaryModalData.boundaryMeters}m).
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="space-y-2 pt-1">
+                {/* 1. Get Directions on Google Maps */}
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&destination=${boundaryModalData.park.lat},${boundaryModalData.park.lng}&destination_place_id=&travelmode=walking&dir_action=navigate`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Navigation className="w-4 h-4 text-white" />
+                  <span>Get Walking / Driving Directions ({boundaryModalData.distanceKm} km)</span>
+                </a>
+
+                {/* 2. Retry GPS check */}
+                <button
+                  type="button"
+                  onClick={() => handleCheckinAtPark(boundaryModalData.park, false)}
+                  className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Crosshair className="w-4 h-4 text-emerald-400" />
+                  <span>I Am At The Park (Retry GPS Verification)</span>
+                </button>
+
+                {/* 3. Testing / Simulation mode for preview */}
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      executeCheckin(
+                        boundaryModalData.park,
+                        boundaryModalData.userCoords,
+                        45,
+                        boundaryModalData.boundaryMeters,
+                        true
+                      );
+                    }}
+                    className="w-full py-2 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Preview &amp; Testing Mode: Simulate Check-in</span>
+                  </button>
+                  <span className="text-[10px] text-slate-400 block text-center mt-1">
+                    Allows testing in browser emulator or low-GPS conditions
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Check-In Celebration Success Modal */}
+      {checkinSuccessData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full overflow-hidden shadow-2xl border border-slate-200 animate-scale-up">
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-emerald-800 via-teal-800 to-emerald-950 text-white text-center space-y-2 relative">
+              <div className="w-14 h-14 rounded-full bg-emerald-400 text-slate-950 flex items-center justify-center text-2xl mx-auto shadow-lg animate-bounce">
+                🎉
+              </div>
+              <h3 className="text-xl font-black font-serif">
+                You&apos;re Checked In!
+              </h3>
+              <p className="text-xs text-emerald-200 font-medium">
+                {checkinSuccessData.isSimulated ? 'Simulated Preview Check-in Verified' : 'GPS Boundary Verified Successfully'}
+              </p>
+              <button 
+                onClick={() => setCheckinSuccessData(null)}
+                className="absolute top-4 right-4 p-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white transition cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* Park & Live Visitor Highlight */}
+              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-emerald-800">
+                    {checkinSuccessData.park.locality}
+                  </span>
+                  <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[11px] font-black px-2.5 py-0.5 rounded-full animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                    <span>🟢 {checkinSuccessData.liveCount} Parent{checkinSuccessData.liveCount > 1 ? 's' : ''} Live Now</span>
+                  </span>
+                </div>
+                <h4 className="text-base font-black text-slate-900">
+                  {checkinSuccessData.park.name}
+                </h4>
+                <p className="text-xs text-slate-600 font-medium">
+                  Verified distance: {checkinSuccessData.distanceMeters}m from center (within ~{checkinSuccessData.boundaryMeters}m park boundary).
+                </p>
+              </div>
+
+              <div className="text-xs text-slate-600 space-y-1.5 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div className="flex items-center gap-2 text-slate-800 font-bold">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Live Counter Incremented in Firestore</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Nearby parents browsing {checkinSuccessData.park.name} can now see real-time active visitors at the park.
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCheckinSuccessData(null);
+                    setBroadcastTargetPark(checkinSuccessData.park);
+                    setIsBroadcastModalOpen(true);
+                  }}
+                  className="w-full py-2.5 px-4 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-slate-950" />
+                  <span>📢 Announce Playdate to Nearby Parents</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCheckinSuccessData(null)}
+                  className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl transition cursor-pointer"
+                >
+                  Keep Exploring Parks
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

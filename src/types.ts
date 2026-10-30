@@ -1261,10 +1261,25 @@ export interface BangalorePark {
   approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   verified?: boolean;
   accessible?: boolean;
-  hasCafeteria?: boolean;
+  live_visitor_count?: number;
+  boundaryRadiusMeters?: number;
   submittedByUserId?: string;
   submittedByUserName?: string;
   submittedAt?: string;
+}
+
+export interface ParkCheckinRecord {
+  id: string;
+  parkId: string;
+  parkName: string;
+  userId: string;
+  parentName: string;
+  childName?: string;
+  lat: number;
+  lng: number;
+  distanceMeters: number;
+  boundaryMeters: number;
+  timestamp: string;
 }
 
 export interface ParkVisitRsvp {

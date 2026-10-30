@@ -41,7 +41,7 @@ export const AboutUsTab: React.FC<AboutUsTabProps> = ({
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
 
   return (
-    <div className="space-y-12 animate-fadeIn pb-12">
+    <div className="space-y-8 sm:space-y-10 animate-fadeIn pb-2">
       {/* Hero Header */}
       <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white p-6 sm:p-10 shadow-xl border border-white/10">
         <div className="max-w-3xl space-y-4">

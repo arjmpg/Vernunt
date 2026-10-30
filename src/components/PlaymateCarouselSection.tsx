@@ -266,7 +266,7 @@ export default function PlaymateCarouselSection({
               <div className="mt-2.5 px-0.5 space-y-1">
                 {/* Child Title */}
                 <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 line-clamp-1 leading-snug group-hover:text-rose-600 transition-colors">
-                  {isPhotoUnlocked ? `${p.childName}, ${p.childAge} yrs` : '🔒 Playmate, •• yrs'}
+                  {isPhotoUnlocked ? `${p.childName}, ${p.childAge || 5} yrs` : '🔒 Playmate, •• yrs'}
                 </h4>
 
                 {/* Parent & Neighborhood */}

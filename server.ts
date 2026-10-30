@@ -9,6 +9,7 @@ import { registerPrivacyComplianceRoutes } from "./server/privacyComplianceServi
 import { registerMarketplaceRoutes } from "./server/marketplaceService.ts";
 import { registerEmailRoutes, sendEmailMessage } from "./server/emailService.ts";
 import { registerBackupRoutes } from "./server/backupService.ts";
+import { registerRazorpayRoutes } from "./server/razorpayService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 import { initializeApp as initializeClientApp, getApps as getClientApps } from "firebase/app";
 import { initializeFirestore as initializeClientFirestore, collection as clientCollection, getDocs as clientGetDocs, doc as clientDoc, setDoc as clientSetDoc } from "firebase/firestore";
@@ -68,6 +69,9 @@ async function startServer() {
 
   // Automated Nightly Backup Engine & Full App / Data Live Restoration Gateway
   registerBackupRoutes(app, getFirebaseAdmin);
+
+  // Razorpay Standard Web Checkout Gateway (Order Creation & Signature Verification)
+  registerRazorpayRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {

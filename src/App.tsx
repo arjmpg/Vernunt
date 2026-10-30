@@ -2260,14 +2260,25 @@ export default function App() {
     }, 450);
   };
 
-  // Active User Location Coordinates (used for proximity calculations - Default: Bangalore)
-  const userLat = typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
-    ? Number(userProfile.location.lat)
-    : (typeof userProfile?.capturedLat === 'number' ? userProfile.capturedLat : 12.9716);
+  // Active User Location Coordinates (derived dynamically from selectedLocality or userProfile)
+  const selectedLat = typeof selectedLocality?.lat === 'number' && !isNaN(selectedLocality.lat)
+    ? Number(selectedLocality.lat)
+    : undefined;
+  const selectedLng = typeof selectedLocality?.lng === 'number' && !isNaN(selectedLocality.lng)
+    ? Number(selectedLocality.lng)
+    : undefined;
 
-  const userLng = typeof userProfile?.location === 'object' && userProfile?.location?.lng !== undefined
-    ? Number(userProfile.location.lng)
-    : (typeof userProfile?.capturedLng === 'number' ? userProfile.capturedLng : 77.5946);
+  const userLat = selectedLat !== undefined
+    ? selectedLat
+    : (typeof userProfile?.location === 'object' && userProfile?.location?.lat !== undefined
+        ? Number(userProfile.location.lat)
+        : (typeof userProfile?.capturedLat === 'number' ? userProfile.capturedLat : 12.9716));
+
+  const userLng = selectedLng !== undefined
+    ? selectedLng
+    : (typeof userProfile?.location === 'object' && userProfile?.location?.lng !== undefined
+        ? Number(userProfile.location.lng)
+        : (typeof userProfile?.capturedLng === 'number' ? userProfile.capturedLng : 77.5946));
 
   // 1km Immediate Proximity Alert Notifications State & Detection
   const [proximityAlerts, setProximityAlerts] = useState<ProximityAlert[]>([]);
@@ -2333,7 +2344,23 @@ export default function App() {
       });
 
       if (alertsToAdd.length > 0) {
-        setProximityAlerts(prev => [...alertsToAdd, ...prev].slice(0, 5));
+        setProximityAlerts(prev => {
+          const combined = [...alertsToAdd, ...prev];
+          const deduped: ProximityAlert[] = [];
+          const seenIds = new Set<string>();
+          const seenNames = new Set<string>();
+
+          for (const a of combined) {
+            const idKey = a.targetId || a.id;
+            const normTitle = a.title.trim().toLowerCase();
+            if (!seenIds.has(idKey) && !seenNames.has(normTitle)) {
+              seenIds.add(idKey);
+              seenNames.add(normTitle);
+              deduped.push(a);
+            }
+          }
+          return deduped.slice(0, 2);
+        });
         playSubtleProximityChime();
       }
     }
@@ -2380,7 +2407,23 @@ export default function App() {
       });
 
       if (alertsToAdd.length > 0) {
-        setProximityAlerts(prev => [...alertsToAdd, ...prev].slice(0, 5));
+        setProximityAlerts(prev => {
+          const combined = [...alertsToAdd, ...prev];
+          const deduped: ProximityAlert[] = [];
+          const seenIds = new Set<string>();
+          const seenTitles = new Set<string>();
+
+          for (const a of combined) {
+            const idKey = a.targetId || a.id;
+            const normTitle = a.title.trim().toLowerCase();
+            if (!seenIds.has(idKey) && !seenTitles.has(normTitle)) {
+              seenIds.add(idKey);
+              seenTitles.add(normTitle);
+              deduped.push(a);
+            }
+          }
+          return deduped.slice(0, 2);
+        });
         playSubtleProximityChime();
       }
     }
@@ -2421,24 +2464,51 @@ export default function App() {
   const triggerSimulatedProximityAlert = (type: 'playmate' | 'event') => {
     if (type === 'playmate') {
       const testId = `sim-pm-${Date.now()}`;
-      const sampleNames = ['Aarav & Kabir (6 yrs)', 'Saanvi (4 yrs)', 'Diya & Reyansh (5 yrs)', 'Neil (7 yrs)'];
-      const randomName = sampleNames[Math.floor(Math.random() * sampleNames.length)];
+      const sampleKids = [
+        { name: 'Saanvi Hegde (4 yrs)', parent: 'Priya & Arvind Hegde', emoji: '🧸', id: 'pm-sim-saanvi' },
+        { name: 'Reyansh Gowda (5 yrs)', parent: 'Rohan & Sneha Gowda', emoji: '🚂', id: 'pm-sim-reyansh' },
+        { name: 'Neil Nair (7 yrs)', parent: 'Aditya & Radhika Nair', emoji: '🎨', id: 'pm-sim-neil' },
+        { name: 'Anika Bhat (3 yrs)', parent: 'Siddharth & Ananya Bhat', emoji: '⭐', id: 'pm-sim-anika' },
+        { name: 'Kabir Sharma (6 yrs)', parent: 'Ashwin & Pooja Sharma', emoji: '🧩', id: 'pm-sim-kabir' }
+      ];
+      // Pick random kid not already showing
+      const existingTitles = new Set(proximityAlerts.map(a => a.title.toLowerCase()));
+      const availableKids = sampleKids.filter(k => !existingTitles.has(k.name.toLowerCase()));
+      const selectedKid = availableKids.length > 0
+        ? availableKids[Math.floor(Math.random() * availableKids.length)]
+        : sampleKids[Math.floor(Math.random() * sampleKids.length)];
+
       const dist = (0.2 + Math.random() * 0.6).toFixed(1);
 
       const newAlert: ProximityAlert = {
         id: `alert-${testId}`,
         type: 'playmate',
-        title: randomName,
-        subtitle: 'Modern & Creative Play • Active in neighborhood',
+        title: selectedKid.name,
+        subtitle: `Friendly Neighbor • Parent: ${selectedKid.parent}`,
         distanceKm: parseFloat(dist),
         distanceText: `${dist} km away`,
         photoUrl: 'https://images.unsplash.com/photo-1543332164-6e82f355badc?auto=format&fit=crop&q=80&w=300',
-        avatarEmoji: '🧸',
+        avatarEmoji: selectedKid.emoji,
         timestamp: Date.now(),
-        targetId: playmates[0]?.id || 'playmate-1',
-        address: 'Sector 54 Park Lane (< 1 km)'
+        targetId: selectedKid.id,
+        address: 'Immediate neighborhood (< 1 km)'
       };
-      setProximityAlerts(prev => [newAlert, ...prev].slice(0, 5));
+      setProximityAlerts(prev => {
+        const combined = [newAlert, ...prev];
+        const deduped: ProximityAlert[] = [];
+        const seenIds = new Set<string>();
+        const seenNames = new Set<string>();
+        for (const a of combined) {
+          const idKey = a.targetId || a.id;
+          const normTitle = a.title.trim().toLowerCase();
+          if (!seenIds.has(idKey) && !seenNames.has(normTitle)) {
+            seenIds.add(idKey);
+            seenNames.add(normTitle);
+            deduped.push(a);
+          }
+        }
+        return deduped.slice(0, 2);
+      });
       playSubtleProximityChime();
     } else {
       const testId = `sim-evt-${Date.now()}`;
@@ -2461,10 +2531,25 @@ export default function App() {
         photoUrl: 'https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600',
         avatarEmoji: '🎉',
         timestamp: Date.now(),
-        targetId: eventsList[0]?.id || 'event-1',
+        targetId: `sim-evt-${Date.now()}`,
         address: 'Walking distance (0.4 km)'
       };
-      setProximityAlerts(prev => [newAlert, ...prev].slice(0, 5));
+      setProximityAlerts(prev => {
+        const combined = [newAlert, ...prev];
+        const deduped: ProximityAlert[] = [];
+        const seenIds = new Set<string>();
+        const seenTitles = new Set<string>();
+        for (const a of combined) {
+          const idKey = a.targetId || a.id;
+          const normTitle = a.title.trim().toLowerCase();
+          if (!seenIds.has(idKey) && !seenTitles.has(normTitle)) {
+            seenIds.add(idKey);
+            seenTitles.add(normTitle);
+            deduped.push(a);
+          }
+        }
+        return deduped.slice(0, 2);
+      });
       playSubtleProximityChime();
     }
   };
@@ -3590,6 +3675,8 @@ export default function App() {
                       setIsLocalityDetecting(false);
                       if (captured) {
                         setSelectedLocality(captured);
+                        window.dispatchEvent(new CustomEvent('vernunt-locality-changed', { detail: captured }));
+                        triggerToast(`📍 Auto-detected your location: ${captured.name}! Playmates, parks, and products updated.`);
                         setShowLocationPicker(false);
                       }
                     }}
@@ -3610,12 +3697,18 @@ export default function App() {
                         key={loc.pincode}
                         type="button"
                         onClick={() => {
-                          setSelectedLocality(loc);
+                          const matched = BANGALORE_LOCALITIES_GPS.find(l => 
+                            l.pincode === loc.pincode || l.name.toLowerCase() === loc.name.toLowerCase()
+                          );
+                          const fullLoc = { ...loc, lat: loc.lat ?? matched?.lat, lng: loc.lng ?? matched?.lng };
+                          setSelectedLocality(fullLoc);
                           try {
-                            localStorage.setItem('vernunt_user_locality', JSON.stringify(loc));
+                            localStorage.setItem('vernunt_user_locality', JSON.stringify(fullLoc));
                           } catch (e) {
                             console.debug('Locality save error:', e);
                           }
+                          window.dispatchEvent(new CustomEvent('vernunt-locality-changed', { detail: fullLoc }));
+                          triggerToast(`📍 Location updated to ${loc.name}! Nearest playmates, parks & store products refreshed.`);
                           setShowLocationPicker(false);
                         }}
                         className={`w-full px-2.5 py-1.5 text-xs text-left rounded-xl font-medium flex items-center justify-between transition cursor-pointer ${
@@ -3761,7 +3854,7 @@ export default function App() {
       />
 
       {/* Main content body panel */}
-      <main id="app-main" className={`flex-1 w-full ${activeTab === 'home' ? 'p-0 pb-28' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-6 pb-28'}`}>
+      <main id="app-main" className={`flex-1 w-full ${activeTab === 'home' ? 'p-0 pb-2' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 pb-4'}`}>
         
         {appMode === 'register' && (
           <div className="animate-fade-in">
@@ -4014,6 +4107,7 @@ export default function App() {
             {activeTab === 'home' && (
               <VernuntHomepage
                 userProfile={userProfile}
+                selectedLocality={selectedLocality}
                 playmates={playmates}
                 events={eventsList}
                 banners={banners}
@@ -4635,6 +4729,7 @@ export default function App() {
             {activeTab === 'store' && (
               <VernuntStore 
                 userProfile={userProfile}
+                selectedLocality={selectedLocality}
                 initialAction={storeInitialAction}
                 onClearInitialAction={() => setStoreInitialAction(undefined)}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
