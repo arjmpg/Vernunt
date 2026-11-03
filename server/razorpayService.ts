@@ -31,12 +31,15 @@ function loadEnvVariables() {
   }
 }
 
+const DEFAULT_TEST_KEY_ID = 'rzp_test_TuqHz3loKBM5ol';
+const DEFAULT_TEST_KEY_SECRET = 'uzZn4HElED67u4C9Tr2u60dx';
+
 // Get Razorpay client instance
 function getRazorpayInstance() {
   loadEnvVariables();
 
-  const key_id = process.env.RAZORPAY_KEY_ID;
-  const key_secret = process.env.RAZORPAY_KEY_SECRET;
+  const key_id = process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || DEFAULT_TEST_KEY_ID;
+  const key_secret = process.env.RAZORPAY_KEY_SECRET || DEFAULT_TEST_KEY_SECRET;
 
   if (!key_id || !key_secret) {
     console.error('[Razorpay] Missing RAZORPAY_KEY_ID or RAZORPAY_KEY_SECRET in environment');
@@ -58,12 +61,7 @@ export function registerRazorpayRoutes(app: Express) {
   // Public config endpoint to deliver public key_id to frontend (never KEY_SECRET)
   app.get('/api/razorpay-config', (_req: Request, res: Response) => {
     loadEnvVariables();
-    const key_id = process.env.VITE_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || '';
-    if (!key_id) {
-      return res.status(500).json({
-        error: 'Razorpay Key ID is not configured on server',
-      });
-    }
+    const key_id = process.env.VITE_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || DEFAULT_TEST_KEY_ID;
     return res.json({
       key_id,
       currency: 'INR',
@@ -143,7 +141,7 @@ export function registerRazorpayRoutes(app: Express) {
   app.post('/api/verify-payment', (req: Request, res: Response) => {
     try {
       loadEnvVariables();
-      const key_secret = process.env.RAZORPAY_KEY_SECRET;
+      const key_secret = process.env.RAZORPAY_KEY_SECRET || DEFAULT_TEST_KEY_SECRET;
 
       if (!key_secret) {
         return res.status(500).json({

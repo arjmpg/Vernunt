@@ -67,7 +67,7 @@ export const RazorpayTestModal: React.FC<RazorpayTestModalProps> = ({
                 Active Razorpay Test Gateway
               </span>
               <span className="font-mono text-[10.5px] bg-blue-100 text-blue-900 px-2 py-0.5 rounded-md">
-                rzp_test_TuCX...
+                rzp_test_TuqH...
               </span>
             </div>
             <p className="text-blue-800 text-[11px] leading-relaxed">

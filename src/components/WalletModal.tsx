@@ -7,6 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { UserWallet } from '../types.ts';
 import { getStoredWallet, depositToWallet, withdrawFromWallet } from '../utils/walletStorage.ts';
+import { openRazorpayCheckout } from '../utils/razorpay.ts';
 
 interface WalletModalProps {
   isOpen: boolean;
@@ -99,9 +100,36 @@ export default function WalletModal({
     };
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const payId = `PAY_WAL_${Date.now().toString().slice(-8)}`;
-      executeDepositSuccess(payId);
+      const amountInPaise = Math.max(100, Math.round(finalAmount * 100));
+      const receiptId = `wal_rcpt_${Date.now().toString().slice(-8)}`;
+
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt Wallet Top-Up',
+        description: `Add ₹${finalAmount} to Vernunt Wallet`,
+        receipt: receiptId,
+        customer: {
+          name: 'Vernunt Parent',
+          email: 'wallet@vernunt.com',
+          contact: '9876543210',
+        },
+        notes: {
+          purpose: 'wallet_deposit',
+          amount: String(finalAmount),
+        },
+        onSuccess: (_verifyResult, paymentResponse) => {
+          executeDepositSuccess(paymentResponse.razorpay_payment_id);
+        },
+        onError: (err: any) => {
+          console.error('[Wallet Deposit Razorpay Error]:', err);
+          setIsProcessingDeposit(false);
+          setDepositErrorMsg(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+        },
+        onDismiss: () => {
+          setIsProcessingDeposit(false);
+        }
+      });
     } catch (err: any) {
       console.error('Wallet deposit error:', err);
       setIsProcessingDeposit(false);

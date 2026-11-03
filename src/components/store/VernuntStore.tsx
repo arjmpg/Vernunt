@@ -64,6 +64,7 @@ import {
 import VoiceCallModal from '../auth/VoiceCallModal.tsx';
 import OtpVerificationFallbackCard from '../auth/OtpVerificationFallbackCard.tsx';
 import { triggerGoogleSignIn } from '../../utils/firebase.ts';
+import { openRazorpayCheckout } from '../../utils/razorpay.ts';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
@@ -1256,20 +1257,49 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    // Handle Direct Online Payment Processing (Cards, UPI, NetBanking, Wallets)
+    // Handle Direct Online Payment Processing via Razorpay Standard Web Checkout
     setIsProcessingPayment(true);
 
     try {
-      const generatedPayId = `PAY-${Date.now().toString().slice(-8)}`;
+      const amountInPaise = Math.max(100, Math.round(cartGrandTotal * 100));
+      const receiptId = `rcpt_${Date.now().toString().slice(-8)}`;
 
-      setTimeout(() => {
-        completeOrder(
-          'UPI / Cards (Prepaid)',
-          generatedPayId,
-          'paid',
-          'Verified via Secure Online Payment'
-        );
-      }, 900);
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt Store',
+        description: `Order checkout for ${cart.length} item(s)`,
+        receipt: receiptId,
+        customer: {
+          name: shippingAddress.fullName || userProfile?.parentName || 'Parent Customer',
+          email: customerEmail || 'customer@vernunt.com',
+          contact: shippingAddress.mobileNumber || userProfile?.phoneNumber || '9876543210',
+        },
+        notes: {
+          order_type: 'store_purchase',
+          shipping_city: shippingAddress.city || 'Bangalore',
+          pincode: shippingAddress.pincode || '560034',
+        },
+        onSuccess: (_verifyResult, paymentResponse) => {
+          completeOrder(
+            'UPI / Cards (Razorpay)',
+            paymentResponse.razorpay_payment_id,
+            'paid',
+            `Verified via Razorpay (Order: ${paymentResponse.razorpay_order_id}, Signature Validated)`
+          );
+        },
+        onError: (err: any) => {
+          console.error('[Razorpay Checkout Error]:', err);
+          setIsProcessingPayment(false);
+          setPaymentFailureModal({
+            show: true,
+            reason: err?.description || err?.message || 'Payment was unsuccessful or cancelled by user.'
+          });
+        },
+        onDismiss: () => {
+          setIsProcessingPayment(false);
+        }
+      });
     } catch (error: any) {
       console.error('Payment processing error:', error);
       setIsProcessingPayment(false);

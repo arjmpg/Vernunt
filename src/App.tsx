@@ -90,7 +90,7 @@ import { checkAndCompleteEmailLinkSignIn, dispatchEmailNotification } from './ut
 // Vernunt Carousel Dashboard, Groups, Tracker, Community & Security features
 import PlaymateCarouselDashboard from './components/PlaymateCarouselDashboard.tsx';
 import VernuntHomepage, { POPULAR_LOCALITIES } from './components/home/VernuntHomepage.tsx';
-import { autoDetectUserLocality, saveLocalityPreference, LocalityItem } from './utils/geolocation.ts';
+import { autoDetectUserLocality, saveLocalityPreference, BANGALORE_LOCALITIES_GPS, LocalityItem } from './utils/geolocation.ts';
 import HomeDashboardFeed from './components/home/HomeDashboardFeed.tsx';
 import UnifiedExploreHub from './components/explore/UnifiedExploreHub.tsx';
 import FamilyProfileHub from './components/profile/FamilyProfileHub.tsx';
@@ -119,6 +119,7 @@ import { PageCustomBlocksSection } from './components/admin/visual/PageCustomBlo
 import { AboutUsModal } from './components/about/AboutUsModal.tsx';
 import { AboutUsTab } from './components/about/AboutUsTab.tsx';
 import UniversalSocialShareModal, { PLATFORM_SHAREABLE_LINKS, ShareableItem } from './components/social/UniversalSocialShareModal.tsx';
+import { RazorpayTestModal } from './components/payment/RazorpayTestModal.tsx';
 
 // Icons
 import { 
@@ -2890,6 +2891,14 @@ export default function App() {
     return false;
   });
   const [showGoogleSeoModal, setShowGoogleSeoModal] = useState(false);
+  const [showRazorpayTestModal, setShowRazorpayTestModal] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const p = new URLSearchParams(window.location.search);
+      const path = window.location.pathname.toLowerCase();
+      return p.get('modal') === 'razorpay' || path === '/razorpay-test';
+    }
+    return false;
+  });
   const [showKannadaVoiceModal, setShowKannadaVoiceModal] = useState<boolean>(false);
   const [showContactUsModal, setShowContactUsModal] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
@@ -3854,7 +3863,7 @@ export default function App() {
       />
 
       {/* Main content body panel */}
-      <main id="app-main" className={`flex-1 w-full ${activeTab === 'home' ? 'p-0 pb-2' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 pb-4'}`}>
+      <main id="app-main" className={`w-full ${activeTab === 'home' ? 'p-0 pb-0' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 sm:pt-4 pb-0'}`}>
         
         {appMode === 'register' && (
           <div className="animate-fade-in">
@@ -4794,7 +4803,7 @@ export default function App() {
       {/* Persistent global footer with safe clearance for fixed bottom navigation */}
       <footer 
         id="global-page-footer" 
-        className={`bg-white border-t border-slate-200/90 pt-3 sm:pt-4 mt-auto text-slate-600 transition-all ${
+        className={`bg-white border-t border-slate-200/90 pt-1 text-slate-600 transition-all ${
           appMode === 'dashboard' 
             ? 'pb-40 sm:pb-44 md:pb-48 portrait:pb-[calc(10rem+20px)] sm:portrait:pb-[calc(11rem+20px)] md:portrait:pb-[calc(12rem+20px)]' 
             : 'pb-16 sm:pb-20 portrait:pb-[calc(4rem+20px)] sm:portrait:pb-[calc(5rem+20px)]'
@@ -5144,6 +5153,17 @@ export default function App() {
                 <li>
                   <button
                     type="button"
+                    id="btn-footer-razorpay-test"
+                    onClick={() => setShowRazorpayTestModal(true)}
+                    className="hover:text-blue-700 transition flex items-center gap-2 cursor-pointer text-slate-600 text-left"
+                  >
+                    <span className="w-5 h-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center text-xs shrink-0">💳</span>
+                    <span>Razorpay Standard Checkout (Test Mode)</span>
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
                     onClick={() => {
                       setShowContactUsModal(true);
                       window.history.pushState({}, '', '/contact');
@@ -5294,6 +5314,10 @@ export default function App() {
       <IosAppInstallModal 
         isOpen={showIosAppModal}
         onClose={() => setShowIosAppModal(false)}
+      />
+      <RazorpayTestModal
+        isOpen={showRazorpayTestModal}
+        onClose={() => setShowRazorpayTestModal(false)}
       />
       {detailModalProfile && (
         <PlaymateDetailModal 

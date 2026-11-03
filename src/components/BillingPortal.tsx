@@ -4,6 +4,7 @@ import { ChildProfile, SubscriptionPlan } from '../types.ts';
 import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../utils/firebase.ts';
 import confetti from 'canvas-confetti';
+import { openRazorpayCheckout } from '../utils/razorpay.ts';
 
 interface BillingPortalProps {
   userProfile: ChildProfile | null;
@@ -210,14 +211,41 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         setCouponSuccessMsg(`🎉 Subscription Activated! Welcome to VIP Kids Connect Club (Ref: ${orderRef}). Active until ${expiryDate.toLocaleDateString('en-IN')}.`);
       };
 
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const payId = `PAY_SUB_${Date.now().toString().slice(-8)}`;
-      await activateConfirmedPlan(payId);
-      setLoadingPlan(null);
+      // Process through Razorpay Standard Web Checkout
+      const amountInPaise = Math.max(100, Math.round(Number(plan.price) * 100));
+      const receiptId = `sub_rcpt_${Date.now().toString().slice(-8)}`;
+
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt VIP Club',
+        description: `${plan.title} (${plan.period})`,
+        receipt: receiptId,
+        customer: {
+          name: userProfile?.parentName || 'Parent Member',
+          email: userProfile?.email || 'parent@vernunt.com',
+          contact: userProfile?.phoneNumber || '9876543210',
+        },
+        notes: {
+          plan_id: plan.id,
+          plan_name: plan.title,
+        },
+        onSuccess: async (_verifyResult, paymentResponse) => {
+          await activateConfirmedPlan(paymentResponse.razorpay_payment_id);
+          setLoadingPlan(null);
+        },
+        onError: (err: any) => {
+          console.error('[BillingPortal Razorpay Error]:', err);
+          setErrorMessage(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+          setLoadingPlan(null);
+        },
+        onDismiss: () => {
+          setLoadingPlan(null);
+        }
+      });
     } catch (err: any) {
       console.error("Subscription workflow failed:", err);
       setErrorMessage(err.message || "An unexpected error occurred during subscription activation.");
-    } finally {
       setLoadingPlan(null);
     }
   };

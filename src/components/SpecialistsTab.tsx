@@ -29,6 +29,7 @@ import {
 } from '../utils/geoDistance.ts';
 import { isAuthorizedSystemAdmin } from '../utils/security.ts';
 import { getClaimedSpecialistsMap } from '../utils/specialistClaims.ts';
+import { openRazorpayCheckout } from '../utils/razorpay.ts';
 
 interface SpecialistsTabProps {
   currentProfile: ChildProfile | null;
@@ -661,12 +662,39 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       return;
     }
 
-    // 2. Paid Subscription via Online Payment Gateway
+    // 2. Paid Subscription via Online Payment Gateway (Razorpay Standard Web Checkout)
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const payId = `PAY_SUB_${Date.now().toString().slice(-8)}`;
-      await activateSubscriptionLocally(payId);
-      setLoadingPlan(null);
+      const amountInPaise = Math.max(100, Math.round(Number(plan.price) * 100));
+      const receiptId = `sub_rcpt_${Date.now().toString().slice(-8)}`;
+
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt VIP Membership',
+        description: `${plan.title} (${plan.period})`,
+        receipt: receiptId,
+        customer: {
+          name: currentProfile?.parentName || 'Parent Member',
+          email: currentProfile?.email || 'parent@vernunt.com',
+          contact: currentProfile?.phoneNumber || '9876543210',
+        },
+        notes: {
+          plan_id: plan.id,
+          plan_name: plan.title,
+        },
+        onSuccess: async (_verifyResult, paymentResponse) => {
+          await activateSubscriptionLocally(paymentResponse.razorpay_payment_id);
+          setLoadingPlan(null);
+        },
+        onError: (err: any) => {
+          console.error('[Specialist Sub Razorpay Error]:', err);
+          setSubError(err?.description || err?.message || 'Payment was unsuccessful or cancelled.');
+          setLoadingPlan(null);
+        },
+        onDismiss: () => {
+          setLoadingPlan(null);
+        }
+      });
     } catch (err: any) {
       console.error("In-popup subscription fail:", err);
       setSubError(err.message || "An unexpected error occurred.");
@@ -755,56 +783,85 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
       return;
     }
 
-    // 2. Paid Appointment: Initiate Online Gateway
+    // 2. Paid Appointment: Initiate Online Gateway (Razorpay Standard Web Checkout)
     setPaymentStep('processing');
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const payId = `PAY_SPEC_${Date.now().toString().slice(-8)}`;
-      setProductionPaymentId(payId);
-      setPaymentStep('success');
+      const amountInPaise = Math.max(100, Math.round(totalAmount * 100));
+      const receiptId = `spec_rcpt_${Date.now().toString().slice(-8)}`;
 
-      const rate = selectedSpecialist.commissionPercentage ?? globalCommissionRate;
-      const earnedCommission = Math.round((fee * rate) / 100);
-      const hostShare = fee - earnedCommission;
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt Specialist Consultation',
+        description: `Booking with ${selectedSpecialist.name} (${selectedSlot})`,
+        receipt: receiptId,
+        customer: {
+          name: buyerName || currentProfile?.parentName || 'Parent Client',
+          email: buyerEmail || 'parent@vernunt.com',
+          contact: currentProfile?.phoneNumber || '9876543210',
+        },
+        notes: {
+          specialist_id: selectedSpecialist.id,
+          specialist_name: selectedSpecialist.name,
+          slot: selectedSlot,
+        },
+        onSuccess: (_verifyResult, paymentResponse) => {
+          const payId = paymentResponse.razorpay_payment_id;
+          setProductionPaymentId(payId);
+          setPaymentStep('success');
 
-      const newBooking: Booking = {
-        id: `booking-${Date.now()}`,
-        itemId: selectedSpecialist.id,
-        itemTitle: selectedSpecialist.name,
-        type: 'SpecialistAppointment',
-        buyerName: buyerName,
-        buyerEmail: buyerEmail,
-        amountPaid: totalAmount,
-        commissionPercentage: rate,
-        commissionEarned: earnedCommission,
-        hostEarned: hostShare,
-        dateStr: bookingDate,
-        timeSelected: selectedSlot,
-        paymentId: payId,
-        paymentGateway: 'OnlineGateway',
-        paymentStatus: 'PAID',
-        status: 'Paid'
-      };
+          const rate = selectedSpecialist.commissionPercentage ?? globalCommissionRate;
+          const earnedCommission = Math.round((fee * rate) / 100);
+          const hostShare = fee - earnedCommission;
 
-      onAddBooking(newBooking);
+          const newBooking: Booking = {
+            id: `booking-${Date.now()}`,
+            itemId: selectedSpecialist.id,
+            itemTitle: selectedSpecialist.name,
+            type: 'SpecialistAppointment',
+            buyerName: buyerName,
+            buyerEmail: buyerEmail,
+            amountPaid: totalAmount,
+            commissionPercentage: rate,
+            commissionEarned: earnedCommission,
+            hostEarned: hostShare,
+            dateStr: bookingDate,
+            timeSelected: selectedSlot,
+            paymentId: payId,
+            paymentGateway: 'OnlineGateway',
+            paymentStatus: 'PAID',
+            status: 'Paid'
+          };
 
-            // Dispatch instant Email notification
-            sendSpecialistBookingNotifications({
-              toEmail: buyerEmail,
-              parentName: buyerName,
-              specialistName: selectedSpecialist.name,
-              specialistRole: selectedSpecialist.title,
-              dateStr: bookingDate,
-              timeSlot: selectedSlot,
-              fee: totalAmount,
-              paymentId: payId
-            }).catch((e) => console.warn('Specialist alert note:', e));
+          onAddBooking(newBooking);
 
-            confettiDefault({
-              particleCount: 100,
-              spread: 70,
-              colors: ['#3b82f6', '#f59e0b', '#10b981']
-            });
+          // Dispatch instant Email notification
+          sendSpecialistBookingNotifications({
+            toEmail: buyerEmail,
+            parentName: buyerName,
+            specialistName: selectedSpecialist.name,
+            specialistRole: selectedSpecialist.title,
+            dateStr: bookingDate,
+            timeSlot: selectedSlot,
+            fee: totalAmount,
+            paymentId: payId
+          }).catch((e) => console.warn('Specialist alert note:', e));
+
+          confettiDefault({
+            particleCount: 100,
+            spread: 70,
+            colors: ['#3b82f6', '#f59e0b', '#10b981']
+          });
+        },
+        onError: (err: any) => {
+          console.error('[Specialist Consultation Razorpay Error]:', err);
+          alert(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+          setPaymentStep('details');
+        },
+        onDismiss: () => {
+          setPaymentStep('details');
+        }
+      });
     } catch (e: any) {
       console.error(e);
       setPaymentStep('details');

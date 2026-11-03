@@ -13,6 +13,7 @@ import EventMenuComponent from './EventMenuComponent.tsx';
 import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
+import { openRazorpayCheckout } from '../../utils/razorpay.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -192,27 +193,56 @@ export default function EventBookingModal({
       return;
     }
 
-    // 2. Paid transaction (amount > 0): Process through secure online payment gateway
+    // 2. Paid transaction (amount > 0): Process through secure online payment gateway (Razorpay Standard Web Checkout)
     setIsPaymentLoading(true);
     setPaymentError('');
     setStep('payment_processing');
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const payId = `PAY_EVT_${Date.now().toString().slice(-8)}`;
-      finalizeOrder(
-        payId,
-        realTimeWalletDeduction,
-        realTimeRemainingOnline,
-        realTimeWalletDeduction > 0 ? 'Hybrid' : 'OnlineGateway'
-      );
+      const amountInPaise = Math.max(100, Math.round(realTimeRemainingOnline * 100));
+      const receiptId = `evt_rcpt_${Date.now().toString().slice(-8)}`;
+
+      openRazorpayCheckout({
+        amountInPaise,
+        currency: 'INR',
+        name: 'Vernunt Events',
+        description: `Pass: ${event.title} (${quantity} tickets)`,
+        receipt: receiptId,
+        customer: {
+          name: buyerName || userProfile?.parentName || 'Parent Attendee',
+          email: buyerEmail || 'parent@vernunt.com',
+          contact: buyerPhone || userProfile?.phoneNumber || '9876543210',
+        },
+        notes: {
+          event_id: String(event.id),
+          event_title: event.title.substring(0, 30),
+          wallet_used: String(realTimeWalletDeduction),
+        },
+        onSuccess: (_verifyResult, paymentResponse) => {
+          setIsPaymentLoading(false);
+          finalizeOrder(
+            paymentResponse.razorpay_payment_id,
+            realTimeWalletDeduction,
+            realTimeRemainingOnline,
+            realTimeWalletDeduction > 0 ? 'Hybrid' : 'OnlineGateway'
+          );
+        },
+        onError: (err: any) => {
+          console.error('[Event Razorpay Payment Error]:', err);
+          setIsPaymentLoading(false);
+          setStep('attendee_info');
+          setPaymentError(err?.description || err?.message || 'Payment was unsuccessful or cancelled by user.');
+        },
+        onDismiss: () => {
+          setIsPaymentLoading(false);
+          setStep('attendee_info');
+        }
+      });
     } catch (payErr: any) {
       console.error('[Payment Processing Error]', payErr);
       setIsPaymentLoading(false);
       setStep('attendee_info');
       setPaymentError(payErr?.message || 'Payment Gateway unreachable. Please retry.');
-    } finally {
-      setIsPaymentLoading(false);
     }
   };
 

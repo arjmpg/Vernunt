@@ -111,7 +111,7 @@ export async function getRazorpayKeyId(): Promise<string> {
   }
 
   // 3. Fallback default test key from configuration
-  return 'rzp_test_TuCXnPNjkAvczu';
+  return 'rzp_test_TuqHz3loKBM5ol';
 }
 
 /**
