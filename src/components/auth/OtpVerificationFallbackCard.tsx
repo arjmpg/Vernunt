@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  PhoneCall, 
   Mail, 
   ShieldCheck, 
   AlertCircle, 
@@ -8,10 +7,8 @@ import {
   MessageSquare, 
   Smartphone,
   HelpCircle,
-  ArrowRight,
-  Radio
+  ArrowRight
 } from 'lucide-react';
-import { executeFirebasePnv, isPnvSupported } from '../../utils/firebasePnvAuth.ts';
 
 interface OtpVerificationFallbackCardProps {
   phone: string;
@@ -19,11 +16,9 @@ interface OtpVerificationFallbackCardProps {
   otpCountdown: number;
   otpSent: boolean;
   onYesReceived: () => void;
-  onInitiateVoiceCall: () => void;
   onSelectGoogleLogin: () => void;
   onSelectEmailOtp?: () => void;
   onSelectWhatsApp?: () => void;
-  onPnvSuccess?: (result: any) => void;
   context?: 'auth' | 'checkout';
 }
 
@@ -33,17 +28,12 @@ export default function OtpVerificationFallbackCard({
   otpCountdown,
   otpSent,
   onYesReceived,
-  onInitiateVoiceCall,
   onSelectGoogleLogin,
   onSelectEmailOtp,
   onSelectWhatsApp,
-  onPnvSuccess,
   context = 'auth'
 }: OtpVerificationFallbackCardProps) {
   const [userResponse, setUserResponse] = useState<'none' | 'yes' | 'no'>('none');
-  const [isCalling, setIsCalling] = useState(false);
-  const [isVerifyingPnv, setIsVerifyingPnv] = useState(false);
-  const [pnvSuccessMessage, setPnvSuccessMessage] = useState<string | null>(null);
 
   if (!otpSent) return null;
 
@@ -57,30 +47,6 @@ export default function OtpVerificationFallbackCard({
 
   const handleNo = () => {
     setUserResponse('no');
-  };
-
-  const handleVoiceCallClick = () => {
-    setIsCalling(true);
-    onInitiateVoiceCall();
-    setTimeout(() => setIsCalling(false), 2000);
-  };
-
-  const handleFirebasePnvClick = async () => {
-    setIsVerifyingPnv(true);
-    setPnvSuccessMessage(null);
-    try {
-      const pnvResult = await executeFirebasePnv(cleanPhone, 'Parent');
-      if (pnvResult.verified) {
-        setPnvSuccessMessage(pnvResult.message);
-        if (onPnvSuccess) {
-          onPnvSuccess(pnvResult);
-        }
-      }
-    } catch (err: any) {
-      console.warn('PNV Verification error:', err);
-    } finally {
-      setIsVerifyingPnv(false);
-    }
   };
 
   return (
@@ -166,66 +132,7 @@ export default function OtpVerificationFallbackCard({
           </div>
 
           <div className="grid grid-cols-1 gap-2 pt-1">
-            {/* 1. Firebase Phone Number Verification (PNV) - Carrier SIM Level */}
-            <button
-              type="button"
-              onClick={handleFirebasePnvClick}
-              disabled={isVerifyingPnv}
-              className="w-full p-2.5 bg-gradient-to-r from-indigo-700 via-indigo-600 to-purple-700 hover:from-indigo-600 hover:to-purple-600 text-white rounded-xl text-left transition flex items-center justify-between shadow-md active:scale-98 cursor-pointer group border border-indigo-400/30"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                  <Radio className={`w-4 h-4 text-white ${isVerifyingPnv ? 'animate-spin' : 'group-hover:scale-110'}`} />
-                </div>
-                <div>
-                  <div className="text-xs font-black flex items-center gap-1.5">
-                    <span>Firebase Phone Number Verification (PNV)</span>
-                    <span className="bg-amber-400 text-amber-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
-                      1-Tap SIM
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-indigo-100 mt-0.5">
-                    Single-tap verification directly from SIM card &amp; mobile carrier without SMS delays.
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition" />
-            </button>
-
-            {pnvSuccessMessage && (
-              <div className="p-2 bg-emerald-950 border border-emerald-500/40 rounded-xl text-emerald-300 text-xs flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                <span>{pnvSuccessMessage}</span>
-              </div>
-            )}
-
-            {/* 2. Automated Voice Call Verification */}
-            <button
-              type="button"
-              onClick={handleVoiceCallClick}
-              disabled={isCalling}
-              className="w-full p-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-left transition flex items-center justify-between shadow-md active:scale-98 cursor-pointer group"
-            >
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
-                  <PhoneCall className="w-4 h-4 text-white group-hover:animate-bounce" />
-                </div>
-                <div>
-                  <div className="text-xs font-black flex items-center gap-1.5">
-                    <span>Verify through Automated Voice Call</span>
-                    <span className="bg-emerald-400 text-emerald-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
-                      Voice Call
-                    </span>
-                  </div>
-                  <p className="text-[10px] text-emerald-100 mt-0.5">
-                    We will call +91 {cleanPhone} and speak your verification code aloud.
-                  </p>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-white/80 group-hover:translate-x-1 transition" />
-            </button>
-
-            {/* 3. Google Sign-In (Available in auth flows) */}
+            {/* 1. Google Sign-In (Available in auth flows) */}
             {context === 'auth' && (
               <button
                 type="button"
@@ -258,7 +165,7 @@ export default function OtpVerificationFallbackCard({
                       Sign In with Google Account
                     </div>
                     <p className="text-[10px] text-slate-500 mt-0.5">
-                      Verify instantly using your 1-tap Google parent profile
+                      Verify securely using your Google parent profile
                     </p>
                   </div>
                 </div>
@@ -266,7 +173,7 @@ export default function OtpVerificationFallbackCard({
               </button>
             )}
 
-            {/* 4. Verify via Email OTP */}
+            {/* 2. Verify via Email OTP */}
             {onSelectEmailOtp && (
               <button
                 type="button"
@@ -290,7 +197,7 @@ export default function OtpVerificationFallbackCard({
               </button>
             )}
 
-            {/* 5. WhatsApp Verification */}
+            {/* 3. WhatsApp Verification */}
             {onSelectWhatsApp && (
               <button
                 type="button"
@@ -325,7 +232,7 @@ export default function OtpVerificationFallbackCard({
             onClick={() => setUserResponse('no')}
             className="text-[11px] font-bold text-slate-500 hover:text-rose-600 transition underline cursor-pointer"
           >
-            Didn't receive SMS? Try SIM PNV, Voice Call or Google
+            Didn't receive SMS? Try Email OTP or Google
           </button>
         </div>
       )}

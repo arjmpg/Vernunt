@@ -20,6 +20,7 @@ import {
   increment, serverTimestamp 
 } from 'firebase/firestore';
 import confetti from 'canvas-confetti';
+import ParkDetailModal from './ParkDetailModal.tsx';
 
 interface BangaloreParksHubProps {
   userProfile: ChildProfile | null;
@@ -27,6 +28,7 @@ interface BangaloreParksHubProps {
   userLng?: number;
   onOpenChatWithParent?: (targetUserId: string, initialMessage?: string) => void;
   onRequireAuth?: () => void;
+  initialSelectedParkId?: string;
 }
 
 export default function BangaloreParksHub({
@@ -34,7 +36,8 @@ export default function BangaloreParksHub({
   userLat = 12.9716,
   userLng = 77.5946,
   onOpenChatWithParent,
-  onRequireAuth
+  onRequireAuth,
+  initialSelectedParkId
 }: BangaloreParksHubProps) {
   // Parks list: Pre-seeded authentic parks + custom added by community
   const [customParks, setCustomParks] = useState<BangalorePark[]>(() => {
@@ -145,6 +148,19 @@ export default function BangaloreParksHub({
   // Selected Park for "Who is Playing" Inspector drawer/modal
   const [inspectingPark, setInspectingPark] = useState<BangalorePark | null>(null);
 
+  // Selected Park for Comprehensive Details Modal (Photos, Equipment, Accessibility)
+  const [detailedPark, setDetailedPark] = useState<BangalorePark | null>(null);
+
+  // Auto-open detailed park if initialSelectedParkId is provided
+  useEffect(() => {
+    if (initialSelectedParkId) {
+      const found = BANGALORE_PARKS.find(p => p.id === initialSelectedParkId) || customParks.find(p => p.id === initialSelectedParkId);
+      if (found) {
+        setDetailedPark(found);
+      }
+    }
+  }, [initialSelectedParkId, customParks]);
+
   // Inspector Date and Time filters
   const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [selectedTimeSlotId, setSelectedTimeSlotId] = useState<string>('all');
@@ -166,14 +182,12 @@ export default function BangaloreParksHub({
   const [newParkLocality, setNewParkLocality] = useState('');
   const [newParkZone, setNewParkZone] = useState<BangalorePark['zone']>('South');
   const [newParkAddress, setNewParkAddress] = useState('');
-  const [newParkPincode, setNewParkPincode] = useState('560001');
+  const [newParkPincode, setNewParkPincode] = useState('');
   const [newParkLat, setNewParkLat] = useState<string>('');
   const [newParkLng, setNewParkLng] = useState<string>('');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
-  const [newParkFacilities, setNewParkFacilities] = useState<string[]>([
-    'Toddler Play Area', 'Swings & Slides', 'Lush Shade Trees'
-  ]);
-  const [newParkTimings, setNewParkTimings] = useState('5:30 AM – 10:00 AM & 4:30 PM – 8:30 PM');
+  const [newParkFacilities, setNewParkFacilities] = useState<string[]>([]);
+  const [newParkTimings, setNewParkTimings] = useState('');
   const [newParkMapsUrl, setNewParkMapsUrl] = useState('');
 
   // RSVP prompt modal
@@ -1437,7 +1451,10 @@ export default function BangaloreParksHub({
                 >
                   <div>
                     {/* Park Photo & Badges */}
-                    <div className="relative h-48 w-full overflow-hidden bg-slate-100">
+                    <div 
+                      onClick={() => setDetailedPark(park)}
+                      className="relative h-48 w-full overflow-hidden bg-slate-100 cursor-pointer"
+                    >
                       <img 
                         src={park.imageUrl} 
                         alt={park.name}
@@ -1511,9 +1528,15 @@ export default function BangaloreParksHub({
 
                       {/* Bottom Title on Image */}
                       <div className="absolute bottom-3 left-3 right-3 text-white">
-                        <h3 className="text-lg font-black font-serif leading-tight line-clamp-1">
-                          {park.name}
-                        </h3>
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="text-lg font-black font-serif leading-tight line-clamp-1 group-hover:text-emerald-300 transition">
+                            {park.name}
+                          </h3>
+                          <span className="bg-black/60 hover:bg-black/80 text-emerald-300 border border-emerald-400/30 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-xs shrink-0 flex items-center gap-1">
+                            <span>Photos &amp; Equipment</span>
+                            <span>→</span>
+                          </span>
+                        </div>
                         {park.kannadaName && (
                           <span className="text-[11px] text-emerald-200 font-medium block">
                             {park.kannadaName}
@@ -1634,6 +1657,21 @@ export default function BangaloreParksHub({
                         )}
                       </button>
                     )}
+
+                    {/* View Full Park Details, Gallery & Equipment Button */}
+                    <button
+                      type="button"
+                      onClick={() => setDetailedPark(park)}
+                      className="w-full py-2.5 px-3 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs rounded-xl transition flex items-center justify-between cursor-pointer border border-emerald-300 hover:border-emerald-400 shadow-2xs group/btn"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>Photos, Equipment &amp; Accessibility</span>
+                      </div>
+                      <span className="text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 group-hover/btn:bg-emerald-600 group-hover/btn:text-white transition">
+                        View Details →
+                      </span>
+                    </button>
 
                     <div className="grid grid-cols-2 gap-2">
                       {/* Who is Going Inspector Button */}
@@ -2213,6 +2251,17 @@ export default function BangaloreParksHub({
                 >
                   <Plus className="w-4 h-4 text-amber-300" />
                   <span>Broadcast Playdate</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailedPark(inspectingPark);
+                  }}
+                  className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-bold text-xs rounded-xl border border-emerald-200 transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Photos &amp; Equipment</span>
                 </button>
               </div>
 
@@ -2859,6 +2908,30 @@ export default function BangaloreParksHub({
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL: Full Park Details (Photo Gallery, Equipment, Accessibility) */}
+      {detailedPark && (
+        <ParkDetailModal
+          park={detailedPark}
+          onClose={() => setDetailedPark(null)}
+          userProfile={userProfile}
+          parkVisits={parkVisits}
+          checkedInParkId={checkedInParkId}
+          checkingInParkId={checkingInParkId}
+          liveCount={liveVisitorCounts[detailedPark.id] ?? detailedPark.live_visitor_count}
+          onCheckin={(p) => handleCheckinAtPark(p)}
+          onCheckout={(p) => handleCheckoutOfPark(p)}
+          onBroadcastVisit={(p) => {
+            setBroadcastTargetPark(p);
+            setIsBroadcastModalOpen(true);
+          }}
+          onInspectVisits={(p) => {
+            setInspectingPark(p);
+            setSelectedDate(new Date().toISOString().split('T')[0]);
+          }}
+          onRequireAuth={onRequireAuth}
+        />
       )}
     </div>
   );

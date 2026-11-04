@@ -2216,6 +2216,7 @@ export default function App() {
   // Interactive matched playmates list
   const [playmates, setPlaymates] = useState<ChildProfile[]>(INITIAL_PLAYMATES);
   const [selectedPlaymate, setSelectedPlaymate] = useState<ChildProfile | null>(INITIAL_PLAYMATES[0]);
+  const [selectedParkIdForHub, setSelectedParkIdForHub] = useState<string | undefined>(undefined);
   const [chatPreFilledMessage, setChatPreFilledMessage] = useState<string>('');
 
   // Dynamic QR Code Event Check-in modal state
@@ -3839,6 +3840,7 @@ export default function App() {
                 if (type === 'park') {
                   setActiveTab('radar');
                   setPlaymateSubCategory('parks');
+                  if (item?.id) setSelectedParkIdForHub(item.id);
                 } else {
                   setActiveTab(tabId as any);
                 }
@@ -4472,6 +4474,7 @@ export default function App() {
                       userProfile={effectiveProfile}
                       userLat={userLat}
                       userLng={userLng}
+                      initialSelectedParkId={selectedParkIdForHub}
                       onOpenChatWithParent={(targetUserId) => {
                         setActiveTab('chat');
                         const target = playmates.find(p => p.id === targetUserId);

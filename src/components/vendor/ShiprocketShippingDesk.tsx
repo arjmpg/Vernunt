@@ -38,9 +38,8 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
   const [authMessage, setAuthMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
   // Rate & Serviceability Calculator State
-  const defaultPickupPin = currentVendor?.address?.pincode || '560102';
-  const [calcPickupPin, setCalcPickupPin] = useState(defaultPickupPin);
-  const [calcDeliveryPin, setCalcDeliveryPin] = useState('400001'); // Mumbai sample
+  const [calcPickupPin, setCalcPickupPin] = useState(currentVendor?.address?.pincode || '');
+  const [calcDeliveryPin, setCalcDeliveryPin] = useState('');
   const [calcWeight, setCalcWeight] = useState<number>(0.5);
   const [calcCod, setCalcCod] = useState<boolean>(false);
   const [isCheckingRate, setIsCheckingRate] = useState(false);
@@ -50,14 +49,14 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
   const [pickupLocations, setPickupLocations] = useState<ShiprocketPickupLocation[]>([]);
   const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState(false);
   const [newLocationForm, setNewLocationForm] = useState({
-    pickup_location: `${currentVendor?.storeName || 'Primary'}-Hub`,
-    name: currentVendor?.ownerName || 'Warehouse Manager',
-    email: currentVendor?.email || 'dispatch@vernunt.com',
-    phone: currentVendor?.phone || '9845012345',
-    address: currentVendor?.address?.street || '27th Main, Sector 2, HSR Layout',
-    city: currentVendor?.address?.city || 'Bengaluru',
-    state: currentVendor?.address?.state || 'Karnataka',
-    pin_code: currentVendor?.address?.pincode || '560102'
+    pickup_location: '',
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    pin_code: ''
   });
 
   // Shipments & Orders
@@ -1067,6 +1066,7 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
                   <input
                     type="text"
                     value={newLocationForm.city}
+                    placeholder="e.g. Bengaluru"
                     onChange={e => setNewLocationForm({ ...newLocationForm, city: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                     required
@@ -1078,6 +1078,7 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
                     type="text"
                     maxLength={6}
                     value={newLocationForm.pin_code}
+                    placeholder="6-digit PIN code"
                     onChange={e => setNewLocationForm({ ...newLocationForm, pin_code: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900"
                     required
@@ -1091,6 +1092,7 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
                   <input
                     type="text"
                     value={newLocationForm.name}
+                    placeholder="Full name"
                     onChange={e => setNewLocationForm({ ...newLocationForm, name: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-900"
                     required
@@ -1102,6 +1104,7 @@ export const ShiprocketShippingDesk: React.FC<ShiprocketShippingDeskProps> = ({
                     type="text"
                     maxLength={10}
                     value={newLocationForm.phone}
+                    placeholder="10-digit mobile number"
                     onChange={e => setNewLocationForm({ ...newLocationForm, phone: e.target.value })}
                     className="w-full px-3 py-2 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900"
                     required

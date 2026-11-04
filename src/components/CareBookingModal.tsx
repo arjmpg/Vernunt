@@ -45,12 +45,12 @@ export default function CareBookingModal({
   const [startTime, setStartTime] = useState<string>(initialStartTime || '10:00 AM');
   const [durationHours, setDurationHours] = useState<number>(initialDurationHours);
   
-  const [childName, setChildName] = useState<string>(currentUserProfile?.childName || 'Ayaan');
-  const [childAge, setChildAge] = useState<number>(currentUserProfile?.childAge || 5);
+  const [childName, setChildName] = useState<string>(currentUserProfile?.childName || '');
+  const [childAge, setChildAge] = useState<number | ''>(currentUserProfile?.childAge || '');
   const [childGender, setChildGender] = useState<string>(currentUserProfile?.childGender || 'Boy');
-  const [parentName, setParentName] = useState<string>(currentUserProfile?.parentName || 'Parent');
-  const [parentPhone, setParentPhone] = useState<string>(currentUserProfile?.phoneNumber || '9820011223');
-  const [emergencyContact, setEmergencyContact] = useState<string>(currentUserProfile?.phoneNumber || '9820011223');
+  const [parentName, setParentName] = useState<string>(currentUserProfile?.parentName || '');
+  const [parentPhone, setParentPhone] = useState<string>(currentUserProfile?.phoneNumber || '');
+  const [emergencyContact, setEmergencyContact] = useState<string>(currentUserProfile?.phoneNumber || '');
   const [specialInstructions, setSpecialInstructions] = useState<string>('');
   
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -224,7 +224,7 @@ export default function CareBookingModal({
       parentPhone,
       parentPhotoUrl: currentUserProfile?.parentPhotoUrl || currentUserProfile?.photoUrl,
       childName,
-      childAge,
+      childAge: Number(childAge) || 4,
       childGender,
       providerId: provider.id,
       providerName: provider.hostName,
@@ -678,7 +678,8 @@ export default function CareBookingModal({
                       value={childAge}
                       min={0}
                       max={15}
-                      onChange={(e) => setChildAge(parseInt(e.target.value, 10) || 0)}
+                      placeholder="e.g. 4"
+                      onChange={(e) => setChildAge(e.target.value === '' ? '' : parseInt(e.target.value, 10) || 0)}
                       className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 focus:outline-rose-600"
                       required
                     />

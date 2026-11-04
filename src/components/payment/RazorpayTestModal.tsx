@@ -15,9 +15,9 @@ export const RazorpayTestModal: React.FC<RazorpayTestModalProps> = ({
   defaultAmountRupees = 10,
 }) => {
   const [testAmount, setTestAmount] = useState<number>(defaultAmountRupees);
-  const [customerName, setCustomerName] = useState('Parent Tester');
-  const [customerEmail, setCustomerEmail] = useState('parent.tester@vernunt.com');
-  const [customerPhone, setCustomerPhone] = useState('9876543210');
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [verificationResult, setVerificationResult] = useState<{
     verifyResult: RazorpayVerifyResponse;
     paymentResponse: RazorpaySuccessResponse;
@@ -116,8 +116,9 @@ export const RazorpayTestModal: React.FC<RazorpayTestModalProps> = ({
               <input
                 type="text"
                 value={customerName}
+                placeholder="e.g. Aarti Menon"
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white"
               />
             </div>
             <div className="space-y-1">
@@ -125,8 +126,9 @@ export const RazorpayTestModal: React.FC<RazorpayTestModalProps> = ({
               <input
                 type="tel"
                 value={customerPhone}
+                placeholder="10-digit mobile number"
                 onChange={(e) => setCustomerPhone(e.target.value)}
-                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
+                className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white"
               />
             </div>
           </div>
@@ -136,8 +138,9 @@ export const RazorpayTestModal: React.FC<RazorpayTestModalProps> = ({
             <input
               type="email"
               value={customerEmail}
+              placeholder="name@example.com"
               onChange={(e) => setCustomerEmail(e.target.value)}
-              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
+              className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800 focus:bg-white"
             />
           </div>
 

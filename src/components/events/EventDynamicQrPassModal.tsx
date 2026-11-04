@@ -2858,7 +2858,7 @@ export default function EventDynamicQrPassModal({
                           </div>
                         </div>
 
-                        {/* Quick 1-tap Check-in / Undo button */}
+                        {/* Attendee Check-in / Undo button */}
                         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                           <button
                             id={`btn-toggle-attendee-${attendee.id}`}

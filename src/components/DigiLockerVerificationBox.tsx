@@ -144,8 +144,8 @@ export default function DigiLockerVerificationBox({
         body: JSON.stringify({
           txnId,
           otp: otp.trim(),
-          userName: defaultName || 'Aarti Menon',
-          userAddress: defaultAddress || 'Flat 304, Palm Heights, 100ft Road, Indiranagar, Bangalore - 560038'
+          userName: defaultName || '',
+          userAddress: defaultAddress || ''
         })
       });
 
@@ -201,9 +201,9 @@ export default function DigiLockerVerificationBox({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          aadhaarNumber: aadhaarNumber || '892410294821',
-          userName: defaultName || 'Aarti Menon',
-          userAddress: defaultAddress || 'Flat 304, Palm Heights, 100ft Road, Indiranagar, Bangalore - 560038'
+          aadhaarNumber: aadhaarNumber || '',
+          userName: defaultName || '',
+          userAddress: defaultAddress || ''
         })
       });
       const data = await resp.json();

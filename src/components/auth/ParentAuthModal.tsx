@@ -8,7 +8,6 @@ import { db, auth, triggerGoogleSignIn } from '../../utils/firebase.ts';
 import { sendFirebaseOtp, verifyFirebaseOtp } from '../../utils/firebasePhoneAuth.ts';
 import { sendFirebaseEmailOtp, verifyFirebaseEmailOtp } from '../../utils/firebaseEmailAuth.ts';
 import VernuntLogo from '../VernuntLogo.tsx';
-import VoiceCallModal from './VoiceCallModal.tsx';
 import OtpVerificationFallbackCard from './OtpVerificationFallbackCard.tsx';
 
 interface ParentAuthModalProps {
@@ -46,11 +45,6 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [infoMessage, setInfoMessage] = useState<string>('');
-
-  // Voice Call & Alternative verification state
-  const [showVoiceCallModal, setShowVoiceCallModal] = useState<boolean>(false);
-  const [voiceCallOtp, setVoiceCallOtp] = useState<string>('');
-  const [isInitiatingVoiceCall, setIsInitiatingVoiceCall] = useState<boolean>(false);
 
 
   // Reset when modal opens/closes
@@ -274,34 +268,7 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
     }
   };
 
-  // Alternative 1: Voice Call Verification Handler
-  const handleInitiateVoiceCall = async () => {
-    setIsInitiatingVoiceCall(true);
-    setErrorMessage('');
-    try {
-      const res = await fetch('/api/auth/send-voice-call-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, role: 'Parent' })
-      });
-      const data = await res.json();
-      if (data?.success && data?.otp) {
-        setVoiceCallOtp(data.otp);
-      } else {
-        const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-        setVoiceCallOtp(fallbackCode);
-      }
-      setShowVoiceCallModal(true);
-    } catch (err: any) {
-      const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setVoiceCallOtp(fallbackCode);
-      setShowVoiceCallModal(true);
-    } finally {
-      setIsInitiatingVoiceCall(false);
-    }
-  };
-
-  // Alternative 2: Google Sign-In Handler
+  // Google Sign-In Handler
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setErrorMessage('');
@@ -613,7 +580,6 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                     setCountdown(60);
                     setInfoMessage('Great! Please enter the 6-digit code in the field above.');
                   }}
-                  onInitiateVoiceCall={handleInitiateVoiceCall}
                   onSelectGoogleLogin={handleGoogleSignIn}
                   onSelectEmailOtp={() => {
                     setMethod('email');
@@ -625,19 +591,6 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
                     const url = `https://wa.me/91${cleanPhone}?text=Hello%20Vernunt,%20please%20send%20my%20verification%20code`;
                     window.open(url, '_blank');
                     setInfoMessage(`WhatsApp verification initiated for +91 ${cleanPhone}`);
-                  }}
-                  onPnvSuccess={(result) => {
-                    setInfoMessage(result.message || '✓ Phone verified via SIM Carrier (Firebase PNV).');
-                    if (isRegistered && registeredProfile) {
-                      onSuccessLogin(registeredProfile);
-                      onClose();
-                    } else {
-                      onStartSignup({
-                        phone: cleanPhone,
-                        phoneVerified: true
-                      });
-                      onClose();
-                    }
                   }}
                   context="auth"
                 />
@@ -732,18 +685,6 @@ export const ParentAuthModal: React.FC<ParentAuthModalProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Automated Voice Call Verification Modal */}
-      <VoiceCallModal
-        isOpen={showVoiceCallModal}
-        phone={cleanPhone}
-        otpCode={voiceCallOtp}
-        onClose={() => setShowVoiceCallModal(false)}
-        onAutoFillAndVerify={(code) => {
-          handleAutoFillCode(code);
-          setShowVoiceCallModal(false);
-        }}
-      />
     </div>
   );
 };

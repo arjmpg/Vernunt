@@ -648,9 +648,9 @@ export default function RegistrationHub({
   // --- DAYCARE CENTER & CRECHE SPECIFIC STATES ---
   const [daycareCenterName, setDaycareCenterName] = useState('');
   const [daycareType, setDaycareType] = useState<'Montessori Daycare' | 'Pre-school & Daycare' | 'Infant Creche' | 'Certified Playhome'>('Pre-school & Daycare');
-  const [establishedYear, setEstablishedYear] = useState('2020');
+  const [establishedYear, setEstablishedYear] = useState('');
   const [directorName, setDirectorName] = useState(initialParentName || '');
-  const [directorDesignation, setDirectorDesignation] = useState('Center Director / Founder');
+  const [directorDesignation, setDirectorDesignation] = useState('');
   const [officialEmail, setOfficialEmail] = useState(initialEmail || '');
   const [staffToChildRatio, setStaffToChildRatio] = useState('1:4');
   const [seatCapacity, setSeatCapacity] = useState<number>(20);

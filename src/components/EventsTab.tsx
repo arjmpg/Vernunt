@@ -302,7 +302,7 @@ export default function EventsTab({
   const [checkoutEvent, setCheckoutEvent] = useState<CommunityEvent | null>(null);
   const [checkoutStep, setCheckoutStep] = useState<'details' | 'processing' | 'otp' | 'success'>('details');
   const [buyerName, setBuyerName] = useState(userProfile?.parentName || '');
-  const [buyerEmail, setBuyerEmail] = useState('parent@vernunt.org');
+  const [buyerEmail, setBuyerEmail] = useState(userProfile?.email || '');
   const [otpValue, setOtpValue] = useState('');
   const [productionPayId, setProductionPayId] = useState('');
 
@@ -313,7 +313,7 @@ export default function EventsTab({
   const [newEventDate, setNewEventDate] = useState('');
   const [newEventTime, setNewEventTime] = useState('');
   const [newEventLoc, setNewEventLoc] = useState('');
-  const [newEventHost, setNewEventHost] = useState(userProfile?.parentName || 'Parent Organizer');
+  const [newEventHost, setNewEventHost] = useState(userProfile?.parentName || '');
   const [newEventCat, setNewEventCat] = useState('Event'); // 'Event' | 'Activity' | 'Competition' | 'Class'
   const [newEventPhoto, setNewEventPhoto] = useState('');
   const [newEventTagsStr, setNewEventTagsStr] = useState('');

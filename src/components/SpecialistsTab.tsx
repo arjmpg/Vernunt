@@ -310,18 +310,14 @@ export default function SpecialistsTab({
   const [regLocation, setRegLocation] = useState('');
   const [regFee, setRegFee] = useState(499);
   const [regSpecialtiesStr, setRegSpecialtiesStr] = useState('');
-  const [regEmail, setRegEmail] = useState(
-    currentProfile?.parentName 
-      ? currentProfile.parentName.replace(/\s+/g, '').toLowerCase() + '@gmail.com' 
-      : 'specialist@vernunt.org'
-  );
-  const [regPhone, setRegPhone] = useState('9876543210');
+  const [regEmail, setRegEmail] = useState(currentProfile?.email || '');
+  const [regPhone, setRegPhone] = useState(currentProfile?.phone || currentProfile?.phoneNumber || '');
   const [regError, setRegError] = useState('');
 
   // Booking details states
   const [selectedSpecialist, setSelectedSpecialist] = useState<SpecialistProfile | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
-  const [bookingDate, setBookingDate] = useState<string>('2026-06-01');
+  const [bookingDate, setBookingDate] = useState<string>('');
   const [showBookingModal, setShowBookingModal] = useState(false);
 
   // Safe live payment states
@@ -383,7 +379,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
     openWhatsAppShare(shareText);
   }, [currentProfile?.affiliateCode, currentProfile?.referralCode]);
   const [buyerName, setBuyerName] = useState(currentProfile?.parentName || '');
-  const [buyerEmail, setBuyerEmail] = useState('parent@vernunt.org');
+  const [buyerEmail, setBuyerEmail] = useState(currentProfile?.email || '');
 
   const categories = [
     { 

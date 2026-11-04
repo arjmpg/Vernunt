@@ -47,7 +47,7 @@ export default function CreateEventWizardModal({
   const todayStr = new Date().toISOString().split('T')[0];
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
-  const [time, setTime] = useState('10:00 AM - 12:30 PM');
+  const [time, setTime] = useState('');
 
   // Physical Location Fields
   const [location, setLocation] = useState(userProfile?.location?.address || '');
@@ -61,32 +61,29 @@ export default function CreateEventWizardModal({
 
   // Classes Specific Dynamic Fields
   const [subjectSkill, setSubjectSkill] = useState('');
-  const [batchSchedule, setBatchSchedule] = useState('Every Saturday & Sunday');
+  const [batchSchedule, setBatchSchedule] = useState('');
   const [batchSize, setBatchSize] = useState<number>(15);
-  const [prerequisites, setPrerequisites] = useState('Beginner friendly, no prior experience needed');
+  const [prerequisites, setPrerequisites] = useState('');
 
   // Activity Specific Dynamic Fields
   const [activityTheme, setActivityTheme] = useState('');
-  const [suppliesProvided, setSuppliesProvided] = useState('All art supplies, aprons, and materials provided by host');
-  const [thingsToBring, setThingsToBring] = useState('Water bottle, comfortable play clothing');
+  const [suppliesProvided, setSuppliesProvided] = useState('');
+  const [thingsToBring, setThingsToBring] = useState('');
 
   // Event Specific Dynamic Fields
   const [eventGenre, setEventGenre] = useState('');
   const [chiefGuest, setChiefGuest] = useState('');
-  const [dressCode, setDressCode] = useState('Comfortable Casual / Festive');
-  const [refreshmentsIncluded, setRefreshmentsIncluded] = useState('Healthy snack box & fresh juice included for all kids');
+  const [dressCode, setDressCode] = useState('');
+  const [refreshmentsIncluded, setRefreshmentsIncluded] = useState('');
 
   // Common Visuals & Demographic
   const [photoUrl, setPhotoUrl] = useState('');
-  const [targetAgeRange, setTargetAgeRange] = useState('3 - 10 Years');
-  const [tagsStr, setTagsStr] = useState('Kids, Weekend, Fun, Learning');
+  const [targetAgeRange, setTargetAgeRange] = useState('');
+  const [tagsStr, setTagsStr] = useState('');
   
   // Recurring slots
   const [isRecurring, setIsRecurring] = useState(false);
-  const [recurringSlots, setRecurringSlots] = useState<string[]>([
-    '10:00 AM - 11:30 AM (Morning Batch)',
-    '03:00 PM - 04:30 PM (Evening Batch)'
-  ]);
+  const [recurringSlots, setRecurringSlots] = useState<string[]>([]);
   const [newSlotInput, setNewSlotInput] = useState('');
 
   // Ticket Tiers Builder (WooEvents)

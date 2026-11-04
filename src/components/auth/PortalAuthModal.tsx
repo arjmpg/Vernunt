@@ -6,7 +6,6 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { ChildProfile } from '../../types.ts';
-import { executeFirebasePnv } from '../../utils/firebasePnvAuth.ts';
 
 export type PortalType = 'vendor' | 'host' | 'care';
 
@@ -40,7 +39,6 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
   const [dispatchedOtp, setDispatchedOtp] = useState<string>('');
   const [isSending, setIsSending] = useState<boolean>(false);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
-  const [isPnvLoading, setIsPnvLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [countdown, setCountdown] = useState<number>(60);
 
@@ -160,85 +158,6 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
       setCountdown(60);
     } finally {
       setIsSending(false);
-    }
-  };
-
-  // Firebase Phone Number Verification (Firebase PNV) - 1-Tap SIM verification
-  const handlePnvPartnerVerify = async () => {
-    setErrorMessage('');
-    const cleanPhone = phoneNumber.replace(/[^\d]/g, '');
-    if (cleanPhone.length < 10) {
-      setErrorMessage('Please enter a valid 10-digit Indian mobile number.');
-      return;
-    }
-
-    if (authMode === 'signup') {
-      if (!fullName.trim()) {
-        setErrorMessage('Please enter your full representative name.');
-        return;
-      }
-      if (!businessName.trim()) {
-        setErrorMessage(`Please enter your ${portalType === 'vendor' ? 'Store / Brand' : 'Studio / Activity'} name.`);
-        return;
-      }
-    }
-
-    setIsPnvLoading(true);
-    try {
-      const fullPhone = `+91${cleanPhone.slice(-10)}`;
-      const pnvRes = await executeFirebasePnv(cleanPhone, portalConfig.role, fullName || businessName || `${portalConfig.role} Partner`);
-      if (pnvRes.success) {
-        confetti({ particleCount: 75, spread: 80, origin: { y: 0.6 } });
-        const sessionUser: ChildProfile = {
-          id: `usr_${portalType}_${cleanPhone.slice(-6)}`,
-          childName: businessName || `${portalConfig.role} Desk`,
-          childAge: 5,
-          parentName: fullName || businessName || `${portalConfig.role} Lead`,
-          gender: 'Other',
-          interests: category ? [category] : ['Child Development & Activities'],
-          userRole: (portalType === 'vendor' ? 'Vendor' : portalType === 'host' ? 'Event Organizer' : 'Daycare Center') as any,
-          phoneNumber: fullPhone,
-          phoneVerified: true,
-          email: `${cleanPhone.slice(-10)}@vernunt.com`,
-          emailVerified: true,
-          verificationStatus: 'VERIFIED' as any,
-          aadhaarVerified: true,
-          isVerified: true,
-          location: {
-            lat: 12.9716,
-            lng: 77.5946,
-            address: address || 'Bangalore, Karnataka'
-          },
-          locationSharing: 'PRECISE' as any,
-          companyName: businessName || undefined,
-          companyRegNumber: taxId || undefined,
-          companyDocName: businessDocName || undefined,
-          companyDocUrl: businessDocUrl || undefined,
-          idDocumentName: idDocName || undefined,
-          idDocUrl: idDocUrl || undefined,
-          createdAt: new Date().toISOString()
-        };
-
-        if (portalType === 'vendor') {
-          localStorage.setItem('vernunt_active_vendor', JSON.stringify({
-            id: sessionUser.id,
-            name: fullName || 'Store Owner',
-            storeName: businessName || 'Vernunt Artisan Store',
-            phone: fullPhone,
-            verified: true,
-            pnvVerified: true
-          }));
-        }
-        localStorage.setItem('vernunt_portal_auth_user', JSON.stringify(sessionUser));
-        onSuccess(sessionUser, portalType);
-        onClose();
-      } else {
-        setErrorMessage(pnvRes.error || 'Carrier SIM verification failed. Use SMS OTP below.');
-      }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Firebase PNV check failed. Please use SMS OTP.');
-    } finally {
-      setIsPnvLoading(false);
     }
   };
 
@@ -588,18 +507,7 @@ export const PortalAuthModal: React.FC<PortalAuthModalProps> = ({
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={handlePnvPartnerVerify}
-                  disabled={isPnvLoading || phoneNumber.length < 10}
-                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                  title="Firebase Phone Number Verification (PNV) via carrier SIM card"
-                >
-                  <ShieldCheck className="w-4 h-4" />
-                  <span>{isPnvLoading ? 'Verifying SIM via Firebase PNV...' : '1-Tap SIM Verification (Firebase PNV)'}</span>
-                </button>
-
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={isSending || phoneNumber.length < 10}

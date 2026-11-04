@@ -1230,6 +1230,35 @@ export type BangaloreParkZone = 'Central' | 'South' | 'North' | 'East' | 'West' 
 
 export type ParkSpaceCategory = 'all' | 'parks_playgrounds' | 'community_centers' | 'indoor_paid';
 
+export interface ParkEquipmentItem {
+  id: string;
+  name: string;
+  category: 'swings' | 'slides' | 'sandbox' | 'climbing' | 'sensory' | 'spinners' | 'sports';
+  ageRange?: string; // e.g. '1-3 yrs (Toddlers)', '3-8 yrs', 'All Ages'
+  description?: string;
+  safetySurface?: string; // e.g. 'Rubberized EPDM', 'Clean River Sand', 'Soft Grass'
+  status?: 'Operational' | 'Maintenance' | 'New';
+  count?: number;
+  icon?: string;
+}
+
+export interface ParkAccessibilityFeature {
+  id: string;
+  title: string;
+  description: string;
+  available: boolean;
+  category: 'mobility' | 'adaptive_play' | 'sensory' | 'restrooms' | 'convenience';
+  badge?: string;
+  icon?: string;
+}
+
+export interface ParkGalleryPhoto {
+  url: string;
+  caption: string;
+  tag?: 'Play Area' | 'Swings & Slides' | 'Sandbox' | 'Walking Track' | 'Shade & Lawns' | 'Accessibility';
+  photographer?: string;
+}
+
 export interface BangalorePark {
   id: string;
   name: string;
@@ -1249,6 +1278,11 @@ export interface BangalorePark {
   facilities: string[];
   highlights: string[];
   imageUrl: string;
+  galleryImages?: (string | ParkGalleryPhoto)[];
+  equipment?: ParkEquipmentItem[];
+  accessibilityFeatures?: ParkAccessibilityFeature[];
+  accessibilityRating?: 'High' | 'Moderate' | 'Basic';
+  accessibilitySummary?: string;
   googleMapsUrl: string;
   placeRating?: number;
   reviewsCount?: number;
@@ -1261,6 +1295,7 @@ export interface BangalorePark {
   approvalStatus?: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
   verified?: boolean;
   accessible?: boolean;
+  hasCafeteria?: boolean;
   live_visitor_count?: number;
   boundaryRadiusMeters?: number;
   submittedByUserId?: string;

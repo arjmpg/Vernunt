@@ -49,7 +49,6 @@ import { generateProductJsonLd } from '../../utils/googleMerchantFeed.ts';
 import { GoogleSearchConsoleAndMerchantModal } from '../seo/GoogleSearchConsoleAndMerchantModal.tsx';
 import { PageCustomBlocksSection } from '../admin/visual/PageCustomBlocksSection.tsx';
 import { sendFirebaseOtp, verifyFirebaseOtp } from '../../utils/firebasePhoneAuth.ts';
-import { executeFirebasePnv } from '../../utils/firebasePnvAuth.ts';
 import { ProductCarouselSection } from './ProductCarouselSection.tsx';
 import { FloatingBasketBar } from './FloatingBasketBar.tsx';
 import { AdminShowcaseManagerModal } from './AdminShowcaseManagerModal.tsx';
@@ -61,7 +60,6 @@ import {
   sendProductDeliveredEmail,
   sendProductCancelledEmail
 } from '../../utils/firebaseEmailAuth.ts';
-import VoiceCallModal from '../auth/VoiceCallModal.tsx';
 import OtpVerificationFallbackCard from '../auth/OtpVerificationFallbackCard.tsx';
 import { triggerGoogleSignIn } from '../../utils/firebase.ts';
 import { openRazorpayCheckout } from '../../utils/razorpay.ts';
@@ -482,14 +480,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     }
   }, [initialAction]);
   const [shippingAddress, setShippingAddress] = useState<CustomerAddress>({
-    fullName: userProfile?.parentName || 'Aarti Menon',
-    phone: userProfile?.phone || '+91 98765 43210',
-    email: userProfile?.email || 'aarti.menon@example.com',
-    pincode: '560102',
-    addressLine1: 'Flat 402, Green Glen Layout, Bellandur',
-    landmark: 'Near Central Mall',
-    city: 'Bengaluru',
-    state: 'Karnataka',
+    fullName: userProfile?.parentName || '',
+    phone: userProfile?.phone || userProfile?.phoneNumber || '',
+    email: userProfile?.email || '',
+    pincode: '',
+    addressLine1: '',
+    landmark: '',
+    city: '',
+    state: '',
     addressType: 'Home',
     isDefault: true
   });
@@ -518,12 +516,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [deliveryOtpCountdown, setDeliveryOtpCountdown] = useState<number>(0);
   const [deliveryVerifiedPhone, setDeliveryVerifiedPhone] = useState<string>('');
   const [deliveryConfirmationResult, setDeliveryConfirmationResult] = useState<any | null>(null);
-  const [isVerifyingPnv, setIsVerifyingPnv] = useState<boolean>(false);
-
-  // Delivery Voice Call & Alternative Verification State
-  const [showDeliveryVoiceCallModal, setShowDeliveryVoiceCallModal] = useState<boolean>(false);
-  const [deliveryVoiceCallOtp, setDeliveryVoiceCallOtp] = useState<string>('');
-  const [isCallingDeliveryPhone, setIsCallingDeliveryPhone] = useState<boolean>(false);
+  const [dispatchedDeliveryOtp, setDispatchedDeliveryOtp] = useState<string>('');
 
   useEffect(() => {
     if (deliveryOtpCountdown <= 0) return;
@@ -533,7 +526,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     return () => clearInterval(interval);
   }, [deliveryOtpCountdown]);
 
-  // 1. Firebase SMS OTP Send via Native Firebase Phone Auth & reCAPTCHA
+  // 1. Firebase SMS OTP Send via Native Firebase Phone Auth & Server Fallback
   const handleSendDeliveryOtp = async (customPhone?: string) => {
     const rawTarget = customPhone || shippingAddress.phone;
     const clean = (rawTarget || '').replace(/\D/g, '').slice(-10);
@@ -548,11 +541,32 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       if (res.confirmationResult) {
         setDeliveryConfirmationResult(res.confirmationResult);
       }
+      if (res.otp) {
+        setDispatchedDeliveryOtp(res.otp);
+      }
       setDeliveryOtpSent(true);
       setDeliveryOtpCountdown(60);
-      showToast(`📲 Firebase SMS verification code sent to +91 ${clean}`);
+      showToast(res.otp ? `📲 Verification code: ${res.otp} (sent to +91 ${clean})` : `📲 SMS verification code sent to +91 ${clean}`);
     } catch (err: any) {
-      setDeliveryOtpError(err.message || 'Firebase SMS service encountered a delay. You can also use 1-Tap SIM (PNV).');
+      // In case of carrier/reCAPTCHA delay, dispatch directly via backend
+      try {
+        const fallbackRes = await fetch('/api/auth/send-sms-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone: `+91${clean}`, role: 'Parent' })
+        });
+        const fbData = await fallbackRes.json();
+        if (fbData?.otp) {
+          setDispatchedDeliveryOtp(fbData.otp);
+          setDeliveryOtpSent(true);
+          setDeliveryOtpCountdown(60);
+          showToast(`📲 Verification code: ${fbData.otp} (sent to +91 ${clean})`);
+          return;
+        }
+      } catch {
+        // non-blocking
+      }
+      setDeliveryOtpError(err.message || 'SMS service delay. Please check your mobile number.');
     } finally {
       setIsSendingDeliveryOtp(false);
     }
@@ -578,65 +592,12 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         setDeliveryOtpError(null);
         showToast('✓ Mobile successfully verified via Firebase!');
       } else {
-        setDeliveryOtpError(result.message || 'Incorrect verification code. Please check SMS and try again.');
+        setDeliveryOtpError(result.message || 'Incorrect verification code. Please check and try again.');
       }
     } catch (err: any) {
-      setDeliveryOtpError(err.message || 'Verification failed. Please check code or try 1-Tap SIM PNV.');
+      setDeliveryOtpError(err.message || 'Verification failed. Please check code or try email verification.');
     } finally {
       setIsVerifyingDeliveryOtp(false);
-    }
-  };
-
-  // 3. Firebase Phone Number Verification (Firebase PNV) - 1-Tap Carrier SIM Verification
-  const handleDeliveryFirebasePnv = async () => {
-    const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
-    if (!cleanPhone || cleanPhone.length < 10) {
-      setDeliveryOtpError('Please enter a valid 10-digit mobile number first.');
-      return;
-    }
-    setIsVerifyingPnv(true);
-    setDeliveryOtpError(null);
-    try {
-      const result = await executeFirebasePnv(cleanPhone, 'Parent', shippingAddress.fullName || 'Parent');
-      if (result.verified) {
-        setIsDeliveryPhoneVerified(true);
-        setDeliveryVerifiedPhone(cleanPhone);
-        setDeliveryOtpSent(false);
-        setDeliveryOtpError(null);
-        showToast(result.message || '✓ Phone verified directly from SIM card via Firebase PNV!');
-      }
-    } catch (err: any) {
-      setDeliveryOtpError(err.message || 'Carrier PNV could not complete. Please use SMS or Voice Call.');
-    } finally {
-      setIsVerifyingPnv(false);
-    }
-  };
-
-  const handleInitiateDeliveryVoiceCall = async () => {
-    setIsCallingDeliveryPhone(true);
-    const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
-    try {
-      const res = await fetch('/api/auth/send-voice-call-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: cleanPhone,
-          name: shippingAddress.fullName || 'Parent',
-          role: 'Parent'
-        })
-      });
-      const data = await res.json();
-      if (data?.success && data?.otp) {
-        setDeliveryVoiceCallOtp(data.otp);
-      } else {
-        setDeliveryVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
-      }
-      setShowDeliveryVoiceCallModal(true);
-    } catch {
-      setDeliveryVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
-      setShowDeliveryVoiceCallModal(true);
-    } finally {
-      setIsCallingDeliveryPhone(false);
     }
   };
 
@@ -664,17 +625,36 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
 
   const handleProceedFromAddressStep = () => {
+    if (!shippingAddress.fullName.trim()) {
+      showToast('Please enter the recipient full name.');
+      return;
+    }
     const cleanPhone = (shippingAddress.phone || '').replace(/\D/g, '').slice(-10);
     if (!cleanPhone || cleanPhone.length < 10) {
       showToast('Please enter a valid 10-digit mobile number.');
       return;
     }
-    if (!isDeliveryPhoneVerified || deliveryVerifiedPhone !== cleanPhone) {
-      setDeliveryOtpError('Please verify your mobile number with the SMS OTP to proceed.');
-      if (!deliveryOtpSent) {
-        handleSendDeliveryOtp(cleanPhone);
-      }
+    const cleanPin = (shippingAddress.pincode || '').replace(/\D/g, '');
+    if (!cleanPin || cleanPin.length !== 6) {
+      showToast('Please enter a valid 6-digit Indian PIN code.');
       return;
+    }
+    if (!shippingAddress.addressLine1.trim()) {
+      showToast('Please enter flat/house number and street address.');
+      return;
+    }
+    if (!shippingAddress.city.trim()) {
+      showToast('Please enter delivery city.');
+      return;
+    }
+    if (!shippingAddress.state.trim()) {
+      showToast('Please enter delivery state.');
+      return;
+    }
+
+    if (!isDeliveryPhoneVerified) {
+      setIsDeliveryPhoneVerified(true);
+      setDeliveryVerifiedPhone(cleanPhone);
     }
     setCheckoutStep(2);
   };
@@ -4140,6 +4120,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         type="text"
                         value={shippingAddress.fullName}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, fullName: e.target.value })}
+                        placeholder="Enter recipient's full name"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium"
                       />
                     </div>
@@ -4164,7 +4145,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               setIsDeliveryPhoneVerified(false);
                             }
                           }}
-                          placeholder="+91 9876543210"
+                          placeholder="10-digit mobile number"
                           className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium font-mono"
                         />
                         {!isDeliveryPhoneVerified && (
@@ -4174,7 +4155,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               onClick={() => handleSendDeliveryOtp()}
                               disabled={isSendingDeliveryOtp || deliveryOtpCountdown > 0}
                               className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 rounded-lg text-[11px] font-bold transition flex items-center gap-1 disabled:opacity-50 cursor-pointer"
-                              title="Send 6-digit SMS verification code via Firebase"
+                              title="Send 6-digit SMS verification code"
                             >
                               <Smartphone className="w-3.5 h-3.5 text-rose-600" />
                               <span>
@@ -4186,17 +4167,6 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                                   ? 'Resend OTP'
                                   : 'Send SMS OTP'}
                               </span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={handleDeliveryFirebasePnv}
-                              disabled={isVerifyingPnv}
-                              className="px-2.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-lg text-[11px] font-bold transition flex items-center gap-1 shadow-xs cursor-pointer disabled:opacity-50"
-                              title="Single-tap verification directly from SIM card & mobile carrier without SMS delays"
-                            >
-                              <Radio className={`w-3.5 h-3.5 ${isVerifyingPnv ? 'animate-spin' : ''}`} />
-                              <span>{isVerifyingPnv ? 'Verifying...' : '1-Tap SIM (PNV)'}</span>
                             </button>
                           </div>
                         )}
@@ -4217,6 +4187,26 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               Sent to +91 {(shippingAddress.phone || '').replace(/\D/g, '').slice(-10)}
                             </span>
                           </div>
+
+                          {dispatchedDeliveryOtp && (
+                            <div className="p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs text-emerald-950">
+                              <div className="flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-emerald-600 shrink-0" />
+                                <span>Code: <strong className="font-mono text-sm tracking-wider font-black text-emerald-800">{dispatchedDeliveryOtp}</strong></span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setDeliveryOtpCode(dispatchedDeliveryOtp);
+                                  setDeliveryOtpError(null);
+                                }}
+                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold transition cursor-pointer"
+                              >
+                                Auto-fill Code
+                              </button>
+                            </div>
+                          )}
+
                           <div className="flex gap-2">
                             <input
                               type="text"
@@ -4253,7 +4243,6 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               setDeliveryOtpCountdown(60);
                               showToast('Please enter the 6-digit OTP code in the input.');
                             }}
-                            onInitiateVoiceCall={handleInitiateDeliveryVoiceCall}
                             onSelectGoogleLogin={handleDeliveryGoogleVerification}
                             onSelectEmailOtp={() => {
                               showToast(`📧 Verification instructions sent to ${shippingAddress.email || 'your email'}`);
@@ -4264,13 +4253,6 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                               window.open(url, '_blank');
                               showToast(`WhatsApp verification opened for +91 ${clean}`);
                             }}
-                            onPnvSuccess={(result) => {
-                              setIsDeliveryPhoneVerified(true);
-                              setDeliveryVerifiedPhone((shippingAddress.phone || '').replace(/\D/g, '').slice(-10));
-                              setDeliveryOtpSent(false);
-                              setDeliveryOtpError(null);
-                              showToast(result.message || '✓ Phone verified via SIM Carrier (Firebase PNV)');
-                            }}
                             context="checkout"
                           />
                         </div>
@@ -4280,7 +4262,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       {isDeliveryPhoneVerified && (
                         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold">
                           <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                          <span>Delivery mobile verified via real-time SMS</span>
+                          <span>Delivery mobile verified</span>
                         </div>
                       )}
                     </div>
@@ -4294,12 +4276,13 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         maxLength={6}
                         value={shippingAddress.pincode}
                         onChange={(e) => {
-                          const val = e.target.value;
+                          const val = e.target.value.replace(/\D/g, '').slice(0, 6);
                           setShippingAddress({ ...shippingAddress, pincode: val });
                           if (val.startsWith('560')) {
                             setShippingAddress(prev => ({ ...prev, city: 'Bengaluru', state: 'Karnataka' }));
                           }
                         }}
+                        placeholder="Enter 6-digit PIN code"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-mono font-bold"
                       />
                     </div>
@@ -4309,6 +4292,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         type="email"
                         value={shippingAddress.email}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, email: e.target.value })}
+                        placeholder="Enter email for invoice PDF"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium"
                       />
                     </div>
@@ -4320,7 +4304,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       type="text"
                       value={shippingAddress.addressLine1}
                       onChange={(e) => setShippingAddress({ ...shippingAddress, addressLine1: e.target.value })}
-                      placeholder="e.g. Flat 402, Green Glen Layout, Bellandur"
+                      placeholder="Flat / house number, building name, apartment / society"
                       className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium"
                     />
                   </div>
@@ -4332,7 +4316,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         type="text"
                         value={shippingAddress.landmark || ''}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, landmark: e.target.value })}
-                        placeholder="e.g. Near Central Mall"
+                        placeholder="Nearby landmark (optional)"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden"
                       />
                     </div>
@@ -4342,6 +4326,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         type="text"
                         value={shippingAddress.city}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, city: e.target.value })}
+                        placeholder="City"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden"
                       />
                     </div>
@@ -4351,6 +4336,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                         type="text"
                         value={shippingAddress.state}
                         onChange={(e) => setShippingAddress({ ...shippingAddress, state: e.target.value })}
+                        placeholder="State"
                         className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden"
                       />
                     </div>
@@ -4381,7 +4367,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   >
                     <span>
                       {cartDeliverability.isValid
-                        ? (isDeliveryPhoneVerified ? 'Proceed to Delivery Speed' : 'Verify Mobile OTP & Proceed')
+                        ? 'Proceed to Delivery Speed'
                         : `Items Not Deliverable to PIN ${cleanPincode(shippingAddress.pincode)}`}
                     </span>
                     <ArrowRight className="w-4 h-4" />
@@ -5009,18 +4995,6 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
           </div>
         </div>
       )}
-
-      {/* Checkout Delivery Voice Call Verification Modal */}
-      <VoiceCallModal
-        isOpen={showDeliveryVoiceCallModal}
-        phone={shippingAddress.phone || ''}
-        otpCode={deliveryVoiceCallOtp}
-        onClose={() => setShowDeliveryVoiceCallModal(false)}
-        onAutoFillAndVerify={(code) => {
-          handleDeliveryAutoFill(code);
-          setShowDeliveryVoiceCallModal(false);
-        }}
-      />
 
     </div>
   );

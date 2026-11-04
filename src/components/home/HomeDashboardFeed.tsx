@@ -343,33 +343,51 @@ export const HomeDashboardFeed: React.FC<HomeDashboardFeedProps> = ({
             <div
               key={park.id}
               onClick={onOpenParksSubcategory}
-              className="bg-white rounded-2xl border border-slate-200/90 hover:border-emerald-300 p-4 transition-all duration-200 hover:shadow-xs flex flex-col justify-between cursor-pointer group"
+              className="bg-white rounded-2xl border border-slate-200/90 hover:border-emerald-300 overflow-hidden transition-all duration-200 hover:shadow-xs flex flex-col justify-between cursor-pointer group"
             >
-              <div className="space-y-2">
+              <div className="h-28 w-full overflow-hidden relative bg-slate-100">
+                <img
+                  src={park.imageUrl}
+                  alt={park.name}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                />
+                <div className="absolute top-2 left-2 bg-slate-900/80 text-white text-[10px] font-bold px-2 py-0.5 rounded-full backdrop-blur-xs">
+                  {park.locality}
+                </div>
+                {park.accessible && (
+                  <div className="absolute top-2 right-2 bg-blue-600/90 text-white text-[9.5px] font-bold px-1.5 py-0.5 rounded-full">
+                    ♿ Accessible
+                  </div>
+                )}
+              </div>
+
+              <div className="p-3.5 space-y-2">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="font-bold text-emerald-700 px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100">
-                    {park.neighborhood}
+                  <span className="font-bold text-emerald-800 text-[10.5px] px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-100">
+                    {park.zone} Bangalore
                   </span>
-                  <span className="text-slate-400 text-[11px] font-medium">Free Entry</span>
+                  <span className="text-slate-500 text-[10.5px] font-medium">{park.entryFee || 'Free Entry'}</span>
                 </div>
                 <h3 className="font-bold text-sm text-slate-900 group-hover:text-emerald-700 transition line-clamp-1">
                   {park.name}
                 </h3>
                 <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                  {park.description}
+                  {park.highlights?.[0] || park.facilities.slice(0, 3).join(', ')}
                 </p>
                 <div className="flex flex-wrap gap-1 pt-1">
-                  {(park.amenities || []).slice(0, 2).map((amenity: string, idx: number) => (
+                  {(park.facilities || []).slice(0, 3).map((facility: string, idx: number) => (
                     <span key={idx} className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-slate-50 text-slate-600 border border-slate-100">
-                      {amenity}
+                      {facility}
                     </span>
                   ))}
                 </div>
               </div>
 
-              <div className="pt-3 mt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-700">
-                <span>View Live Playmates</span>
-                <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition" />
+              <div className="p-3.5 pt-0">
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-emerald-700">
+                  <span>Photos &amp; Equipment</span>
+                  <ChevronRight className="w-4 h-4 transform group-hover:translate-x-0.5 transition" />
+                </div>
               </div>
             </div>
           ))}

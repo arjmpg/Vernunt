@@ -10,7 +10,6 @@ import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'fire
 import { db, auth, triggerGoogleSignIn } from '../../utils/firebase.ts';
 import { sendFirebaseEmailOtp, verifyFirebaseEmailOtp } from '../../utils/firebaseEmailAuth.ts';
 import VernuntLogo from '../VernuntLogo.tsx';
-import VoiceCallModal from './VoiceCallModal.tsx';
 import OtpVerificationFallbackCard from './OtpVerificationFallbackCard.tsx';
 import type { ChildProfile } from '../../types.ts';
 import { VerificationStatus, LocationSharing } from '../../types.ts';
@@ -47,12 +46,6 @@ export default function UnifiedParentAuthModal({
   const [expectedOtp, setExpectedOtp] = useState('');
   const [otpCountdown, setOtpCountdown] = useState(60);
 
-  // Voice Call & Alternative verification state
-  const [showVoiceCallModal, setShowVoiceCallModal] = useState(false);
-  const [voiceCallOtp, setVoiceCallOtp] = useState('');
-  const [isInitiatingVoiceCall, setIsInitiatingVoiceCall] = useState(false);
-
-
   // Status & lookup states
   const [isCheckingAccount, setIsCheckingAccount] = useState(false);
   const [accountStatus, setAccountStatus] = useState<'unknown' | 'registered' | 'new'>('unknown');
@@ -66,7 +59,7 @@ export default function UnifiedParentAuthModal({
   const [childName, setChildName] = useState('');
   const [childAge, setChildAge] = useState<number>(4);
   const [childGender, setChildGender] = useState<'Boy' | 'Girl' | 'Other'>('Boy');
-  const [locality, setLocality] = useState('Indiranagar, Bengaluru');
+  const [locality, setLocality] = useState('');
 
   // KYC Document states
   const [aadhaarFile, setAadhaarFile] = useState<{ name: string; url: string; size: number } | null>(null);
@@ -262,31 +255,6 @@ export default function UnifiedParentAuthModal({
       setErrorMessage(err.message || 'Verification failed.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleInitiateVoiceCall = async () => {
-    setIsInitiatingVoiceCall(true);
-    setErrorMessage('');
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
-    try {
-      const res = await fetch('/api/auth/send-voice-call-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, role: 'Parent' })
-      });
-      const data = await res.json();
-      if (data?.success && data?.otp) {
-        setVoiceCallOtp(data.otp);
-      } else {
-        setVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
-      }
-      setShowVoiceCallModal(true);
-    } catch {
-      setVoiceCallOtp(Math.floor(100000 + Math.random() * 900000).toString());
-      setShowVoiceCallModal(true);
-    } finally {
-      setIsInitiatingVoiceCall(false);
     }
   };
 
@@ -854,7 +822,6 @@ export default function UnifiedParentAuthModal({
                       setOtpCountdown(60);
                       setInfoMessage('Great! Please enter the 6-digit code in the field above.');
                     }}
-                    onInitiateVoiceCall={handleInitiateVoiceCall}
                     onSelectGoogleLogin={handleGoogleSignIn}
                     onSelectEmailOtp={() => {
                       setMethod('email');
@@ -867,14 +834,6 @@ export default function UnifiedParentAuthModal({
                       const url = `https://wa.me/91${clean}?text=Hello%20Vernunt,%20please%20send%20my%20verification%20code`;
                       window.open(url, '_blank');
                       setInfoMessage(`WhatsApp verification initiated for +91 ${clean}`);
-                    }}
-                    onPnvSuccess={(result) => {
-                      setInfoMessage(result.message || '✓ Phone verified via SIM Carrier (Firebase PNV).');
-                      if (accountStatus === 'registered' && registeredProfile) {
-                        completeLogin(registeredProfile);
-                      } else {
-                        setStep('parent_child_details');
-                      }
                     }}
                     context="auth"
                   />
@@ -1153,18 +1112,6 @@ export default function UnifiedParentAuthModal({
         </div>
 
       </div>
-
-      {/* Voice Call Verification Modal */}
-      <VoiceCallModal
-        isOpen={showVoiceCallModal}
-        phone={phone}
-        otpCode={voiceCallOtp}
-        onClose={() => setShowVoiceCallModal(false)}
-        onAutoFillAndVerify={(code) => {
-          handleAutoFillCode(code);
-          setShowVoiceCallModal(false);
-        }}
-      />
     </div>
   );
 }

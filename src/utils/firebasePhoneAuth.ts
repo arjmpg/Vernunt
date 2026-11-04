@@ -25,6 +25,7 @@ export interface SendOtpResult {
   method: 'firebase_phone_auth' | 'firebase_firestore_otp';
   confirmationResult?: ConfirmationResult;
   message: string;
+  otp?: string;
 }
 
 export interface VerifyOtpResult {
@@ -175,7 +176,10 @@ export async function sendFirebaseOtp(
   return {
     success: true,
     method: 'firebase_firestore_otp',
-    message: `✓ 6-digit verification code sent via SMS to ${fullPhone}. Please enter it below.`
+    otp: data?.otp,
+    message: data?.otp 
+      ? `✓ 6-digit verification code: ${data.otp} (Sent to ${fullPhone}). Please enter it below.`
+      : `✓ 6-digit verification code sent via SMS to ${fullPhone}. Please enter it below.`
   };
 }
 
