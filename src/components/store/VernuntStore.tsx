@@ -479,18 +479,66 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       if (onClearInitialAction) onClearInitialAction();
     }
   }, [initialAction]);
-  const [shippingAddress, setShippingAddress] = useState<CustomerAddress>({
-    fullName: userProfile?.parentName || '',
-    phone: userProfile?.phone || userProfile?.phoneNumber || '',
-    email: userProfile?.email || '',
-    pincode: '',
-    addressLine1: '',
-    landmark: '',
-    city: '',
-    state: '',
-    addressType: 'Home',
-    isDefault: true
-  });
+  const isUserLoggedIn = Boolean(userProfile && userProfile.id && userProfile.id !== 'guest-explorer');
+
+  // Load previously saved checkout address if previously mentioned in cart checkout
+  const getInitialCheckoutAddress = (): CustomerAddress => {
+    if (!isUserLoggedIn || !userProfile?.id) {
+      // For logged out users: keep all fields blank with help text
+      return {
+        fullName: '',
+        phone: '',
+        email: '',
+        pincode: '',
+        addressLine1: '',
+        landmark: '',
+        city: '',
+        state: '',
+        addressType: 'Home',
+        isDefault: true
+      };
+    }
+
+    try {
+      const saved = localStorage.getItem(`vernunt_checkout_addr_${userProfile.id}`);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            fullName: parsed.fullName || userProfile.parentName || '',
+            phone: parsed.phone || userProfile.phone || userProfile.phoneNumber || '',
+            email: parsed.email || userProfile.email || '',
+            pincode: parsed.pincode || '',
+            addressLine1: parsed.addressLine1 || '',
+            landmark: parsed.landmark || '',
+            city: parsed.city || '',
+            state: parsed.state || '',
+            addressType: parsed.addressType || 'Home',
+            isDefault: true
+          };
+        }
+      }
+    } catch (e) {
+      console.debug('Error reading saved address:', e);
+    }
+
+    // If logged-in user has NOT previously entered address during checkout:
+    // keep address fields blank with just help text, auto-fill verified name/phone/email from logged-in account
+    return {
+      fullName: userProfile.parentName || '',
+      phone: userProfile.phone || userProfile.phoneNumber || '',
+      email: userProfile.email || '',
+      pincode: '',
+      addressLine1: '',
+      landmark: '',
+      city: '',
+      state: '',
+      addressType: 'Home',
+      isDefault: true
+    };
+  };
+
+  const [shippingAddress, setShippingAddress] = useState<CustomerAddress>(getInitialCheckoutAddress);
   const [shippingMethod, setShippingMethod] = useState<'standard' | 'express' | 'instant'>('express');
   
   // Real-time Cart Deliverability Validation against Multi-Vendor Pincode Rules
@@ -499,7 +547,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   }, [cart, shippingAddress.pincode, vendors]);
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('OnlineGateway');
-  // Cash on Delivery is strictly hidden until an online payment attempt fails or has balance/technical issues
+  // Cash on Delivery is strictly hidden until an online payment attempt fails with a technical error
   const [isCodOffered, setIsCodOffered] = useState<boolean>(false);
   const [paymentFailureModal, setPaymentFailureModal] = useState<{ show: boolean; reason: string } | null>(null);
   const [orderToCancel, setOrderToCancel] = useState<StoreOrder | null>(null);
@@ -507,16 +555,43 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [completedOrder, setCompletedOrder] = useState<StoreOrder | null>(null);
 
   // Delivery Mobile Real-Time SMS OTP Verification (Step 1 Address)
-  const [isDeliveryPhoneVerified, setIsDeliveryPhoneVerified] = useState<boolean>(false);
+  // For logged-in users: automatically verified! Should not ask for OTP again.
+  const [isDeliveryPhoneVerified, setIsDeliveryPhoneVerified] = useState<boolean>(isUserLoggedIn);
   const [deliveryOtpSent, setDeliveryOtpSent] = useState<boolean>(false);
   const [deliveryOtpCode, setDeliveryOtpCode] = useState<string>('');
   const [isSendingDeliveryOtp, setIsSendingDeliveryOtp] = useState<boolean>(false);
   const [isVerifyingDeliveryOtp, setIsVerifyingDeliveryOtp] = useState<boolean>(false);
   const [deliveryOtpError, setDeliveryOtpError] = useState<string | null>(null);
   const [deliveryOtpCountdown, setDeliveryOtpCountdown] = useState<number>(0);
-  const [deliveryVerifiedPhone, setDeliveryVerifiedPhone] = useState<string>('');
+  const [deliveryVerifiedPhone, setDeliveryVerifiedPhone] = useState<string>(
+    isUserLoggedIn ? (userProfile?.phone || userProfile?.phoneNumber || '') : ''
+  );
   const [deliveryConfirmationResult, setDeliveryConfirmationResult] = useState<any | null>(null);
   const [dispatchedDeliveryOtp, setDispatchedDeliveryOtp] = useState<string>('');
+
+  // Sync address & verification state when login profile changes
+  useEffect(() => {
+    if (isUserLoggedIn && userProfile?.id) {
+      setIsDeliveryPhoneVerified(true);
+      setDeliveryVerifiedPhone(userProfile.phone || userProfile.phoneNumber || '');
+      setShippingAddress(getInitialCheckoutAddress());
+    } else {
+      setIsDeliveryPhoneVerified(false);
+      setDeliveryVerifiedPhone('');
+      setShippingAddress({
+        fullName: '',
+        phone: '',
+        email: '',
+        pincode: '',
+        addressLine1: '',
+        landmark: '',
+        city: '',
+        state: '',
+        addressType: 'Home',
+        isDefault: true
+      });
+    }
+  }, [userProfile?.id, isUserLoggedIn]);
 
   useEffect(() => {
     if (deliveryOtpCountdown <= 0) return;
@@ -656,6 +731,16 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       setIsDeliveryPhoneVerified(true);
       setDeliveryVerifiedPhone(cleanPhone);
     }
+
+    // Persist address for logged-in user so future checkouts automatically auto-fill it
+    if (isUserLoggedIn && userProfile?.id) {
+      try {
+        localStorage.setItem(`vernunt_checkout_addr_${userProfile.id}`, JSON.stringify(shippingAddress));
+      } catch (err) {
+        console.debug('Could not persist checkout address:', err);
+      }
+    }
+
     setCheckoutStep(2);
   };
 
@@ -1244,6 +1329,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       const amountInPaise = Math.max(100, Math.round(cartGrandTotal * 100));
       const receiptId = `rcpt_${Date.now().toString().slice(-8)}`;
 
+      const customerEmail = shippingAddress.email || userProfile?.email || 'customer@vernunt.com';
+      const rawPhone = shippingAddress.phone || userProfile?.phone || userProfile?.phoneNumber || '9876543210';
+      const customerContact = rawPhone.replace(/\D/g, '').slice(-10) || '9876543210';
+      const customerName = shippingAddress.fullName || userProfile?.parentName || 'Parent Customer';
+
       openRazorpayCheckout({
         amountInPaise,
         currency: 'INR',
@@ -1251,9 +1341,9 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         description: `Order checkout for ${cart.length} item(s)`,
         receipt: receiptId,
         customer: {
-          name: shippingAddress.fullName || userProfile?.parentName || 'Parent Customer',
-          email: customerEmail || 'customer@vernunt.com',
-          contact: shippingAddress.mobileNumber || userProfile?.phoneNumber || '9876543210',
+          name: customerName,
+          email: customerEmail,
+          contact: customerContact,
         },
         notes: {
           order_type: 'store_purchase',
@@ -1271,22 +1361,49 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         onError: (err: any) => {
           console.error('[Razorpay Checkout Error]:', err);
           setIsProcessingPayment(false);
-          setPaymentFailureModal({
-            show: true,
-            reason: err?.description || err?.message || 'Payment was unsuccessful or cancelled by user.'
-          });
+
+          const errReason = String(err?.reason || err?.description || err?.message || '');
+          const isUserCancellation =
+            errReason.toLowerCase().includes('cancel') ||
+            errReason.toLowerCase().includes('dismiss') ||
+            err?.code === 'PAYMENT_CANCELLED';
+
+          if (isUserCancellation) {
+            // User manually cancelled: DO NOT show COD modal
+            showToast('Online payment was cancelled. You can retry paying online when ready.');
+          } else {
+            // Technical or gateway failure during transaction: offer COD fallback
+            setIsCodOffered(true);
+            setPaymentFailureModal({
+              show: true,
+              reason: err?.description || err?.message || 'Technical or network issue with payment gateway. Order amount was not debited.'
+            });
+          }
         },
         onDismiss: () => {
+          console.log('[VernuntStore] Customer dismissed payment modal');
           setIsProcessingPayment(false);
+          // User closed/cancelled modal: DO NOT show COD modal
+          showToast('Payment window closed. You can retry paying online anytime.');
         }
       });
     } catch (error: any) {
       console.error('Payment processing error:', error);
       setIsProcessingPayment(false);
-      setPaymentFailureModal({
-        show: true,
-        reason: error.message || 'Unable to process online payment due to network or technical issue.'
-      });
+
+      const errMsg = String(error?.message || '');
+      const isUserCancellation = errMsg.toLowerCase().includes('cancel');
+
+      if (isUserCancellation) {
+        showToast('Online payment was cancelled.');
+      } else {
+        // Technical error creating order or loading gateway: offer COD
+        setIsCodOffered(true);
+        setPaymentFailureModal({
+          show: true,
+          reason: error.message || 'Unable to connect to payment gateway due to a technical error.'
+        });
+      }
     }
   };
 
@@ -4126,8 +4243,13 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                     </div>
                     <div>
                       <div className="flex items-center justify-between mb-1">
-                        <label className="font-bold text-slate-700 block">Mobile Phone (for delivery SMS / OTP) *</label>
-                        {isDeliveryPhoneVerified && deliveryVerifiedPhone === (shippingAddress.phone || '').replace(/\D/g, '').slice(-10) ? (
+                        <label className="font-bold text-slate-700 block">Mobile Phone (for delivery SMS) *</label>
+                        {isUserLoggedIn ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                            Verified Account
+                          </span>
+                        ) : isDeliveryPhoneVerified && deliveryVerifiedPhone === (shippingAddress.phone || '').replace(/\D/g, '').slice(-10) ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                             <ShieldCheck className="w-3 h-3 text-emerald-600" />
                             OTP Verified
@@ -4141,14 +4263,14 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                           onChange={(e) => {
                             const val = e.target.value;
                             setShippingAddress({ ...shippingAddress, phone: val });
-                            if (isDeliveryPhoneVerified && val.replace(/\D/g, '').slice(-10) !== deliveryVerifiedPhone) {
+                            if (!isUserLoggedIn && isDeliveryPhoneVerified && val.replace(/\D/g, '').slice(-10) !== deliveryVerifiedPhone) {
                               setIsDeliveryPhoneVerified(false);
                             }
                           }}
                           placeholder="10-digit mobile number"
                           className="flex-1 bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-hidden focus:border-rose-500 font-medium font-mono"
                         />
-                        {!isDeliveryPhoneVerified && (
+                        {!isUserLoggedIn && !isDeliveryPhoneVerified && (
                           <div className="flex gap-1.5 shrink-0">
                             <button
                               type="button"
@@ -4175,8 +4297,8 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       {/* Invisible Firebase Recaptcha Container */}
                       <div id="checkout-recaptcha-container"></div>
 
-                      {/* Real-Time SMS OTP Verification Card */}
-                      {deliveryOtpSent && !isDeliveryPhoneVerified && (
+                      {/* Real-Time SMS OTP Verification Card - Only for guests / unauthenticated users */}
+                      {!isUserLoggedIn && deliveryOtpSent && !isDeliveryPhoneVerified && (
                         <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-2 animate-fadeIn">
                           <div className="flex items-center justify-between">
                             <span className="text-[11px] font-bold text-amber-900 flex items-center gap-1">
@@ -4259,12 +4381,17 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       )}
 
                       {/* Verified Badge */}
-                      {isDeliveryPhoneVerified && (
+                      {isUserLoggedIn ? (
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold">
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          <span>Logged in as {userProfile?.parentName || 'Parent'} • No OTP required</span>
+                        </div>
+                      ) : isDeliveryPhoneVerified ? (
                         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-emerald-700 font-bold">
                           <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                           <span>Delivery mobile verified</span>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
 
