@@ -18,6 +18,7 @@ import PlaymateCard, { calculateMatchScore } from './components/PlaymateCard.tsx
 import { PlaymateDetailModal } from './components/PlaymateDetailModal.tsx';
 import ChatPanel from './components/ChatPanel.tsx';
 import EditProfileModal from './components/EditProfileModal.tsx';
+import { recordParentMlFeedback, getParentMlState } from './utils/parentMlEngine.ts';
 
 // Code-split heavy tab views for instant initial load and high performance
 const TabLoadingFallback = () => (
@@ -1494,8 +1495,8 @@ export default function App() {
     }
   };
 
-  // Business, Specialists and commission states
-  const [globalCommissionRate, setGlobalCommissionRate] = useState<number>(15); // Default 15% platform commission
+  // Business, Specialists and commission states (0% platform fee / zero app charges)
+  const [globalCommissionRate, setGlobalCommissionRate] = useState<number>(0);
   const [showEditProfileModal, setShowEditProfileModal] = useState<boolean>(false);
 
   // User In-App Wallet State
@@ -1780,6 +1781,7 @@ export default function App() {
 
   const [eventsList, setEventsList] = useState<CommunityEvent[]>(MOCK_EVENTS);
   const [storeInitialAction, setStoreInitialAction] = useState<string | undefined>(undefined);
+  const [selectedGuideSlug, setSelectedGuideSlug] = useState<string | undefined>(undefined);
 
   const handleAddEvent = (newEvent: CommunityEvent) => {
     setEventsList(prev => [newEvent, ...prev]);
@@ -1932,6 +1934,11 @@ export default function App() {
     });
     try {
       logProductSearch(q, 'radar_search', userProfile);
+      recordParentMlFeedback(userProfile, {
+        eventType: 'PARENT_SEARCH_FILTER',
+        searchQuery: q,
+        filterRadiusKm: maxDistanceKm
+      });
     } catch (err) {
       console.warn('Error recording radar search telemetry:', err);
     }
@@ -2594,6 +2601,11 @@ export default function App() {
       const next = isAlreadySaved ? prev.filter(id => id !== profileId) : [...prev, profileId];
       if (!isAlreadySaved) {
         triggerToast('⭐ Profile saved to your bookmarks!');
+        const target = profiles.find(p => p.id === profileId) || null;
+        recordParentMlFeedback(userProfile, {
+          eventType: 'PROFILE_SAVED',
+          targetProfile: target
+        });
       } else {
         triggerToast('Profile removed from bookmarks.');
       }
@@ -2719,6 +2731,11 @@ export default function App() {
         // Enqueue to background sync outbox for offline resilience and Firebase sync
         try {
           queueAcceptConnection(partnerId, userProfile);
+          const acceptedPartner = profiles.find(p => p.id === partnerId) || null;
+          recordParentMlFeedback(userProfile, {
+            eventType: 'CONNECTION_ACCEPTED',
+            targetProfile: acceptedPartner
+          });
         } catch (err) {
           console.debug('Sync outbox accept note:', err);
         }
@@ -2762,10 +2779,14 @@ export default function App() {
           console.debug('Sync outbox connect note:', err);
         }
 
-        // Dispatch email notification to recipient parent
+        // Dispatch email notification to recipient parent & update Parent-Only ML weights
         try {
           const partnerProfile = profiles.find(p => p.id === partnerId);
           if (partnerProfile) {
+            recordParentMlFeedback(userProfile, {
+              eventType: 'WAVE_SENT',
+              targetProfile: partnerProfile
+            });
             dispatchEmailNotification({
               toEmail: (partnerProfile as any).email || 'parent@vernunt.org',
               recipientName: partnerProfile.parentName,
@@ -3527,14 +3548,21 @@ export default function App() {
       results.push({ ...p, _cachedDistance: distanceKm });
     }
 
-    // Default show nearby ones first to users (closest distance first)
+    // Default show nearby ones first, with adaptive Parent-Only ML match ranking when opted in
+    const mlOptedIn = getParentMlState(userProfile?.id).mlPersonalizationOptIn;
     results.sort((a, b) => {
       const distDiff = a._cachedDistance - b._cachedDistance;
-      if (Math.abs(distDiff) > 0.2) {
+      if (!mlOptedIn && Math.abs(distDiff) > 0.2) {
         return distDiff;
       }
       const matchA = calculateMatchScore(userProfile, a, userLat, userLng).score;
       const matchB = calculateMatchScore(userProfile, b, userLat, userLng).score;
+      if (mlOptedIn) {
+        // Blend adaptive ML probability with distance proximity penalty
+        const rankA = matchA - a._cachedDistance * 2.5;
+        const rankB = matchB - b._cachedDistance * 2.5;
+        if (Math.abs(rankB - rankA) > 0.5) return rankB - rankA;
+      }
       if (matchB !== matchA) {
         return matchB - matchA;
       }
@@ -3831,7 +3859,9 @@ export default function App() {
               </button>
             </div>
             <GlobalUniversalSearch
+              userProfile={userProfile}
               playmates={playmates}
+              specialists={specialistsList}
               events={eventsList}
               daycares={daycarePlayhomes}
               storeProducts={MOCK_MARKETPLACE}
@@ -3841,11 +3871,38 @@ export default function App() {
                   setActiveTab('radar');
                   setPlaymateSubCategory('parks');
                   if (item?.id) setSelectedParkIdForHub(item.id);
+                } else if (type === 'category' && item?.id) {
+                  const jumpPayload = { categoryId: item.id };
+                  try {
+                    sessionStorage.setItem('vernunt_store_jump', JSON.stringify(jumpPayload));
+                  } catch {
+                    // ignore storage quota errors
+                  }
+                  window.dispatchEvent(new CustomEvent('vernunt_store_jump', { detail: jumpPayload }));
+                  setActiveTab('store');
+                } else if (type === 'store' && (item?.id || item?.name || item?.title)) {
+                  const jumpPayload = {
+                    productId: item?.id,
+                    title: item?.name || item?.title
+                  };
+                  try {
+                    sessionStorage.setItem('vernunt_store_jump', JSON.stringify(jumpPayload));
+                  } catch {
+                    // ignore storage quota errors
+                  }
+                  window.dispatchEvent(new CustomEvent('vernunt_store_jump', { detail: jumpPayload }));
+                  setActiveTab('store');
+                } else if (type === 'guide' && item?.slug) {
+                  setSelectedGuideSlug(item.slug);
+                  setActiveTab('knowledge');
+                } else if (type === 'daycare') {
+                  setActiveTab('care');
+                } else if (type === 'playmate' && item) {
+                  setActiveTab('radar');
+                  setPlaymateSubCategory('playmates');
+                  setSelectedPlaymate(item);
                 } else {
                   setActiveTab(tabId as any);
-                }
-                if (type === 'playmate' && item) {
-                  setSelectedPlaymate(item);
                 }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -4611,15 +4668,32 @@ export default function App() {
               </div>
             )}
 
-            {/* If tab is ever specialists, redirect to store */}
+            {/* Tab: Verified Specialists & Child Doctors */}
             {activeTab === 'specialists' && (
-              <div className="py-12 text-center text-sm font-semibold text-slate-500">
-                Redirecting to Vernunt Shop...
-                {(() => {
-                  setTimeout(() => setActiveTab('store'), 50);
-                  return null;
-                })()}
-              </div>
+              <SpecialistsTab
+                currentProfile={userProfile}
+                specialistsList={specialistsList}
+                bookingsList={bookingsList}
+                onAddBooking={(newBooking) => {
+                  setBookingsList(prev => [newBooking, ...prev]);
+                  confetti({ particleCount: 140, spread: 75 });
+                }}
+                onUpdateRole={(newRole) => {
+                  setUserRole(newRole);
+                  if (userProfile) {
+                    setUserProfile({ ...userProfile, userRole: newRole });
+                  }
+                }}
+                onAddNewSpecialist={(newSpec) => {
+                  setSpecialistsList(prev => [...prev, newSpec]);
+                  confetti({ particleCount: 100, spread: 60 });
+                }}
+                globalCommissionRate={globalCommissionRate}
+                onUpdateUserProfile={(profileObj) => {
+                  setUserProfile(profileObj);
+                }}
+                onUpdateSpecialist={handleUpdateSpecialist}
+              />
             )}
 
             {/* Tab: Consolidated Business dashboard */}
@@ -4732,8 +4806,30 @@ export default function App() {
 
             {/* Tab: 1000+ Child Guides & SEO Knowledge Base */}
             {activeTab === 'knowledge' && (
-              <KnowledgeHub 
+              <KnowledgeHub
+                initialSlug={selectedGuideSlug}
                 onNavigateToRadar={() => setActiveTab('radar')}
+              />
+            )}
+
+            {/* Tab: Verified Daycares & Home Playhomes */}
+            {(activeTab === 'care' || (activeTab as string) === 'daycare') && (
+              <DaycareSittingTab
+                daycarePlayhomes={daycarePlayhomes}
+                careBookings={careBookings}
+                currentUserProfile={effectiveProfile}
+                onSaveDaycareProfile={handleSaveDaycareProfile}
+                onAddCareBooking={handleAddCareBooking}
+                onUpdateBookingStatus={handleUpdateBookingStatus}
+                onOpenChatWithUser={(opponentId) => {
+                  const target = playmates.find(p => p.id === opponentId);
+                  if (target) setSelectedPlaymate(target);
+                  setActiveTab('chat');
+                }}
+                onOpenUserProfile={(u) => {
+                  setSelectedPlaymate(u);
+                  setActiveTab('radar');
+                }}
               />
             )}
 

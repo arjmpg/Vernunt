@@ -11,6 +11,7 @@ import { calculateEventCommissionPolicy } from '../../utils/ticketingCommission.
 import { db } from '../../utils/firebase.ts';
 import { doc, setDoc } from 'firebase/firestore';
 import EventHostQrShareModal from './EventHostQrShareModal.tsx';
+import { fetchAiCatalogAssist } from '../../utils/marketplaceAiEngine.ts';
 
 interface CreateEventWizardModalProps {
   userProfile: any;
@@ -120,10 +121,55 @@ export default function CreateEventWizardModal({
   const [newAgendaTime, setNewAgendaTime] = useState('');
   const [newAgendaTitle, setNewAgendaTitle] = useState('');
 
-  // Active Tab in Wizard
   const [wizardStep, setWizardStep] = useState<'basics' | 'tickets' | 'agenda'>('basics');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAiAssisting, setIsAiAssisting] = useState(false);
+  const [aiAssistMessage, setAiAssistMessage] = useState<string | null>(null);
+
+  const handleAiAutoWriteEvent = async () => {
+    if (!title.trim()) {
+      setValidationError('Enter a title first so AI can generate descriptions, classification, and tags.');
+      return;
+    }
+    setValidationError(null);
+    setAiAssistMessage(null);
+    setIsAiAssisting(true);
+    try {
+      const { mode, data } = await fetchAiCatalogAssist({
+        targetType: 'event',
+        title: title.trim(),
+        category,
+        notes: description.trim() || `${itemCategoryType} (${deliveryMode})`,
+        price: ticketTiers[0]?.price
+      });
+      if (data.description) setDescription(data.description);
+      if (data.category) setCategory(data.category);
+      if (data.targetAgeRange) setTargetAgeRange(data.targetAgeRange);
+      if (Array.isArray(data.tags) && data.tags.length > 0) {
+        setTagsStr(data.tags.join(', '));
+      }
+      if (Array.isArray(data.recommendedAgenda) && data.recommendedAgenda.length > 0) {
+        setScheduleAgenda(
+          data.recommendedAgenda.map((item, idx) => ({
+            id: `ai-sch-${Date.now()}-${idx}`,
+            time: item.time,
+            title: item.title,
+            description: data.highlightsPitch || ''
+          }))
+        );
+      }
+      setAiAssistMessage(
+        mode === 'gemini'
+          ? 'AI generated promotional description, age bracket, discovery tags & timeline agenda.'
+          : 'Auto-generated promotional description, age bracket, tags & agenda.'
+      );
+    } catch (err: any) {
+      setValidationError(err?.message || 'AI Assistant could not generate copy right now.');
+    } finally {
+      setIsAiAssisting(false);
+    }
+  };
 
   // Sync category display name when itemCategoryType switches
   const handleItemTypeChange = (type: 'event' | 'classes' | 'activity') => {
@@ -1049,15 +1095,32 @@ export default function CreateEventWizardModal({
                 </div>
               )}
 
-              {/* Comprehensive Description Field */}
+              {/* Comprehensive Description Field + AI Catalog Assistant */}
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
-                  {itemCategoryType === 'classes'
-                    ? 'Class Description & Syllabus Outline *'
-                    : itemCategoryType === 'activity'
-                    ? 'Activity Description & Itinerary *'
-                    : 'Event Description & Highlights *'}
-                </label>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                  <label className="block font-bold text-slate-700">
+                    {itemCategoryType === 'classes'
+                      ? 'Class Description & Syllabus Outline *'
+                      : itemCategoryType === 'activity'
+                      ? 'Activity Description & Itinerary *'
+                      : 'Event Description & Highlights *'}
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleAiAutoWriteEvent}
+                    disabled={isAiAssisting}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[11px] font-bold transition cursor-pointer disabled:opacity-60"
+                  >
+                    <Sparkles className={`w-3 h-3 text-indigo-600 ${isAiAssisting ? 'animate-spin' : ''}`} />
+                    <span>{isAiAssisting ? 'Writing with AI...' : 'Auto-Write Copy, Age & Tags (AI)'}</span>
+                  </button>
+                </div>
+                {aiAssistMessage && (
+                  <p className="text-[11px] text-emerald-700 font-semibold mb-1.5 flex items-center gap-1">
+                    <Check className="w-3.5 h-3.5 shrink-0" />
+                    <span>{aiAssistMessage}</span>
+                  </p>
+                )}
                 <textarea
                   rows={4}
                   value={description}

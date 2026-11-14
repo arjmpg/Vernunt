@@ -32,8 +32,11 @@ import {
   GraduationCap,
   Activity,
   ShieldCheck,
-  Zap
+  Zap,
+  Globe
 } from 'lucide-react';
+import { wordpressService } from '../services/wordpressService.ts';
+import { WordPressHeadlessManagerModal } from './admin/WordPressHeadlessManagerModal.tsx';
 
 interface KnowledgeHubProps {
   initialSlug?: string;
@@ -94,10 +97,30 @@ export function KnowledgeHub({
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
 
-  // Generate full 1,000+ programmatic SEO articles index
-  const allArticlesIndex = useMemo(() => {
-    return generateProgrammaticKnowledgeIndex();
+  const [isWpModalOpen, setIsWpModalOpen] = useState(false);
+  const [wpLiveArticles, setWpLiveArticles] = useState<KnowledgeArticle[]>([]);
+
+  // Check and fetch live guides from WordPress if sync is enabled
+  useEffect(() => {
+    wordpressService.getConfig().then(cfgRes => {
+      if (cfgRes.success && cfgRes.config?.syncEnabled && cfgRes.config?.endpoint) {
+        wordpressService.fetchLiveArticles().then(artRes => {
+          if (artRes.success && artRes.articles && artRes.articles.length > 0) {
+            setWpLiveArticles(artRes.articles);
+          }
+        });
+      }
+    }).catch(() => {});
   }, []);
+
+  // Generate full 1,000+ programmatic SEO articles index + live WordPress posts (100% white-labeled)
+  const allArticlesIndex = useMemo(() => {
+    const base = generateProgrammaticKnowledgeIndex();
+    if (wpLiveArticles.length === 0) return base;
+    const seen = new Set(wpLiveArticles.map(a => a.slug));
+    const rest = base.filter(a => !seen.has(a.slug));
+    return [...wpLiveArticles, ...rest];
+  }, [wpLiveArticles]);
 
   // Filtered list based on search & filters
   const filteredArticles = useMemo(() => {
@@ -122,11 +145,13 @@ export function KnowledgeHub({
     return filteredArticles.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredArticles, currentPage]);
 
-  // Selected full article object
+  // Selected full article object (supports live WP guides and built-in encyclopedic guides)
   const currentArticle: KnowledgeArticle | null = useMemo(() => {
     if (!selectedArticleSlug) return null;
+    const foundWp = wpLiveArticles.find(a => a.slug === selectedArticleSlug);
+    if (foundWp) return foundWp;
     return getKnowledgeArticleBySlug(selectedArticleSlug);
-  }, [selectedArticleSlug]);
+  }, [selectedArticleSlug, wpLiveArticles]);
 
   // Dynamic SEO title, meta description, and keywords tags updates
   useEffect(() => {
@@ -624,8 +649,19 @@ export function KnowledgeHub({
       {/* Hero Search Header */}
       <div className="bg-gradient-to-br from-slate-900 via-rose-950 to-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
         <div className="relative z-10 max-w-3xl space-y-4">
-          <div className="inline-flex items-center gap-2 bg-rose-500/20 border border-rose-400/30 text-rose-300 text-xs font-black px-3.5 py-1 rounded-full">
-            <Sparkles className="w-3.5 h-3.5" /> 1,000+ Evidence-Based Guides & Child Development Blueprints
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="inline-flex items-center gap-2 bg-rose-500/20 border border-rose-400/30 text-rose-300 text-xs font-black px-3.5 py-1 rounded-full">
+              <Sparkles className="w-3.5 h-3.5" /> 1,000+ Evidence-Based Guides &amp; Child Development Blueprints
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsWpModalOpen(true)}
+              className="inline-flex items-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3.5 py-1.5 rounded-full transition cursor-pointer backdrop-blur-xs shadow-xs"
+              title="Open Headless WordPress Blog & Guide Publisher"
+            >
+              <Globe className="w-3.5 h-3.5 text-emerald-400" />
+              <span>WordPress Blog &amp; Publisher</span>
+            </button>
           </div>
 
           <h1 className="text-2xl sm:text-4xl font-black font-serif leading-tight tracking-tight">
@@ -895,6 +931,18 @@ export function KnowledgeHub({
         )}
       </div>
 
+      {/* Headless WordPress Blog & Guide Publisher Modal */}
+      <WordPressHeadlessManagerModal
+        isOpen={isWpModalOpen}
+        onClose={() => setIsWpModalOpen(false)}
+        onSyncCompleted={() => {
+          wordpressService.fetchLiveArticles().then(artRes => {
+            if (artRes.success && artRes.articles && artRes.articles.length > 0) {
+              setWpLiveArticles(artRes.articles);
+            }
+          });
+        }}
+      />
     </div>
   );
 }

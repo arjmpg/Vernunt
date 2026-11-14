@@ -29,6 +29,10 @@ import { AdminProductSearchesDesk } from './AdminProductSearchesDesk.tsx';
 import { AdminCommerceEngineDesk } from './AdminCommerceEngineDesk.tsx';
 import { AdminShippingRulesModal } from '../store/AdminShippingRulesModal.tsx';
 import { saveStoredShippingRules } from '../../utils/pincodeChecker.ts';
+import {
+  fetchAiCatalogAssist,
+  computeInventoryHealthSummary
+} from '../../utils/marketplaceAiEngine.ts';
 
 /**
  * Client-side image compression utility.
@@ -121,9 +125,15 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
   const [editingProduct, setEditingProduct] = useState<StoreProduct | null>(null);
   const [selectedWithdrawalForAction, setSelectedWithdrawalForAction] = useState<VendorWithdrawal | null>(null);
   const [payoutTxRef, setPayoutTxRef] = useState<string>('');
+  const [isAiAssistingCatalog, setIsAiAssistingCatalog] = useState<boolean>(false);
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState<boolean>(false);
   const [broadcastTitle, setBroadcastTitle] = useState<string>('');
   const [broadcastContent, setBroadcastContent] = useState<string>('');
+
+  const adminInventorySummary = useMemo(
+    () => computeInventoryHealthSummary(products, orders),
+    [products, orders]
+  );
 
   // Category Modal
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState<boolean>(false);
@@ -1081,6 +1091,21 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
             </div>
           </div>
 
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-3 rounded-xl border border-slate-200 bg-white">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">30-Day Predicted Store Demand</span>
+              <span className="text-lg font-black font-mono text-slate-900">{adminInventorySummary.totalPredicted30dUnits} units</span>
+            </div>
+            <div className="p-3 rounded-xl border border-rose-200 bg-rose-50/70">
+              <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Stockout Risk SKUs</span>
+              <span className="text-lg font-black font-mono text-rose-900">{adminInventorySummary.stockoutRiskCount} SKUs</span>
+            </div>
+            <div className="p-3 rounded-xl border border-amber-200 bg-amber-50/70">
+              <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Slow-Moving / Overstock Risk</span>
+              <span className="text-lg font-black font-mono text-amber-950">{adminInventorySummary.overstockRiskCount} SKUs</span>
+            </div>
+          </div>
+
           <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-2xs">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
@@ -1090,14 +1115,16 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                     <th className="py-3 px-4">Seller / Brand</th>
                     <th className="py-3 px-4">Category &amp; Age</th>
                     <th className="py-3 px-4">Price / MRP</th>
-                    <th className="py-3 px-4">Stock Status</th>
+                    <th className="py-3 px-4">Stock &amp; 30d Forecast</th>
                     <th className="py-3 px-4">GST Rate</th>
                     <th className="py-3 px-4">Showcase Badges</th>
                     <th className="py-3 px-4 text-right">Quick Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredProducts.map(prod => (
+                  {filteredProducts.map(prod => {
+                    const fc = adminInventorySummary.forecastsById[prod.id];
+                    return (
                     <tr key={prod.id} className="hover:bg-slate-50/70 transition">
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
@@ -1145,6 +1172,14 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                             +
                           </button>
                         </div>
+                        {fc && (
+                          <span className={`text-[10px] font-bold block mt-1 ${
+                            fc.riskStatus === 'STOCKOUT_RISK' ? 'text-rose-700' :
+                            fc.riskStatus === 'OVERSTOCK_RISK' ? 'text-indigo-700' : 'text-slate-500'
+                          }`} title={fc.insight}>
+                            Est. {fc.predicted30DayDemand}/mo · {fc.daysUntilStockout < 365 ? `${fc.daysUntilStockout}d left` : '365d+'}
+                          </span>
+                        )}
                       </td>
                       <td className="py-3 px-4 font-mono font-semibold text-slate-700">
                         {prod.gstRate || 12}% GST
@@ -1215,7 +1250,8 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
                         </button>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -1929,7 +1965,45 @@ export const AdminVernuntCommerceDesk: React.FC<AdminVernuntCommerceDeskProps> =
 
             <form onSubmit={handleSaveProduct} className="space-y-3 text-xs">
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Product Title *</label>
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <label className="font-bold text-slate-700">Product Title *</label>
+                  <button
+                    type="button"
+                    disabled={isAiAssistingCatalog}
+                    onClick={async () => {
+                      const title = (productFormData.name || '').trim();
+                      if (!title) return;
+                      setIsAiAssistingCatalog(true);
+                      try {
+                        const { data } = await fetchAiCatalogAssist({
+                          targetType: 'product',
+                          title,
+                          category: productFormData.category,
+                          notes: productFormData.shortDescription || productFormData.description,
+                          price: Number(productFormData.price || 0)
+                        });
+                        setProductFormData(prev => ({
+                          ...prev,
+                          shortDescription: data.shortDescription || prev.shortDescription,
+                          description: data.description || prev.description,
+                          category: data.category || prev.category,
+                          ageGroup: (data.ageGroup as any) || prev.ageGroup,
+                          ageLabel: data.ageLabel || prev.ageLabel,
+                          hsnCode: data.hsnCode || prev.hsnCode,
+                          gstRate: typeof data.gstRate === 'number' ? data.gstRate : prev.gstRate,
+                          badges: Array.isArray(data.badges) && data.badges.length > 0 ? data.badges : prev.badges,
+                          tags: Array.isArray(data.tags) && data.tags.length > 0 ? data.tags : prev.tags
+                        }));
+                      } finally {
+                        setIsAiAssistingCatalog(false);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-[11px] font-bold cursor-pointer disabled:opacity-60"
+                  >
+                    <Sparkles className={`w-3 h-3 text-indigo-600 ${isAiAssistingCatalog ? 'animate-spin' : ''}`} />
+                    <span>{isAiAssistingCatalog ? 'Optimizing...' : 'AI Auto-Write & Classify'}</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   required

@@ -52,6 +52,7 @@ import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
 import AdminVisualCmsDesk from './admin/AdminVisualCmsDesk.tsx';
 import AdminMerchantHubDesk from './admin/AdminMerchantHubDesk.tsx';
+import WordPressHeadlessManagerModal from './admin/WordPressHeadlessManagerModal.tsx';
 import { 
   isAuthorizedSystemAdmin, 
   maskAadhaar, 
@@ -191,6 +192,7 @@ export default function AdminDashboard({
   const [knowledgeSearchTerm, setKnowledgeSearchTerm] = useState<string>('');
   const [knowledgeCategoryFilter, setKnowledgeCategoryFilter] = useState<string>('all');
   const [showArticleEditorModal, setShowArticleEditorModal] = useState<boolean>(false);
+  const [showWordPressModal, setShowWordPressModal] = useState<boolean>(false);
   const [editingArticleSlug, setEditingArticleSlug] = useState<string | null>(null);
 
   const [articleForm, setArticleForm] = useState({
@@ -5014,6 +5016,15 @@ export default function AdminDashboard({
                     <Plus className="w-4 h-4" />
                     <span>+ Add New Article / Influencer Post</span>
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowWordPressModal(true)}
+                    className="px-4 py-2 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white text-xs font-bold rounded-xs hover:bg-slate-800 transition-all shadow-xs cursor-pointer flex items-center gap-1.5 shrink-0 border border-indigo-500/30"
+                  >
+                    <Globe className="w-4 h-4 text-emerald-400" />
+                    <span>Headless WordPress Sync &amp; Publisher</span>
+                  </button>
                 </div>
 
                 {/* Filters & Search */}
@@ -5687,6 +5698,16 @@ export default function AdminDashboard({
               </div>
             </div>
           )}
+
+          {/* Headless WordPress Blog & Guide Publisher Modal */}
+          <WordPressHeadlessManagerModal
+            isOpen={showWordPressModal}
+            onClose={() => setShowWordPressModal(false)}
+            onSyncCompleted={() => {
+              const updatedCustom = getAdminCustomKnowledgeArticles();
+              setKnowledgeArticlesList([...updatedCustom, ...FLAGSHIP_KNOWLEDGE_ARTICLES]);
+            }}
+          />
 
           {/* ========================================================================= */}
           {/* VIEW: KID STORIES & LITTLE ACHIEVERS EDITORIAL DESK                        */}

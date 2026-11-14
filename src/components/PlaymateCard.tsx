@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { ChildProfile, VerificationStatus } from '../types.ts';
-import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin, Navigation, EyeOff } from 'lucide-react';
+import { BadgeAlert, ShieldCheck, Heart, MessageSquare, CalendarPlus, User, ShieldAlert, Lock, Unlock, Phone, Sparkles, Zap, Activity, Bookmark, Clock, Gift, ChevronRight, Star, ExternalLink, Flame, MapPin, Navigation, EyeOff, ThumbsUp, ThumbsDown, Brain } from 'lucide-react';
 import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
+import { predictParentMatchML, recordParentMlFeedback, getParentMlState } from '../utils/parentMlEngine.ts';
 
 export function formatLastActive(timestamp?: string): string {
   if (!timestamp) return 'Recently active';
@@ -30,140 +31,18 @@ const incomeTierWeights: Record<string, number> = {
 
 export function calculateMatchScore(p1: ChildProfile | null, p2: ChildProfile, currentUserLat?: number, currentUserLng?: number): {
   score: number;
-  breakdown: { interests: number; proximity: number; availability: number; age: number; playStyle: number };
+  breakdown: { interests: number; proximity: number; availability: number; age: number; playStyle: number; nlpTone?: number; collaborative?: number };
   matchingInterests: string[];
   matchingAvailability: string[];
   isSimulated: boolean;
+  mlActive?: boolean;
+  nlpToneLabel?: string;
+  nlpSimilarityPercent?: number;
+  collaborativeScorePercent?: number;
+  collaborativeReason?: string | null;
+  topReasons?: string[];
 } {
-  // If no user profile exists, we provide a consistent simulated/default match score based on names
-  if (!p1) {
-    const seedStr = (p2.id || '') + (p2.childName || '') + (p2.parentName || '');
-    const charSum = seedStr.split('').reduce((sum, ch) => sum + ch.charCodeAt(0), 0);
-    const simulatedScore = 72 + (charSum % 24); // stable value between 72% and 96%
-    
-    const displayInterests = p2.interests && p2.interests.length > 0
-      ? p2.interests.slice(0, Math.min(2, p2.interests.length))
-      : ['Playtime Hobbies'];
-
-    const displayAvail = p2.generalAvailability && p2.generalAvailability.length > 0
-      ? p2.generalAvailability.slice(0, 1)
-      : ['Weekends'];
-
-    return {
-      score: simulatedScore,
-      breakdown: { 
-        interests: 25, 
-        proximity: 25, 
-        availability: 20, 
-        age: 15, 
-        playStyle: 10 
-      },
-      matchingInterests: displayInterests,
-      matchingAvailability: displayAvail,
-      isSimulated: true
-    };
-  }
-
-  // 1. Interests Overlap Score (Max 30 points)
-  let matchingInterests: string[] = [];
-  if (p1.interests && p2.interests) {
-    matchingInterests = p2.interests.filter(i => 
-      p1.interests.some(ci => {
-        const ciClean = ci.toLowerCase().trim();
-        const iClean = i.toLowerCase().trim();
-        return ciClean === iClean || ciClean.includes(iClean) || iClean.includes(ciClean);
-      })
-    );
-  }
-  
-  const interestOverlapCount = matchingInterests.length;
-  let interestsScore = 10;
-  if (interestOverlapCount >= 3) {
-    interestsScore = 30;
-  } else if (interestOverlapCount === 2) {
-    interestsScore = 24;
-  } else if (interestOverlapCount === 1) {
-    interestsScore = 18;
-  }
-
-  // 2. Geographic Proximity Score (Max 25 points)
-  const uLat = currentUserLat || (p1.location && p1.location.lat) || 12.9716;
-  const uLng = currentUserLng || (p1.location && p1.location.lng) || 77.5946;
-  const p2Lat = p2.location?.lat ?? (typeof (p2 as any).lat === 'number' ? (p2 as any).lat : 12.9716);
-  const p2Lng = p2.location?.lng ?? (typeof (p2 as any).lng === 'number' ? (p2 as any).lng : 77.5946);
-  const distKm = getHaversineDistance(uLat, uLng, p2Lat, p2Lng);
-  let proximityScore = 10;
-  if (distKm <= 1.5) {
-    proximityScore = 25; // Same building or immediate walking circle
-  } else if (distKm <= 3.5) {
-    proximityScore = 20; // Walking / quick scooter distance
-  } else if (distKm <= 7.0) {
-    proximityScore = 15; // Short neighbourhood drive
-  }
-
-  // 3. General Availability Overlap Score (Max 20 points)
-  let matchingAvailability: string[] = [];
-  if (p1.generalAvailability && p2.generalAvailability) {
-    matchingAvailability = p2.generalAvailability.filter(a =>
-      p1.generalAvailability!.some(ca => ca.toLowerCase() === a.toLowerCase())
-    );
-  }
-  let availabilityScore = 10;
-  if (matchingAvailability.length >= 2) {
-    availabilityScore = 20;
-  } else if (matchingAvailability.length === 1) {
-    availabilityScore = 16;
-  }
-
-  // 4. Age Proximity Score (Max 15 points)
-  const age1 = p1.childAge * (p1.ageUnit === 'months' ? 1/12 : 1);
-  const age2 = p2.childAge * (p2.ageUnit === 'months' ? 1/12 : 1);
-  const ageDiff = Math.abs(age1 - age2);
-  let ageScore = 5;
-  if (ageDiff <= 1) {
-    ageScore = 15; // Exact peer age
-  } else if (ageDiff <= 2.5) {
-    ageScore = 11;
-  } else if (ageDiff <= 4) {
-    ageScore = 8;
-  }
-
-  // 5. Psychological Demographic & Income Affinity with Progressive Fallback (Max 10 points)
-  // Income is hidden in frontend, used only to prioritize peer cohorts with smooth fallback
-  let incomeAffinityScore = 6;
-  if (p1.parentsIncome && p2.parentsIncome) {
-    const tier1 = incomeTierWeights[p1.parentsIncome] ?? 2;
-    const tier2 = incomeTierWeights[p2.parentsIncome] ?? 2;
-    const diff = Math.abs(tier1 - tier2);
-    if (diff === 0) {
-      incomeAffinityScore = 10; // Exact tier match
-    } else if (diff === 1) {
-      incomeAffinityScore = 8;  // Adjacent bracket
-    } else if (diff === 2) {
-      incomeAffinityScore = 6;  // Nearby bracket
-    } else {
-      incomeAffinityScore = 5;  // Seamless fallback so parents still discover great families
-    }
-  }
-
-  // Influencer / Community Ambassador Priority Boost
-  const isInfluencer = p2.userRole === 'Influencer' || p2.isInfluencerSpotlight;
-  const influencerBoost = isInfluencer ? 10 : 0;
-
-  const finalScore = Math.min(99, Math.max(45, interestsScore + proximityScore + availabilityScore + ageScore + incomeAffinityScore + influencerBoost));
-  return {
-    score: finalScore,
-    breakdown: { 
-      interests: interestsScore, 
-      proximity: proximityScore, 
-      availability: availabilityScore, 
-      age: ageScore, 
-      playStyle: incomeAffinityScore + influencerBoost
-    },
-    matchingInterests,
-    matchingAvailability,
-    isSimulated: false
-  };
+  return predictParentMatchML(p1, p2, currentUserLat, currentUserLng);
 }
 
 interface PlaymateCardProps {
@@ -209,6 +88,8 @@ export default function PlaymateCard({
 }: PlaymateCardProps) {
   const [liked, setLiked] = useState(isInterestSent || isConnected);
   const [activePhotoTab, setActivePhotoTab] = useState<'parent' | 'child'>('parent');
+  const [mlFeedbackGiven, setMlFeedbackGiven] = useState<'up' | 'down' | null>(null);
+  const [mlFeedbackNotice, setMlFeedbackNotice] = useState<string | null>(null);
 
   const isViewerKycVerified = currentUserProfile?.userRole === 'Admin' || !!currentUserProfile?.aadhaarVerified;
   // All profile photos must remain strictly locked with EyeOff state until viewer Aadhaar and KYC is verified
@@ -736,6 +617,97 @@ export default function PlaymateCard({
                   </div>
                 </div>
               )}
+
+              {/* Parent-Only NLP Vibe, Collaborative Filtering & SGD Feedback Controls */}
+              <div className="pt-2 border-t border-dashed border-slate-200 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1.5 text-[9.5px]">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-slate-200 font-bold text-indigo-800">
+                    <Brain className="w-3 h-3 text-indigo-600" />
+                    <span>Vibe: {match.nlpToneLabel || 'Warm & Nurturing'}</span>
+                  </span>
+                  {match.mlActive ? (
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 font-black uppercase text-[8px]">
+                      Parent ML Active • Collab {match.collaborativeScorePercent ?? 70}%
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-500 font-bold text-[8px]">
+                      Baseline Match (Parent ML Paused)
+                    </span>
+                  )}
+                </div>
+
+                {match.collaborativeReason && (
+                  <p className="text-[10px] text-indigo-900 font-medium bg-white/80 px-2.5 py-1.5 rounded-lg border border-indigo-100">
+                    ✨ {match.collaborativeReason}
+                  </p>
+                )}
+
+                {currentUserProfile && (
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <span className="text-[9.5px] text-slate-500 font-semibold">
+                      {mlFeedbackNotice || 'Train Parent-Only Match Model:'}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mlState = getParentMlState(currentUserProfile.id);
+                          if (!mlState.mlPersonalizationOptIn) {
+                            setMlFeedbackNotice('Enable Parent ML opt-in in Privacy / Match Insights first');
+                            return;
+                          }
+                          const res = recordParentMlFeedback(currentUserProfile, {
+                            eventType: 'GREAT_VIBE_FEEDBACK',
+                            targetProfile: profile
+                          });
+                          setMlFeedbackGiven('up');
+                          setMlFeedbackNotice(
+                            res.trained
+                              ? `✓ Learned! Est. Accuracy ${res.state.estimatedAccuracy}%`
+                              : 'Paused'
+                          );
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition cursor-pointer ${
+                          mlFeedbackGiven === 'up'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200'
+                        }`}
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                        <span>Great Vibe</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const mlState = getParentMlState(currentUserProfile.id);
+                          if (!mlState.mlPersonalizationOptIn) {
+                            setMlFeedbackNotice('Enable Parent ML opt-in in Privacy / Match Insights first');
+                            return;
+                          }
+                          const res = recordParentMlFeedback(currentUserProfile, {
+                            eventType: 'NOT_A_FIT_FEEDBACK',
+                            targetProfile: profile
+                          });
+                          setMlFeedbackGiven('down');
+                          setMlFeedbackNotice(
+                            res.trained
+                              ? `✓ Adjusted weights (${res.state.trainingSamples} samples)`
+                              : 'Paused'
+                          );
+                        }}
+                        className={`px-2 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1 transition cursor-pointer ${
+                          mlFeedbackGiven === 'down'
+                            ? 'bg-rose-600 text-white border-rose-600'
+                            : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200'
+                        }`}
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                        <span>Not a Fit</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           );
         })()}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   ShoppingBag, Search, Filter, Star, Heart, Share2, Check, ShieldCheck,
   Truck, ArrowRight, X, Plus, Minus, Trash2, Tag, Sparkles, AlertCircle,
@@ -6,7 +6,7 @@ import {
   CreditCard, Smartphone, DollarSign, Clock, HelpCircle, MessageCircle,
   ChevronDown, ThumbsUp, Send, FileText, ArrowLeft, ExternalLink, Box,
   Store, Building, CheckSquare, MessageSquare, AlertTriangle, Users, Award,
-  Lock, Barcode, Printer, Zap, RefreshCw, Mail, Scale, Radio
+  Lock, Barcode, Printer, Zap, RefreshCw, Mail, Scale, Radio, Camera
 } from 'lucide-react';
 import {
   StoreProduct, CartItem, CustomerAddress, PaymentMethod,
@@ -53,6 +53,16 @@ import { ProductCarouselSection } from './ProductCarouselSection.tsx';
 import { FloatingBasketBar } from './FloatingBasketBar.tsx';
 import { AdminShowcaseManagerModal } from './AdminShowcaseManagerModal.tsx';
 import {
+  semanticRankProducts,
+  fetchAiSemanticSearch,
+  fetchAiVisualSearch,
+  getLifecycleProductRecommendations,
+  getComplementaryCartRecommendations,
+  evaluateDynamicParentOffer,
+  trackParentAccountAction,
+  VisualSearchResult
+} from '../../utils/marketplaceAiEngine.ts';
+import {
   sendProductPurchaseEmail,
   sendProductPaymentReceiptEmail,
   sendProductShippedEmail,
@@ -63,6 +73,7 @@ import {
 import OtpVerificationFallbackCard from '../auth/OtpVerificationFallbackCard.tsx';
 import { triggerGoogleSignIn } from '../../utils/firebase.ts';
 import { openRazorpayCheckout } from '../../utils/razorpay.ts';
+import { recordParentMlFeedback } from '../../utils/parentMlEngine.ts';
 
 interface VernuntStoreProps {
   userProfile: ChildProfile | null;
@@ -216,18 +227,132 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [showAdminSearchLogsModal, setShowAdminSearchLogsModal] = useState<boolean>(false);
 
-  // Auto-log product search queries into 45-day retention telemetry
+  // AI Semantic Search & Multimodal Visual Search (strictly bound to registered adult parent account)
+  const visualSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const [isAiSearching, setIsAiSearching] = useState<boolean>(false);
+  const [aiSemanticMatch, setAiSemanticMatch] = useState<{
+    query: string;
+    correctedQuery: string;
+    interpretedIntent: string;
+    matchedIds: string[];
+    mode: string;
+  } | null>(null);
+  const [isVisualSearching, setIsVisualSearching] = useState<boolean>(false);
+  const [visualSearchPreviewUrl, setVisualSearchPreviewUrl] = useState<string | null>(null);
+  const [visualSearchResult, setVisualSearchResult] = useState<VisualSearchResult | null>(null);
+  const [earlyEventDropUnlocked, setEarlyEventDropUnlocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('vernunt_vip_event_drop_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  // Auto-log product search queries & invoke AI semantic intent expansion (parent account only)
   useEffect(() => {
-    if (!searchQuery.trim() || searchQuery.trim().length < 2) return;
-    const timer = setTimeout(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setAiSemanticMatch(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
       try {
-        logProductSearch(searchQuery.trim(), 'store_catalog', userProfile);
+        logProductSearch(trimmed, 'store_catalog', userProfile);
+        trackParentAccountAction(userProfile, { type: 'search', value: trimmed });
       } catch (err) {
         console.warn('Failed to log store product search:', err);
       }
-    }, 650);
+
+      if (trimmed.length >= 3) {
+        setIsAiSearching(true);
+        const aiRes = await fetchAiSemanticSearch({
+          query: trimmed,
+          targetType: 'product',
+          accountId: userProfile?.id,
+          items: products.map(p => ({
+            id: p.id,
+            title: p.name,
+            category: p.category,
+            subcategory: p.subcategory,
+            tags: p.tags,
+            description: p.shortDescription || p.description.slice(0, 100),
+            ageLabel: p.ageLabel
+          }))
+        });
+        setIsAiSearching(false);
+        if (aiRes && aiRes.success) {
+          setAiSemanticMatch({
+            query: trimmed,
+            correctedQuery: aiRes.correctedQuery || trimmed,
+            interpretedIntent: aiRes.interpretedIntent || '',
+            matchedIds: Array.isArray(aiRes.matchedIds) ? aiRes.matchedIds : [],
+            mode: aiRes.mode
+          });
+        }
+      }
+    }, 550);
     return () => clearTimeout(timer);
-  }, [searchQuery, userProfile]);
+  }, [searchQuery, userProfile, products]);
+
+  // Handle Parent Photo Upload for Visual Toy / Outfit Search
+  const handleVisualSearchFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsVisualSearching(true);
+    setActiveView('shop');
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const maxDim = 960;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxDim || h > maxDim) {
+            if (w > h) {
+              h = Math.round((h * maxDim) / w);
+              w = maxDim;
+            } else {
+              w = Math.round((w * maxDim) / h);
+              h = maxDim;
+            }
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas unavailable');
+          ctx.drawImage(img, 0, 0, w, h);
+          const compressedUrl = canvas.toDataURL('image/jpeg', 0.8);
+          setVisualSearchPreviewUrl(compressedUrl);
+
+          const result = await fetchAiVisualSearch({
+            imageDataUrl: compressedUrl,
+            filenameHint: file.name.replace(/\.[^.]+$/, ''),
+            products,
+            accountId: userProfile?.id
+          });
+          setVisualSearchResult(result);
+          setSelectedCategory('all');
+          setSelectedSubcategory('all');
+          setStoreLayoutMode('grid');
+          trackParentAccountAction(userProfile, {
+            type: 'visual_search',
+            value: result.detectedItem
+          });
+          showToast(`Visual Search matched ${result.matchedIds.length} products for "${result.detectedItem}"`);
+        } catch (err: any) {
+          showToast(err?.message || 'Visual search could not analyze this photo');
+        } finally {
+          setIsVisualSearching(false);
+          if (e.target) e.target.value = '';
+        }
+      };
+      img.src = ev.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string>('all');
@@ -845,6 +970,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
   // Synchronize product detail initial values & record product visit
   const handleOpenProduct = (product: StoreProduct) => {
     trackProductVisit(product.id);
+    trackParentAccountAction(userProfile, {
+      type: 'view_product',
+      value: product.id,
+      category: product.category
+    });
     setSelectedProduct(product);
     setDetailActiveImage(product.featuredImage);
     const initialAttrs: Record<string, string> = {};
@@ -857,6 +987,56 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     setDetailQuantity(1);
     setShowReviewForm(false);
   };
+
+  // Deep-link handler from Global Universal Search (jump straight to department category or open product modal)
+  useEffect(() => {
+    const applyJumpPayload = (payload: { categoryId?: string; productId?: string; title?: string } | null) => {
+      if (!payload) return;
+      if (payload.categoryId) {
+        setActiveView('shop');
+        setSelectedCategory(payload.categoryId);
+        setSelectedSubcategory('all');
+        setStoreLayoutMode('grid');
+        setSelectedProduct(null);
+      } else if (payload.productId || payload.title) {
+        setActiveView('shop');
+        const catalog = products.length > 0 ? products : getStoredProducts();
+        const match = payload.productId
+          ? catalog.find(p => p.id === payload.productId)
+          : undefined;
+        if (match) {
+          setSelectedCategory('all');
+          setStoreLayoutMode('grid');
+          handleOpenProduct(match);
+        } else if (payload.title) {
+          setSelectedCategory('all');
+          setStoreLayoutMode('grid');
+          setSearchQuery(payload.title);
+        }
+      }
+      try {
+        sessionStorage.removeItem('vernunt_store_jump');
+      } catch {
+        // ignore storage cleanup errors
+      }
+    };
+
+    try {
+      const pendingRaw = sessionStorage.getItem('vernunt_store_jump');
+      if (pendingRaw) {
+        applyJumpPayload(JSON.parse(pendingRaw));
+      }
+    } catch {
+      // ignore invalid session payload
+    }
+
+    const onJumpEvent = (e: Event) => {
+      const custom = e as CustomEvent<{ categoryId?: string; productId?: string; title?: string }>;
+      applyJumpPayload(custom.detail || null);
+    };
+    window.addEventListener('vernunt_store_jump', onJumpEvent);
+    return () => window.removeEventListener('vernunt_store_jump', onJumpEvent);
+  }, [products]);
 
   // Resolved StoreProduct objects for recently viewed list (max 5)
   const recentlyViewedProducts = useMemo(() => {
@@ -930,6 +1110,11 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
   // Add to Cart
   const handleAddToCart = (product: StoreProduct, qty: number = 1, attrs: Record<string, string> = {}, openCart: boolean = true) => {
+    recordParentMlFeedback(userProfile, {
+      eventType: 'PRODUCT_VIEWED_OR_CART',
+      categoryTag: product.category,
+      searchQuery: product.tags?.[0] || ''
+    });
     const attrKey = Object.entries(attrs).sort().map(([k, v]) => `${k}:${v}`).join('-');
     const cartItemId = `${product.id}-${attrKey || 'default'}`;
 
@@ -988,8 +1173,8 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     }
   };
 
-  // Apply Coupon
-  const handleApplyCoupon = (codeToApply?: string) => {
+  // Apply Coupon (supports Dynamic AI Parent Free-Shipping Incentive)
+  const handleApplyCoupon = (codeToApply?: string, bypassMinSpend: boolean = false) => {
     const code = (codeToApply || couponCodeInput).trim().toUpperCase();
     if (!code) {
       setCouponMessage({ type: 'error', text: 'Please enter a valid coupon code.' });
@@ -1002,7 +1187,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    if (found.minSpend && cartSubtotal < found.minSpend) {
+    if (!bypassMinSpend && found.minSpend && cartSubtotal < found.minSpend) {
       setCouponMessage({
         type: 'error',
         text: `Minimum order of ₹${found.minSpend} required for "${code}". Add ₹${found.minSpend - cartSubtotal} more!`
@@ -1010,14 +1195,41 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       return;
     }
 
-    setAppliedCoupon(found);
+    setAppliedCoupon(bypassMinSpend ? { ...found, minSpend: 0 } : found);
     setCouponCodeInput('');
     setCouponMessage({
       type: 'success',
-      text: `Coupon "${found.code}" applied successfully!`
+      text: bypassMinSpend
+        ? `Dynamic Parent Offer "${found.code}" unlocked — Free Shipping applied!`
+        : `Coupon "${found.code}" applied successfully!`
     });
-    showToast(`Discount applied: ${found.code} 🎉`);
+    showToast(`Offer applied: ${found.code} 🎉`);
   };
+
+  // Dynamic Lifecycle, Complementary Cart & Parent-Only Offer Calculations
+  const lifecycleRecs = useMemo(() => {
+    return getLifecycleProductRecommendations({
+      allProducts: products,
+      cart,
+      pastOrders: orders,
+      accountId: userProfile?.id
+    });
+  }, [products, cart, orders, userProfile?.id]);
+
+  const complementaryCartRecs = useMemo(() => {
+    return getComplementaryCartRecommendations(cart, products, orders, userProfile?.id);
+  }, [cart, products, orders, userProfile?.id]);
+
+  const dynamicParentOffer = useMemo(() => {
+    return evaluateDynamicParentOffer({
+      userProfile,
+      cart,
+      cartSubtotal,
+      shippingFee,
+      pastOrders: orders,
+      appliedCouponCode: appliedCoupon?.code
+    });
+  }, [userProfile, cart, cartSubtotal, shippingFee, orders, appliedCoupon?.code]);
 
   // Check Pin code via Multi-Vendor Deliverability & Shiprocket Logistics
   const handleCheckPincode = async () => {
@@ -1451,18 +1663,34 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
     showToast('Order cancelled. Refund & confirmation email sent to your inbox 📩');
   };
 
-  // Filtered Products Calculation
+  // Local + AI Semantic Ranker
+  const semanticSearchEvaluation = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    return semanticRankProducts(searchQuery, products, userProfile?.id);
+  }, [searchQuery, products, userProfile?.id]);
+
+  // Filtered Products Calculation (supports Typo-Tolerant Semantic Search + Visual Search)
   const filteredProducts = useMemo(() => {
+    const aiMatchedOrder = new Map<string, number>();
+    if (visualSearchResult?.matchedIds) {
+      visualSearchResult.matchedIds.forEach((id, idx) => aiMatchedOrder.set(id, idx));
+    } else if (aiSemanticMatch && aiSemanticMatch.query === searchQuery.trim()) {
+      aiSemanticMatch.matchedIds.forEach((id, idx) => aiMatchedOrder.set(id, idx));
+    }
+
+    const localScoreMap = semanticSearchEvaluation?.scores || {};
+
     return products.filter(p => {
-      // Search
+      // Visual Search Filter (when parent uploaded a toy/outfit image)
+      if (visualSearchResult && visualSearchResult.matchedIds.length > 0) {
+        if (!aiMatchedOrder.has(p.id)) return false;
+      }
+
+      // Semantic & Typo-Forgiving Search Filter
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchTitle = p.name.toLowerCase().includes(q);
-        const matchDesc = p.description.toLowerCase().includes(q);
-        const matchTags = p.tags.some(t => t.toLowerCase().includes(q));
-        const matchCat = p.category.toLowerCase().includes(q);
-        const matchSubcat = p.subcategory?.toLowerCase().includes(q);
-        if (!matchTitle && !matchDesc && !matchTags && !matchCat && !matchSubcat) return false;
+        const hasLocalScore = (localScoreMap[p.id] || 0) > 0;
+        const hasGeminiScore = aiMatchedOrder.has(p.id);
+        if (!hasLocalScore && !hasGeminiScore) return false;
       }
 
       // Category
@@ -1515,10 +1743,25 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
 
       return true;
     }).sort((a, b) => {
+      // Visual search exact match ranking comes first
+      if (visualSearchResult) {
+        return (aiMatchedOrder.get(a.id) ?? 999) - (aiMatchedOrder.get(b.id) ?? 999);
+      }
+
       if (sortBy === 'price-low') return a.price - b.price;
       if (sortBy === 'price-high') return b.price - a.price;
       if (sortBy === 'rating') return b.rating - a.rating;
       if (sortBy === 'bestselling') return (b.reviewCount || 0) - (a.reviewCount || 0);
+
+      // When actively searching, rank by combined Gemini + local semantic personal relevance
+      if (searchQuery.trim()) {
+        const aAiRank = aiMatchedOrder.has(a.id) ? (100 - (aiMatchedOrder.get(a.id) || 0) * 4) : 0;
+        const bAiRank = aiMatchedOrder.has(b.id) ? (100 - (aiMatchedOrder.get(b.id) || 0) * 4) : 0;
+        const aScore = (localScoreMap[a.id] || 0) + aAiRank;
+        const bScore = (localScoreMap[b.id] || 0) + bAiRank;
+        if (bScore !== aScore) return bScore - aScore;
+      }
+
       if (selectedLocality?.pincode || selectedLocality?.name) {
         const pin = selectedLocality?.pincode || '';
         const locName = (selectedLocality?.name || '').toLowerCase();
@@ -1528,7 +1771,7 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       }
       return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0);
     });
-  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe, filterOnlyFeatured, filterOnlyHighlighted, selectedLocality]);
+  }, [products, categories, searchQuery, selectedCategory, selectedSubcategory, selectedAgeGroup, sortBy, filterOnlyInStock, filterOnlyDeals, filterCertifiedSafe, filterOnlyFeatured, filterOnlyHighlighted, selectedLocality, visualSearchResult, aiSemanticMatch, semanticSearchEvaluation]);
 
   return (
     <div className="w-full bg-slate-50 text-slate-900 pb-4 relative" id="vernunt-store-container">
@@ -1545,26 +1788,53 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2.5">
           {/* Top Row: Search Input & Controls (Track Orders, Wishlist, Cart) */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Search Input Bar */}
-            <div className="flex-1 relative">
-              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {/* Search Input Bar + AI Visual Search Trigger */}
+            <div className="flex-1 flex items-center gap-1.5">
+              <div className="flex-1 relative">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="AI semantic search (e.g. teething infant gift, wooden blocks...)"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    if (visualSearchResult) setVisualSearchResult(null);
+                    setSearchQuery(e.target.value);
+                  }}
+                  className="w-full pl-9 sm:pl-10 pr-9 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs sm:text-sm text-slate-800 border border-slate-200 focus:border-rose-500 rounded-xl outline-hidden transition shadow-2xs font-medium"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery('');
+                      setAiSemanticMatch(null);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
               <input
-                type="text"
-                placeholder="Search kids products, STEM kits..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-9 py-2 bg-slate-100 hover:bg-slate-100/80 focus:bg-white text-xs sm:text-sm text-slate-800 border border-slate-200 focus:border-rose-500 rounded-xl outline-hidden transition shadow-2xs font-medium"
+                ref={visualSearchInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleVisualSearchFileSelect}
+                className="hidden"
+                aria-label="Upload toy or outfit photo for AI visual search"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
-                  title="Clear search"
-                >
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => visualSearchInputRef.current?.click()}
+                disabled={isVisualSearching}
+                className="shrink-0 flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 text-xs font-bold transition cursor-pointer disabled:opacity-60"
+                title="Upload a photo of any toy, outfit, or baby item to find matches in Vernunt Store"
+              >
+                <Camera className={`w-3.5 h-3.5 text-indigo-600 ${isVisualSearching ? 'animate-pulse' : ''}`} />
+                <span className="hidden md:inline">{isVisualSearching ? 'Scanning...' : 'Visual Search'}</span>
+              </button>
             </div>
 
             {/* Track Orders & Wishlist */}
@@ -1791,9 +2061,127 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
               </div>
             </div>
 
-            {/* When in Showcase mode (selectedCategory === 'all' && !searchQuery && storeLayoutMode === 'showcase') */}
-            {selectedCategory === 'all' && !searchQuery && storeLayoutMode === 'showcase' ? (
+            {/* AI Visual Search Result Header Banner */}
+            {visualSearchResult && (
+              <div className="bg-white border border-indigo-200 rounded-2xl p-4 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  {visualSearchPreviewUrl && (
+                    <img
+                      src={visualSearchPreviewUrl}
+                      alt="Uploaded visual search item"
+                      className="w-16 h-16 rounded-xl object-cover border border-slate-200 shrink-0"
+                    />
+                  )}
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-indigo-700">
+                        Visual Search Match
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-xs font-bold text-slate-900">{visualSearchResult.detectedItem}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 leading-relaxed">{visualSearchResult.visualRationale}</p>
+                    <p className="text-[11px] text-slate-500">
+                      Detected Category: <strong className="text-slate-800">{visualSearchResult.detectedCategory}</strong>
+                      {visualSearchResult.suggestedAgeLabel ? ` · ${visualSearchResult.suggestedAgeLabel}` : ''}
+                      {visualSearchResult.detectedColors?.length > 0 ? ` · Palette: ${visualSearchResult.detectedColors.join(', ')}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisualSearchResult(null);
+                    setVisualSearchPreviewUrl(null);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold shrink-0 cursor-pointer"
+                >
+                  Clear Visual Search
+                </button>
+              </div>
+            )}
+
+            {/* AI Semantic Search Intent Strip */}
+            {searchQuery.trim().length >= 2 && (semanticSearchEvaluation?.typoCorrectedUsed || aiSemanticMatch?.interpretedIntent || isAiSearching) && (
+              <div className="bg-white border border-slate-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 text-slate-700">
+                  <Sparkles className={`w-3.5 h-3.5 text-rose-600 shrink-0 ${isAiSearching ? 'animate-spin' : ''}`} />
+                  <span>
+                    {isAiSearching
+                      ? 'Understanding natural language intent across store catalog...'
+                      : aiSemanticMatch?.interpretedIntent || 'Typo-tolerant AI semantic matching applied to catalog.'}
+                  </span>
+                </div>
+                {aiSemanticMatch?.correctedQuery && aiSemanticMatch.correctedQuery.toLowerCase() !== searchQuery.trim().toLowerCase() && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery(aiSemanticMatch.correctedQuery)}
+                    className="text-rose-700 font-bold hover:underline cursor-pointer"
+                  >
+                    Did you mean "{aiSemanticMatch.correctedQuery}"?
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* When in Showcase mode (selectedCategory === 'all' && !searchQuery && !visualSearchResult && storeLayoutMode === 'showcase') */}
+            {selectedCategory === 'all' && !searchQuery && !visualSearchResult && storeLayoutMode === 'showcase' ? (
               <div className="space-y-8 animate-fade-in">
+                {/* 0. Lifecycle-Based Next Stage Product Recommendations (Strictly Parent Account Only) */}
+                {lifecycleRecs.recommendations.length > 0 && (
+                  <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-2xs space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-rose-600" />
+                          <h3 className="text-sm sm:text-base font-black text-slate-900">
+                            Lifecycle Picks: {lifecycleRecs.nextStageLabel}
+                          </h3>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Stage: <strong className="text-slate-700">{lifecycleRecs.stageLabel}</strong> · {lifecycleRecs.basisSummary}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-bold text-emerald-800 shrink-0">
+                        Parent-Account AI (Zero Child Profiling)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {lifecycleRecs.recommendations.map(({ product, reason }) => (
+                        <div
+                          key={product.id}
+                          onClick={() => handleOpenProduct(product)}
+                          className="border border-slate-200 rounded-xl p-2.5 bg-slate-50/40 hover:bg-white hover:border-rose-300 transition cursor-pointer flex flex-col justify-between gap-2"
+                        >
+                          <div>
+                            <img
+                              src={product.featuredImage}
+                              alt={product.name}
+                              className="w-full h-24 object-cover rounded-lg border border-slate-100 mb-2"
+                            />
+                            <h4 className="font-bold text-xs text-slate-900 line-clamp-1">{product.name}</h4>
+                            <p className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">{reason}</p>
+                          </div>
+                          <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+                            <span className="font-mono font-bold text-xs text-slate-900">₹{product.price}</span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleAddToCart(product, 1, {}, true);
+                              }}
+                              className="px-2 py-1 rounded-md bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-bold cursor-pointer"
+                            >
+                              + Add
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 1. Featured Products Carousel */}
                 <ProductCarouselSection
                   icon={<Sparkles className="w-5 h-5 text-purple-600" />}
@@ -2228,7 +2616,13 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       <label className="text-[11px] text-slate-500 font-bold hidden sm:inline">Sort By:</label>
                       <select
                         value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value as any)}
+                        onChange={(e) => {
+                          const nextSort = e.target.value as any;
+                          setSortBy(nextSort);
+                          if (nextSort === 'price-low') {
+                            trackParentAccountAction(userProfile, { type: 'sort_price_low' });
+                          }
+                        }}
                         className="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 font-bold text-slate-700 outline-hidden focus:border-rose-500 cursor-pointer"
                       >
                         <option value="featured">✨ Featured First</option>
@@ -2244,7 +2638,10 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                   <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs">
                     <button
                       type="button"
-                      onClick={() => setFilterOnlyDeals(prev => !prev)}
+                      onClick={() => {
+                        setFilterOnlyDeals(prev => !prev);
+                        trackParentAccountAction(userProfile, { type: 'deals_click' });
+                      }}
                       className={`px-2.5 py-1 rounded-full border text-[11px] font-bold transition cursor-pointer flex items-center gap-1 ${
                         filterOnlyDeals ? 'bg-amber-100 text-amber-900 border-amber-300' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                       }`}
@@ -4078,6 +4475,98 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
                       </div>
                     </div>
                   ))
+                )}
+
+                {/* Lifecycle-Based Complementary Add-Ons (Reacting Dynamically to Cart Items) */}
+                {cart.length > 0 && complementaryCartRecs.length > 0 && (
+                  <div className="mt-4 pt-3 border-t border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                        <span>Parents Adding This Next Needed</span>
+                      </span>
+                      <span className="text-[10px] text-slate-400">Lifecycle AI</span>
+                    </div>
+                    <div className="space-y-2">
+                      {complementaryCartRecs.slice(0, 3).map(({ product, reason }) => (
+                        <div
+                          key={product.id}
+                          className="flex items-center gap-2.5 p-2 rounded-xl border border-slate-200 bg-slate-50/70"
+                        >
+                          <img
+                            src={product.featuredImage}
+                            alt={product.name}
+                            className="w-11 h-11 rounded-lg object-cover border border-slate-200 shrink-0"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <h5 className="text-xs font-bold text-slate-900 truncate">{product.name}</h5>
+                            <p className="text-[10px] text-slate-500 line-clamp-1">{reason}</p>
+                            <span className="font-mono text-[11px] font-bold text-slate-800">₹{product.price}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleAddToCart(product, 1, {}, false)}
+                            className="px-2.5 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold shrink-0 cursor-pointer"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Dynamic Parent-Account Offer / Incentive */}
+                {cart.length > 0 && dynamicParentOffer && (
+                  <div className={`p-3 rounded-xl border space-y-2 ${
+                    dynamicParentOffer.segment === 'LOYAL_REPEAT_PARENT'
+                      ? 'bg-indigo-50/80 border-indigo-200'
+                      : 'bg-emerald-50/80 border-emerald-200'
+                  }`}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`text-[10px] font-black uppercase tracking-wider ${
+                        dynamicParentOffer.segment === 'LOYAL_REPEAT_PARENT' ? 'text-indigo-800' : 'text-emerald-800'
+                      }`}>
+                        {dynamicParentOffer.badgeText}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Parent Account Personalized</span>
+                    </div>
+                    <h5 className="text-xs font-bold text-slate-900">{dynamicParentOffer.headline}</h5>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">{dynamicParentOffer.description}</p>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-[10px] text-slate-500">{dynamicParentOffer.marginPreservedNote}</span>
+                      {dynamicParentOffer.actionType === 'APPLY_COUPON' && dynamicParentOffer.couponCode && (
+                        <button
+                          type="button"
+                          onClick={() => handleApplyCoupon(dynamicParentOffer.couponCode, true)}
+                          className="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-bold shrink-0 cursor-pointer"
+                        >
+                          {dynamicParentOffer.actionLabel}
+                        </button>
+                      )}
+                      {dynamicParentOffer.actionType === 'UNLOCK_EVENT_VIP_DROP' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEarlyEventDropUnlocked(true);
+                            try {
+                              localStorage.setItem('vernunt_vip_event_drop_unlocked', 'true');
+                            } catch {
+                              // ignore
+                            }
+                            showToast('VIP Early Access to Upcoming Vernunt Event Drops Unlocked!');
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-[11px] font-bold shrink-0 cursor-pointer ${
+                            earlyEventDropUnlocked
+                              ? 'bg-emerald-700 text-white'
+                              : 'bg-indigo-700 hover:bg-indigo-800 text-white'
+                          }`}
+                        >
+                          {earlyEventDropUnlocked ? 'VIP Pass Active ✓' : dynamicParentOffer.actionLabel}
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 )}
               </div>
 

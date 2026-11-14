@@ -1,13 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChildProfile } from '../types.ts';
 import { 
   SlidersHorizontal, ChevronDown, Search, RotateCcw, 
   Clock, UserCheck, Bookmark, Sparkles, Navigation,
   ShieldCheck, Users, HeartHandshake, Baby, School, Trophy,
-  Trees
+  Trees, Brain, Trash2, Lock
 } from 'lucide-react';
 import PlaymateCarouselSection from './PlaymateCarouselSection.tsx';
 import { getHaversineDistance } from '../utils/distance.ts';
+import {
+  getParentMlState,
+  setParentMlOptIn,
+  resetParentMlModel,
+  getCollaborativePlaymatePicks,
+  getLearnedTopInterests,
+  syncParentMlWithServer,
+  ParentMlModelState
+} from '../utils/parentMlEngine.ts';
 
 interface PlaymateCarouselDashboardProps {
   playmates: ChildProfile[];
@@ -111,6 +120,51 @@ export default function PlaymateCarouselDashboard({
   const [showFilterHub, setShowFilterHub] = useState<boolean>(false);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState<boolean>(false);
   const [isSearchFocused, setIsSearchFocused] = useState<boolean>(false);
+
+  // Parent-Only ML Model State (GDPR-K & DPDP Act 2023 Sec. 9 compliant)
+  const [mlState, setMlState] = useState<ParentMlModelState>(() => getParentMlState(userProfile?.id));
+  const [showMlInspector, setShowMlInspector] = useState<boolean>(false);
+  const [isTogglingMl, setIsTogglingMl] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMlState(getParentMlState(userProfile?.id));
+    if (userProfile?.id) {
+      syncParentMlWithServer(userProfile.id).then(setMlState).catch(() => {});
+    }
+    const handler = (e: any) => {
+      if (e?.detail && (!userProfile?.id || e.detail.userId === userProfile.id)) {
+        setMlState(e.detail);
+      } else {
+        setMlState(getParentMlState(userProfile?.id));
+      }
+    };
+    window.addEventListener('vernunt-parent-ml-updated', handler);
+    return () => window.removeEventListener('vernunt-parent-ml-updated', handler);
+  }, [userProfile?.id]);
+
+  const handleToggleParentMlOptIn = async () => {
+    if (!userProfile?.id) return;
+    setIsTogglingMl(true);
+    try {
+      const updated = await setParentMlOptIn(userProfile.id, !mlState.mlPersonalizationOptIn);
+      setMlState(updated);
+    } finally {
+      setIsTogglingMl(false);
+    }
+  };
+
+  const handleResetMlWeights = async () => {
+    if (!userProfile?.id) return;
+    const fresh = await resetParentMlModel(userProfile.id);
+    setMlState(fresh);
+  };
+
+  const topLearnedInterests = useMemo(() => getLearnedTopInterests(mlState, 4), [mlState]);
+
+  const collaborativePicks = useMemo(() => {
+    if (!mlState.mlPersonalizationOptIn) return [];
+    return getCollaborativePlaymatePicks(userProfile, playmates, connectedIds, 8).map(x => x.profile);
+  }, [mlState, userProfile, playmates, connectedIds]);
 
   const hasActiveFilters = useMemo(() => {
     return (
@@ -634,6 +688,159 @@ export default function PlaymateCarouselDashboard({
               </div>
             </div>
           </div>
+
+          {/* 🧠 Parent-Only AI & ML Adaptive Matching Banner (COPPA, GDPR-K, DPDP Act 2023 Compliant) */}
+          <div id="parent-ml-insights-banner" className="rounded-3xl bg-white border border-indigo-200/80 shadow-xs p-5 sm:p-6 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1.5 max-w-2xl">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-800 text-[10px] font-black uppercase tracking-wider">
+                    <Brain className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>Parent-Account Only ML Matching</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    <span>Zero Child Data Used • DPDP Sec. 9 &amp; COPPA Safe</span>
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 font-serif">
+                  {mlState.mlPersonalizationOptIn
+                    ? `Adaptive Compatibility Active • Est. Model Accuracy ${mlState.estimatedAccuracy}%`
+                    : 'Optional Parent-Only ML Personalization (Default OFF for High Privacy)'}
+                </h3>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {mlState.mlPersonalizationOptIn
+                    ? `Learns strictly from your adult account's search filters, bio tone NLP, and post-playdate ratings (${mlState.trainingSamples} training updates). Never tracks or profiles children.`
+                    : 'Under GDPR-K & India DPDP Act 2023, automated profiling is switched OFF by default. Enable strictly on your adult parent account to get adaptive playdate predictions, NLP vibe matching, and collaborative recommendations.'}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  id="btn-toggle-parent-ml-optin"
+                  disabled={isTogglingMl}
+                  onClick={handleToggleParentMlOptIn}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer flex items-center gap-1.5 shadow-2xs ${
+                    mlState.mlPersonalizationOptIn
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
+                >
+                  {mlState.mlPersonalizationOptIn ? (
+                    <>
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Parent ML ON (Click to Pause)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="w-4 h-4" />
+                      <span>Enable Parent-Only ML</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMlInspector(prev => !prev)}
+                  className="px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-800 transition cursor-pointer"
+                >
+                  {showMlInspector ? 'Hide Learned Weights' : 'Inspect ML Weights'}
+                </button>
+              </div>
+            </div>
+
+            {showMlInspector && (
+              <div className="pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4 text-xs animate-fadeIn">
+                <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                    Logistic Regression SGD Weights
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span className="text-slate-500">Proximity</span>
+                      <span className="font-bold text-slate-900">{mlState.weights.proximity.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span className="text-slate-500">Interests</span>
+                      <span className="font-bold text-slate-900">{mlState.weights.interests.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span className="text-slate-500">NLP Tone</span>
+                      <span className="font-bold text-slate-900">{mlState.weights.nlpTone.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between bg-white px-2 py-1 rounded border border-slate-100">
+                      <span className="text-slate-500">Collab</span>
+                      <span className="font-bold text-slate-900">{mlState.weights.collaborative.toFixed(2)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 space-y-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                    Learned Parent Affinity Signals
+                  </span>
+                  {topLearnedInterests.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {topLearnedInterests.map(item => (
+                        <span key={item.tag} className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-800 text-[10px] font-bold">
+                          {item.tag} (+{item.weight})
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500">
+                      {mlState.mlPersonalizationOptIn
+                        ? 'Interact with profiles, swipes, or filters to train adult-only hobby affinities.'
+                        : 'Enable Parent ML opt-in to start learning parent preferences.'}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    Epoch {mlState.epoch} • Loss {mlState.rollingLogLoss} • Radius {mlState.preferredMaxRadiusKm}km
+                  </p>
+                </div>
+
+                <div className="bg-rose-50/50 rounded-2xl p-3.5 border border-rose-200/80 flex flex-col justify-between space-y-2">
+                  <div className="space-y-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-800 flex items-center gap-1">
+                      <Lock className="w-3 h-3" /> Child Data Firewall Verified
+                    </span>
+                    <p className="text-[11px] text-slate-600 leading-snug">
+                      Zero minor names, birthdates, or child behavioral events are stored in ML weights. Erase anytime under DPDP Sec. 12.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleResetMlWeights}
+                    className="w-full py-1.5 px-3 rounded-xl bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-bold flex items-center justify-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Erase &amp; Reset ML Model</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ✨ Serendipitous Collaborative Filtering Picks (Only when Parent ML Opt-In is ON) */}
+          {mlState.mlPersonalizationOptIn && collaborativePicks.length > 0 && (
+            <PlaymateCarouselSection
+              id="carousel-collaborative-picks"
+              title="✨ Serendipitous Picks · Parents Like You Connected With"
+              subtitle="Collaborative filtering & NLP bio tone recommendations derived strictly from opted-in adult parent preferences"
+              playmates={collaborativePicks}
+              onSelectPlaymate={onSelectPlaymate}
+              onQuickChat={onQuickChat}
+              connectedIds={connectedIds}
+              savedProfileIds={savedProfileIds}
+              onToggleSave={onToggleSave}
+              userLat={userLat}
+              userLng={userLng}
+              badgeType="TOP MATCH"
+              isAadhaarVerified={!!userProfile?.aadhaarVerified}
+              currentUserProfile={userProfile}
+            />
+          )}
 
           {/* ⚡ Spontaneous Meetups Nearby (< 0.5 km) */}
           {immediateNearbyPlaymates.length > 0 && (

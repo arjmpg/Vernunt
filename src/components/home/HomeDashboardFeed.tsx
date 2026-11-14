@@ -7,6 +7,7 @@ import {
 import type { ChildProfile, CommunityEvent } from '../../types.ts';
 import { BANGALORE_PARKS } from '../../data/bangaloreParks.ts';
 import { INITIAL_STORE_PRODUCTS } from '../../data/storeProducts.ts';
+import { predictParentMatchML, getParentMlState } from '../../utils/parentMlEngine.ts';
 
 export interface HomeDashboardFeedProps {
   userProfile: ChildProfile;
@@ -44,12 +45,15 @@ export const HomeDashboardFeed: React.FC<HomeDashboardFeedProps> = ({
 }) => {
   const isGuestMode = isGuest || userProfile.id === 'guest-explorer' || !userProfile.email;
 
-  // Filter top 4 playmates near child's age
+  // Filter top playmates ranked by Parent-Only ML compatibility (if opted in)
   const recommendedPlaymates = React.useMemo(() => {
-    return playmates
-      .filter(p => p.id !== userProfile.id)
+    const others = playmates.filter(p => p.id !== userProfile.id);
+    const mlOpted = getParentMlState(userProfile?.id).mlPersonalizationOptIn;
+    if (!mlOpted) return others.slice(0, 6);
+    return [...others]
+      .sort((a, b) => predictParentMatchML(userProfile, b).score - predictParentMatchML(userProfile, a).score)
       .slice(0, 6);
-  }, [playmates, userProfile.id]);
+  }, [playmates, userProfile]);
 
   // Featured Bangalore Parks
   const featuredParks = React.useMemo(() => {

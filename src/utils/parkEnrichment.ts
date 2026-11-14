@@ -31,6 +31,28 @@ const CURATED_GALLERIES: Record<string, ParkGalleryPhoto[]> = {
       tag: 'Accessibility'
     }
   ],
+  'royal-county-park-gottigere': [
+    {
+      url: '/assets/aistudio/Screenshot_20261107_060948_15b258d8.jpg',
+      caption: 'Natural Rock Outcrops, Yellow Adventure Bridge & Tree Canopy in Royal County BDA Layout',
+      tag: 'Play Area'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1200&q=80',
+      caption: 'Toddler Swings, Slides, and Shaded Stone Benches',
+      tag: 'Swings & Slides'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&fit=crop&w=1200&q=80',
+      caption: 'Clean Play Sand Area for Sensory Play and Mud Pies',
+      tag: 'Sandbox'
+    },
+    {
+      url: 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=1200&q=80',
+      caption: 'Paved Walkway Loop for Strollers and Kids Trikes',
+      tag: 'Walking Track'
+    }
+  ],
   'lalbagh-botanical-garden': [
     {
       url: 'https://images.unsplash.com/photo-1588714477688-cf28a50e94f7?auto=format&fit=crop&w=1200&q=80',

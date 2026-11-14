@@ -2,9 +2,16 @@ import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, Lock, Download, Trash2, AlertTriangle, Eye, EyeOff,
   UserX, MapPin, Mail, Cookie, RefreshCw, CheckCircle2, X, FileText,
-  Sliders, UserCheck, HeartHandshake, ShieldAlert
+  Sliders, UserCheck, HeartHandshake, ShieldAlert, Brain
 } from 'lucide-react';
 import { ChildProfile, ChildProfileVisibility } from '../types.ts';
+import {
+  getParentMlState,
+  setParentMlOptIn,
+  resetParentMlModel,
+  getLearnedTopInterests,
+  ParentMlModelState
+} from '../utils/parentMlEngine.ts';
 
 interface PrivacyAndDataModalProps {
   isOpen: boolean;
@@ -21,7 +28,9 @@ export const PrivacyAndDataModal: React.FC<PrivacyAndDataModalProps> = ({
   onUpdateProfile,
   onAccountDeleted
 }) => {
-  const [activeTab, setActiveTab] = useState<'privacy_controls' | 'data_rights' | 'email_prefs'>('privacy_controls');
+  const [activeTab, setActiveTab] = useState<'privacy_controls' | 'ai_ml_privacy' | 'data_rights' | 'email_prefs'>('privacy_controls');
+  const [mlState, setMlState] = useState<ParentMlModelState>(() => getParentMlState(userProfile?.id));
+  const [mlActionNotice, setMlActionNotice] = useState<string | null>(null);
   const [visibility, setVisibility] = useState<ChildProfileVisibility>(userProfile?.profileVisibility || 'PRIVATE');
   const [locationSharing, setLocationSharing] = useState<string>(userProfile?.locationSharing || 'APPROXIMATE');
   const [neighbourhood, setNeighbourhood] = useState<string>(userProfile?.neighbourhood || 'Indiranagar / Koramangala');
@@ -45,7 +54,8 @@ export const PrivacyAndDataModal: React.FC<PrivacyAndDataModalProps> = ({
     if (userProfile?.profileVisibility) {
       setVisibility(userProfile.profileVisibility);
     }
-  }, [userProfile]);
+    setMlState(getParentMlState(userProfile?.id));
+  }, [userProfile, isOpen]);
 
   if (!isOpen) return null;
 
@@ -270,6 +280,19 @@ export const PrivacyAndDataModal: React.FC<PrivacyAndDataModalProps> = ({
           >
             <Lock className="w-4 h-4 text-indigo-600" />
             <span>Child Privacy &amp; Visibility</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('ai_ml_privacy')}
+            className={`flex items-center gap-2 px-4 py-2.5 border-b-2 font-bold text-xs sm:text-sm transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'ai_ml_privacy'
+                ? 'border-purple-600 text-purple-700 bg-white rounded-t-xl shadow-2xs'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Brain className="w-4 h-4 text-purple-600" />
+            <span>AI / ML Privacy</span>
           </button>
 
           <button
@@ -589,6 +612,106 @@ export const PrivacyAndDataModal: React.FC<PrivacyAndDataModalProps> = ({
                     Delete My Account Permanently
                   </button>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB: AI / ML MATCHING PRIVACY & PARENT-ONLY ENGINE */}
+          {activeTab === 'ai_ml_privacy' && (
+            <div className="space-y-5">
+              <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-200 text-indigo-950 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-xs text-indigo-900">
+                  <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>COPPA, GDPR-K &amp; India DPDP Act 2023 (Section 9) Safeguards</span>
+                </div>
+                <p className="text-xs text-indigo-900 leading-relaxed">
+                  Automated profiling is <strong>switched OFF by default</strong>. When opted in, Vernunt&apos;s adaptive Logistic Regression, NLP bio vibe matcher, and collaborative filtering run <strong>exclusively on adult Parent Account interactions</strong> — never tracking, profiling, or serving targeted ads to children under 18.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <span className="font-bold text-slate-900 text-xs sm:text-sm block">
+                    Parent-Only Adaptive ML Matching ({mlState.mlPersonalizationOptIn ? 'Enabled' : 'Paused / Default OFF'})
+                  </span>
+                  <span className="text-[11px] text-slate-600 block">
+                    Uses your adult search filters, adult bio tone, and post-playdate ratings to improve match accuracy ({mlState.trainingSamples} training updates, est. accuracy {mlState.estimatedAccuracy}%).
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const updated = await setParentMlOptIn(userProfile?.id || 'guest', !mlState.mlPersonalizationOptIn);
+                    setMlState(updated);
+                    setMlActionNotice(updated.mlPersonalizationOptIn ? '✓ Parent-only ML personalization enabled.' : '✓ Parent-only ML personalization paused.');
+                  }}
+                  className={`px-4 py-2 rounded-xl text-xs font-black transition cursor-pointer shrink-0 ${
+                    mlState.mlPersonalizationOptIn
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                  }`}
+                >
+                  {mlState.mlPersonalizationOptIn ? 'ON (Click to Turn OFF)' : 'OFF (Enable Opt-In)'}
+                </button>
+              </div>
+
+              {mlActionNotice && (
+                <div className="px-3.5 py-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold">
+                  {mlActionNotice}
+                </div>
+              )}
+
+              <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 block">
+                  Live Model Weights &amp; Learned Adult Preferences
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-[11px]">
+                  <div className="bg-white p-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 block text-[9px]">PROXIMITY</span>
+                    <span className="font-bold text-slate-900">{mlState.weights.proximity.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 block text-[9px]">INTERESTS</span>
+                    <span className="font-bold text-slate-900">{mlState.weights.interests.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 block text-[9px]">NLP VIBE</span>
+                    <span className="font-bold text-slate-900">{mlState.weights.nlpTone.toFixed(2)}</span>
+                  </div>
+                  <div className="bg-white p-2 rounded-xl border border-slate-200">
+                    <span className="text-slate-400 block text-[9px]">COLLAB FIT</span>
+                    <span className="font-bold text-slate-900">{mlState.weights.collaborative.toFixed(2)}</span>
+                  </div>
+                </div>
+                {getLearnedTopInterests(mlState, 5).length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {getLearnedTopInterests(mlState, 5).map(i => (
+                      <span key={i.tag} className="px-2 py-0.5 bg-white border border-indigo-200 text-indigo-800 rounded-md text-[10px] font-bold">
+                        {i.tag} (+{i.weight})
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 rounded-2xl bg-rose-50/70 border border-rose-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="space-y-1">
+                  <h4 className="font-bold text-rose-900 text-xs sm:text-sm">Reset &amp; Erase Learned ML Weights</h4>
+                  <p className="text-[11px] text-rose-800">
+                    Permanently deletes your adult account&apos;s trained weights, collaborative graph links, and search affinity history under DPDP Act Sec. 12.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const fresh = await resetParentMlModel(userProfile?.id || 'guest');
+                    setMlState(fresh);
+                    setMlActionNotice('✓ Learned ML weights & history permanently erased.');
+                  }}
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                >
+                  Erase ML Model
+                </button>
               </div>
             </div>
           )}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ChildProfile } from '../types.ts';
 import { Compass, MapPin, Clock, CalendarCheck2, Lightbulb, Users, CheckCircle2, ChevronRight, Layers, Award } from 'lucide-react';
+import { rankActivitiesWithParentML } from '../utils/parentMlEngine.ts';
 
 interface SuggestedActivity {
   id: string;
@@ -142,7 +143,7 @@ export function PlaydateActivitySuggestions({
       });
     }
 
-    return suggestions.slice(0, 3);
+    return rankActivitiesWithParentML(suggestions, userProfile).slice(0, 3);
   };
 
   const suggestedList = getAlgorithmicSuggestions();

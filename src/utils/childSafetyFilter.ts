@@ -156,12 +156,17 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
           rule: 'Absolute Data Minimization',
           description: 'Child profiles require only first name, age bracket, and recreational interests. No exact birthdays or SSN/Aadhaar stored for minors.',
           implemented: true
+        },
+        {
+          rule: 'Zero AI Training on Minor (<13) Data',
+          description: 'ML model training firewall strips all minor PII and runs exclusively on adult parent account preferences.',
+          implemented: true
         }
       ]
     },
     {
       name: 'DPDP Act 2023 (Digital Personal Data Protection - India)',
-      description: 'Section 9 requirements regarding the processing of personal data of children.',
+      description: 'Section 9 requirements regarding the processing of personal data of children under 18.',
       status: 'COMPLIANT' as const,
       items: [
         {
@@ -170,13 +175,35 @@ export function runChildComplianceAudit(): ChildComplianceAuditResult {
           implemented: true
         },
         {
-          rule: 'Ban on Behavioral Monitoring of Minors',
-          description: 'System prevents algorithmic profiling that causes detrimental behavioral impacts on child well-being.',
+          rule: 'Ban on Tracking & Behavioral Monitoring of Minors (<18)',
+          description: 'Zero child tracking or minor profiling; SGD ML models operate strictly on opted-in adult parent accounts.',
+          implemented: true
+        },
+        {
+          rule: 'Ban on Targeted Advertising to Children',
+          description: 'Platform enforces zero minor-targeted ads; recommendations are parent-account contextual only.',
           implemented: true
         },
         {
           rule: 'Concentric Proximity Masking & Area-Only Display',
           description: 'Exact residential GPS coordinates and street/door addresses of children and parents are concealed; only general neighborhood area names are shown.',
+          implemented: true
+        }
+      ]
+    },
+    {
+      name: 'GDPR-K & UK Children’s Code (Automated Profiling Safeguards)',
+      description: 'High-privacy defaults & parent-controlled algorithmic personalization.',
+      status: 'COMPLIANT' as const,
+      items: [
+        {
+          rule: 'Automated Profiling Switched OFF by Default',
+          description: 'Parent-Only ML matching personalization defaults to OFF (opt-in required) with instant pause and 1-click weight erasure.',
+          implemented: true
+        },
+        {
+          rule: 'Explainable Parent-Account Weight Inspection',
+          description: 'Parents can inspect learned SGD weights, NLP parenting vibe alignment, and collaborative affinity at any time.',
           implemented: true
         }
       ]

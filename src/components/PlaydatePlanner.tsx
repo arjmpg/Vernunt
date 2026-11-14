@@ -10,6 +10,7 @@ import { auth, db, handleFirestoreError, OperationType } from '../utils/firebase
 import { onSnapshot, collection, query, where, or, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { PlaydateActivitySuggestions } from './PlaydateActivitySuggestions.tsx';
 import { sendPlaydateRequestPush, sendPlaydateConfirmedPush } from '../utils/fcmMessaging.ts';
+import { recordParentMlFeedback, getParentMlState } from '../utils/parentMlEngine.ts';
 
 export interface PlayLocation {
   id: string;
@@ -251,6 +252,27 @@ export default function PlaydatePlanner({
   const [meetingNotes, setMeetingNotes] = useState('');
   const [plannerTitle, setPlannerTitle] = useState('');
   const [notification, setNotification] = useState<string | null>(null);
+  const [playdateRatings, setPlaydateRatings] = useState<Record<string, 'success' | 'mismatch'>>({});
+
+  const handleRatePlaydateOutcome = (id: string, targetProfile: ChildProfile | null, outcome: 'success' | 'mismatch') => {
+    setPlaydateRatings(prev => ({ ...prev, [id]: outcome }));
+    const mlState = getParentMlState(userProfile?.id);
+    if (!mlState.mlPersonalizationOptIn) {
+      setNotification('ℹ️ Enable Parent-Only ML in Radar Insights or Privacy Center to learn from meetup ratings.');
+      setTimeout(() => setNotification(null), 5000);
+      return;
+    }
+    const res = recordParentMlFeedback(userProfile, {
+      eventType: outcome === 'success' ? 'PLAYDATE_SUCCESS_RATING' : 'PLAYDATE_MISMATCH_RATING',
+      targetProfile
+    });
+    setNotification(
+      res.trained
+        ? `🧠 Parent ML Model updated from meetup outcome! Est. Accuracy: ${res.state.estimatedAccuracy}%`
+        : 'Saved feedback.'
+    );
+    setTimeout(() => setNotification(null), 5000);
+  };
 
   // Real-time Firestore sync for Group Sessions
   useEffect(() => {
@@ -1008,19 +1030,51 @@ export default function PlaydatePlanner({
                 <h3 className="font-bold text-base font-serif">1-on-1 Meets</h3>
               </div>
               <div className="space-y-3">
-                {playdates.map((d) => (
-                  <div key={d.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-800">{d.title}</span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
-                        {d.status}
-                      </span>
+                {playdates.map((d) => {
+                  const companionId = d.hostId === userProfile?.id ? d.guestId : d.hostId;
+                  const companionProf = playmates.find(p => p.id === companionId) || null;
+                  const rated = playdateRatings[d.id];
+                  return (
+                    <div key={d.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-800">{d.title}</span>
+                        <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">
+                          {d.status}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        📍 {d.location} • 🗓️ {d.date} at {d.time}
+                      </div>
+                      <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+                        <span className="text-slate-500 font-semibold">How was this parent meetup?</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleRatePlaydateOutcome(d.id, companionProf, 'success')}
+                            className={`px-2 py-1 rounded-lg font-bold border transition cursor-pointer ${
+                              rated === 'success'
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-200'
+                            }`}
+                          >
+                            Great Meetup ✓
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRatePlaydateOutcome(d.id, companionProf, 'mismatch')}
+                            className={`px-2 py-1 rounded-lg font-bold border transition cursor-pointer ${
+                              rated === 'mismatch'
+                                ? 'bg-rose-600 text-white border-rose-600'
+                                : 'bg-white hover:bg-rose-50 text-rose-700 border-rose-200'
+                            }`}
+                          >
+                            Not a Match
+                          </button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-[11px] text-slate-500">
-                      📍 {d.location} • 🗓️ {d.date} at {d.time}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {playdates.length === 0 && (
                   <p className="text-xs text-slate-400 text-center py-4">No 1-on-1 invitations yet.</p>
                 )}

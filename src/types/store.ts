@@ -229,7 +229,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   autoApproveVendors: false,
   autoApproveVendorProducts: false,
   globalCommissionType: 'percentage',
-  globalCommissionRate: 10, // 10% marketplace commission
+  globalCommissionRate: 0, // 0% marketplace commission / zero app charges
   minWithdrawalAmount: 500, // ₹500 minimum payout threshold
   allowedPayoutMethods: ['UPI', 'Bank Transfer', 'Paytm'],
   allowVendorCustomCoupons: true,

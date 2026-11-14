@@ -32,6 +32,10 @@ import {
   CURRENT_VENDOR_AGREEMENT_VERSION, 
   STANDARD_VENDOR_COMMISSION_PERCENT 
 } from '../../types/vendorAgreement.ts';
+import {
+  fetchAiCatalogAssist,
+  computeInventoryHealthSummary
+} from '../../utils/marketplaceAiEngine.ts';
 
 export type VendorTabKey = 
   | 'overview'
@@ -245,6 +249,9 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
     slaAccepted: false
   });
 
+  // Generative AI Catalog Assistant State
+  const [isAiAssistingProduct, setIsAiAssistingProduct] = useState(false);
+
   // Helper toast notification
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -394,6 +401,55 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
   // =========================================================================
 
   // Handle Add Product Submission
+  // Predictive Inventory Health Forecast Memo
+  const inventoryForecastSummary = useMemo(() => {
+    const ownProducts = products.filter(
+      p => !currentVendor || p.vendorId === currentVendor.id || p.brand === currentVendor.storeName
+    );
+    return computeInventoryHealthSummary(ownProducts, orders);
+  }, [products, orders, currentVendor]);
+
+  // Generative AI Catalog Optimizer for Sellers
+  const handleAiOptimizeProductCatalog = async () => {
+    const cleanTitle = (newProductForm.name || '').trim();
+    if (!cleanTitle) {
+      showToast('Enter a Product Title first so AI can write descriptions & classify HSN/GST.');
+      return;
+    }
+    setIsAiAssistingProduct(true);
+    try {
+      const { mode, data } = await fetchAiCatalogAssist({
+        targetType: 'product',
+        title: cleanTitle,
+        category: newProductForm.category,
+        notes: newProductForm.description || newProductForm.shortDescription || '',
+        price: Number(newProductForm.price || 0)
+      });
+      setNewProductForm(prev => ({
+        ...prev,
+        shortDescription: data.shortDescription || prev.shortDescription,
+        description: data.description || prev.description,
+        category: data.category || prev.category,
+        subcategory: data.subcategory || prev.subcategory,
+        ageGroup: (data.ageGroup as any) || prev.ageGroup,
+        ageLabel: data.ageLabel || prev.ageLabel,
+        hsnCode: data.hsnCode || prev.hsnCode,
+        gstRate: typeof data.gstRate === 'number' ? data.gstRate : prev.gstRate,
+        badges: Array.isArray(data.badges) && data.badges.length > 0 ? data.badges : prev.badges,
+        tags: Array.isArray(data.tags) && data.tags.length > 0 ? data.tags : prev.tags
+      }));
+      showToast(
+        mode === 'gemini'
+          ? 'AI generated product copy, age group, HSN code & category tags!'
+          : 'Catalog descriptions, HSN code & tags auto-filled!'
+      );
+    } catch (err: any) {
+      showToast(err?.message || 'Could not generate catalog copy right now.');
+    } finally {
+      setIsAiAssistingProduct(false);
+    }
+  };
+
   const handleAddProductSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProductForm.name || !newProductForm.price) {
@@ -1974,9 +2030,20 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
         {/* ========================================================================= */}
         {activeTab === 'add_product' && (
           <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-6">
-            <div className="border-b border-slate-100 pb-4">
-              <h3 className="text-base font-black text-slate-900">Add New Marketplace Product</h3>
-              <p className="text-xs text-slate-500">Configure catalog information, pricing, stock levels, and deliverable pincodes.</p>
+            <div className="border-b border-slate-100 pb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">Add New Marketplace Product</h3>
+                <p className="text-xs text-slate-500">Configure catalog information, pricing, stock levels, and deliverable pincodes.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAiOptimizeProductCatalog}
+                disabled={isAiAssistingProduct}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 text-xs font-bold transition cursor-pointer disabled:opacity-60"
+              >
+                <Sparkles className={`w-3.5 h-3.5 text-indigo-600 ${isAiAssistingProduct ? 'animate-spin' : ''}`} />
+                <span>{isAiAssistingProduct ? 'Generating Catalog...' : 'AI Auto-Write & Classify (Title → Copy/HSN)'}</span>
+              </button>
             </div>
 
             <form onSubmit={handleAddProductSubmit} className="space-y-6">
@@ -2004,6 +2071,30 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
                       <option key={c.id} value={c.name}>{c.name}</option>
                     ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Descriptions (Auto-populated by Generative AI Assistant or manual) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Short Summary</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Crisp 1-sentence benefit highlight for store cards..."
+                    value={newProductForm.shortDescription || ''}
+                    onChange={e => setNewProductForm({ ...newProductForm, shortDescription: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">Full Catalog Description &amp; Safety Info</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Detailed child-safe specs, materials & developmental benefits..."
+                    value={newProductForm.description || ''}
+                    onChange={e => setNewProductForm({ ...newProductForm, description: e.target.value })}
+                    className="w-full px-3 py-2 text-xs border border-slate-300 rounded-lg outline-hidden"
+                  />
                 </div>
               </div>
 
@@ -2985,77 +3076,111 @@ export const VendorDashboard: React.FC<VendorDashboardProps> = ({
         {/* VIEW 12: INVENTORY MANAGEMENT                                             */}
         {/* ========================================================================= */}
         {activeTab === 'inventory' && (
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-2xs space-y-5">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-base font-black text-slate-900">Inventory Stock Controller</h3>
-                <p className="text-xs text-slate-500">Prevent overselling with real-time stock counters and low inventory alerts.</p>
+                <h3 className="text-base font-black text-slate-900">Predictive Inventory &amp; Demand Forecast</h3>
+                <p className="text-xs text-slate-500">Forecasts 30-day SKU demand from historical order velocity to prevent stockouts &amp; overstocking.</p>
               </div>
               <span className="text-xs font-mono font-bold text-teal-700 bg-teal-50 px-2.5 py-1 rounded-lg">
                 Total Units: {kpiStats.availableInventory}
               </span>
             </div>
 
+            {/* Predictive Inventory KPI Strip */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">30-Day Predicted Demand</span>
+                <span className="text-xl font-black font-mono text-slate-900 mt-0.5 block">
+                  {inventoryForecastSummary.totalPredicted30dUnits} units
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl border border-rose-200 bg-rose-50/60">
+                <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block">Stockout Risk SKUs</span>
+                <span className="text-xl font-black font-mono text-rose-900 mt-0.5 block">
+                  {inventoryForecastSummary.stockoutRiskCount} alerts
+                </span>
+              </div>
+              <div className="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60">
+                <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">Slow-Moving / Overstock Risk</span>
+                <span className="text-xl font-black font-mono text-amber-950 mt-0.5 block">
+                  {inventoryForecastSummary.overstockRiskCount} SKUs
+                </span>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 uppercase text-[10px] font-bold">
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-bold">
                     <th className="py-2.5 px-3">Product Name &amp; SKU</th>
-                    <th className="py-2.5 px-3">Current Stock</th>
-                    <th className="py-2.5 px-3">Low-Stock Alert Level</th>
-                    <th className="py-2.5 px-3">Quick Counter Adjustment</th>
-                    <th className="py-2.5 px-3 text-right">Status</th>
+                    <th className="py-2.5 px-3">Stock</th>
+                    <th className="py-2.5 px-3">30d Forecast</th>
+                    <th className="py-2.5 px-3">Runway</th>
+                    <th className="py-2.5 px-3">Quick Adjust &amp; AI Reorder</th>
+                    <th className="py-2.5 px-3 text-right">Demand Risk</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {vendorProducts.map(prod => (
-                    <tr key={prod.id} className="hover:bg-slate-50/80 transition">
-                      <td className="py-3 px-3 font-semibold text-slate-900">
-                        {prod.name}
-                        <span className="text-[10px] text-slate-400 font-mono block">SKU: {prod.sku}</span>
-                      </td>
-                      <td className="py-3 px-3 font-mono font-black text-base text-slate-900">
-                        {prod.stockQuantity}
-                      </td>
-                      <td className="py-3 px-3 text-slate-500 font-mono">
-                        &le; {prod.lowStockThreshold || 5} units
-                      </td>
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateStock(prod.id, -1)}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs"
-                          >
-                            -1
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateStock(prod.id, 1)}
-                            className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs"
-                          >
-                            +1
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateStock(prod.id, 10)}
-                            className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-lg font-bold text-xs"
-                          >
-                            +10
-                          </button>
-                        </div>
-                      </td>
-                      <td className="py-3 px-3 text-right">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                          prod.stockQuantity > 5 ? 'bg-emerald-50 text-emerald-800' :
-                          prod.stockQuantity > 0 ? 'bg-amber-50 text-amber-800' :
-                          'bg-rose-50 text-rose-800'
-                        }`}>
-                          {prod.stockStatus}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {vendorProducts.map(prod => {
+                    const fc = inventoryForecastSummary.forecastsById[prod.id];
+                    return (
+                      <tr key={prod.id} className="hover:bg-slate-50/80 transition">
+                        <td className="py-3 px-3 font-semibold text-slate-900">
+                          {prod.name}
+                          <span className="text-[10px] text-slate-400 font-mono block">SKU: {prod.sku}</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono font-black text-base text-slate-900">
+                          {prod.stockQuantity}
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-700">
+                          <span className="font-bold text-slate-900 block">{fc?.predicted30DayDemand || 0} / mo</span>
+                          <span className="text-[10px] text-slate-400">{fc?.dailyVelocity || 0}/day</span>
+                        </td>
+                        <td className="py-3 px-3 font-mono text-slate-700">
+                          {fc?.daysUntilStockout && fc.daysUntilStockout < 365 ? `${fc.daysUntilStockout}d` : '365d+'}
+                        </td>
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(prod.id, -1)}
+                              className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg font-bold text-xs cursor-pointer"
+                            >
+                              -1
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStock(prod.id, 10)}
+                              className="px-2.5 py-1 bg-teal-50 hover:bg-teal-100 text-teal-800 rounded-lg font-bold text-xs cursor-pointer"
+                            >
+                              +10
+                            </button>
+                            {fc && fc.recommendedReorderQty > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStock(prod.id, fc.recommendedReorderQty)}
+                                className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-lg font-bold text-[11px] cursor-pointer"
+                                title={fc.insight}
+                              >
+                                +Restock {fc.recommendedReorderQty}
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right">
+                          <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${
+                            fc?.riskStatus === 'STOCKOUT_RISK' ? 'bg-rose-100 text-rose-800' :
+                            fc?.riskStatus === 'REORDER_SOON' ? 'bg-amber-100 text-amber-900' :
+                            fc?.riskStatus === 'OVERSTOCK_RISK' ? 'bg-indigo-100 text-indigo-800' :
+                            'bg-emerald-50 text-emerald-800'
+                          }`} title={fc?.insight}>
+                            {fc?.riskStatus?.replace('_', ' ') || prod.stockStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

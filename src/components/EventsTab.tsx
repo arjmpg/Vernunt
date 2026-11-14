@@ -35,6 +35,12 @@ import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare
 import { MOCK_EVENTS } from '../data/mockData.ts';
 import { PageCustomBlocksSection } from './admin/visual/PageCustomBlocksSection.tsx';
 import { openRazorpayCheckout } from '../utils/razorpay.ts';
+import { scoreEventWithParentML } from '../utils/parentMlEngine.ts';
+import {
+  semanticRankEvents,
+  fetchAiSemanticSearch,
+  trackParentAccountAction
+} from '../utils/marketplaceAiEngine.ts';
 
 // Calculate status: 'Upcoming' | 'Full' | 'Past'
 export const getEventStatus = (evt: CommunityEvent): 'Upcoming' | 'Full' | 'Past' => {
@@ -82,7 +88,7 @@ export default function EventsTab({
 }: EventsTabProps) {
   // Core Filter and Sort States declared upfront to eliminate TDZ
   const [activeSubCategory, setActiveSubCategory] = useState<GatheringSubCategory>('all');
-  const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low'>('nearby_only');
+  const [sortMode, setSortMode] = useState<'featured_nearby' | 'nearby_only' | 'date' | 'price_low' | 'ai_match'>('nearby_only');
   const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [maxDistanceRadiusKm, setMaxDistanceRadiusKm] = useState<number>(15.0);
@@ -119,6 +125,59 @@ export default function EventsTab({
     setMaxDistanceRadiusKm(15.0);
     setSearchQuery('');
   };
+
+  // WooEvents & AI Semantic / Loyalty State
+  const [aiEventSemanticMatch, setAiEventSemanticMatch] = useState<{
+    query: string;
+    correctedQuery: string;
+    interpretedIntent: string;
+    matchedIds: string[];
+  } | null>(null);
+  const [isAiEventSearching, setIsAiEventSearching] = useState<boolean>(false);
+  const [vipEventDropUnlocked] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('vernunt_vip_event_drop_unlocked') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed || trimmed.length < 2) {
+      setAiEventSemanticMatch(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      trackParentAccountAction(userProfile, { type: 'search', value: trimmed });
+      if (trimmed.length >= 3) {
+        setIsAiEventSearching(true);
+        const aiRes = await fetchAiSemanticSearch({
+          query: trimmed,
+          targetType: 'event',
+          accountId: userProfile?.id,
+          items: eventsList.map(e => ({
+            id: e.id,
+            title: e.title,
+            category: e.category,
+            tags: e.tags,
+            description: (e.description || '').slice(0, 120),
+            ageLabel: e.targetAgeRange
+          }))
+        });
+        setIsAiEventSearching(false);
+        if (aiRes && aiRes.success) {
+          setAiEventSemanticMatch({
+            query: trimmed,
+            correctedQuery: aiRes.correctedQuery || trimmed,
+            interpretedIntent: aiRes.interpretedIntent || '',
+            matchedIds: Array.isArray(aiRes.matchedIds) ? aiRes.matchedIds : []
+          });
+        }
+      }
+    }, 550);
+    return () => clearTimeout(timer);
+  }, [searchQuery, eventsList, userProfile]);
 
   useEffect(() => {
     if (initialOpenCreateWizard) {
@@ -814,6 +873,11 @@ export default function EventsTab({
   // 4. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
   const effectiveEvents = eventsList;
 
+  const semanticEventEvaluation = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    return semanticRankEvents(searchQuery, effectiveEvents, userProfile?.id);
+  }, [searchQuery, effectiveEvents, userProfile?.id]);
+
   const filteredEvents = effectiveEvents
     .map(evt => {
       const evtLat = evt.lat || 19.0760;
@@ -848,22 +912,26 @@ export default function EventsTab({
         return false;
       }
 
-      // 3. Query check
-      const query = searchQuery.toLowerCase().trim();
+      // 3. Semantic & Typo-Forgiving Query check
+      const query = searchQuery.trim();
       if (!query) return true;
 
-      const matchesTag = evt.tags && evt.tags.some(tag => tag.toLowerCase().includes(query));
+      const localMatched = (semanticEventEvaluation?.scores?.[evt.id] || 0) > 0;
+      const geminiMatched =
+        aiEventSemanticMatch &&
+        aiEventSemanticMatch.query === query &&
+        aiEventSemanticMatch.matchedIds.includes(evt.id);
 
-      return (
-        evt.title.toLowerCase().includes(query) ||
-        evt.description.toLowerCase().includes(query) ||
-        evt.hostName.toLowerCase().includes(query) ||
-        evt.location.toLowerCase().includes(query) ||
-        (evt.sponsoredBy && evt.sponsoredBy.toLowerCase().includes(query)) ||
-        matchesTag
-      );
+      return Boolean(localMatched || geminiMatched);
     })
     .sort((a, b) => {
+      if (searchQuery.trim()) {
+        const aAiIdx = aiEventSemanticMatch?.query === searchQuery.trim() ? aiEventSemanticMatch.matchedIds.indexOf(a.id) : -1;
+        const bAiIdx = aiEventSemanticMatch?.query === searchQuery.trim() ? aiEventSemanticMatch.matchedIds.indexOf(b.id) : -1;
+        const aScore = (semanticEventEvaluation?.scores?.[a.id] || 0) + (aAiIdx >= 0 ? 100 - aAiIdx * 4 : 0);
+        const bScore = (semanticEventEvaluation?.scores?.[b.id] || 0) + (bAiIdx >= 0 ? 100 - bAiIdx * 4 : 0);
+        if (bScore !== aScore) return bScore - aScore;
+      }
       if (sortMode === 'featured_nearby') {
         // Top Priority: Featured or Sponsored events
         const aPromo = (a.featured || a.isSponsored) ? 1 : 0;
@@ -880,6 +948,8 @@ export default function EventsTab({
         return new Date(a.date).getTime() - new Date(b.date).getTime();
       } else if (sortMode === 'price_low') {
         return (a.ticketPrice || 0) - (b.ticketPrice || 0);
+      } else if (sortMode === 'ai_match') {
+        return scoreEventWithParentML(b, userProfile) - scoreEventWithParentML(a, userProfile);
       }
       return 0;
     });
@@ -1289,7 +1359,7 @@ ${deepLink}`;
             <input
               id="event-search-input"
               type="text"
-              placeholder="Search title, host, venue..."
+              placeholder="AI search events, robotics, swimming..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-9 py-2 bg-white hover:bg-slate-50/50 focus:bg-white text-xs border border-slate-200 focus:border-orange-300 rounded-xl outline-none focus:ring-4 focus:ring-orange-100 transition shadow-xs placeholder-slate-400 text-slate-700"
@@ -1676,6 +1746,20 @@ ${deepLink}`;
                   <Ticket className="w-3.5 h-3.5 text-amber-500" />
                   <span>Price: Low to High</span>
                 </button>
+
+                <button
+                  type="button"
+                  id="btn-sort-ai-match"
+                  onClick={() => setSortMode('ai_match')}
+                  className={`px-3 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                    sortMode === 'ai_match'
+                      ? 'bg-indigo-700 text-white shadow-xs'
+                      : 'bg-indigo-50/70 hover:bg-indigo-100 text-indigo-800 border border-indigo-200'
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>Parent ML Pick</span>
+                </button>
               </div>
             </div>
 
@@ -1721,18 +1805,48 @@ ${deepLink}`;
         )}
       </div>
 
+      {(vipEventDropUnlocked || myTickets.length >= 2) && (
+        <div className="bg-indigo-50/80 border border-indigo-200 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2.5">
+            <Award className="w-4 h-4 text-indigo-700 shrink-0" />
+            <div>
+              <strong className="text-indigo-950 font-black">Loyal Parent Early-Access VIP Drop Active</strong>
+              <span className="text-indigo-800 block text-[11px]">
+                Priority booking unlocked for your registered parent account on upcoming Vernunt featured drops &amp; weekend workshops.
+              </span>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold text-indigo-800 uppercase tracking-wider">Parent Account Perk</span>
+        </div>
+      )}
+
       {searchQuery && (
-        <div id="search-filter-stats" className="text-xs text-slate-500 font-medium flex items-center justify-between">
-          <span>
-            Found <strong className="text-slate-800">{filteredEvents.length}</strong> {filteredEvents.length === 1 ? 'event' : 'events'} matching "{searchQuery}"
-          </span>
-          <button
-            type="button"
-            onClick={() => setSearchQuery('')}
-            className="text-[11px] text-orange-600 font-bold hover:underline cursor-pointer"
-          >
-            Clear Search
-          </button>
+        <div id="search-filter-stats" className="text-xs text-slate-500 font-medium flex flex-wrap items-center justify-between gap-2 bg-white border border-slate-200 rounded-xl px-3.5 py-2">
+          <div className="flex items-center gap-2">
+            <Sparkles className={`w-3.5 h-3.5 text-orange-600 shrink-0 ${isAiEventSearching ? 'animate-spin' : ''}`} />
+            <span>
+              Found <strong className="text-slate-800">{filteredEvents.length}</strong> {filteredEvents.length === 1 ? 'event' : 'events'} matching "{searchQuery}"
+              {aiEventSemanticMatch?.interpretedIntent ? ` · ${aiEventSemanticMatch.interpretedIntent}` : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
+            {aiEventSemanticMatch?.correctedQuery && aiEventSemanticMatch.correctedQuery.toLowerCase() !== searchQuery.trim().toLowerCase() && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery(aiEventSemanticMatch.correctedQuery)}
+                className="text-[11px] text-indigo-700 font-bold hover:underline cursor-pointer"
+              >
+                Use "{aiEventSemanticMatch.correctedQuery}"?
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-[11px] text-orange-600 font-bold hover:underline cursor-pointer"
+            >
+              Clear Search
+            </button>
+          </div>
         </div>
       )}
 

@@ -3,6 +3,7 @@ import { ChildProfile } from '../types.ts';
 import { calculateMatchScore } from './PlaymateCard.tsx';
 import { getHaversineDistance, getProximityBadge, openDeviceNavigation } from '../utils/distance.ts';
 import { getSafeChildAreaName } from '../utils/childSafetyFilter.ts';
+import { recordParentMlFeedback } from '../utils/parentMlEngine.ts';
 import { 
   Heart, 
   X, 
@@ -173,12 +174,20 @@ export function PlaymateSwipeDeck({
 
   const triggerPass = () => {
     if (!currentProfile) return;
+    recordParentMlFeedback(userProfile, {
+      eventType: 'SWIPE_PASS',
+      targetProfile: currentProfile
+    });
     setHistory(prev => [...prev, { profile: currentProfile, action: 'pass' }]);
     setCurrentIndex(prev => prev + 1);
   };
 
   const triggerWave = () => {
     if (!currentProfile) return;
+    recordParentMlFeedback(userProfile, {
+      eventType: 'WAVE_SENT',
+      targetProfile: currentProfile
+    });
     confetti({
       particleCount: 40,
       spread: 60,
@@ -197,6 +206,10 @@ export function PlaymateSwipeDeck({
 
   const triggerSuperWave = () => {
     if (!currentProfile) return;
+    recordParentMlFeedback(userProfile, {
+      eventType: 'GREAT_VIBE_FEEDBACK',
+      targetProfile: currentProfile
+    });
     confetti({
       particleCount: 70,
       spread: 90,

@@ -129,8 +129,9 @@ export default function EventBookingModal({
   }
 
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  const convenienceFee = discountedSubtotal > 0 ? Math.round(discountedSubtotal * 0.02) : 0;
-  const finalTotal = discountedSubtotal + convenienceFee;
+  // Zero App Charges: No convenience fees or platform processing charges
+  const convenienceFee = 0;
+  const finalTotal = discountedSubtotal;
 
   // Real-time wallet balance lookup and prioritized deduction
   const latestWallet = getStoredWallet();
@@ -839,12 +840,10 @@ export default function EventBookingModal({
                     <span className="font-bold">-₹{discountAmount}</span>
                   </div>
                 )}
-                {convenienceFee > 0 && (
-                  <div className="flex justify-between text-slate-500 text-[11px]">
-                    <span>Secure Gateway Processing Fee (2%)</span>
-                    <span>₹{convenienceFee}</span>
-                  </div>
-                )}
+                <div className="flex justify-between text-emerald-700 text-[11px] font-semibold">
+                  <span>App Charges / Convenience Fee</span>
+                  <span className="font-bold">FREE (₹0)</span>
+                </div>
                 <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm">
                   <span className="font-bold text-slate-900">Total Order Amount:</span>
                   <span className="font-black text-slate-900 text-base">₹{finalTotal}</span>

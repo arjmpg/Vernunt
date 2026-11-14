@@ -10,6 +10,9 @@ import { registerMarketplaceRoutes } from "./server/marketplaceService.ts";
 import { registerEmailRoutes, sendEmailMessage } from "./server/emailService.ts";
 import { registerBackupRoutes } from "./server/backupService.ts";
 import { registerRazorpayRoutes } from "./server/razorpayService.ts";
+import { registerWordPressRoutes } from "./server/wordpressService.ts";
+import { registerParentMlRoutes } from "./server/parentMlService.ts";
+import { registerMarketplaceAiRoutes } from "./server/marketplaceAiService.ts";
 import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 import { initializeApp as initializeClientApp, getApps as getClientApps } from "firebase/app";
 import { initializeFirestore as initializeClientFirestore, collection as clientCollection, getDocs as clientGetDocs, doc as clientDoc, setDoc as clientSetDoc } from "firebase/firestore";
@@ -72,6 +75,15 @@ async function startServer() {
 
   // Razorpay Standard Web Checkout Gateway (Order Creation & Signature Verification)
   registerRazorpayRoutes(app);
+
+  // Headless WordPress CMS & Guide Publishing Engine
+  registerWordPressRoutes(app);
+
+  // Parent-Only Adaptive ML Matching & Privacy Compliance Engine
+  registerParentMlRoutes(app);
+
+  // Gemini AI Semantic Search, Visual Search & Automated Catalog Management
+  registerMarketplaceAiRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {
