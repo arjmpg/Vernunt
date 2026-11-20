@@ -14,6 +14,7 @@ import { getStoredProducts } from '../../data/storeProducts.ts';
 import { LanguageCode } from '../../utils/dictionary.ts';
 import { autoDetectUserLocality, saveLocalityPreference, BANGALORE_LOCALITIES_GPS, LocalityItem } from '../../utils/geolocation.ts';
 import { scoreProductWithParentML } from '../../utils/parentMlEngine.ts';
+import { deduplicatePlaymates } from '../../utils/deduplicatePlaymates.ts';
 
 export interface VernuntHomepageProps {
   userProfile: ChildProfile | null;
@@ -151,11 +152,12 @@ export default function VernuntHomepage({
   const [isLocalityDetecting, setIsLocalityDetecting] = useState(false);
   const [customPincodeInput, setCustomPincodeInput] = useState('');
 
-  // Proximity-sorted playmates strictly nearest to the selected locality
+  // Proximity-sorted unique playmates strictly nearest to the selected locality (each profile shown once)
   const nearestPlaymates = useMemo(() => {
     const uLat = selectedLocality?.lat ?? 12.9716;
     const uLng = selectedLocality?.lng ?? 77.5946;
-    return [...playmates].sort((a, b) => {
+    const uniquePlaymates = deduplicatePlaymates(playmates, { excludeInvalidChildren: true });
+    return [...uniquePlaymates].sort((a, b) => {
       const latA = a.location?.lat ?? (a as any).lat ?? 12.9716;
       const lngA = a.location?.lng ?? (a as any).lng ?? 77.5946;
       const latB = b.location?.lat ?? (b as any).lat ?? 12.9716;

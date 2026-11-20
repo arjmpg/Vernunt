@@ -19,6 +19,7 @@ import { PlaymateDetailModal } from './components/PlaymateDetailModal.tsx';
 import ChatPanel from './components/ChatPanel.tsx';
 import EditProfileModal from './components/EditProfileModal.tsx';
 import { recordParentMlFeedback, getParentMlState } from './utils/parentMlEngine.ts';
+import { deduplicatePlaymates } from './utils/deduplicatePlaymates.ts';
 
 // Code-split heavy tab views for instant initial load and high performance
 const TabLoadingFallback = () => (
@@ -1218,8 +1219,9 @@ export default function App() {
             }
             return { ...p, location: safeLoc };
           });
-          setPlaymates(refreshedCached);
-          setSelectedPlaymate(refreshedCached[0] || null);
+          const dedupedCached = deduplicatePlaymates(refreshedCached);
+          setPlaymates(dedupedCached);
+          setSelectedPlaymate(dedupedCached[0] || null);
           console.log("⚡ Offline/Fast-Boot Cache: Successfully pre-populated playmate nodes with fresh photos");
         }
       } catch (err) {
@@ -1233,21 +1235,19 @@ export default function App() {
       .then(data => {
         if (data?.success && Array.isArray(data.users) && data.users.length > 0) {
           setPlaymates(prev => {
-            const map = new Map<string, ChildProfile>();
-            data.users.forEach((u: ChildProfile) => {
+            const normalizedServerUsers: ChildProfile[] = data.users.map((u: ChildProfile) => {
               const lat = typeof u.location?.lat === 'number' ? u.location.lat : (typeof (u as any).lat === 'number' ? (u as any).lat : 12.9716);
               const lng = typeof u.location?.lng === 'number' ? u.location.lng : (typeof (u as any).lng === 'number' ? (u as any).lng : 77.5946);
-              map.set(u.id, {
+              return {
                 ...u,
                 location: {
                   lat,
                   lng,
                   address: u.location?.address || u.area || u.city || 'Bengaluru, Karnataka'
                 }
-              });
+              };
             });
-            prev.forEach(p => { if (!map.has(p.id)) map.set(p.id, p); });
-            return Array.from(map.values());
+            return deduplicatePlaymates([...normalizedServerUsers, ...prev]);
           });
         }
       })
@@ -1283,19 +1283,21 @@ export default function App() {
         }
       }
 
-      // Always guarantee latest photos from INITIAL_PLAYMATES for all mock profiles
-      const refreshedCombined = combined.map(p => {
-        const fresh = mockPhotoMap.get(p.id);
-        if (fresh) {
-          return {
-            ...p,
-            photoUrl: fresh.photoUrl,
-            parentPhotoUrl: fresh.parentPhotoUrl,
-            childPhotoUrl: fresh.childPhotoUrl
-          };
-        }
-        return p;
-      });
+      // Always guarantee latest photos from INITIAL_PLAYMATES and deduplicate across id/email/phone/name
+      const refreshedCombined = deduplicatePlaymates(
+        combined.map(p => {
+          const fresh = mockPhotoMap.get(p.id);
+          if (fresh) {
+            return {
+              ...p,
+              photoUrl: fresh.photoUrl,
+              parentPhotoUrl: fresh.parentPhotoUrl,
+              childPhotoUrl: fresh.childPhotoUrl
+            };
+          }
+          return p;
+        })
+      );
 
       setPlaymates(refreshedCombined);
       
@@ -1326,10 +1328,12 @@ export default function App() {
           try {
             const cached: ChildProfile[] = JSON.parse(cacheStr);
             if (Array.isArray(cached) && cached.length > 0) {
-              const refreshed = cached.map(p => {
-                const fresh = mockPhotoMap.get(p.id);
-                return fresh ? { ...p, photoUrl: fresh.photoUrl, parentPhotoUrl: fresh.parentPhotoUrl, childPhotoUrl: fresh.childPhotoUrl } : p;
-              });
+              const refreshed = deduplicatePlaymates(
+                cached.map(p => {
+                  const fresh = mockPhotoMap.get(p.id);
+                  return fresh ? { ...p, photoUrl: fresh.photoUrl, parentPhotoUrl: fresh.parentPhotoUrl, childPhotoUrl: fresh.childPhotoUrl } : p;
+                })
+              );
               setPlaymates(refreshed);
               return;
             }
@@ -3469,9 +3473,10 @@ export default function App() {
     const now = Date.now();
 
     const results: (ChildProfile & { _cachedDistance: number })[] = [];
+    const uniquePlaymates = deduplicatePlaymates(playmates, { excludeInvalidChildren: true });
 
-    for (let i = 0; i < playmates.length; i++) {
-      const p = playmates[i];
+    for (let i = 0; i < uniquePlaymates.length; i++) {
+      const p = uniquePlaymates[i];
       // Exclude if parent or profile is blocked by user locally
       if (blockedIds.includes(p.id)) continue;
 

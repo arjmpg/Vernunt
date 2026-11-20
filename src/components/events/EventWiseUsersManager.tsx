@@ -182,6 +182,18 @@ function csvEscapeCell(val: unknown): string {
   return s;
 }
 
+const GENERIC_HOST_LABELS = new Set([
+  'community organizer',
+  'organizer',
+  'verified vernunt host',
+  'vernunt event host',
+  'vernunt community host',
+  'guest',
+  'parent',
+  'user',
+  'admin'
+]);
+
 function isEventHostedByUser(evt: CommunityEvent, userProfile?: ChildProfile | null): boolean {
   if (!userProfile) return false;
   const userId = String(userProfile.id || '').trim();
@@ -194,7 +206,7 @@ function isEventHostedByUser(evt: CommunityEvent, userProfile?: ChildProfile | n
 
   if (userId && evtHostId && userId === evtHostId) return true;
   if (userEmail && evtOrgEmail && userEmail === evtOrgEmail) return true;
-  if (userName && evtHostName && userName === evtHostName) return true;
+  if (userName && evtHostName && !GENERIC_HOST_LABELS.has(evtHostName) && userName === evtHostName) return true;
   return false;
 }
 
@@ -746,6 +758,46 @@ export default function EventWiseUsersManager({
   const invalidRowCount = parsedRows.length - validRowCount;
   const emailsSentCount = attendees.filter((a) => a.emailSent).length;
   const checkedInCount = attendees.filter((a) => a.checkedIn).length;
+
+  // Hard component-level role gate: ONLY Event Hosts and Admins can access Event Users CSV
+  const isAuthorizedHostOrAdmin = Boolean(
+    userProfile && (isAdmin || userProfile.userRole === 'Event Organizer' || accessibleEvents.length > 0)
+  );
+
+  if (!isAuthorizedHostOrAdmin) {
+    const restrictedCard = (
+      <div className="bg-white border border-slate-200 rounded-2xl shadow-lg p-6 sm:p-8 text-center space-y-4">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto border border-rose-200">
+          <ShieldCheck className="w-7 h-7" />
+        </div>
+        <div className="space-y-1">
+          <h3 className="text-base font-bold text-slate-900 font-serif">
+            Event Hosts &amp; Admin Access Only
+          </h3>
+          <p className="text-xs text-slate-600 max-w-md mx-auto leading-relaxed">
+            Event Users CSV export and import is restricted exclusively to verified Event Hosts (for their own organized events) and Platform Administrators.
+          </p>
+        </div>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold cursor-pointer"
+          >
+            Close
+          </button>
+        )}
+      </div>
+    );
+    if (isModal) {
+      return (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs">
+          <div className="w-full max-w-md">{restrictedCard}</div>
+        </div>
+      );
+    }
+    return restrictedCard;
+  }
 
   const content = (
     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">

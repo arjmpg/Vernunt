@@ -205,6 +205,18 @@ interface EventAttendeeRouteDeps {
   getFirebaseAdmin: () => Promise<any>;
 }
 
+const GENERIC_HOST_NAMES = new Set([
+  'community organizer',
+  'organizer',
+  'verified vernunt host',
+  'vernunt event host',
+  'vernunt community host',
+  'guest',
+  'parent',
+  'user',
+  'admin'
+]);
+
 function isRequesterEventOwnerOrAdmin(params: {
   requesterRole?: string;
   requesterId?: string;
@@ -234,13 +246,13 @@ function isRequesterEventOwnerOrAdmin(params: {
 
   if (cleanReqId && hostId && cleanReqId === hostId) return true;
   if (cleanReqEmail && orgEmail && cleanReqEmail === orgEmail) return true;
-  if (cleanReqName && hostName && cleanReqName === hostName) return true;
+  if (cleanReqName && hostName && !GENERIC_HOST_NAMES.has(hostName) && cleanReqName === hostName) return true;
 
   return false;
 }
 
 export function registerEventAttendeeRoutes(app: Express, deps: EventAttendeeRouteDeps): void {
-  // 1. List all attendees/users booked or imported for a single event (Admin or owning Event Host only)
+  // 1. List all attendees/users booked or imported for a single event (Admin or owning Event Host ONLY)
   app.get('/api/events/:eventId/attendees', (req: Request, res: Response) => {
     try {
       const eventId = String(req.params.eventId || '').trim();
@@ -249,32 +261,22 @@ export function registerEventAttendeeRoutes(app: Express, deps: EventAttendeeRou
       }
       const attendees = getAttendeesForEvent(eventId);
 
-      // Enforce host ownership when requester metadata is supplied (or block non-admin unauthorized access)
-      const requesterRole = String(req.query.requesterRole || '').trim();
-      const requesterId = String(req.query.requesterId || '').trim();
-      const requesterEmail = String(req.query.requesterEmail || '').trim();
-      const requesterName = String(req.query.requesterName || '').trim();
-      const eventHostId = String(req.query.eventHostId || '').trim();
-      const eventOrganizerEmail = String(req.query.eventOrganizerEmail || '').trim();
-      const eventHostName = String(req.query.eventHostName || '').trim();
-
-      if (requesterRole || requesterEmail || requesterId || requesterName) {
-        const allowed = isRequesterEventOwnerOrAdmin({
-          requesterRole,
-          requesterId,
-          requesterEmail,
-          requesterName,
-          eventHostId,
-          eventOrganizerEmail,
-          eventHostName,
-          storedAttendees: attendees
+      // Strictly enforce Event Host or Admin authorization on every request
+      const allowed = isRequesterEventOwnerOrAdmin({
+        requesterRole: String(req.query.requesterRole || '').trim(),
+        requesterId: String(req.query.requesterId || '').trim(),
+        requesterEmail: String(req.query.requesterEmail || '').trim(),
+        requesterName: String(req.query.requesterName || '').trim(),
+        eventHostId: String(req.query.eventHostId || '').trim(),
+        eventOrganizerEmail: String(req.query.eventOrganizerEmail || '').trim(),
+        eventHostName: String(req.query.eventHostName || '').trim(),
+        storedAttendees: attendees
+      });
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Event Users CSV is restricted exclusively to the Event Host and Admin.'
         });
-        if (!allowed) {
-          return res.status(403).json({
-            success: false,
-            error: 'Access denied: Event hosts can only view or export users for events they have organized.'
-          });
-        }
       }
 
       res.json({ success: true, eventId, count: attendees.length, attendees });
@@ -283,34 +285,28 @@ export function registerEventAttendeeRoutes(app: Express, deps: EventAttendeeRou
     }
   });
 
-  // 2. Export event-wise users list as CSV (Admin or owning Event Host only)
+  // 2. Export event-wise users list as CSV (Admin or owning Event Host ONLY)
   app.get('/api/events/:eventId/attendees/export.csv', (req: Request, res: Response) => {
     try {
       const eventId = String(req.params.eventId || '').trim();
       const eventTitle = String(req.query.eventTitle || eventId).trim();
       const attendees = getAttendeesForEvent(eventId);
 
-      const requesterRole = String(req.query.requesterRole || '').trim();
-      const requesterId = String(req.query.requesterId || '').trim();
-      const requesterEmail = String(req.query.requesterEmail || '').trim();
-      const requesterName = String(req.query.requesterName || '').trim();
-      if (requesterRole || requesterEmail || requesterId || requesterName) {
-        const allowed = isRequesterEventOwnerOrAdmin({
-          requesterRole,
-          requesterId,
-          requesterEmail,
-          requesterName,
-          eventHostId: String(req.query.eventHostId || '').trim(),
-          eventOrganizerEmail: String(req.query.eventOrganizerEmail || '').trim(),
-          eventHostName: String(req.query.eventHostName || '').trim(),
-          storedAttendees: attendees
+      const allowed = isRequesterEventOwnerOrAdmin({
+        requesterRole: String(req.query.requesterRole || '').trim(),
+        requesterId: String(req.query.requesterId || '').trim(),
+        requesterEmail: String(req.query.requesterEmail || '').trim(),
+        requesterName: String(req.query.requesterName || '').trim(),
+        eventHostId: String(req.query.eventHostId || '').trim(),
+        eventOrganizerEmail: String(req.query.eventOrganizerEmail || '').trim(),
+        eventHostName: String(req.query.eventHostName || '').trim(),
+        storedAttendees: attendees
+      });
+      if (!allowed) {
+        return res.status(403).json({
+          success: false,
+          error: 'Access denied: Event Users CSV export is restricted exclusively to the Event Host and Admin.'
         });
-        if (!allowed) {
-          return res.status(403).json({
-            success: false,
-            error: 'Access denied: Event hosts can only export users for events they have organized.'
-          });
-        }
       }
 
       const header = [

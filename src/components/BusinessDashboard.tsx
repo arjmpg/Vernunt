@@ -1477,8 +1477,8 @@ export default function BusinessDashboard({
         />
       )}
 
-      {/* Event-Wise Users Export & Import Modal (Host sees ONLY own hosted events; Admin sees all) */}
-      {usersManagerEventId && (
+      {/* Event-Wise Users Export & Import Modal (Strictly Event Hosts & Admin Only) */}
+      {usersManagerEventId && (userRole === 'Event Organizer' || userRole === 'Admin' || userProfile?.userRole === 'Event Organizer' || userProfile?.userRole === 'Admin') && (
         <EventWiseUsersManager
           isModal
           eventsList={visibleEvents}

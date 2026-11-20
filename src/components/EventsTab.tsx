@@ -235,9 +235,20 @@ export default function EventsTab({
     ? userProfile.location.address
     : (typeof userProfile?.location === 'string' ? userProfile.location : 'Bangalore Central (12.97, 77.59)');
 
-  // Events strictly organized/hosted by the current user
+  // Events strictly organized/hosted by the current user (excluding generic placeholder host names)
   const hostedEventsByUser = useMemo(() => {
     if (!userProfile) return [];
+    const genericNames = new Set([
+      'community organizer',
+      'organizer',
+      'verified vernunt host',
+      'vernunt event host',
+      'vernunt community host',
+      'guest',
+      'parent',
+      'user',
+      'admin'
+    ]);
     const userName = (userProfile?.parentName || '').toLowerCase().trim();
     const userEmail = (userProfile?.email || '').toLowerCase().trim();
     const userId = userProfile?.id;
@@ -248,18 +259,27 @@ export default function EventsTab({
       const hostId = (evt as any).hostId;
       return Boolean(
         (userId && hostId && hostId === userId) ||
-        (userName && hostName && hostName === userName) ||
-        (userEmail && organizerEmail && organizerEmail === userEmail)
+        (userEmail && organizerEmail && organizerEmail === userEmail) ||
+        (userName && hostName && !genericNames.has(hostName) && hostName === userName)
       );
     });
   }, [userProfile, eventsList]);
 
-  // Check if current user is an Event Host (Organizer, Admin, or host of any listed event)
+  // Strict Admin & Event Host permission flags
+  const isAdminUser = useMemo(() => {
+    if (!userProfile) return false;
+    const role = userProfile.userRole;
+    const email = (userProfile.email || '').toLowerCase().trim();
+    return role === 'Admin' || ['arjunmpgupta@gmail.com', 'ardha@vernunt.com'].includes(email);
+  }, [userProfile]);
+
   const isEventHost = useMemo(() => {
-    const role = userProfile?.userRole;
-    if (role === 'Event Organizer' || role === 'Admin') return true;
-    return hostedEventsByUser.length > 0;
-  }, [userProfile, hostedEventsByUser]);
+    if (!userProfile) return false;
+    return isAdminUser || userProfile.userRole === 'Event Organizer' || hostedEventsByUser.length > 0;
+  }, [userProfile, isAdminUser, hostedEventsByUser]);
+
+  // Event Users CSV is strictly visible & accessible ONLY to Event Hosts and Admin
+  const canAccessEventUsersCsv = Boolean(userProfile && (isAdminUser || isEventHost));
 
   // Check if current user is authorized to operate the Gate Desk & QR Scanner
   const isAuthorizedOrganizer = (evt?: CommunityEvent) => {
@@ -1393,31 +1413,35 @@ ${deepLink}`;
 
         {/* Top Header Actions: Host Scan Event QR (Hosts only), Merged My Passes & Check-in QR, and Search Input */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {/* Scan Event QR Code Button — visible ONLY to Event Hosts */}
+          {/* Scan Event QR Code Button — visible ONLY to Event Hosts & Admin */}
           {isEventHost && (
-            <>
-              <button
-                id="btn-scan-event-qr-code"
-                type="button"
-                onClick={() => setShowScannerModal(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-slate-200"
-                title="Event Host: Scan an event or attendee QR code"
-              >
-                <QrCode className="w-3.5 h-3.5 text-orange-600" />
-                <span>Scan Event QR</span>
-              </button>
+            <button
+              id="btn-scan-event-qr-code"
+              type="button"
+              onClick={() => setShowScannerModal(true)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-slate-200"
+              title="Event Host: Scan an event or attendee QR code"
+            >
+              <QrCode className="w-3.5 h-3.5 text-orange-600" />
+              <span>Scan Event QR</span>
+            </button>
+          )}
 
-              <button
-                id="btn-host-event-users-export-import"
-                type="button"
-                onClick={() => setShowEventUsersManagerModal(true)}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-emerald-200"
-                title="Export or import event-wise users list (Name, Email ID, Mobile Number)"
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Event Users CSV</span>
-              </button>
-            </>
+          {/* Event Users CSV Button — strictly visible & accessible ONLY to Event Hosts and Admin */}
+          {canAccessEventUsersCsv && (
+            <button
+              id="btn-host-event-users-export-import"
+              type="button"
+              onClick={() => setShowEventUsersManagerModal(true)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-emerald-200"
+              title="Host & Admin Only: Export or import event-wise users list (Name, Email ID, Mobile Number)"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Event Users CSV</span>
+              <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-600 text-white">
+                {isAdminUser ? 'Admin' : 'Host'}
+              </span>
+            </button>
           )}
 
           {/* Merged My Passes & Check-in QR Button */}
@@ -3618,15 +3642,15 @@ ${deepLink}`;
         />
       )}
 
-      {/* Event-Wise Users Export / Import & Admin Bulk Upload Modal */}
-      {showEventUsersManagerModal && isEventHost && (
+      {/* Event-Wise Users Export / Import & Admin Bulk Upload Modal (Strictly Event Hosts & Admin Only) */}
+      {showEventUsersManagerModal && canAccessEventUsersCsv && (
         <EventWiseUsersManager
           isModal
-          eventsList={userProfile?.userRole === 'Admin' ? eventsList : hostedEventsByUser}
+          eventsList={isAdminUser ? eventsList : hostedEventsByUser}
           userProfile={userProfile}
-          isAdmin={userProfile?.userRole === 'Admin'}
+          isAdmin={isAdminUser}
           initialEventId={
-            userProfile?.userRole === 'Admin'
+            isAdminUser
               ? (selectedEventId || eventsList[0]?.id)
               : hostedEventsByUser[0]?.id
           }
