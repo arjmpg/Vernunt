@@ -342,7 +342,11 @@ export default function BangaloreParksHub({
     }
   }, []);
 
-  const isAdmin = userProfile?.userRole === 'Admin';
+  const normalizedUserEmail = String(userProfile?.email || '').trim().toLowerCase();
+  const isAdmin =
+    userProfile?.userRole === 'Admin' ||
+    normalizedUserEmail === 'arjunmpgupta@gmail.com' ||
+    normalizedUserEmail === 'ardha@vernunt.com';
 
   // Boundary verification helper: calculates physical perimeter radius in meters
   const calculateParkBoundaryMeters = (park: BangalorePark): number => {
@@ -633,9 +637,14 @@ export default function BangaloreParksHub({
     }
   };
 
-  // Add custom park with mandatory latitude and longitude
+  // Add custom park with mandatory latitude and longitude (Admin Only)
   const handleAddNewPark = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      showToast('🔒 Only Vernunt Admins can add new parks.');
+      setIsAddParkModalOpen(false);
+      return;
+    }
     if (!newParkName.trim()) {
       showToast('⚠️ Park name is mandatory.');
       return;
@@ -669,7 +678,7 @@ export default function BangaloreParksHub({
       timings: newParkTimings.trim() || '5:00 AM - 10:00 AM, 4:00 PM - 8:30 PM',
       entryFee: 'Free',
       facilities: newParkFacilities.length > 0 ? newParkFacilities : ['Toddler Play Area', 'Lush Shade Trees'],
-      highlights: ['Neighborhood park added by community parent', 'Safe for evening strolls & child play'],
+      highlights: ['Verified Bangalore park added by Vernunt Admin', 'Safe for evening strolls & child play'],
       imageUrl: 'https://images.unsplash.com/photo-1519331379826-f10be5486c6f?auto=format&fit=crop&w=1200&q=80',
       googleMapsUrl: newParkMapsUrl.trim() || `https://www.google.com/maps/search/?api=1&query=${latNum},${lngNum}`,
       placeRating: 4.5,
@@ -677,8 +686,8 @@ export default function BangaloreParksHub({
       isCustomAdded: true,
       isApproved: true,
       approvalStatus: 'APPROVED',
-      submittedByUserId: userProfile?.id || 'community-guest',
-      submittedByUserName: userProfile?.parentName || 'Parent',
+      submittedByUserId: userProfile?.id || 'admin',
+      submittedByUserName: userProfile?.parentName || 'Vernunt Admin',
       submittedAt: new Date().toISOString()
     };
 
@@ -921,70 +930,27 @@ export default function BangaloreParksHub({
         </div>
       )}
 
-      {/* Hero Strip: Bangalore Parks & Playtime Connect */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-emerald-900 via-teal-900 to-slate-900 text-white p-6 sm:p-10 shadow-xl border border-emerald-800/40">
-        <div className="absolute -right-12 -bottom-12 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 max-w-4xl space-y-4">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-bold uppercase tracking-wider">
-            <Trees className="w-4 h-4 text-emerald-400" />
-            <span>Bangalore Parks &amp; Playtime Connect</span>
-          </div>
+      {/* Compact Park Broadcast Strip */}
+      <div className="bg-white rounded-3xl p-4 sm:p-5 border border-amber-200/80 shadow-xs flex flex-col items-start gap-2.5">
+        <button
+          type="button"
+          onClick={() => {
+            if (!userProfile && onRequireAuth) {
+              onRequireAuth();
+              return;
+            }
+            setBroadcastTargetPark(allParks[0] || null);
+            setIsBroadcastModalOpen(true);
+          }}
+          className="w-full sm:w-auto px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-sm hover:shadow-md transition transform active:scale-95 cursor-pointer"
+        >
+          <Sparkles className="w-4 h-4 text-slate-950 shrink-0" />
+          <span>📢 My Kid is Going to the Park</span>
+        </button>
 
-          <h1 className="text-2xl sm:text-4xl lg:text-5xl font-black font-serif tracking-tight leading-tight">
-            Discover Every Park in Bangalore — <br className="hidden sm:inline" />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-200">
-              See Who&apos;s Playing &amp; Invite Nearby Kids!
-            </span>
-          </h1>
-
-          <p className="text-emerald-100/90 text-sm sm:text-base leading-relaxed max-w-2xl">
-            Want to take your child to the park? Check real-time &amp; scheduled playtime slots to see other parents and kids visiting. Or announce your own park visit so neighborhood friends can join and play together!
-          </p>
-
-          {/* Quick Metrics & Highlights */}
-          <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold text-emerald-200">
-            <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-              <MapPin className="w-4 h-4 text-amber-300" />
-              <span>{allParks.length} Bangalore Parks Curated</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-              <Users className="w-4 h-4 text-emerald-300" />
-              <span>{parkVisits.length} Active Park Playdates</span>
-            </div>
-            <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10">
-              <ShieldCheck className="w-4 h-4 text-teal-300" />
-              <span>100% Verified Parent Network</span>
-            </div>
-          </div>
-
-          {/* Call to Actions */}
-          <div className="flex flex-wrap items-center gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => {
-                if (!userProfile && onRequireAuth) {
-                  onRequireAuth();
-                  return;
-                }
-                setBroadcastTargetPark(allParks[0] || null);
-                setIsBroadcastModalOpen(true);
-              }}
-              className="px-5 py-3 rounded-2xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-sm flex items-center gap-2 shadow-lg hover:shadow-xl transition transform active:scale-95 cursor-pointer"
-            >
-              <Sparkles className="w-4 h-4 text-slate-950" />
-              <span>📢 My Kid is Going to the Park (Broadcast)</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setIsAddParkModalOpen(true)}
-              className="px-5 py-3 rounded-2xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-sm flex items-center gap-2 shadow-lg hover:shadow-xl transition transform active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4 text-slate-950" />
-              <span>+ Add My Local BDA / Road Park</span>
-            </button>
-          </div>
-        </div>
+        <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-2xl">
+          If your kid wants to go to any particular park, just broadcast your plan here and interested nearby parents can join you at the park.
+        </p>
       </div>
 
       {/* Community BDA Layout & Street Parks Notice Banner */}
@@ -998,24 +964,26 @@ export default function BangaloreParksHub({
               <span className="text-[11px] font-black uppercase tracking-wider text-emerald-800 bg-emerald-100 px-2.5 py-0.5 rounded-full border border-emerald-300">
                 Neighborhood &amp; BDA Layouts
               </span>
-              <span className="text-xs text-slate-500 font-medium">Every street &amp; cross-road welcome</span>
+              <span className="text-xs text-slate-500 font-medium">Curated Bangalore parks directory</span>
             </div>
             <h3 className="text-sm sm:text-base font-black text-slate-900">
-              Every BDA Layout Park &amp; Cross-Road Park is on Playtime Park &amp; Play!
+              Every BDA Layout Park &amp; Cross-Road Park on Playtime Park &amp; Play
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed max-w-2xl">
-              From <strong className="text-slate-800">Royal County Park in Gottigere</strong> to local cross-road parks in JP Nagar, Hulimavu, Arekere, HSR Layout, Koramangala &amp; BTM. Don&apos;t see your specific road&apos;s park? Tap <strong className="text-emerald-700 font-bold">&quot;+ Add My Local BDA / Road Park&quot;</strong> to add it instantly!
+              Explore curated parks from <strong className="text-slate-800">Royal County Park in Gottigere</strong> to local cross-road parks in JP Nagar, Hulimavu, Arekere, HSR Layout, Koramangala &amp; BTM.
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setIsAddParkModalOpen(true)}
-          className="shrink-0 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95"
-        >
-          <Plus className="w-3.5 h-3.5 text-white" />
-          <span>Add Your Park</span>
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsAddParkModalOpen(true)}
+            className="shrink-0 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+          >
+            <Plus className="w-3.5 h-3.5 text-white" />
+            <span>Add Park (Admin)</span>
+          </button>
+        )}
       </div>
 
       {/* Checked-In Active Status Bar */}
@@ -1799,16 +1767,20 @@ export default function BangaloreParksHub({
                 No matching parks found for &ldquo;{searchQuery}&rdquo;
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                Know a society park, newly created layout park or BBMP ground? You can add it directly from Google Maps in 10 seconds!
+                {isAdmin
+                  ? 'No park matched this search. As an Admin, you can add a new verified park to the directory below.'
+                  : 'Try searching with a different park name, locality, or adjusting your active filters.'}
               </p>
-              <button
-                type="button"
-                onClick={() => setIsAddParkModalOpen(true)}
-                className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 cursor-pointer shadow-sm"
-              >
-                <Plus className="w-4 h-4" />
-                <span>Add This Park Now</span>
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddParkModalOpen(true)}
+                  className="px-4 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 cursor-pointer shadow-sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  <span>Add Park (Admin)</span>
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -2550,8 +2522,8 @@ export default function BangaloreParksHub({
         </div>
       )}
 
-      {/* MODAL: Add / Scrape Park from Google Maps (All Parents & Community) */}
-      {isAddParkModalOpen && (
+      {/* MODAL: Add Park to Directory (Admin Only) */}
+      {isAdmin && isAddParkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/75 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-3xl max-w-lg w-full max-h-[95vh] overflow-y-auto shadow-2xl border border-slate-200 animate-scale-up">
             <div className="p-5 bg-gradient-to-r from-emerald-900 to-slate-900 text-white flex items-center justify-between">
@@ -2559,10 +2531,10 @@ export default function BangaloreParksHub({
                 <span className="text-2xl">🏡</span>
                 <div>
                   <h3 className="text-base font-black font-serif">
-                    Add Any BDA Layout or Street Park
+                    Add Park to Directory (Admin Only)
                   </h3>
                   <span className="text-xs text-emerald-300">
-                    Add your local cross-road park, BDA green space, or society play area in 10 seconds
+                    Publish a verified Bangalore park, BDA green space, or play area
                   </span>
                 </div>
               </div>

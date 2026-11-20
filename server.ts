@@ -719,6 +719,29 @@ async function startServer() {
       }
       const users = loadRegisteredUsers();
       const existingIdx = users.findIndex(u => u.id === profile.id);
+
+      // Enforce mandatory parent photo upload for all new Parent signups
+      const effectiveRole = String(profile.userRole || 'Parent').trim();
+      const isNewParentSignup =
+        existingIdx === -1 &&
+        effectiveRole === 'Parent' &&
+        !profile.createdByAdminBulkUpload;
+      if (isNewParentSignup) {
+        const candidatePhoto = String(profile.parentPhotoUrl || profile.photoUrl || '').trim();
+        const isPlaceholderStockPhoto =
+          !candidatePhoto ||
+          candidatePhoto.includes('images.unsplash.com/photo-1602030028438') ||
+          candidatePhoto.includes('images.unsplash.com/photo-1519689680058') ||
+          candidatePhoto.includes('images.unsplash.com/photo-1544717305') ||
+          candidatePhoto.includes('images.unsplash.com/photo-1535713875002');
+        if (isPlaceholderStockPhoto) {
+          return res.status(400).json({
+            success: false,
+            error: 'Parent profile photo upload is mandatory to complete signup.'
+          });
+        }
+      }
+
       const isNewUserSignup =
         existingIdx === -1 &&
         !notifiedNewSignupUserIds.has(profile.id);

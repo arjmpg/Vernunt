@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   X, Phone, Mail, Lock, ShieldCheck, KeyRound, ArrowRight,
   Sparkles, CheckCircle2, AlertCircle, RefreshCw, Eye, EyeOff,
-  User, Baby, MapPin, Upload, FileText, Check, ShieldAlert
+  User, Baby, MapPin, Upload, FileText, Check, ShieldAlert, Camera
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { collection, query, where, getDocs, doc, setDoc, limit } from 'firebase/firestore';
@@ -60,6 +60,8 @@ export default function UnifiedParentAuthModal({
   const [childAge, setChildAge] = useState<number>(4);
   const [childGender, setChildGender] = useState<'Boy' | 'Girl' | 'Other'>('Boy');
   const [locality, setLocality] = useState('');
+  const [parentPhotoUrl, setParentPhotoUrl] = useState('');
+  const [isUploadingParentPhoto, setIsUploadingParentPhoto] = useState(false);
 
   // KYC Document states
   const [aadhaarFile, setAadhaarFile] = useState<{ name: string; url: string; size: number } | null>(null);
@@ -86,6 +88,7 @@ export default function UnifiedParentAuthModal({
       setOtpCode('');
       setAccountStatus('unknown');
       setRegisteredProfile(null);
+      setParentPhotoUrl('');
     }
   }, [isOpen]);
 
@@ -475,6 +478,11 @@ export default function UnifiedParentAuthModal({
       return;
     }
 
+    if (!parentPhotoUrl.trim()) {
+      setErrorMessage('Parent profile photo upload is mandatory to complete signup.');
+      return;
+    }
+
     setLoading(true);
     setErrorMessage('');
 
@@ -500,7 +508,8 @@ export default function UnifiedParentAuthModal({
         locationSharing: LocationSharing.PRECISE,
         verificationStatus: VerificationStatus.UNVERIFIED,
         interests: ['Outdoor Play', 'Lego Building', 'Drawing & Painting'],
-        photoUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&q=80&w=200',
+        parentPhotoUrl: parentPhotoUrl.trim(),
+        photoUrl: parentPhotoUrl.trim(),
         userRole: 'Parent',
         email: cleanEmail || undefined,
         phoneNumber: cleanPhone ? `+91${cleanPhone}` : undefined,
@@ -898,6 +907,87 @@ export default function UnifiedParentAuthModal({
           {/* ========================================================================= */}
           {step === 'parent_child_details' && (
             <div className="space-y-3.5 animate-fade-in">
+              {/* Mandatory Parent Photo Upload */}
+              <div className={`p-3.5 rounded-2xl border-2 space-y-2.5 ${parentPhotoUrl ? 'bg-emerald-50/40 border-emerald-200' : 'bg-rose-50/50 border-rose-200'}`}>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <Camera className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Parent Profile Photo *</span>
+                  </label>
+                  <span className={`text-[9.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full ${parentPhotoUrl ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                    {parentPhotoUrl ? '✓ Uploaded' : 'Mandatory'}
+                  </span>
+                </div>
+                {parentPhotoUrl ? (
+                  <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-emerald-200">
+                    <img src={parentPhotoUrl} alt="Parent preview" className="w-14 h-14 rounded-xl object-cover border border-emerald-300 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-slate-800">Parent Photo Ready</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <label className="text-[11px] font-bold text-indigo-600 hover:underline cursor-pointer">
+                          Change Photo
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file || !file.type.startsWith('image/')) return;
+                              setIsUploadingParentPhoto(true);
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                setParentPhotoUrl(reader.result as string);
+                                setIsUploadingParentPhoto(false);
+                                setErrorMessage('');
+                              };
+                              reader.readAsDataURL(file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setParentPhotoUrl('')}
+                          className="text-[11px] font-bold text-rose-600 hover:underline cursor-pointer"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="block border-2 border-dashed border-rose-300 hover:border-rose-500 rounded-xl p-3 text-center bg-white cursor-pointer transition">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (!file.type.startsWith('image/')) {
+                          setErrorMessage('Please upload a valid JPG or PNG photo.');
+                          return;
+                        }
+                        setIsUploadingParentPhoto(true);
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setParentPhotoUrl(reader.result as string);
+                          setIsUploadingParentPhoto(false);
+                          setErrorMessage('');
+                        };
+                        reader.readAsDataURL(file);
+                        e.target.value = '';
+                      }}
+                    />
+                    <Upload className="w-4 h-4 text-rose-500 mx-auto mb-1" />
+                    <span className="text-xs font-bold text-slate-800 block">
+                      {isUploadingParentPhoto ? 'Processing photo...' : 'Upload Parent Photo (Required)'}
+                    </span>
+                    <span className="text-[10px] text-slate-500 block mt-0.5">Clear recent portrait • JPG / PNG</span>
+                  </label>
+                )}
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                   <User className="w-3.5 h-3.5 text-rose-500" />
@@ -978,6 +1068,10 @@ export default function UnifiedParentAuthModal({
               <button
                 type="button"
                 onClick={() => {
+                  if (!parentPhotoUrl.trim()) {
+                    setErrorMessage('Parent profile photo upload is mandatory. Please upload your photo to continue.');
+                    return;
+                  }
                   if (!parentName.trim() || !childName.trim()) {
                     setErrorMessage('Please provide both parent and child names.');
                     return;

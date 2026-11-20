@@ -325,9 +325,13 @@ export default function RegistrationHub({
   const [influencerBio, setInfluencerBio] = useState('');
 
   // --- PROFILE PHOTO & SELFIE STATES & HANDLERS ---
-  const [parentProfilePhoto, setParentProfilePhoto] = useState(initialPhotoUrl || '');
+  const isInitialParentRole = ((initialRole as any) || 'Parent') === 'Parent';
+  const [parentProfilePhoto, setParentProfilePhoto] = useState(isInitialParentRole ? '' : (initialPhotoUrl || ''));
+  const [parentPhotoUploaded, setParentPhotoUploaded] = useState(false);
   const [liveSelfiePhoto, setLiveSelfiePhoto] = useState('');
-  const [stepAPhotoSource, setStepAPhotoSource] = useState<'selfie' | 'gallery' | null>(initialPhotoUrl ? 'gallery' : null);
+  const [stepAPhotoSource, setStepAPhotoSource] = useState<'selfie' | 'gallery' | null>(
+    !isInitialParentRole && initialPhotoUrl ? 'gallery' : null
+  );
   const [cameraTarget, setCameraTarget] = useState<'stepA' | 'stepB' | null>(null);
   const [faceVerificationStatus, setFaceVerificationStatus] = useState<'none' | 'verified' | 'failed' | 'pending_admin'>('verified');
   const [faceVerificationScore, setFaceVerificationScore] = useState<number>(100);
@@ -384,6 +388,24 @@ export default function RegistrationHub({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      setErrors(prev => ({
+        ...prev,
+        parentProfilePhoto: 'Please select a valid image file (JPG, PNG, or WebP).'
+      }));
+      e.target.value = '';
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrors(prev => ({
+        ...prev,
+        parentProfilePhoto: 'Photo file size must be under 10 MB. Please choose a smaller image.'
+      }));
+      e.target.value = '';
+      return;
+    }
+
     const reader = new FileReader();
     reader.onload = (event) => {
       const img = document.createElement('img');
@@ -408,9 +430,11 @@ export default function RegistrationHub({
         
         setParentProfilePhoto(compressedDataUrl);
         setLiveSelfiePhoto(compressedDataUrl);
+        setParentPhotoUploaded(true);
         setStepAPhotoSource('gallery');
         setFaceVerificationStatus('verified');
         setFaceVerificationScore(100);
+        setFormSubmitError('');
         setErrors(prev => {
           const next = { ...prev };
           delete next.parentProfilePhoto;
@@ -419,9 +443,16 @@ export default function RegistrationHub({
           return next;
         });
       };
+      img.onerror = () => {
+        setErrors(prev => ({
+          ...prev,
+          parentProfilePhoto: 'Unable to read this image file. Please try another JPG or PNG photo.'
+        }));
+      };
       img.src = event.target?.result as string;
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   const startCamera = async (target: 'stepA' | 'stepB' = 'stepA') => {
@@ -473,12 +504,10 @@ export default function RegistrationHub({
 
   const captureSelfieSnapshot = () => {
     let capturedDataUrl = '';
-    if (videoRef.current) {
+    if (videoRef.current && videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
       try {
         const video = videoRef.current;
         const canvas = document.createElement('canvas');
-        const vWidth = video.videoWidth || 480;
-        const vHeight = video.videoHeight || 480;
         canvas.width = 480;
         canvas.height = 480;
         const ctx = canvas.getContext('2d');
@@ -494,8 +523,12 @@ export default function RegistrationHub({
       }
     }
 
-    // Fallback if video frame was unavailable
+    // For Parent signup, never substitute a stock placeholder photo — require a real camera capture or gallery upload
     if (!capturedDataUrl || capturedDataUrl.length < 50) {
+      if (preferredRole === 'Parent') {
+        setCameraError('Live camera feed is not active. Please allow camera permission or upload your photo from your device gallery.');
+        return;
+      }
       const isMaleName = (parentName || hostName || '').toLowerCase().includes('mr') || 
                          (parentName || hostName || '').toLowerCase().includes('father') || 
                          (parentName || hostName || '').toLowerCase().includes('john') || 
@@ -508,9 +541,11 @@ export default function RegistrationHub({
 
     setParentProfilePhoto(capturedDataUrl);
     setLiveSelfiePhoto(capturedDataUrl);
+    setParentPhotoUploaded(true);
     setStepAPhotoSource('selfie');
     setFaceVerificationStatus('verified');
     setFaceVerificationScore(100);
+    setFormSubmitError('');
     setErrors(prev => {
       const next = { ...prev };
       delete next.parentProfilePhoto;
@@ -1603,6 +1638,9 @@ export default function RegistrationHub({
           setEmailVerified(true);
         }
       } else if (step === 2) {
+        if (!parentProfilePhoto.trim() || !parentPhotoUploaded) {
+          newErrors.parentProfilePhoto = 'Parent profile photo is mandatory. Please upload your photo or take a live selfie to complete signup.';
+        }
         if (!parentName.trim()) {
           newErrors.parentName = 'Parent full name is required';
         }
@@ -1790,11 +1828,22 @@ export default function RegistrationHub({
     const { isValid, errors: stepErrors } = validateStep();
     if (!isValid) {
       const errValues = Object.values(stepErrors);
-      setFormSubmitError(errValues.length > 0 ? errValues[0] : 'Please complete all required fields and verify mobile & email OTP before submitting.');
-      const formEl = document.getElementById('reg-form') || document.getElementById('reg-registration-form');
-      if (formEl) {
-        formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setFormSubmitError(errValues.length > 0 ? errValues[0] : 'Please complete all required fields before submitting.');
+      const targetEl = stepErrors.parentProfilePhoto
+        ? document.getElementById('parent-profile-photo-section')
+        : (document.getElementById('reg-form') || document.getElementById('reg-registration-form'));
+      if (targetEl) {
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
+      return;
+    }
+
+    // Defense-in-depth guard: Parent signup strictly requires an uploaded parent photo
+    if (preferredRole === 'Parent' && (!parentProfilePhoto.trim() || !parentPhotoUploaded)) {
+      const msg = 'Parent profile photo is mandatory. Please upload your photo or take a live selfie to complete signup.';
+      setErrors(prev => ({ ...prev, parentProfilePhoto: msg }));
+      setFormSubmitError(msg);
+      document.getElementById('parent-profile-photo-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -1861,10 +1910,12 @@ export default function RegistrationHub({
         preferredActivities: selectedPreferredActivities.length > 0 ? selectedPreferredActivities : ['Indoor Games', 'Park Play'],
         parentPhotoUrl: parentProfilePhoto.trim() || undefined,
         childPhotoUrl: childPhotoUrl.trim() || undefined,
-        photoUrl: parentProfilePhoto.trim() || childPhotoUrl.trim() || photoUrl.trim() || (childGender === 'Boy' 
-          ? 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400' 
-          : 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400'),
-        selfiePhotoUrl: liveSelfiePhoto,
+        photoUrl: preferredRole === 'Parent'
+          ? parentProfilePhoto.trim()
+          : (parentProfilePhoto.trim() || childPhotoUrl.trim() || photoUrl.trim() || (childGender === 'Boy' 
+            ? 'https://images.unsplash.com/photo-1602030028438-4cf153cba9e7?auto=format&fit=crop&q=80&w=400' 
+            : 'https://images.unsplash.com/photo-1519689680058-324335c77ebd?auto=format&fit=crop&q=80&w=400')),
+        selfiePhotoUrl: liveSelfiePhoto || parentProfilePhoto.trim(),
         stepAPhotoSource: stepAPhotoSource || 'gallery',
         facialAuditRequired: false,
         faceVerificationStatus: 'pending_admin',
@@ -2371,10 +2422,16 @@ export default function RegistrationHub({
               id="reg-user-type-select"
               value={preferredRole}
               onChange={(e) => {
-                setPreferredRole(e.target.value as any);
+                const nextRole = e.target.value as any;
+                setPreferredRole(nextRole);
                 setStep(1);
                 setErrors({});
                 setFormSubmitError('');
+                if (nextRole === 'Parent' && !parentPhotoUploaded) {
+                  setParentProfilePhoto('');
+                  setLiveSelfiePhoto('');
+                  setStepAPhotoSource(null);
+                }
               }}
               className="w-full appearance-none px-3.5 py-2.5 bg-white border border-slate-300 focus:border-orange-500 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none shadow-2xs transition cursor-pointer pr-9"
             >
@@ -2706,6 +2763,217 @@ export default function RegistrationHub({
                     </div>
                   </div>
                 )}
+
+                {/* Mandatory Parent Profile Photo Upload Section */}
+                <div
+                  id="parent-profile-photo-section"
+                  className={`p-4 sm:p-5 rounded-2xl border-2 space-y-3.5 transition-all ${
+                    errors.parentProfilePhoto
+                      ? 'bg-red-50/50 border-red-400 shadow-xs'
+                      : parentProfilePhoto && parentPhotoUploaded
+                        ? 'bg-emerald-50/40 border-emerald-200'
+                        : 'bg-rose-50/50 border-rose-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                        <Camera className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5">
+                          <span>{preferredRole === 'Influencer' ? 'Creator / Parent Profile Photo' : 'Parent Profile Photo'}</span>
+                          {preferredRole === 'Parent' && <span className="text-rose-600">*</span>}
+                        </h4>
+                        <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                          {preferredRole === 'Parent'
+                            ? 'Upload a clear, recent photo of yourself or take a live selfie. Mandatory for parent identity verification and neighborhood child safety.'
+                            : 'Upload a clear portrait photo of yourself or take a live selfie for your creator profile.'}
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-[9.5px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full shrink-0 border ${
+                        parentProfilePhoto && parentPhotoUploaded
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                          : preferredRole === 'Parent'
+                            ? 'bg-rose-100 text-rose-700 border-rose-200'
+                            : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}
+                    >
+                      {parentProfilePhoto && parentPhotoUploaded ? '✓ Uploaded' : preferredRole === 'Parent' ? 'Mandatory' : 'Optional'}
+                    </span>
+                  </div>
+
+                  {parentProfilePhoto && parentPhotoUploaded ? (
+                    <div className="flex flex-col sm:flex-row items-center gap-4 bg-white p-3.5 rounded-xl border border-emerald-200 shadow-2xs">
+                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-100 border-2 border-emerald-400 shadow-xs shrink-0">
+                        <img
+                          src={parentProfilePhoto}
+                          alt="Parent Profile Preview"
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute bottom-1 left-1 right-1 bg-slate-900/85 text-white text-[8.5px] font-black tracking-wider uppercase py-0.5 px-1 rounded text-center truncate">
+                          {stepAPhotoSource === 'selfie' ? '📸 Live Selfie' : '📁 Uploaded Photo'}
+                        </span>
+                      </div>
+
+                      <div className="space-y-2 text-center sm:text-left flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                            <Check className="w-3 h-3 text-emerald-700" />
+                            Parent Photo Ready
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">
+                            {stepAPhotoSource === 'selfie' ? 'Captured via Front Camera' : 'Uploaded from Device'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 leading-snug">
+                          Your photo will be shown on your verified parent profile to help neighborhood families recognize and trust you.
+                        </p>
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
+                          <label className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-bold transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95">
+                            <Upload className="w-3.5 h-3.5" />
+                            <span>Change Photo</span>
+                            <input
+                              type="file"
+                              id="input-parent-photo-replace"
+                              accept="image/*"
+                              onChange={handleParentProfilePhotoUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => startCamera('stepA')}
+                            className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-[11px] font-bold transition cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Retake Selfie</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setParentProfilePhoto('');
+                              setLiveSelfiePhoto('');
+                              setParentPhotoUploaded(false);
+                              setStepAPhotoSource(null);
+                            }}
+                            className="px-2.5 py-1.5 text-rose-600 hover:bg-rose-50 rounded-xl text-[11px] font-bold transition cursor-pointer"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : cameraActive ? (
+                    <div className="bg-slate-950 rounded-2xl p-4 flex flex-col items-center justify-center text-center space-y-3 border border-slate-900 shadow-lg">
+                      <div className="relative w-full max-w-xs h-56 sm:h-64 rounded-xl overflow-hidden bg-black border-2 border-rose-500/50 flex items-center justify-center">
+                        <video
+                          ref={videoRef}
+                          playsInline
+                          muted
+                          autoPlay
+                          onLoadedMetadata={() => videoRef.current?.play().catch(() => {})}
+                          className="w-full h-full object-cover transform scale-x-[-1]"
+                        />
+                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                          <div className="w-36 h-44 border-2 border-dashed border-white/50 rounded-full"></div>
+                        </div>
+                        <div className="absolute top-2 left-2 bg-slate-900/80 text-white text-[9.5px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                          <span>Front Camera Live</span>
+                        </div>
+                      </div>
+
+                      {cameraError && (
+                        <div className="bg-amber-950/90 border border-amber-600/40 text-amber-200 text-[11px] p-2.5 rounded-xl max-w-xs text-center">
+                          {cameraError}
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center justify-center gap-2.5">
+                        <button
+                          type="button"
+                          id="btn-click-parent-selfie-photo"
+                          onClick={captureSelfieSnapshot}
+                          className="px-4 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-black text-xs rounded-xl shadow-md cursor-pointer inline-flex items-center gap-1.5 active:scale-95 transition"
+                        >
+                          <Camera className="w-4 h-4" />
+                          <span>Capture Parent Photo</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={stopCamera}
+                          className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Primary Option: Upload from Device Gallery */}
+                      <label
+                        htmlFor="input-parent-photo-upload"
+                        className="bg-white p-4 rounded-xl border-2 border-dashed border-rose-300 hover:border-rose-500 hover:bg-rose-50/30 transition flex flex-col items-center justify-between text-center space-y-2.5 cursor-pointer group"
+                      >
+                        <div className="w-11 h-11 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center group-hover:scale-105 transition">
+                          <Upload className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-slate-900 block">Upload Parent Photo</span>
+                          <span className="text-[10.5px] text-slate-500 block mt-0.5">
+                            Select a clear portrait from your phone or computer (JPG/PNG)
+                          </span>
+                        </div>
+                        <span className="w-full py-2 px-3 bg-slate-900 group-hover:bg-slate-800 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1.5 transition">
+                          <Upload className="w-3.5 h-3.5" />
+                          <span>Choose Photo from Device</span>
+                        </span>
+                        <input
+                          id="input-parent-photo-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleParentProfilePhotoUpload}
+                          className="hidden"
+                        />
+                      </label>
+
+                      {/* Option 2: Live Front Camera Selfie */}
+                      <div className="bg-white p-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-amber-400 transition flex flex-col items-center justify-between text-center space-y-2.5">
+                        <div className="w-11 h-11 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                          <Camera className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <span className="font-bold text-xs text-slate-900 block">Take Live Selfie</span>
+                          <span className="text-[10.5px] text-slate-500 block mt-0.5">
+                            Snap an instant photo directly using your front camera
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          id="btn-open-parent-camera"
+                          onClick={() => startCamera('stepA')}
+                          className="w-full py-2 px-3 bg-gradient-to-r from-rose-600 to-amber-500 hover:from-rose-700 hover:to-amber-600 text-white font-bold text-xs rounded-xl inline-flex items-center justify-center gap-1.5 cursor-pointer transition active:scale-98"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Open Camera &amp; Snap</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {errors.parentProfilePhoto && (
+                    <div
+                      id="error-parent-profile-photo"
+                      className="p-2.5 bg-red-100/80 border border-red-300 rounded-xl text-[11px] text-red-700 font-bold flex items-center gap-2"
+                    >
+                      <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                      <span>{errors.parentProfilePhoto}</span>
+                    </div>
+                  )}
+                </div>
 
                 {/* Parent Name */}
                 <div className="flex flex-col space-y-1.5">
@@ -5511,6 +5779,23 @@ export default function RegistrationHub({
                 </p>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Reminder when Parent photo has not yet been uploaded on final step */}
+        {preferredRole === 'Parent' && step === maxSteps && (!parentProfilePhoto || !parentPhotoUploaded) && (
+          <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl flex items-center justify-between gap-2 text-[11px] text-rose-800">
+            <div className="flex items-center gap-2 font-semibold">
+              <Camera className="w-4 h-4 text-rose-600 shrink-0" />
+              <span>Parent profile photo upload is mandatory before completing signup.</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => document.getElementById('parent-profile-photo-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+              className="text-[11px] font-black text-rose-700 underline shrink-0 cursor-pointer"
+            >
+              Upload Now
+            </button>
           </div>
         )}
 
