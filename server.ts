@@ -2,18 +2,32 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import crypto from "crypto";
 import { execSync } from "child_process";
 import { registerCommerceEngineRoutes } from "./server/commerceEngine.ts";
 import { registerShiprocketRoutes } from "./server/shiprocketService.ts";
 import { registerPrivacyComplianceRoutes } from "./server/privacyComplianceService.ts";
 import { registerMarketplaceRoutes } from "./server/marketplaceService.ts";
-import { registerEmailRoutes, sendEmailMessage } from "./server/emailService.ts";
+import {
+  registerEmailRoutes,
+  sendEmailMessage,
+  sendAdminNewSignupEmail,
+  sendWelcomeSignupEmail,
+  sendPasswordChangedEmail,
+  sendAdminKycSubmittedEmail,
+  sendUserKycApprovedEmail,
+  sendUserKycRejectedEmail,
+  buildVernuntEmailTemplate
+} from "./server/emailService.ts";
+import { generateEventTicketPdfAndQr } from "./server/ticketPdfService.ts";
+import { registerEventAttendeeRoutes, upsertEventAttendee } from "./server/eventAttendeesService.ts";
 import { registerBackupRoutes } from "./server/backupService.ts";
 import { registerRazorpayRoutes } from "./server/razorpayService.ts";
 import { registerWordPressRoutes } from "./server/wordpressService.ts";
 import { registerParentMlRoutes } from "./server/parentMlService.ts";
 import { registerMarketplaceAiRoutes } from "./server/marketplaceAiService.ts";
-import { generateGoogleMerchantXml, generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
+import { registerGoogleSyncRoutes } from "./server/googleSyncService.ts";
+import { generateStoreSitemapXml } from "./src/utils/googleMerchantFeed.ts";
 import { initializeApp as initializeClientApp, getApps as getClientApps } from "firebase/app";
 import { initializeFirestore as initializeClientFirestore, collection as clientCollection, getDocs as clientGetDocs, doc as clientDoc, setDoc as clientSetDoc } from "firebase/firestore";
 
@@ -84,6 +98,9 @@ async function startServer() {
 
   // Gemini AI Semantic Search, Visual Search & Automated Catalog Management
   registerMarketplaceAiRoutes(app);
+
+  // Google Merchant Center (5909118279) Single-Product Sync, Daily Cron & Google Events Ticketing Partner JSON Feed
+  registerGoogleSyncRoutes(app);
 
   // Client telemetry & IP capture endpoint (visible only to system administrators)
   app.get("/api/client-telemetry", (req, res) => {
@@ -692,6 +709,8 @@ async function startServer() {
     }
   });
 
+  const notifiedNewSignupUserIds = new Set<string>();
+
   app.post("/api/users/register", async (req, res) => {
     try {
       const profile = req.body;
@@ -700,21 +719,287 @@ async function startServer() {
       }
       const users = loadRegisteredUsers();
       const existingIdx = users.findIndex(u => u.id === profile.id);
+      const isNewUserSignup =
+        existingIdx === -1 &&
+        !notifiedNewSignupUserIds.has(profile.id);
+
       let savedUser: any;
       if (existingIdx >= 0) {
         savedUser = { ...users[existingIdx], ...profile, updatedAt: new Date().toISOString() };
         users[existingIdx] = savedUser;
       } else {
-        savedUser = { ...profile, registeredAt: profile.registeredAt || new Date().toISOString() };
+        savedUser = {
+          ...profile,
+          registeredAt: profile.registeredAt || new Date().toISOString(),
+          adminSignupAlertSent: true
+        };
         users.unshift(savedUser);
       }
+
+      if (isNewUserSignup) {
+        notifiedNewSignupUserIds.add(profile.id);
+      }
+
       saveRegisteredUsers(users);
       // Persist permanently to Firestore cloud database so GitHub redeploy never erases it
       await persistUserToFirestore(savedUser);
-      console.log(`[Users Engine] Registered user '${profile.parentName || profile.id}' saved successfully. Total users: ${users.length}`);
-      res.json({ success: true, user: savedUser });
+
+      // Fire-and-forget admin signup email trigger (non-blocking so user signup stays instant)
+      if (isNewUserSignup) {
+        void (async () => {
+          try {
+            const adminInstance = await getFirebaseAdmin().catch(() => null);
+            await sendAdminNewSignupEmail({ user: savedUser, adminInstance });
+            if (savedUser.email && String(savedUser.email).includes("@")) {
+              await sendWelcomeSignupEmail({ user: savedUser, adminInstance });
+            }
+          } catch (emailErr) {
+            console.warn("[Users Engine] Signup email trigger note:", emailErr);
+          }
+        })();
+      }
+
+      console.log(`[Users Engine] Registered user '${profile.parentName || profile.id}' saved successfully. Total users: ${users.length}${isNewUserSignup ? ' (Admin & Welcome emails triggered)' : ''}`);
+      res.json({ success: true, user: savedUser, adminEmailTriggered: isNewUserSignup });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // Register Event-Wise Users Export / Import & Admin Bulk Auto-Provisioning Routes
+  registerEventAttendeeRoutes(app, {
+    loadRegisteredUsers,
+    saveRegisteredUsers,
+    persistUserToFirestore,
+    getFirebaseAdmin
+  });
+
+  // =========================================================================
+  // SECURE ACCOUNT PASSWORD MANAGEMENT (ADMIN & ALL USERS)
+  // Uses salted scrypt hashing — plaintext passwords are never stored.
+  // =========================================================================
+  const USER_PASSWORDS_FILE = path.join(process.cwd(), "data", "user_passwords.json");
+
+  interface StoredPasswordRecord {
+    userId: string;
+    email?: string;
+    phone?: string;
+    salt: string;
+    hash: string;
+    updatedAt: string;
+  }
+
+  function loadPasswordRecords(): StoredPasswordRecord[] {
+    try {
+      if (fs.existsSync(USER_PASSWORDS_FILE)) {
+        const parsed = JSON.parse(fs.readFileSync(USER_PASSWORDS_FILE, "utf-8"));
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (err) {
+      console.warn("[Password Store] Read notice:", err);
+    }
+    return [];
+  }
+
+  function savePasswordRecords(records: StoredPasswordRecord[]) {
+    try {
+      const dir = path.dirname(USER_PASSWORDS_FILE);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(USER_PASSWORDS_FILE, JSON.stringify(records, null, 2));
+    } catch (err) {
+      console.error("[Password Store] Write error:", err);
+    }
+  }
+
+  function normalizePhone10(phone?: string): string {
+    if (!phone) return "";
+    const digits = String(phone).replace(/\D/g, "");
+    return digits.length >= 10 ? digits.slice(-10) : digits;
+  }
+
+  function findPasswordRecord(
+    records: StoredPasswordRecord[],
+    identifiers: { userId?: string; email?: string; phoneNumber?: string }
+  ): { index: number; record: StoredPasswordRecord | null } {
+    const cleanId = String(identifiers.userId || "").trim();
+    const cleanEmail = String(identifiers.email || "").trim().toLowerCase();
+    const cleanPhone = normalizePhone10(identifiers.phoneNumber);
+
+    const index = records.findIndex((r) => {
+      if (cleanId && r.userId === cleanId) return true;
+      if (cleanEmail && r.email && r.email.toLowerCase() === cleanEmail) return true;
+      if (cleanPhone && r.phone && normalizePhone10(r.phone) === cleanPhone) return true;
+      return false;
+    });
+
+    return { index, record: index >= 0 ? records[index] : null };
+  }
+
+  function hashUserPassword(password: string, salt?: string): { salt: string; hash: string } {
+    const usedSalt = salt || crypto.randomBytes(16).toString("hex");
+    const derived = crypto.scryptSync(password, usedSalt, 64).toString("hex");
+    return { salt: usedSalt, hash: derived };
+  }
+
+  function verifyUserPasswordHash(password: string, record: StoredPasswordRecord): boolean {
+    try {
+      const derived = crypto.scryptSync(password, record.salt, 64);
+      const stored = Buffer.from(record.hash, "hex");
+      if (derived.length !== stored.length) return false;
+      return crypto.timingSafeEqual(derived, stored);
+    } catch {
+      return false;
+    }
+  }
+
+  app.get("/api/users/password-status", (req, res) => {
+    try {
+      const userId = String(req.query.userId || "");
+      const email = String(req.query.email || "");
+      const phoneNumber = String(req.query.phone || req.query.phoneNumber || "");
+      const records = loadPasswordRecords();
+      const { record } = findPasswordRecord(records, { userId, email, phoneNumber });
+      return res.json({
+        success: true,
+        hasPassword: Boolean(record),
+        updatedAt: record?.updatedAt || null
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
+  app.post("/api/users/change-password", async (req, res) => {
+    try {
+      const { userId, email, phoneNumber, currentPassword, newPassword } = req.body || {};
+      const cleanId = String(userId || "").trim();
+      const cleanEmail = String(email || "").trim().toLowerCase();
+      const cleanPhone = normalizePhone10(phoneNumber);
+
+      if (!cleanId && !cleanEmail && !cleanPhone) {
+        return res.status(400).json({ success: false, error: "Authenticated account identifier is required." });
+      }
+      if (cleanId === "guest-explorer") {
+        return res.status(403).json({ success: false, error: "Please sign in with your account to set or change your password." });
+      }
+      if (!newPassword || typeof newPassword !== "string" || newPassword.trim().length < 6) {
+        return res.status(400).json({ success: false, error: "New password must be at least 6 characters long." });
+      }
+      if (newPassword.length > 128) {
+        return res.status(400).json({ success: false, error: "Password cannot exceed 128 characters." });
+      }
+
+      const records = loadPasswordRecords();
+      const { index, record } = findPasswordRecord(records, {
+        userId: cleanId,
+        email: cleanEmail,
+        phoneNumber: cleanPhone
+      });
+
+      if (record) {
+        if (!currentPassword || typeof currentPassword !== "string") {
+          return res.status(400).json({ success: false, error: "Please enter your current password." });
+        }
+        if (!verifyUserPasswordHash(currentPassword, record)) {
+          return res.status(401).json({ success: false, error: "Current password is incorrect." });
+        }
+      }
+
+      const { salt, hash } = hashUserPassword(newPassword);
+      const updatedAt = new Date().toISOString();
+      const nextRecord: StoredPasswordRecord = {
+        userId: cleanId || record?.userId || `usr-${Date.now()}`,
+        email: cleanEmail || record?.email || undefined,
+        phone: cleanPhone || record?.phone || undefined,
+        salt,
+        hash,
+        updatedAt
+      };
+
+      if (index >= 0) {
+        records[index] = nextRecord;
+      } else {
+        records.unshift(nextRecord);
+      }
+      savePasswordRecords(records);
+
+      // Update non-sensitive passwordUpdatedAt metadata on user profile record & Firestore
+      let matchedUserRecord: any = null;
+      try {
+        const users = loadRegisteredUsers();
+        const uIdx = users.findIndex(
+          (u) =>
+            (cleanId && u.id === cleanId) ||
+            (cleanEmail && u.email?.toLowerCase() === cleanEmail) ||
+            (cleanPhone && normalizePhone10(u.phoneNumber) === cleanPhone)
+        );
+        if (uIdx >= 0) {
+          users[uIdx] = { ...users[uIdx], passwordUpdatedAt: updatedAt, updatedAt };
+          matchedUserRecord = users[uIdx];
+          saveRegisteredUsers(users);
+          await persistUserToFirestore(users[uIdx]);
+        }
+      } catch (metaErr) {
+        console.debug("[Password Store] User metadata sync note:", metaErr);
+      }
+
+      // Send instant Password Changed / Set security notification email
+      const notifyEmail = cleanEmail || nextRecord.email || matchedUserRecord?.email || "";
+      if (notifyEmail && notifyEmail.includes("@")) {
+        (async () => {
+          try {
+            const adminInstance = await getFirebaseAdmin().catch(() => null);
+            await sendPasswordChangedEmail({
+              email: notifyEmail,
+              userName: matchedUserRecord?.parentName || matchedUserRecord?.name || "Vernunt Member",
+              userRole: matchedUserRecord?.userRole || "Member",
+              isFirstTimeSet: !record,
+              adminInstance
+            });
+          } catch (mailErr) {
+            console.warn("[Password Store] Password-changed email alert note:", mailErr);
+          }
+        })();
+      }
+
+      return res.json({
+        success: true,
+        hasPassword: true,
+        updatedAt,
+        message: record ? "Password updated successfully." : "Account password set successfully."
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Failed to update password." });
+    }
+  });
+
+  app.post("/api/users/verify-password", (req, res) => {
+    try {
+      const { userId, email, phoneNumber, password } = req.body || {};
+      if (!password || typeof password !== "string") {
+        return res.status(400).json({ success: false, verified: false, error: "Password is required." });
+      }
+      const records = loadPasswordRecords();
+      const { record } = findPasswordRecord(records, { userId, email, phoneNumber });
+
+      if (!record) {
+        // Account has not set a custom password yet (e.g. OTP/Google-created account)
+        return res.json({ success: true, verified: true, hasCustomPassword: false });
+      }
+
+      const matched = verifyUserPasswordHash(password, record);
+      if (!matched) {
+        return res.status(401).json({
+          success: false,
+          verified: false,
+          hasCustomPassword: true,
+          error: "Incorrect password. Please try again or sign in with OTP."
+        });
+      }
+
+      return res.json({ success: true, verified: true, hasCustomPassword: true });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, verified: false, error: err?.message || String(err) });
     }
   });
 
@@ -754,6 +1039,17 @@ async function startServer() {
       // Persist permanently to Firestore cloud database
       await persistUserToFirestore(updatedUser);
       console.log(`[KYC Engine] KYC submission recorded for user '${userId}'. Total users: ${users.length}`);
+
+      // Trigger instant email notification to Admin(s) for KYC review
+      getFirebaseAdmin()
+        .then(adminInstance =>
+          sendAdminKycSubmittedEmail({
+            applicant: updatedUser,
+            adminInstance
+          })
+        )
+        .catch(err => console.warn("[KYC Engine] Admin KYC email notice:", err));
+
       res.json({ success: true, user: updatedUser });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -762,23 +1058,37 @@ async function startServer() {
 
   app.post("/api/users/kyc-review", async (req, res) => {
     try {
-      const { userId, verificationStatus, aadhaarVerified, adminNotes } = req.body || {};
+      const { userId, verificationStatus, aadhaarVerified, adminNotes, email, parentName, userRole, loginUrl } = req.body || {};
       if (!userId) {
         return res.status(400).json({ success: false, error: "userId is required" });
       }
       const users = loadRegisteredUsers();
-      const user = users.find(u => u.id === userId);
-      if (!user) {
-        return res.status(404).json({ success: false, error: "User not found" });
-      }
+      let user = users.find(u => u.id === userId);
       const now = new Date().toISOString();
-      user.verificationStatus = verificationStatus || "VERIFIED";
-      user.aadhaarVerified = aadhaarVerified !== undefined ? aadhaarVerified : (verificationStatus === "VERIFIED");
-      if (verificationStatus === "VERIFIED") {
+      if (!user) {
+        // Fallback record if user exists in Firestore/client state but not yet in local cache
+        user = {
+          id: userId,
+          parentName: parentName || "Verified Member",
+          email: email || "",
+          userRole: userRole || "Parent",
+          createdAt: now
+        };
+        users.unshift(user);
+      } else {
+        if (email && !user.email) user.email = email;
+        if (parentName && !user.parentName) user.parentName = parentName;
+        if (userRole && !user.userRole) user.userRole = userRole;
+      }
+
+      const nextStatus = verificationStatus || "VERIFIED";
+      user.verificationStatus = nextStatus;
+      user.aadhaarVerified = aadhaarVerified !== undefined ? aadhaarVerified : (nextStatus === "VERIFIED");
+      if (nextStatus === "VERIFIED") {
         user.kycVerifiedAt = now;
         user.facialAuditRequired = false;
         user.faceVerificationStatus = "verified";
-      } else if (verificationStatus === "REJECTED") {
+      } else if (nextStatus === "REJECTED") {
         user.facialAuditRequired = false;
         user.faceVerificationStatus = "rejected";
       }
@@ -788,6 +1098,25 @@ async function startServer() {
       // Persist permanently to Firestore cloud database
       await persistUserToFirestore(user);
       console.log(`[KYC Engine] Admin updated KYC for '${user.parentName}' to '${user.verificationStatus}'`);
+
+      // Automatically notify user by email when Admin approves (or requests re-upload)
+      if (user.email && String(user.email).includes("@")) {
+        const adminInstance = await getFirebaseAdmin();
+        if (nextStatus === "VERIFIED") {
+          sendUserKycApprovedEmail({
+            user,
+            loginUrl,
+            adminInstance
+          }).catch(err => console.warn("[KYC Engine] User approval email notice:", err));
+        } else if (nextStatus === "REJECTED") {
+          sendUserKycRejectedEmail({
+            user,
+            adminNotes,
+            adminInstance
+          }).catch(err => console.warn("[KYC Engine] User rejection email notice:", err));
+        }
+      }
+
       res.json({ success: true, user });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
@@ -2833,19 +3162,8 @@ async function startServer() {
     return res.send(xml);
   });
 
-  // Google Merchant Center & Google Shopping Official Product Feed XML (RSS 2.0 with google base namespace)
-  app.get(["/google-merchant-feed.xml", "/google-shopping-feed.xml", "/api/google-merchant-feed"], (req, res) => {
-    try {
-      const xml = generateGoogleMerchantXml();
-      res.setHeader("Content-Type", "application/xml; charset=utf-8");
-      res.setHeader("X-Content-Type-Options", "nosniff");
-      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=3600");
-      return res.status(200).send(xml);
-    } catch (e: any) {
-      console.error("[Google Merchant Feed] Error generating XML:", e);
-      return res.status(500).send("<error>Failed to generate Google Merchant Feed</error>");
-    }
-  });
+  // Note: /google-merchant-feed.xml, /google-merchant-feed.json, and /google-events-feed.json
+  // are served by registerGoogleSyncRoutes(app) in ./server/googleSyncService.ts (Merchant Center ID 5909118279).
 
   // Dedicated Vernunt Store Products XML Sitemap for Google Search Console
   app.get(["/sitemap-store.xml", "/sitemap-products.xml"], (req, res) => {
@@ -3931,40 +4249,41 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   // =========================================================================
   app.post("/api/notify-approval", async (req, res) => {
     try {
-      const { userId, parentName, email, phoneNumber, role, loginUrl } = req.body;
+      const { userId, parentName, email, phoneNumber, role, loginUrl } = req.body || {};
       const targetName = parentName || "Verified Member";
       const targetRole = role || "Parent";
       const userLoginLink = loginUrl || `https://app.vernunt.com/?action=login&user=${userId || 'user'}`;
 
       console.log(`[Notification Gateway] Dispatching Approval Email & SMS for ${targetName} (${email || 'No email'}, ${phoneNumber || 'No phone'})`);
 
-      // Construct verified email and SMS messages
-      const emailSubject = `🎉 Your Vernunt Profile & Identity Have Been Approved!`;
-      const emailContent = `Hello ${targetName},\n\nGreat news! Your ${targetRole} profile and biometric verification on Vernunt have been officially approved by our community administration team.\n\nYou can now log in to connect with neighborhood families, explore verified playdates, and join community activities:\n\nDirect Login Link: ${userLoginLink}\n\nWelcome to our safe, verified playdate community!\n- The Vernunt Safety & Community Team`;
+      const emailSubject = `✅ Your Vernunt Profile & KYC Verification Have Been Approved!`;
+      const smsText = `Vernunt Alert: Hi ${targetName}, your profile & KYC verification have been APPROVED by admin! Log in now to access playdates & activities: ${userLoginLink}`;
 
-      const smsText = `Vernunt Alert: Hi ${targetName}, your profile & verification have been APPROVED by admin! Log in now to access playdates & activities: ${userLoginLink}`;
-
-      let emailResult = { success: true, previewUrl: undefined as string | undefined };
-      if (email && email.includes('@')) {
+      let emailResult: { success: boolean; deduplicated?: boolean; logId?: string; previewUrl?: string; error?: string } = { success: true };
+      if (email && String(email).includes('@')) {
         const adminInstance = await getFirebaseAdmin();
-        emailResult = await sendEmailMessage({
-          to: email,
-          subject: emailSubject,
-          type: 'profile_approved',
-          textContent: emailContent,
-          htmlContent: `<p>Hello <strong>${targetName}</strong>,</p><p>Great news! Your <strong>${targetRole}</strong> profile and biometric verification on Vernunt have been officially approved by our community administration team.</p><p><a href="${userLoginLink}" style="display:inline-block;padding:12px 24px;background:#be123c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">Log In to Your Vernunt Account</a></p>`,
+        emailResult = await sendUserKycApprovedEmail({
+          user: {
+            id: userId,
+            parentName: targetName,
+            email,
+            userRole: targetRole
+          },
+          loginUrl: userLoginLink,
           adminInstance
         });
       }
 
       return res.json({
         success: true,
+        deduplicated: emailResult.deduplicated,
+        logId: emailResult.logId,
         previewUrl: emailResult.previewUrl,
         dispatched: {
           email: {
             to: email || "user@example.com",
             subject: emailSubject,
-            status: "delivered",
+            status: emailResult.success ? "delivered" : "failed",
             previewUrl: emailResult.previewUrl,
             timestamp: new Date().toISOString()
           },
@@ -3987,44 +4306,182 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
   });
 
   // =========================================================================
-  // EVENT E-TICKET PASS DISPATCH GATEWAY (EMAIL + SMS WITH PDF VIEWER LINKS)
+  // EVENT E-TICKET PASS DISPATCH GATEWAY (EMAIL WITH PDF TICKET + QR CODE ATTACHMENT)
   // =========================================================================
   app.post("/api/send-ticket-email", async (req, res) => {
     try {
       const { toEmail, recipientName, booking, event, ticketNumber, ticketViewUrl } = req.body || {};
-      const targetEmail = toEmail || booking?.buyerEmail || "parent@vernunt.org";
-      const targetName = recipientName || booking?.buyerName || "Parent";
-      const eventTitle = booking?.itemTitle || event?.title || "Vernunt Community Event";
-      const eventDate = booking?.dateStr || event?.date || "Scheduled Date";
-      const eventTime = booking?.timeSelected || event?.time || "All Day";
-      const eventVenue = booking?.eventVenue || event?.location || "Bangalore, India";
-      const passId = ticketNumber || booking?.ticketNumber || `VERN-EVT-${booking?.id?.slice(-6) || "PASS"}`;
-      const viewUrl = ticketViewUrl || `https://app.vernunt.com/?tab=events&ticket=${passId}`;
+      const targetEmail = String(toEmail || booking?.buyerEmail || "").trim();
+      if (!targetEmail || !targetEmail.includes("@")) {
+        return res.status(400).json({ success: false, error: "Valid recipient email address is required." });
+      }
 
-      console.log(`[Ticket Notification Engine] 📧 Dispatching E-Ticket Pass Email to ${targetEmail} for #${passId}`);
+      const targetName = String(recipientName || booking?.buyerName || "Parent").trim();
+      const childName = booking?.childName ? String(booking.childName).trim() : "";
+      const eventTitle = String(booking?.itemTitle || event?.title || "Vernunt Community Event").trim();
+      const eventCategory = String(event?.category || "Kids & Family Event").trim();
+      const eventDate = String(booking?.dateStr || event?.date || "Scheduled Date").trim();
+      const eventTime = String(booking?.timeSelected || event?.time || "All Day").trim();
+      const eventVenue = String(booking?.eventVenue || event?.location || "Bengaluru, India").trim();
+      const hostName = String(event?.hostName || "Verified Vernunt Host").trim();
+      const tierName = String(booking?.ticketTierName || booking?.tierName || "General Admission Pass").trim();
+      const quantity = Math.max(1, Number(booking?.quantity || 1));
+      const amountPaid = Math.max(0, Number(booking?.amountPaid || 0));
+      const isFree = amountPaid === 0;
+      const passId = String(ticketNumber || booking?.ticketNumber || `VERN-EVT-${booking?.id?.slice(-6) || Date.now().toString().slice(-6)}`).toUpperCase();
+      const viewUrl = String(ticketViewUrl || `https://app.vernunt.com/?tab=events&ticket=${encodeURIComponent(passId)}`);
 
-      const subject = `🎟️ Official Admission Pass #${passId}: ${eventTitle}`;
-      const emailBodyText = `Hi ${targetName},\n\nYour event booking is confirmed for "${eventTitle}".\n\nDate: ${eventDate}\nTime: ${eventTime}\nVenue: ${eventVenue}\nPass ID: #${passId}\nAmount Paid: ₹${booking?.amountPaid || 0}\n\nView and download your digital PDF pass and gate QR code here:\n${viewUrl}\n\nSee you at the event!\n- Team Vernunt`;
+      console.log(`[Ticket Notification Engine] 📧 Generating PDF Ticket + QR Code for ${targetEmail} (#${passId})`);
+
+      // Generate real PDF Admission Pass with embedded scannable QR code
+      const ticketAssets = await generateEventTicketPdfAndQr({
+        passId,
+        eventTitle,
+        eventCategory,
+        eventDate,
+        eventTime,
+        eventVenue,
+        hostName,
+        attendeeName: targetName,
+        childName,
+        buyerEmail: targetEmail,
+        buyerPhone: booking?.buyerPhone,
+        ticketTierName: tierName,
+        quantity,
+        amountPaid,
+        paymentId: booking?.paymentId || booking?.id,
+        bookingId: booking?.id,
+        eventId: booking?.itemId || event?.id,
+        ticketViewUrl: viewUrl
+      });
+
+      const subject = `🎟️ Event Ticket & QR Pass (PDF Attached) #${passId} — ${eventTitle}`;
+      const attendeeDisplay = childName && childName !== targetName ? `${childName} (Parent: ${targetName})` : targetName;
+      const feeDisplay = isFree ? 'FREE (Complimentary Verified Pass)' : `₹${amountPaid.toLocaleString('en-IN')}.00 (PAID & VERIFIED)`;
+
+      const mainHtml = `
+        <p>Hi <strong>${targetName}</strong>,</p>
+        <p>Your booking for <strong>${eventTitle}</strong> is confirmed! Your official <strong>PDF Admission Pass with scannable QR Code</strong> is attached to this email (${ticketAssets.pdfFilename}).</p>
+
+        <div class="details-card">
+          <div class="details-row"><span class="details-label">Ticket Pass ID</span><span class="details-value font-mono">#${passId}</span></div>
+          <div class="details-row"><span class="details-label">Event</span><span class="details-value">${eventTitle}</span></div>
+          <div class="details-row"><span class="details-label">Date &amp; Time</span><span class="details-value">${eventDate} • ${eventTime}</span></div>
+          <div class="details-row"><span class="details-label">Venue</span><span class="details-value">${eventVenue}</span></div>
+          <div class="details-row"><span class="details-label">Attendee</span><span class="details-value">${attendeeDisplay}</span></div>
+          <div class="details-row"><span class="details-label">Tier &amp; Quantity</span><span class="details-value">${tierName} × ${quantity}</span></div>
+          <div class="details-row"><span class="details-label">Organizer</span><span class="details-value">${hostName}</span></div>
+          <div class="details-row"><span class="details-label">Admission Fee</span><span class="details-value"><span class="status-pill status-paid">${feeDisplay}</span></span></div>
+        </div>
+
+        <div style="text-align:center;background:#ffffff;border:2px dashed #be123c;border-radius:16px;padding:20px;margin:20px 0;">
+          <div style="font-size:11px;font-weight:800;color:#be123c;letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;">
+            📱 Instant Gate Check-In QR Code
+          </div>
+          <img src="cid:vernunt-ticket-qr@vernunt.com" alt="Event Ticket QR Code #${passId}" width="180" height="180" style="display:block;margin:0 auto;border-radius:10px;border:1px solid #e2e8f0;" />
+          <div style="margin-top:10px;font-family:monospace;font-size:13px;font-weight:800;color:#0f172a;">#${passId}</div>
+          <div style="margin-top:6px;font-size:12px;color:#475569;">📎 Printable PDF Pass attached: <strong>${ticketAssets.pdfFilename}</strong></div>
+        </div>
+
+        <div class="safety-callout">
+          🛡️ <strong>Gate Entry Tip:</strong> Present either the attached PDF ticket or the QR code above at the Vernunt Gate Desk for contactless entry.
+        </div>
+      `;
+
+      const htmlContent = buildVernuntEmailTemplate({
+        title: subject,
+        badgeText: '🎟️ Confirmed Event Ticket + PDF',
+        mainContentHtml: mainHtml,
+        callToAction: { label: 'Open Live Digital Pass in App', url: viewUrl },
+        footerNote: 'Official Vernunt Event Ticket • PDF Pass with QR Code attached.'
+      });
+
+      const emailBodyText = [
+        `Hi ${targetName},`,
+        '',
+        `Your event booking is confirmed for "${eventTitle}"!`,
+        `Your official PDF Admission Pass with scannable QR code is attached (${ticketAssets.pdfFilename}).`,
+        '',
+        `Ticket Pass ID: #${passId}`,
+        `Date & Time: ${eventDate} at ${eventTime}`,
+        `Venue: ${eventVenue}`,
+        `Attendee: ${attendeeDisplay}`,
+        `Ticket Tier: ${tierName} x ${quantity}`,
+        `Admission Fee: ${feeDisplay}`,
+        '',
+        `Open Live Digital Pass: ${viewUrl}`,
+        '',
+        'Present the attached PDF ticket or QR code at the event gate desk for contactless check-in.',
+        '- Team Vernunt'
+      ].join('\n');
 
       const adminInstance = await getFirebaseAdmin();
       const sendResult = await sendEmailMessage({
         to: targetEmail,
         subject,
         type: 'event_ticket',
+        triggerSource: 'Event Booking Confirmed (PDF + QR)',
         textContent: emailBodyText,
-        htmlContent: `<p>Hi <strong>${targetName}</strong>,</p><p>Your event booking is confirmed for <strong>${eventTitle}</strong>!</p><div style="background:#f8fafc;padding:16px;border-radius:12px;margin:16px 0;"><p><strong>Pass ID:</strong> #${passId}</p><p><strong>Date & Time:</strong> ${eventDate} • ${eventTime}</p><p><strong>Venue:</strong> ${eventVenue}</p></div><p><a href="${viewUrl}" style="display:inline-block;padding:12px 24px;background:#be123c;color:#fff;text-decoration:none;border-radius:8px;font-weight:bold;">View Digital Pass &amp; QR Code</a></p>`,
+        htmlContent,
+        attachments: [
+          {
+            filename: ticketAssets.pdfFilename,
+            content: ticketAssets.pdfBuffer,
+            contentType: 'application/pdf'
+          },
+          {
+            filename: `qr-${passId}.png`,
+            content: ticketAssets.qrPngBuffer,
+            contentType: 'image/png',
+            cid: 'vernunt-ticket-qr@vernunt.com'
+          }
+        ],
         adminInstance
       });
+
+      // Also record booking into event-wise attendees ledger so Export CSV stays up to date automatically
+      const targetEventId = String(booking?.itemId || event?.id || '').trim();
+      if (targetEventId) {
+        await upsertEventAttendee({
+          id: booking?.id,
+          eventId: targetEventId,
+          eventTitle,
+          eventDate,
+          eventTime,
+          eventVenue,
+          hostName,
+          name: targetName,
+          childName: childName || targetName,
+          email: targetEmail,
+          mobile: String(booking?.buyerPhone || booking?.emergencyPhone || ''),
+          ticketNumber: passId,
+          bookingReference: passId,
+          ticketTierName: tierName,
+          quantity,
+          amountPaid,
+          paymentStatus: isFree ? 'COMPLIMENTARY' : 'PAID',
+          source: 'booking',
+          emailSent: Boolean(sendResult.success),
+          emailSentAt: sendResult.success ? new Date().toISOString() : undefined,
+          qrDataUrl: ticketAssets.qrDataUrl
+        }).catch((recErr) => console.warn('[EventAttendees] Auto-record booking note:', recErr));
+      }
 
       return res.json({
         success: true,
         toEmail: targetEmail,
         ticketNumber: passId,
         subject,
+        pdfAttached: true,
+        pdfFilename: ticketAssets.pdfFilename,
+        pdfSizeBytes: ticketAssets.pdfBuffer.length,
+        qrEmbedded: true,
+        logId: sendResult.logId,
+        deliveryStatus: sendResult.deliveryStatus,
         bodyText: emailBodyText,
         viewUrl,
         previewUrl: sendResult.previewUrl,
-        message: `E-Ticket Pass and PDF download link delivered to ${targetEmail}.`,
+        message: `Event details and QR code PDF (${ticketAssets.pdfFilename}) sent to ${targetEmail}.`,
         timestamp: new Date().toISOString()
       });
     } catch (err: any) {
@@ -4164,7 +4621,8 @@ Thank you for asking about **"${message.slice(0, 60)}${message.length > 60 ? '..
       const sendResult = await sendEmailMessage({
         to: targetEmail,
         subject,
-        type: 'general',
+        type: 'vendor_agreement',
+        triggerSource: 'Vendor Agreement Signed',
         textContent: emailBodyText,
         htmlContent: emailHtml,
         attachments,

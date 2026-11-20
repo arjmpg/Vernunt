@@ -11,7 +11,7 @@ import {
   ShoppingCart, ShoppingBag, HelpCircle, MoreHorizontal, ExternalLink, Settings,
   CreditCard, Key, Server, CheckSquare, Square, Filter, ChevronLeft,
   ChevronRight, ArrowUpRight, Copy, Share2, Plus, X, ArrowUp, ArrowDown,
-  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins, Scale
+  Tag, Clock, Zap, Palette, Ticket, BookOpen, Menu, Coins, Scale, Mail
 } from 'lucide-react';
 import { db, handleFirestoreError, OperationType, auth } from '../utils/firebase.ts';
 import { doc, setDoc, updateDoc, collection, onSnapshot, deleteDoc } from 'firebase/firestore';
@@ -52,6 +52,7 @@ import SpecialistClaimsAdminModal from './SpecialistClaimsAdminModal.tsx';
 import AdminKidStoriesDesk from './admin/AdminKidStoriesDesk.tsx';
 import AdminVisualCmsDesk from './admin/AdminVisualCmsDesk.tsx';
 import AdminMerchantHubDesk from './admin/AdminMerchantHubDesk.tsx';
+import AdminEmailLogsDesk from './admin/AdminEmailLogsDesk.tsx';
 import WordPressHeadlessManagerModal from './admin/WordPressHeadlessManagerModal.tsx';
 import { 
   isAuthorizedSystemAdmin, 
@@ -84,8 +85,8 @@ export default function AdminDashboard({
   const isSuperAdminAuthorized = isAuthorizedSystemAdmin(auth.currentUser?.email, userProfile?.userRole);
   
   // Navigation Menu States
-  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | contacts | security | backups | settings | seo | visual-cms | merchant-hub
-  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo' | 'visual-cms' | 'merchant-hub'>('dashboard');
+  // Main Sections: dashboard | users | child-safety | events | woocommerce | commerce-engine | product-searches | affiliates | subscriptions | coupons | knowledge-hub | kid-stories | broadcast | email-logs | contacts | security | backups | settings | seo | visual-cms | merchant-hub
+  const [activeMenu, setActiveMenu] = useState<'dashboard' | 'users' | 'child-safety' | 'events' | 'woocommerce' | 'commerce-engine' | 'product-searches' | 'affiliates' | 'subscriptions' | 'coupons' | 'knowledge-hub' | 'kid-stories' | 'broadcast' | 'email-logs' | 'contacts' | 'security' | 'backups' | 'settings' | 'seo' | 'visual-cms' | 'merchant-hub'>('dashboard');
   const [activeSubTab, setActiveSubTab] = useState<string>('all');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -425,6 +426,14 @@ export default function AdminDashboard({
   const [adminPhone, setAdminPhone] = useState<string>(userProfile?.phoneNumber || '8073749074');
   const [isSavingPhone, setIsSavingPhone] = useState(false);
 
+  // Admin Sign-Up Email Trigger Settings & Audit Logs
+  const [emailTriggerEnabled, setEmailTriggerEnabled] = useState<boolean>(true);
+  const [emailTriggerRecipientsInput, setEmailTriggerRecipientsInput] = useState<string>('arjunmpgupta@gmail.com, ardha@vernunt.com');
+  const [emailTriggerLogs, setEmailTriggerLogs] = useState<any[]>([]);
+  const [smtpConfigured, setSmtpConfigured] = useState<boolean>(false);
+  const [isSavingEmailTrigger, setIsSavingEmailTrigger] = useState<boolean>(false);
+  const [isSendingTestEmail, setIsSendingTestEmail] = useState<boolean>(false);
+
   // =================== FIRESTORE LISTENERS ===================
 
   // 1. Sync Emergency Lockdown
@@ -569,6 +578,29 @@ export default function AdminDashboard({
       .catch(e => console.debug('Knowledge articles server sync note:', e));
   }, []);
 
+  const refreshAdminEmailTriggers = async () => {
+    try {
+      const resp = await fetch('/api/admin/email-triggers');
+      const data = await resp.json().catch(() => null);
+      if (resp.ok && data?.success) {
+        setEmailTriggerEnabled(data.enabled !== false);
+        if (Array.isArray(data.recipients) && data.recipients.length > 0) {
+          setEmailTriggerRecipientsInput(data.recipients.join(', '));
+        }
+        setSmtpConfigured(Boolean(data.smtpConfigured));
+        setEmailTriggerLogs(Array.isArray(data.logs) ? data.logs : []);
+      }
+    } catch (e) {
+      console.debug('Admin email triggers sync note:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (activeMenu === 'settings') {
+      refreshAdminEmailTriggers();
+    }
+  }, [activeMenu]);
+
   // =================== HANDLERS ===================
 
   const showNotification = (type: 'success' | 'warning' | 'error' | 'info', message: string) => {
@@ -656,14 +688,18 @@ export default function AdminDashboard({
         return [updatePayload, ...prev];
       });
 
-      // Synchronize with backend server store
+      // Synchronize with backend server store (also sends user approval/rejection email automatically)
       fetch('/api/users/kyc-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: selectedUser.id,
           verificationStatus: targetVerification,
-          aadhaarVerified: targetAadhaarVerified
+          aadhaarVerified: targetAadhaarVerified,
+          email: updatePayload.email,
+          parentName: updatePayload.parentName,
+          userRole: updatePayload.userRole,
+          loginUrl: window.location.origin
         })
       }).catch(e => console.debug('Backend review sync note:', e));
       
@@ -687,14 +723,23 @@ export default function AdminDashboard({
       for (const id of selectedUserIds) {
         const userRef = doc(db, 'users', id);
         if (bulkAction === 'verify') {
+          const targetUser = allUsers.find(u => u.id === id);
           await updateDoc(userRef, {
             verificationStatus: VerificationStatus.VERIFIED,
             aadhaarVerified: true
-          });
+          }).catch(() => {});
           fetch('/api/users/kyc-review', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: id, verificationStatus: 'VERIFIED', aadhaarVerified: true })
+            body: JSON.stringify({
+              userId: id,
+              verificationStatus: 'VERIFIED',
+              aadhaarVerified: true,
+              email: targetUser?.email,
+              parentName: targetUser?.parentName,
+              userRole: targetUser?.userRole,
+              loginUrl: window.location.origin
+            })
           }).catch(() => {});
         } else if (bulkAction === 'block') {
           await updateDoc(userRef, {
@@ -1951,6 +1996,28 @@ export default function AdminDashboard({
               )}
             </button>
 
+            {/* MENU ITEM: Real-Time Email Logs & Read Tracker */}
+            <button
+              type="button"
+              onClick={() => { setActiveMenu('email-logs'); setIsMobileMenuOpen(false); }}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 md:py-2 text-left transition cursor-pointer ${
+                activeMenu === 'email-logs'
+                  ? 'bg-[#2271b1] text-white font-bold border-l-4 border-sky-300 shadow-md'
+                  : 'hover:bg-[#135e96] hover:text-white'
+              }`}
+              title="Real-Time Outgoing Email Logs, Delivery Status & Read Tracker"
+            >
+              <Mail className="w-4 h-4 shrink-0 text-sky-300" />
+              {(isMobileMenuOpen || !isSidebarCollapsed) && (
+                <div className="flex items-center justify-between w-full">
+                  <span>Email Logs</span>
+                  <span className="bg-sky-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">
+                    Live
+                  </span>
+                </div>
+              )}
+            </button>
+
             {/* MENU ITEM: Settings & Tabs */}
             <button
               type="button"
@@ -2082,6 +2149,15 @@ export default function AdminDashboard({
               }`}
             >
               Merchant Hub
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveMenu('email-logs')}
+              className={`px-2.5 py-1.5 rounded text-xs font-medium shrink-0 transition cursor-pointer ${
+                activeMenu === 'email-logs' ? 'bg-[#2271b1] text-white font-bold' : 'bg-white text-slate-700 border border-slate-200 shadow-2xs'
+              }`}
+            >
+              Email Logs
             </button>
           </div>
           
@@ -3306,6 +3382,7 @@ export default function AdminDashboard({
           {activeMenu === 'events' && (
             <AdminTicketingCommissionDesk
               eventsList={eventsList}
+              userProfile={userProfile}
               onUpdateEvent={handleUpdateEvent}
               ticketingConfig={ticketingConfig}
               onSaveConfig={handleSaveTicketingConfig}
@@ -5940,6 +6017,162 @@ export default function AdminDashboard({
                   </button>
                 </div>
               </div>
+
+              {/* Admin New-User Sign-Up Email Trigger & Delivery Logs */}
+              <div className="bg-white border border-[#c3c4c7] p-5 rounded-xs space-y-4 shadow-2xs text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#f0f0f1] pb-3">
+                  <div>
+                    <h3 className="font-bold text-[#1d2327] uppercase flex items-center gap-1.5">
+                      <Mail className="w-4 h-4 text-[#2271b1]" />
+                      New User Sign-Up Admin Email Trigger
+                    </h3>
+                    <p className="text-[11px] text-[#646970] mt-0.5">
+                      Automatically dispatches an instant email to admin(s) whenever any new account signs up via Onboarding, Quick Auth, Vendor, Host, or Care Portals.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEmailTriggerEnabled(prev => !prev)}
+                    className={`px-3 py-1.5 rounded-xs font-bold border transition cursor-pointer flex items-center gap-1.5 ${
+                      emailTriggerEnabled
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                        : 'bg-[#f6f7f7] text-[#646970] border-[#c3c4c7]'
+                    }`}
+                  >
+                    {emailTriggerEnabled ? <ToggleRight className="w-4 h-4 text-emerald-600" /> : <ToggleLeft className="w-4 h-4" />}
+                    <span>{emailTriggerEnabled ? 'Trigger Active' : 'Trigger Paused'}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block font-bold text-[#2c3338]">
+                    Admin Notification Email Recipient(s) (comma-separated)
+                  </label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input
+                      type="text"
+                      value={emailTriggerRecipientsInput}
+                      onChange={e => setEmailTriggerRecipientsInput(e.target.value)}
+                      placeholder="arjunmpgupta@gmail.com, ardha@vernunt.com"
+                      className="flex-1 p-2 bg-[#f6f7f7] border border-[#8c8f94] rounded-xs font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      disabled={isSavingEmailTrigger}
+                      onClick={async () => {
+                        setIsSavingEmailTrigger(true);
+                        try {
+                          const resp = await fetch('/api/admin/email-triggers', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              enabled: emailTriggerEnabled,
+                              recipients: emailTriggerRecipientsInput
+                            })
+                          });
+                          const data = await resp.json().catch(() => null);
+                          if (resp.ok && data?.success) {
+                            setEmailTriggerRecipientsInput((data.recipients || []).join(', '));
+                            showNotification('success', `Saved admin sign-up email trigger (${(data.recipients || []).join(', ')})`);
+                          } else {
+                            showNotification('error', data?.error || 'Could not update email trigger settings');
+                          }
+                        } catch (err: any) {
+                          showNotification('error', err?.message || 'Network error saving trigger settings');
+                        } finally {
+                          setIsSavingEmailTrigger(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-[#2271b1] hover:bg-[#135e96] text-white font-bold rounded-xs transition cursor-pointer shrink-0"
+                    >
+                      {isSavingEmailTrigger ? 'Saving...' : 'Save Trigger'}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isSendingTestEmail}
+                      onClick={async () => {
+                        setIsSendingTestEmail(true);
+                        try {
+                          const resp = await fetch('/api/admin/email-triggers/test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ recipients: emailTriggerRecipientsInput })
+                          });
+                          const data = await resp.json().catch(() => null);
+                          if (resp.ok && data?.success) {
+                            if (Array.isArray(data.logs)) setEmailTriggerLogs(data.logs);
+                            showNotification('success', `Test sign-up email dispatched to ${(data.recipients || []).join(', ')}`);
+                          } else {
+                            showNotification('error', data?.error || 'Failed to dispatch test alert');
+                          }
+                        } catch (err: any) {
+                          showNotification('error', err?.message || 'Network error sending test email');
+                        } finally {
+                          setIsSendingTestEmail(false);
+                        }
+                      }}
+                      className="px-4 py-2 bg-[#f6f7f7] hover:bg-[#f0f0f1] border border-[#2271b1] text-[#2271b1] font-bold rounded-xs transition cursor-pointer shrink-0 flex items-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>{isSendingTestEmail ? 'Sending...' : 'Send Test Alert'}</span>
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-[#646970]">
+                    Sender: <span className="font-mono font-semibold">vernunt@gmail.com</span> • Delivery Engine:{' '}
+                    {smtpConfigured
+                      ? 'Direct Gmail SMTP active + Firestore Trigger Email (`mail` collection).'
+                      : 'Firestore Trigger Email queue (`mail` collection) + local preview (add a 16-char Google App Password to SMTP_PASS in Environment Variables for direct Gmail inbox delivery).'}
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-[#f0f0f1]">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="font-bold text-[#1d2327] uppercase text-[11px]">Recent Email Dispatch Logs</h4>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setActiveMenu('email-logs')}
+                        className="text-[11px] font-bold text-[#2271b1] hover:underline cursor-pointer"
+                      >
+                        Open Live Email Logs &amp; Read Tracker →
+                      </button>
+                      <button
+                        type="button"
+                        onClick={refreshAdminEmailTriggers}
+                        className="text-[11px] text-[#2271b1] hover:underline flex items-center gap-1 cursor-pointer"
+                      >
+                        <RefreshCw className="w-3 h-3" /> Refresh
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto border border-[#dcdcde] rounded-xs divide-y divide-[#f0f0f1]">
+                    {emailTriggerLogs.length === 0 ? (
+                      <div className="p-3 text-center text-[11px] text-[#646970]">
+                        No email trigger events recorded yet in this session. Sign up a new account or click &ldquo;Send Test Alert&rdquo;.
+                      </div>
+                    ) : (
+                      emailTriggerLogs.slice(0, 15).map((log, idx) => (
+                        <div key={log.id || idx} className="p-2.5 flex items-center justify-between gap-3 text-[11px] bg-white hover:bg-[#f6f7f7]">
+                          <div className="min-w-0">
+                            <div className="font-bold text-[#1d2327] truncate">{log.subject}</div>
+                            <div className="text-[#646970] truncate">
+                              To: <span className="font-mono">{log.to}</span> • Type: {log.type}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="inline-block px-1.5 py-0.5 rounded-xs font-bold uppercase text-[9px] bg-emerald-100 text-emerald-800">
+                              {log.status}
+                            </span>
+                            <div className="text-[10px] text-[#8c8f94] mt-0.5">
+                              {log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : ''}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -5967,6 +6200,15 @@ export default function AdminDashboard({
           {activeMenu === 'merchant-hub' && (
             <div className="space-y-4 animate-fadeIn">
               <AdminMerchantHubDesk />
+            </div>
+          )}
+
+          {/* ========================================================= */}
+          {/* VIEW O: REAL-TIME OUTGOING EMAIL LOGS & READ TRACKER      */}
+          {/* ========================================================= */}
+          {activeMenu === 'email-logs' && (
+            <div className="space-y-4 animate-fadeIn">
+              <AdminEmailLogsDesk />
             </div>
           )}
 
@@ -6096,6 +6338,19 @@ export default function AdminDashboard({
                         }, { merge: true });
                         setTargetVerification(VerificationStatus.VERIFIED);
                         setTargetAadhaarVerified(true);
+                        fetch('/api/users/kyc-review', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            userId: selectedUser.id,
+                            verificationStatus: 'VERIFIED',
+                            aadhaarVerified: true,
+                            email: selectedUser.email,
+                            parentName: selectedUser.parentName,
+                            userRole: selectedUser.userRole,
+                            loginUrl: window.location.origin
+                          })
+                        }).catch(() => {});
                         await sendApprovalNotification(selectedUser);
                       } catch (e: any) {
                         showNotification('error', e.message);
@@ -6208,6 +6463,19 @@ export default function AdminDashboard({
                             }, { merge: true });
                             setTargetVerification(VerificationStatus.VERIFIED);
                             setTargetAadhaarVerified(true);
+                            fetch('/api/users/kyc-review', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                userId: selectedUser.id,
+                                verificationStatus: 'VERIFIED',
+                                aadhaarVerified: true,
+                                email: selectedUser.email,
+                                parentName: selectedUser.parentName,
+                                userRole: selectedUser.userRole,
+                                loginUrl: window.location.origin
+                              })
+                            }).catch(() => {});
                             await sendApprovalNotification(selectedUser);
                             showNotification('success', `Aadhaar document verified and approved for ${selectedUser.parentName}!`);
                           } catch (e: any) {

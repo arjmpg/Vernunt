@@ -1,98 +1,1105 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
-    <title>Vernunt Store Official Product Feed</title>
-    <link>https://app.vernunt.com/store</link>
-    <description>Verified child play gear, organic toddler nutrition, and child safety equipment on Vernunt.</description>
-    <lastBuildDate>Mon, 26 Oct 2026 17:17:19 GMT</lastBuildDate>
-    <atom:link href="https://app.vernunt.com/google-merchant-feed.xml" rel="self" type="application/rss+xml" />
+    <title>Vernunt Store Official Product Feed (Merchant Center ID: 5909118279)</title>
+    <g:merchant_id>5909118279</g:merchant_id>
+    <link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store</link>
+    <description>Verified child play gear, organic toddler nutrition, Montessori STEM kits, and child safety equipment on Vernunt.</description>
+    <lastBuildDate>Fri, 20 Nov 2026 01:01:05 GMT</lastBuildDate>
+    <atom:link href="https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/google-merchant-feed.xml" rel="self" type="application/rss+xml" />
     <item>
-      <g:id>VRN-FOOD-001</g:id>
-      <g:title>Organic Sprouted Ragi & Almond Baby Porridge Mix</g:title>
-      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
-      <g:link>https://app.vernunt.com/store/organic-sprouted-ragi-almond-baby-porridge</g:link>
-      <g:image_link>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:id>VRN-TEETH-01</g:id>
+      <g:title>Wooden Teether</g:title>
+      <g:description>100% organic beechwood teether with food-grade pastel silicone beads. Chemical-free, splinter-free, soothing for tender gums.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/natural-wooden-teether-ring</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
       <g:availability>in_stock</g:availability>
-      <g:price>349.00 INR</g:price>
-      <g:google_product_category>Food, Beverages & Tobacco > Food Items > Baby & Toddler Food</g:google_product_category>
+      <g:price>499.00 INR</g:price>
+      <g:sale_price>299.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
       <g:brand>Vernunt</g:brand>
       <g:condition>new</g:condition>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-TEETH-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
       <g:shipping>
         <g:country>IN</g:country>
-        <g:service>Standard Delivery</g:service>
+        <g:service>Standard Courier Delivery</g:service>
         <g:price>0.00 INR</g:price>
       </g:shipping>
     </item>
     <item>
-      <g:id>VRN-CLOTH-001</g:id>
-      <g:title>100% Organic Bamboo Cotton Infant Romper & Jumpsuit Set</g:title>
-      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
-      <g:link>https://app.vernunt.com/store/organic-cotton-infant-romper-set</g:link>
-      <g:image_link>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:id>VRN-CLOTH-SET-01</g:id>
+      <g:title>Baby Clothing Set</g:title>
+      <g:description>100% breathable organic combed cotton 3-piece daily wear set with nickel-free snaps and tagless comfort.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-organic-cotton-baby-clothing-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
       <g:availability>in_stock</g:availability>
-      <g:price>699.00 INR</g:price>
-      <g:google_product_category>Apparel & Accessories > Clothing > Baby & Toddler Clothing</g:google_product_category>
+      <g:price>999.00 INR</g:price>
+      <g:sale_price>799.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
       <g:brand>Vernunt</g:brand>
       <g:condition>new</g:condition>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-SET-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
       <g:shipping>
         <g:country>IN</g:country>
-        <g:service>Standard Delivery</g:service>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-STACK-01</g:id>
+      <g:title>Learning Stacking Toy</g:title>
+      <g:description>Montessori-inspired color gradient stacking tower supporting fine motor coordination, spatial logic, and color recognition.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/rainbow-developmental-stacking-rings</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>799.00 INR</g:price>
+      <g:sale_price>649.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-STACK-01</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-WASH-01</g:id>
+      <g:title>Organic Baby Wash &amp; Lotion</g:title>
+      <g:description>Dermatologist-tested tear-free foaming cleanser paired with ultra-hydrating calendula and shea butter lotion.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/gentle-calendula-baby-wash-lotion-duo</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>599.00 INR</g:price>
+      <g:sale_price>499.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-WASH-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CHAIR-01</g:id>
+      <g:title>Baby High Chair</g:title>
+      <g:description>Multi-stage convertible high chair with 5-point safety harness, removable dishwasher-safe food tray, and wipe-clean leatherette cushion.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/ergonomic-convertible-baby-high-chair</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>4999.00 INR</g:price>
+      <g:sale_price>4499.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CHAIR-01</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-STROLL-01</g:id>
+      <g:title>Stroller</g:title>
+      <g:description>One-hand compact folding stroller with multi-recline backrest, all-wheel suspension, and UPF 50+ extendable canopy.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/lightweight-compact-fold-travel-stroller</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>9999.00 INR</g:price>
+      <g:sale_price>8999.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-STROLL-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-RATTLE-01</g:id>
+      <g:title>Rattle Set</g:title>
+      <g:description>Set of 3 soothing auditory rattles made of natural neem wood with melodic gentle chimes that nurture hearing development.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/montessori-auditory-wooden-rattle-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>499.00 INR</g:price>
+      <g:sale_price>399.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-RATTLE-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-SWADDLE-01</g:id>
+      <g:title>Muslin Swaddle</g:title>
+      <g:description>Super-soft pre-washed organic bamboo muslin swaddle blanket (120x120cm) that gets softer with every wash.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-organic-bamboo-muslin-swaddle</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>899.00 INR</g:price>
+      <g:sale_price>699.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-SWADDLE-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARR-01</g:id>
+      <g:title>Baby Carrier</g:title>
+      <g:description>Hip-healthy certified M-position baby carrier with padded crossover shoulder straps and breathable 3D mesh airflow panel.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/ergonomic-lumbar-support-baby-carrier</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>3499.00 INR</g:price>
+      <g:sale_price>2999.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARR-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-MITT-01</g:id>
+      <g:title>Teething Mitts</g:title>
+      <g:description>Food-grade textured silicone teething mitt with crinkle sound sensory fabric and adjustable stay-on velcro strap.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/stay-on-sensory-silicone-teething-mitten</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>599.00 INR</g:price>
+      <g:sale_price>449.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-MITT-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-BLANK-01</g:id>
+      <g:title>Baby Blanket</g:title>
+      <g:description>Heirloom quality 100% combed cotton cable-knit blanket with breathable thermal warmth and silky bound edges.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-cotton-cable-knit-baby-blanket</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1499.00 INR</g:price>
+      <g:sale_price>1299.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-BLANK-01</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-BLOCKS-01</g:id>
+      <g:title>Wooden Blocks</g:title>
+      <g:description>Classic 50-piece solid hardwood building block set with smooth sanded beveled edges in a canvas storage sack.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/solid-hardwood-geometric-building-blocks</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>999.00 INR</g:price>
+      <g:sale_price>799.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Toys &amp; Games</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-BLOCKS-01</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Toys &amp; Games</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-ROMP-01</g:id>
+      <g:title>Cotton Romper</g:title>
+      <g:description>Breathable lightweight organic cotton one-piece romper with two-way easy diaper change zip and chin guard.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-cotton-printed-infant-romper</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1199.00 INR</g:price>
+      <g:sale_price>999.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-ROMP-01</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-001</g:id>
+      <g:title>Organic Sprouted Ragi &amp; Almond Baby Porridge Mix (Stage 1 &amp; 2)</g:title>
+      <g:description>100% whole sprouted ragi with Californian almonds and cardamom. No added sugar, no milk solids, pediatrician approved.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-sprouted-ragi-almond-baby-porridge</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>499.00 INR</g:price>
+      <g:sale_price>349.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-001</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-002</g:id>
+      <g:title>Freeze-Dried 100% Real Strawberry &amp; Alphonso Mango Toddler Melts</g:title>
+      <g:description>Melt-in-mouth real fruit cubes retaining 98% raw vitamins. No added sugar or preservatives. Great for pincer grasp development.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/freeze-dried-strawberry-mango-melts</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1589733955941-5eeaf752f6dd?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>399.00 INR</g:price>
+      <g:sale_price>228.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-002</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-003</g:id>
+      <g:title>Organic Foxtail Millet &amp; Palm Jaggery Teething Rusks with Cardamom</g:title>
+      <g:description>Gentle on sore gums during teething. Baked whole grain millet sweetened mildly with iron-rich organic palm jaggery.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/foxtail-millet-teething-rusks</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>349.00 INR</g:price>
+      <g:sale_price>249.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-003</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-004</g:id>
+      <g:title>Sprouted Nut, Seed &amp; Raw Cacao Brain Growth Superfood Powder (1y - 10y)</g:title>
+      <g:description>Rich in plant DHA, Omega-3, Calcium &amp; Protein. Mix 1 spoon in daily warm milk or smoothie. 100% natural, no maltodextrin.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/sprouted-nut-seed-cacao-brain-superfood</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>699.00 INR</g:price>
+      <g:sale_price>499.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-004</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-005</g:id>
+      <g:title>Crispy Little Millet &amp; Beetroot Star Puffs (Creamy Tomato &amp; Herb)</g:title>
+      <g:description>100% roasted organic millet stars dusted with freeze-dried tomato and basil. Zero maida, zero palm oil, school snack safe.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/crispy-little-millet-star-puffs</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>280.00 INR</g:price>
+      <g:sale_price>199.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-005</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FOOD-006</g:id>
+      <g:title>Natural Pectin Real Fruit Jellies with Vitamin C &amp; Zinc (Berry Burst)</g:title>
+      <g:description>100% vegan gummy bites made with citrus pectin and real apple-strawberry juice. Immunity booster for kids 3y+.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/natural-pectin-real-fruit-jellies-immunity</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1582058091505-f87a2e55a40f?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>450.00 INR</g:price>
+      <g:sale_price>329.00 INR</g:sale_price>
+      <g:google_product_category>Food, Beverages &amp; Tobacco &gt; Food Items &gt; Baby &amp; Toddler Food</g:google_product_category>
+      <g:product_type>Kids Food &amp; Organic Nutrition</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FOOD-006</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Food &amp; Organic Nutrition</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
         <g:price>0.00 INR</g:price>
       </g:shipping>
     </item>
     <item>
       <g:id>VRN-STEM-001</g:id>
-      <g:title>Montessori Wooden Sensory Busy Board & Motor Agility Board</g:title>
-      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
-      <g:link>https://app.vernunt.com/store/montessori-wooden-sensory-activity-board</g:link>
-      <g:image_link>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:title>Vernunt STEM Explorer: 6-in-1 Solar Robotics &amp; Logic Kit</g:title>
+      <g:description>Hands-on DIY solar &amp; battery dual-power robotic set teaching mechanical gears and clean energy.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/stem-explorer-solar-robotics-kit</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1532094349884-543bc11b234d?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1581092335397-9583fe92d232?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
       <g:availability>in_stock</g:availability>
-      <g:price>1299.00 INR</g:price>
-      <g:google_product_category>Toys & Games > Toys > Educational Toys</g:google_product_category>
+      <g:price>2199.00 INR</g:price>
+      <g:sale_price>1275.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys &gt; Educational Toys</g:google_product_category>
+      <g:product_type>Montessori &amp; STEM</g:product_type>
       <g:brand>Vernunt</g:brand>
       <g:condition>new</g:condition>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-STEM-001</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Montessori &amp; STEM</g:custom_label_1>
       <g:shipping>
         <g:country>IN</g:country>
-        <g:service>Standard Delivery</g:service>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-MONT-002</g:id>
+      <g:title>Organic Neem Wood Sensory Balancing Stones &amp; Rainbow Blocks (18 Pcs)</g:title>
+      <g:description>Handcrafted smooth non-toxic wooden tactile blocks for motor skill precision and spatial balance.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-wooden-sensory-balancing-stones</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1399.00 INR</g:price>
+      <g:sale_price>899.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys &gt; Educational Toys</g:google_product_category>
+      <g:product_type>Montessori &amp; STEM</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-MONT-002</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Montessori &amp; STEM</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-ART-003</g:id>
+      <g:title>Mess-Free Sensory Modeling Clay &amp; Pottery Sculpting Studio</g:title>
+      <g:description>Air-dry wheat-based modeling clay with 24 vibrant hues, 10 sculpting tools, and ceramic varnish.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/mess-free-modeling-clay-sculpting-studio</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1560421683-680b9c814e52?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>999.00 INR</g:price>
+      <g:sale_price>649.00 INR</g:sale_price>
+      <g:google_product_category>Arts &amp; Entertainment &gt; Hobbies &amp; Creative Arts &gt; Arts &amp; Crafts</g:google_product_category>
+      <g:product_type>Art &amp; Creative Craft</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-ART-003</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Art &amp; Creative Craft</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-BOK-004</g:id>
+      <g:title>Indian Wildlife &amp; Moral Tales Bilingual Hardcover Library (Set of 6 Books)</g:title>
+      <g:description>Vibrantly illustrated bilingual stories celebrating Indian flora, fauna, kindness, and courage.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/indian-wildlife-moral-tales-bilingual-library</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1799.00 INR</g:price>
+      <g:sale_price>1199.00 INR</g:sale_price>
+      <g:google_product_category>Media &gt; Books &gt; Print Books</g:google_product_category>
+      <g:product_type>Books &amp; Story Sets</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-BOK-004</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Books &amp; Story Sets</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-SAF-005</g:id>
+      <g:title>Complete Toddler Home Childproofing &amp; Corner Safety Suite (36 Pcs)</g:title>
+      <g:description>High-density transparent corner cushions, multi-surface strap locks, and socket cover shields with 3M VHB tape.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/complete-toddler-childproofing-corner-safety-suite</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1199.00 INR</g:price>
+      <g:sale_price>749.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Child Safety &amp; Care</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-SAF-005</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Child Safety &amp; Care</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-GER-006</g:id>
+      <g:title>Vernunt Junior Agility &amp; Playmate Sports Cone &amp; Goal Set</g:title>
+      <g:description>Pop-up foldable football goal, 10 soft training cones, mini ball with pump, and agility ladder.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/junior-agility-playmate-sports-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1999.00 INR</g:price>
+      <g:sale_price>1299.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Playdate &amp; Outdoor Gear</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-GER-006</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Playdate &amp; Outdoor Gear</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-DIG-007</g:id>
+      <g:title>1000+ Screen-Free Developmental Play &amp; Sensory Activity Mega Bundle (Digital Download)</g:title>
+      <g:description>Instant high-resolution PDF printables, milestone journals, chore charts, and flashcards across all age groups.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/screen-free-developmental-play-sensory-activity-bundle</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>999.00 INR</g:price>
+      <g:sale_price>349.00 INR</g:sale_price>
+      <g:google_product_category>Toys &amp; Games &gt; Toys</g:google_product_category>
+      <g:product_type>Digital Activity Kits</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-DIG-007</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Digital Activity Kits</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-FEE-008</g:id>
+      <g:title>Organic Bamboo &amp; Food-Grade Silicone Baby Weaning Suction Bowl &amp; Cutlery Set</g:title>
+      <g:description>Super-grip anti-spill suction base with soft ergonomic gum-friendly silicone training spoon and fork.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-bamboo-silicone-baby-weaning-bowl-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&amp;fit=crop&amp;q=80&amp;w=800</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1299.00 INR</g:price>
+      <g:sale_price>799.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Child Safety &amp; Care</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-FEE-008</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Child Safety &amp; Care</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-B01</g:id>
+      <g:title>Boys 100% Organic Cotton Dino Adventure T-Shirt &amp; Shorts Set</g:title>
+      <g:description>Certified GOTS organic cotton combo with playful dinosaur screen-print and elasticated drawstring shorts.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-organic-cotton-dino-tshirt-shorts-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>999.00 INR</g:price>
+      <g:sale_price>699.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-B01</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-B02</g:id>
+      <g:title>Boys Handwoven Linen Festive Kurta &amp; Dhoti Pants Set</g:title>
+      <g:description>Traditional Indian festive wear woven in breathable organic linen-cotton blend with malmal inner lining.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-handwoven-linen-festive-kurta-dhoti</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:additional_image_link>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:additional_image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1699.00 INR</g:price>
+      <g:sale_price>1199.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-B02</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-B03</g:id>
+      <g:title>Boys Polar-Fleece Zip Hoodie &amp; Joggers Winter Tracksuit</g:title>
+      <g:description>Thermal double-brushed cotton-fleece tracksuit with chin-guard zip protector and deep pockets.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-polar-fleece-zip-hoodie-joggers-tracksuit</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1399.00 INR</g:price>
+      <g:sale_price>949.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-B03</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-B04</g:id>
+      <g:title>Boys Active Play Pique Cotton Polo &amp; Cargo Shorts Set</g:title>
+      <g:description>Smart collar polo with pure cotton multi-pocket cargo shorts for playgrounds and playdates.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-active-play-cotton-polo-cargo-shorts</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1471286174890-9c112ffca564?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1199.00 INR</g:price>
+      <g:sale_price>799.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-B04</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-G01</g:id>
+      <g:title>Girls Botanical Floral Pure Organic Cotton Twirl Dress with Ribbon Sash</g:title>
+      <g:description>A-line flared twirl dress with hand-drawn botanical floral print and featherweight malmal cotton lining.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-botanical-floral-organic-cotton-twirl-dress</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1299.00 INR</g:price>
+      <g:sale_price>849.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-G01</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-G02</g:id>
+      <g:title>Girls Festive Handloom Chanderi Anarkali &amp; Dupatta Set (Soft Cotton Lining)</g:title>
+      <g:description>Royal festive attire featuring gold gota patti work with 100% cotton voile lining for complete itch-free comfort.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-festive-chanderi-anarkali-dupatta-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>2199.00 INR</g:price>
+      <g:sale_price>1449.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-G02</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-G03</g:id>
+      <g:title>Girls Pastel Butterfly Knit Romper Dungarees &amp; Striped Tee 2-Piece Set</g:title>
+      <g:description>Cute pastel overalls with delicate butterfly embroidery and button strap adjustment.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-pastel-butterfly-romper-dungarees-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1299.00 INR</g:price>
+      <g:sale_price>899.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-G03</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CLOTH-G04</g:id>
+      <g:title>Girls Ruffled Peplum Top &amp; Wide-Leg Culottes Co-ord Set</g:title>
+      <g:description>Modern vacation and playdate co-ord set in breathable slub cotton with flutter ruffle sleeves.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-ruffled-peplum-culottes-coord-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1543332164-6e82f355badc?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1099.00 INR</g:price>
+      <g:sale_price>749.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Clothing &gt; Baby &amp; Toddler Clothing</g:google_product_category>
+      <g:product_type>Kids Clothing</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CLOTH-G04</g:mpn>
+      <g:age_group>kids</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Clothing</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
         <g:price>0.00 INR</g:price>
       </g:shipping>
     </item>
     <item>
       <g:id>VRN-JEWEL-001</g:id>
-      <g:title>Hallmarked 925 Pure Silver Baby Nazariya Evil Eye Bangles</g:title>
-      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
-      <g:link>https://app.vernunt.com/store/hallmarked-925-silver-baby-nazariya-bangles</g:link>
-      <g:image_link>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:title>925 Pure Sterling Silver Baby Nazariya Anklet &amp; Bracelet Set (Black Beads)</g:title>
+      <g:description>Traditional 925 hallmarked sterling silver protection evil-eye nazariya with hand-strung black glass beads and smooth rounded ball ends.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/925-pure-sterling-silver-baby-nazariya-set</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
       <g:availability>in_stock</g:availability>
-      <g:price>899.00 INR</g:price>
-      <g:google_product_category>Apparel & Accessories > Jewelry</g:google_product_category>
+      <g:price>1299.00 INR</g:price>
+      <g:sale_price>899.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Jewelry</g:google_product_category>
+      <g:product_type>Kids Jewellery</g:product_type>
       <g:brand>Vernunt</g:brand>
       <g:condition>new</g:condition>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-JEWEL-001</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Jewellery</g:custom_label_1>
       <g:shipping>
         <g:country>IN</g:country>
-        <g:service>Standard Delivery</g:service>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-JEWEL-002</g:id>
+      <g:title>Hypoallergenic 925 Silver Enamel Butterfly Safety Screw-Back Baby Studs</g:title>
+      <g:description>Flat-backed covered screw safety studs in 925 silver with non-toxic pastel enamel butterfly.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/hypoallergenic-925-silver-butterfly-safety-studs</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1630019852942-f89202989a59?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1099.00 INR</g:price>
+      <g:sale_price>749.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Jewelry</g:google_product_category>
+      <g:product_type>Kids Jewellery</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-JEWEL-002</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Jewellery</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-JEWEL-003</g:id>
+      <g:title>Pure Silver Melodic Ghungroo Baby Payal with Soft Tinkling Bells (Pair)</g:title>
+      <g:description>Traditional pair of handcrafted 925 silver payal with soothing chime bells and secure child-safe clasp.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-silver-melodic-ghungroo-baby-payal-pair</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1611591475880-92815124b426?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>1899.00 INR</g:price>
+      <g:sale_price>1299.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Jewelry</g:google_product_category>
+      <g:product_type>Kids Jewellery</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-JEWEL-003</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Jewellery</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-JEWEL-004</g:id>
+      <g:title>18K Gold Plated Little Star &amp; Moon Adjustable Baby Charm Bracelet</g:title>
+      <g:description>Anti-tarnish 18K micron gold-plated chain bracelet with smooth miniature star and crescent moon charms.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/18k-gold-plated-star-moon-baby-charm-bracelet</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>949.00 INR</g:price>
+      <g:sale_price>649.00 INR</g:sale_price>
+      <g:google_product_category>Apparel &amp; Accessories &gt; Jewelry</g:google_product_category>
+      <g:product_type>Kids Jewellery</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-JEWEL-004</g:mpn>
+      <g:age_group>toddler</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Kids Jewellery</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
         <g:price>0.00 INR</g:price>
       </g:shipping>
     </item>
     <item>
       <g:id>VRN-CARE-001</g:id>
-      <g:title>Ultra-Soft Chemical-Free Bamboo Diapers with Wetness Indicator</g:title>
-      <g:description>Pediatrician-tested certified child products from Vernunt Store.</g:description>
-      <g:link>https://app.vernunt.com/store/chemical-free-bamboo-baby-diapers-tape-style</g:link>
-      <g:image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&auto=format&fit=crop&q=80</g:image_link>
+      <g:title>Organic Bamboo Plant-Based Baby Diaper Pants (Zero Chlorine, 48 Pcs)</g:title>
+      <g:description>12-Hour leak-lock protection crafted with 100% unbleached organic bamboo fiber. Ultra-breathable, silky soft, zero rash guarantee.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-bamboo-plant-based-baby-diaper-pants</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
       <g:availability>in_stock</g:availability>
-      <g:price>749.00 INR</g:price>
-      <g:google_product_category>Baby & Toddler > Diapering</g:google_product_category>
+      <g:price>1099.00 INR</g:price>
+      <g:sale_price>799.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
       <g:brand>Vernunt</g:brand>
       <g:condition>new</g:condition>
       <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-001</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
       <g:shipping>
         <g:country>IN</g:country>
-        <g:service>Standard Delivery</g:service>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-002</g:id>
+      <g:title>99% Pure Water Biodegradable Baby Wipes with Organic Aloe (72 Wipes x 3 Packs)</g:title>
+      <g:description>Thick embossed plant fiber wipes soaked in 99% pure EDI water and organic aloe vera. 0% alcohol, fragrance, or parabens.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/99-percent-pure-water-biodegradable-baby-wipes</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>599.00 INR</g:price>
+      <g:sale_price>399.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-002</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-003</g:id>
+      <g:title>Deep Nourishing Cold-Pressed Virgin Coconut &amp; Shea Butter Baby Lotion (300ml)</g:title>
+      <g:description>24-Hour moisture lock formula with certified organic cold-pressed coconut oil, oat milk, and chamomile extract.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/cold-pressed-virgin-coconut-shea-butter-baby-lotion</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>649.00 INR</g:price>
+      <g:sale_price>449.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-003</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-004</g:id>
+      <g:title>Calming Organic Goat Milk &amp; Oatmeal Baby Bath Bar (Pack of 3 x 100g, Tear-Free)</g:title>
+      <g:description>Handcrafted cold-processed moisturizing bath soap bar with fresh organic goat milk and finely ground colloidal oatmeal.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-goat-milk-oatmeal-baby-soap-pack</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1607006411601-775c8cc632dc?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>599.00 INR</g:price>
+      <g:sale_price>429.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-004</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-005</g:id>
+      <g:title>Fast-Acting 15% Zinc Oxide &amp; Organic Calendula Diaper Rash Relief Cream (100g)</g:title>
+      <g:description>Forms an immediate breathable protective moisture shield that calms redness, diaper chafing, and friction within 4-6 hours.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/fast-acting-zinc-oxide-calendula-diaper-rash-cream</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>499.00 INR</g:price>
+      <g:sale_price>349.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-005</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
+        <g:price>0.00 INR</g:price>
+      </g:shipping>
+    </item>
+    <item>
+      <g:id>VRN-CARE-006</g:id>
+      <g:title>Tear-Free Avocado &amp; Sweet Almond Head-to-Toe Baby Wash &amp; Shampoo (400ml Pump)</g:title>
+      <g:description>Ultra-mild 2-in-1 foaming liquid wash designed for soft baby hair, sensitive scalp, and delicate body skin.</g:description>
+      <g:link>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/tear-free-avocado-sweet-almond-baby-wash-shampoo</g:link>
+      <g:image_link>https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=800&amp;auto=format&amp;fit=crop&amp;q=80</g:image_link>
+      <g:availability>in_stock</g:availability>
+      <g:price>699.00 INR</g:price>
+      <g:sale_price>479.00 INR</g:sale_price>
+      <g:google_product_category>Baby &amp; Toddler &gt; Baby Safety</g:google_product_category>
+      <g:product_type>Baby Care Products</g:product_type>
+      <g:brand>Vernunt</g:brand>
+      <g:condition>new</g:condition>
+      <g:identifier_exists>no</g:identifier_exists>
+      <g:mpn>VRN-CARE-006</g:mpn>
+      <g:age_group>infant</g:age_group>
+      <g:custom_label_0>Verified Merchant</g:custom_label_0>
+      <g:custom_label_1>Baby Care Products</g:custom_label_1>
+      <g:shipping>
+        <g:country>IN</g:country>
+        <g:service>Standard Courier Delivery</g:service>
         <g:price>0.00 INR</g:price>
       </g:shipping>
     </item>

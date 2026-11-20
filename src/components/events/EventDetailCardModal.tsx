@@ -7,6 +7,7 @@ import {
   Layers, Info, Award
 } from 'lucide-react';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
+import { generateEventJsonLd } from '../../utils/eventUrls.ts';
 
 interface EventDetailCardModalProps {
   event: CommunityEvent | null;
@@ -31,6 +32,29 @@ export default function EventDetailCardModal({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // Inject Schema.org Event JSON-LD structured data for Google Event Rich Results
+  useEffect(() => {
+    if (!event) return;
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.vernunt.com';
+      const jsonLd = generateEventJsonLd(event, origin);
+      let scriptTag = document.getElementById('vernunt-event-detail-jsonld') as HTMLScriptElement | null;
+      if (!scriptTag) {
+        scriptTag = document.createElement('script');
+        scriptTag.id = 'vernunt-event-detail-jsonld';
+        scriptTag.type = 'application/ld+json';
+        document.head.appendChild(scriptTag);
+      }
+      scriptTag.text = JSON.stringify(jsonLd);
+    } catch (err) {
+      console.warn('Failed to inject individual Event JSON-LD:', err);
+    }
+    return () => {
+      const el = document.getElementById('vernunt-event-detail-jsonld');
+      if (el) el.remove();
+    };
+  }, [event]);
 
   if (!event) return null;
 

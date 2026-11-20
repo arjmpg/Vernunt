@@ -2526,29 +2526,75 @@ export const getStoredProducts = (): StoreProduct[] => {
 // Helper to save Products to storage
 export const saveStoredProducts = (products: StoreProduct[]) => {
   try {
+    // Identify exact published or modified product(s) for single-product Merchant Center delta sync
+    let previousProducts: StoreProduct[] = [];
+    try {
+      const prevRaw = localStorage.getItem('vernunt_store_products_v1');
+      if (prevRaw) {
+        const parsed = JSON.parse(prevRaw);
+        if (Array.isArray(parsed)) previousProducts = parsed;
+      }
+    } catch {
+      previousProducts = [];
+    }
+
+    const prevMap = new Map<string, string>();
+    for (const prev of previousProducts) {
+      if (prev && prev.id) prevMap.set(prev.id, JSON.stringify(prev));
+    }
+
+    const changedProducts: Array<{ product: StoreProduct; action: 'publish' | 'update' }> = [];
+    for (const prod of products) {
+      if (!prod || !prod.id) continue;
+      const prevSerialized = prevMap.get(prod.id);
+      if (!prevSerialized) {
+        changedProducts.push({ product: prod, action: 'publish' });
+      } else if (prevSerialized !== JSON.stringify(prod)) {
+        changedProducts.push({ product: prod, action: 'update' });
+      }
+    }
+
     localStorage.setItem('vernunt_store_products_v1', JSON.stringify(products));
     window.dispatchEvent(new CustomEvent('vernunt_products_updated', { detail: products }));
-    
-    // Automatic Real-Time Google Merchant Center & Search Console Indexing
-    if (products.length > 0 && typeof window !== 'undefined') {
-      const latestProd = products[0]; // Most recent or updated
-      if (latestProd) {
+
+    // Automatic Real-Time Single-Product Delta Sync to Google Merchant Center (ID: 5909118279)
+    if (typeof window !== 'undefined' && changedProducts.length > 0 && changedProducts.length <= 5) {
+      const savedMerchantId = (() => {
+        try {
+          const val = localStorage.getItem('vernunt_gmc_account_id');
+          return val && val !== 'VMH-89410523-IN' ? val : '5909118279';
+        } catch {
+          return '5909118279';
+        }
+      })();
+
+      for (const { product: targetProd, action } of changedProducts) {
+        fetch('/api/google/merchant/sync-product', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product: targetProd,
+            action,
+            merchantCenterId: savedMerchantId
+          })
+        }).catch(() => {});
+
         import('../services/seoAutoIndexer.ts').then(({ triggerAutoIndex }) => {
           triggerAutoIndex({
             type: 'product',
             item: {
-              id: latestProd.id,
-              name: latestProd.name,
-              title: latestProd.name,
-              slug: latestProd.slug || latestProd.id,
-              sku: latestProd.sku || latestProd.id,
-              price: latestProd.salePrice || latestProd.price,
-              regularPrice: latestProd.regularPrice || latestProd.price,
-              category: latestProd.category,
-              featuredImage: latestProd.featuredImage,
-              shortDescription: latestProd.shortDescription || latestProd.description,
-              onSale: latestProd.onSale,
-              salePrice: latestProd.salePrice
+              id: targetProd.id,
+              name: targetProd.name,
+              title: targetProd.name,
+              slug: targetProd.slug || targetProd.id,
+              sku: targetProd.sku || targetProd.id,
+              price: targetProd.salePrice || targetProd.price,
+              regularPrice: targetProd.regularPrice || targetProd.price,
+              category: targetProd.category,
+              featuredImage: targetProd.featuredImage,
+              shortDescription: targetProd.shortDescription || targetProd.description,
+              onSale: targetProd.onSale,
+              salePrice: targetProd.salePrice
             }
           }).catch(() => {});
         });

@@ -1,5 +1,6 @@
 import type { Express, Request, Response } from 'express';
 import nodemailer from 'nodemailer';
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
@@ -37,34 +38,381 @@ export interface StoredOtpRecord {
 
 const emailOtpMemoryStore = new Map<string, StoredOtpRecord>();
 
-// Email delivery logs for audit and in-app debugging
+// Unified Email Log Entry covering all triggers, notifications & transactional emails
+export type EmailLogType =
+  | 'otp'
+  | 'welcome_signup'
+  | 'password_changed'
+  | 'playdate_request'
+  | 'playdate_accepted'
+  | 'playdate_declined'
+  | 'playdate_session_joined'
+  | 'event_ticket'
+  | 'event_published'
+  | 'shop_order'
+  | 'product_purchase'
+  | 'payment_receipt'
+  | 'payment_paid'
+  | 'payment_pending'
+  | 'payment_failed'
+  | 'product_shipped'
+  | 'product_out_for_delivery'
+  | 'product_delivered'
+  | 'product_cancelled'
+  | 'profile_approved'
+  | 'profile_rejected'
+  | 'kyc_submitted'
+  | 'specialist_booking'
+  | 'daycare_booking'
+  | 'vendor_agreement'
+  | 'subscription_activated'
+  | 'emergency_sos'
+  | 'admin_new_signup'
+  | 'admin_kyc_alert'
+  | 'test_email'
+  | 'general';
+
+export type EmailDeliveryStatus = 'queued' | 'sent' | 'delivered' | 'bounced' | 'failed';
+export type EmailTransportMode = 'smtp_gmail' | 'smtp_custom' | 'firestore_queue';
+
 export interface EmailLogEntry {
   id: string;
+  trackingToken: string;
   to: string;
+  from: string;
   subject: string;
-  type:
-    | 'otp'
-    | 'playdate_request'
-    | 'event_ticket'
-    | 'shop_order'
-    | 'product_purchase'
-    | 'payment_receipt'
-    | 'product_shipped'
-    | 'product_out_for_delivery'
-    | 'product_delivered'
-    | 'product_cancelled'
-    | 'profile_approved'
-    | 'specialist_booking'
-    | 'emergency_sos'
-    | 'general';
-  status: 'sent' | 'fallback_delivered' | 'queued' | 'failed';
+  type: EmailLogType;
+  category: string;
+  triggerSource: string;
+  status: 'sent' | 'delivered' | 'queued' | 'fallback_delivered' | 'bounced' | 'failed';
+  deliveryStatus: EmailDeliveryStatus;
+  deliveryTransport: EmailTransportMode;
+  messageId?: string;
+  smtpResponse?: string;
+  accepted?: string[];
+  rejected?: string[];
+  readStatus: 'unread' | 'read';
+  readAt?: string;
+  lastReadAt?: string;
+  openCount: number;
+  lastReadUserAgent?: string;
   previewUrl?: string;
+  textPreview?: string;
+  htmlContent?: string;
   otpCode?: string;
   timestamp: string;
+  updatedAt: string;
   error?: string;
 }
 
-const emailLogs: EmailLogEntry[] = [];
+const EMAIL_LOGS_FILE = path.resolve(process.cwd(), 'data', 'email_logs.json');
+const MAX_EMAIL_LOGS = 1000;
+
+// 1x1 transparent GIF buffer (43 bytes) for live open/read tracking pixel
+const TRANSPARENT_PIXEL_GIF = Buffer.from(
+  'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+  'base64'
+);
+
+let observedPublicOrigin =
+  (process.env.APP_URL || process.env.PUBLIC_APP_URL || '').replace(/\/$/, '') ||
+  'https://ais-pre-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app';
+
+function loadEmailLogsFromDisk(): EmailLogEntry[] {
+  try {
+    if (fs.existsSync(EMAIL_LOGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(EMAIL_LOGS_FILE, 'utf8'));
+      if (Array.isArray(parsed)) {
+        return parsed.slice(0, MAX_EMAIL_LOGS).map((item: any) => ({
+          id: item.id || `mail-${Date.now()}`,
+          trackingToken: item.trackingToken || crypto.randomBytes(10).toString('hex'),
+          to: String(item.to || '').toLowerCase(),
+          from: item.from || `"Vernunt Play Time" <${DEFAULT_SMTP_SENDER_EMAIL}>`,
+          subject: item.subject || 'Vernunt Email',
+          type: (item.type || 'general') as EmailLogType,
+          category: item.category || classifyEmailType(item.type || 'general').category,
+          triggerSource: item.triggerSource || classifyEmailType(item.type || 'general').triggerSource,
+          status: item.status || 'sent',
+          deliveryStatus: item.deliveryStatus || (item.status === 'failed' ? 'failed' : item.status === 'queued' ? 'queued' : 'sent'),
+          deliveryTransport: item.deliveryTransport || 'firestore_queue',
+          messageId: item.messageId,
+          smtpResponse: item.smtpResponse,
+          accepted: Array.isArray(item.accepted) ? item.accepted : undefined,
+          rejected: Array.isArray(item.rejected) ? item.rejected : undefined,
+          readStatus: item.readStatus === 'read' ? 'read' : 'unread',
+          readAt: item.readAt,
+          lastReadAt: item.lastReadAt,
+          openCount: typeof item.openCount === 'number' ? item.openCount : 0,
+          lastReadUserAgent: item.lastReadUserAgent,
+          previewUrl: item.previewUrl,
+          textPreview: item.textPreview,
+          htmlContent: item.htmlContent,
+          otpCode: item.otpCode,
+          timestamp: item.timestamp || new Date().toISOString(),
+          updatedAt: item.updatedAt || item.timestamp || new Date().toISOString(),
+          error: item.error
+        }));
+      }
+    }
+  } catch (err) {
+    console.warn('[EmailService] Disk email log load notice:', err);
+  }
+  return [];
+}
+
+function saveEmailLogsToDisk(logs: EmailLogEntry[]) {
+  try {
+    const dir = path.dirname(EMAIL_LOGS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(EMAIL_LOGS_FILE, JSON.stringify(logs.slice(0, MAX_EMAIL_LOGS), null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[EmailService] Failed saving email logs to disk:', err);
+  }
+}
+
+function classifyEmailType(type: EmailLogType | string): { category: string; triggerSource: string } {
+  switch (type) {
+    case 'admin_new_signup':
+      return { category: 'Admin Trigger', triggerSource: 'New User Sign-Up Trigger' };
+    case 'admin_kyc_alert':
+      return { category: 'Admin Trigger', triggerSource: 'KYC Submission Alert' };
+    case 'welcome_signup':
+      return { category: 'Account & Onboarding', triggerSource: 'New Account Welcome' };
+    case 'password_changed':
+      return { category: 'Security Alert', triggerSource: 'Password Changed / Set' };
+    case 'otp':
+      return { category: 'Auth / OTP', triggerSource: 'Email OTP Verification' };
+    case 'playdate_request':
+      return { category: 'Playtime Connect', triggerSource: 'Playtime Request Received' };
+    case 'playdate_accepted':
+      return { category: 'Playtime Connect', triggerSource: 'Playtime Request Accepted' };
+    case 'playdate_declined':
+      return { category: 'Playtime Connect', triggerSource: 'Playtime Request Declined' };
+    case 'playdate_session_joined':
+      return { category: 'Playtime Connect', triggerSource: 'Group Playtime Joined' };
+    case 'event_ticket':
+      return { category: 'Events & Passes', triggerSource: 'Event Booking Confirmed' };
+    case 'event_published':
+      return { category: 'Events & Passes', triggerSource: 'Event Published Live' };
+    case 'product_purchase':
+    case 'shop_order':
+      return { category: 'Store & Orders', triggerSource: 'Product Purchased' };
+    case 'payment_receipt':
+    case 'payment_paid':
+      return { category: 'Payments', triggerSource: 'Payment Paid & Verified' };
+    case 'payment_pending':
+      return { category: 'Payments', triggerSource: 'Payment Pending / COD' };
+    case 'payment_failed':
+      return { category: 'Payments', triggerSource: 'Payment Failed / Action Needed' };
+    case 'product_shipped':
+      return { category: 'Store & Orders', triggerSource: 'Order Dispatched / Shipped' };
+    case 'product_out_for_delivery':
+      return { category: 'Store & Orders', triggerSource: 'Order Out for Delivery' };
+    case 'product_delivered':
+      return { category: 'Store & Orders', triggerSource: 'Order Delivered' };
+    case 'product_cancelled':
+      return { category: 'Store & Orders', triggerSource: 'Order Cancelled / Refund' };
+    case 'profile_approved':
+      return { category: 'Verification & KYC', triggerSource: 'Profile Approved' };
+    case 'profile_rejected':
+      return { category: 'Verification & KYC', triggerSource: 'Profile Review Update' };
+    case 'kyc_submitted':
+      return { category: 'Verification & KYC', triggerSource: 'KYC Documents Submitted' };
+    case 'specialist_booking':
+      return { category: 'Specialists', triggerSource: 'Specialist Appointment Booked' };
+    case 'daycare_booking':
+      return { category: 'Child Care', triggerSource: 'Daycare Slot Reserved' };
+    case 'vendor_agreement':
+      return { category: 'Merchant / Legal', triggerSource: 'Vendor Agreement Executed' };
+    case 'subscription_activated':
+      return { category: 'Membership', triggerSource: 'Club Plan Activated' };
+    case 'emergency_sos':
+      return { category: 'Emergency SOS', triggerSource: 'Child Safety Distress Beacon' };
+    case 'test_email':
+      return { category: 'Admin Test', triggerSource: 'Manual Test Dispatch' };
+    default:
+      return { category: 'General Notification', triggerSource: 'Platform Notification' };
+  }
+}
+
+const DEFAULT_ADMIN_SIGNUP_RECIPIENTS = ['arjunmpgupta@gmail.com', 'ardha@vernunt.com'];
+const DEFAULT_SMTP_SENDER_EMAIL = 'vernunt@gmail.com';
+const ADMIN_TRIGGER_SETTINGS_FILE = path.resolve(process.cwd(), 'data', 'admin_notification_settings.json');
+
+const emailLogs: EmailLogEntry[] = loadEmailLogsFromDisk();
+
+// Real-Time SSE Subscribers for Admin Email Logs
+const emailLogSseClients = new Set<Response>();
+
+function serializeLogForStream(entry: EmailLogEntry): Omit<EmailLogEntry, 'htmlContent'> & { hasHtmlPreview: boolean } {
+  const { htmlContent, ...rest } = entry;
+  return {
+    ...rest,
+    hasHtmlPreview: Boolean(htmlContent)
+  };
+}
+
+export function getEmailLogStats() {
+  const total = emailLogs.length;
+  let delivered = 0;
+  let sent = 0;
+  let queued = 0;
+  let failed = 0;
+  let bounced = 0;
+  let read = 0;
+  let totalOpens = 0;
+
+  for (const log of emailLogs) {
+    if (log.deliveryStatus === 'delivered') delivered += 1;
+    else if (log.deliveryStatus === 'sent') sent += 1;
+    else if (log.deliveryStatus === 'queued') queued += 1;
+    else if (log.deliveryStatus === 'bounced') bounced += 1;
+    else if (log.deliveryStatus === 'failed') failed += 1;
+
+    if (log.readStatus === 'read') read += 1;
+    totalOpens += log.openCount || 0;
+  }
+
+  const openRatePercent = total > 0 ? Math.round((read / total) * 100) : 0;
+  return {
+    total,
+    delivered,
+    sent,
+    queued,
+    failed,
+    bounced,
+    read,
+    unread: Math.max(0, total - read),
+    totalOpens,
+    openRatePercent
+  };
+}
+
+function getSmtpRuntimeInfo() {
+  const host = (process.env.SMTP_HOST || process.env.MAIL_HOST || '').trim();
+  const user = (process.env.SMTP_USER || process.env.MAIL_USER || process.env.GMAIL_USER || DEFAULT_SMTP_SENDER_EMAIL).trim();
+  const pass = (process.env.SMTP_PASS || process.env.MAIL_PASS || process.env.GMAIL_APP_PASSWORD || '').trim();
+  const transportMode: EmailTransportMode =
+    host && user && pass
+      ? 'smtp_custom'
+      : user && pass && user.includes('@gmail.com')
+        ? 'smtp_gmail'
+        : 'firestore_queue';
+
+  return {
+    smtpConfigured: transportMode !== 'firestore_queue',
+    transportMode,
+    senderEmail: user,
+    host: host || (transportMode === 'smtp_gmail' ? 'smtp.gmail.com' : 'Firestore Mail Queue')
+  };
+}
+
+function broadcastEmailLogEvent(eventName: 'email:created' | 'email:updated' | 'email:cleared', payload: any) {
+  if (emailLogSseClients.size === 0) return;
+  const serialized = `event: ${eventName}\ndata: ${JSON.stringify(payload)}\n\n`;
+  for (const client of emailLogSseClients) {
+    try {
+      client.write(serialized);
+    } catch {
+      emailLogSseClients.delete(client);
+    }
+  }
+}
+
+function injectReadTrackingPixel(html: string, logId: string, trackingToken: string): string {
+  const pixelUrl = `${observedPublicOrigin}/api/emails/track/open/${encodeURIComponent(logId)}/${encodeURIComponent(trackingToken)}.gif`;
+  const pixelTag = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;border:0;margin:0;padding:0;opacity:0;" />`;
+  if (/<\/body>/i.test(html)) {
+    return html.replace(/<\/body>/i, `${pixelTag}</body>`);
+  }
+  return `${html}\n${pixelTag}`;
+}
+
+export interface AdminEmailTriggerSettings {
+  newUserSignupEnabled: boolean;
+  recipients: string[];
+  updatedAt: string;
+}
+
+function parseAdminEmailsList(input?: string | string[] | null): string[] {
+  const rawList = Array.isArray(input)
+    ? input
+    : typeof input === 'string'
+      ? input.split(/[\s,;]+/)
+      : [];
+  const cleaned = rawList
+    .map(e => String(e || '').trim().toLowerCase())
+    .filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  return Array.from(new Set(cleaned));
+}
+
+export function getAdminEmailTriggerSettings(): AdminEmailTriggerSettings {
+  const envRecipients = parseAdminEmailsList(
+    process.env.ADMIN_NOTIFICATION_EMAILS || process.env.ADMIN_EMAIL || ''
+  );
+  const fallbackRecipients = envRecipients.length > 0 ? envRecipients : DEFAULT_ADMIN_SIGNUP_RECIPIENTS;
+
+  try {
+    if (fs.existsSync(ADMIN_TRIGGER_SETTINGS_FILE)) {
+      const parsed = JSON.parse(fs.readFileSync(ADMIN_TRIGGER_SETTINGS_FILE, 'utf8'));
+      const savedRecipients = parseAdminEmailsList(parsed?.recipients);
+      return {
+        newUserSignupEnabled: parsed?.newUserSignupEnabled !== false,
+        recipients: savedRecipients.length > 0 ? savedRecipients : fallbackRecipients,
+        updatedAt: parsed?.updatedAt || new Date().toISOString()
+      };
+    }
+  } catch (err) {
+    console.debug('[EmailService] Admin trigger settings read note:', err);
+  }
+
+  return {
+    newUserSignupEnabled: true,
+    recipients: fallbackRecipients,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function saveAdminEmailTriggerSettings(settings: {
+  newUserSignupEnabled?: boolean;
+  recipients?: string | string[];
+}): AdminEmailTriggerSettings {
+  const current = getAdminEmailTriggerSettings();
+  const parsedRecipients = settings.recipients !== undefined
+    ? parseAdminEmailsList(settings.recipients)
+    : current.recipients;
+
+  const next: AdminEmailTriggerSettings = {
+    newUserSignupEnabled: settings.newUserSignupEnabled !== undefined
+      ? Boolean(settings.newUserSignupEnabled)
+      : current.newUserSignupEnabled,
+    recipients: parsedRecipients.length > 0 ? parsedRecipients : current.recipients,
+    updatedAt: new Date().toISOString()
+  };
+
+  try {
+    const dir = path.dirname(ADMIN_TRIGGER_SETTINGS_FILE);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(ADMIN_TRIGGER_SETTINGS_FILE, JSON.stringify(next, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[EmailService] Failed saving admin email trigger settings:', err);
+  }
+
+  return next;
+}
+
+function escapeHtml(val: any): string {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 // Lazy-initialized Nodemailer transporter
 let transporter: nodemailer.Transporter | null = null;
@@ -75,8 +423,8 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
   // 1. Production SMTP Configuration (via Environment Variables)
   const host = process.env.SMTP_HOST || process.env.MAIL_HOST;
   const port = parseInt(process.env.SMTP_PORT || process.env.MAIL_PORT || '587', 10);
-  const user = process.env.SMTP_USER || process.env.MAIL_USER || process.env.GMAIL_USER;
-  const pass = process.env.SMTP_PASS || process.env.MAIL_PASS || process.env.GMAIL_APP_PASSWORD;
+  const user = (process.env.SMTP_USER || process.env.MAIL_USER || process.env.GMAIL_USER || DEFAULT_SMTP_SENDER_EMAIL).trim();
+  const pass = (process.env.SMTP_PASS || process.env.MAIL_PASS || process.env.GMAIL_APP_PASSWORD || '').trim();
 
   if (host && user && pass) {
     console.log(`[EmailService] Initializing custom SMTP transporter via ${host}:${port}...`);
@@ -90,7 +438,7 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
     return transporter;
   }
 
-  // 2. Gmail SMTP Direct Service
+  // 2. Gmail SMTP Direct Service (defaults to vernunt@gmail.com when SMTP_PASS / Google App Password is set)
   if (user && pass && user.includes('@gmail.com')) {
     console.log(`[EmailService] Initializing Gmail SMTP transporter for ${user}...`);
     transporter = nodemailer.createTransport({
@@ -112,10 +460,17 @@ async function getTransporter(): Promise<nodemailer.Transporter> {
 }
 
 /**
- * Record email directly into Firebase Firestore `mail` collection
- * (Official Firebase Trigger Email extension format: creates documents with `to`, `message`)
+ * Record email directly into Firebase Firestore `mail` & `email_notifications` collections
+ * (Official Firebase Trigger Email extension format + real-time delivery/read audit log)
  */
-async function syncToFirestoreMail(adminInstance: any, to: string, subject: string, html: string, text: string) {
+async function syncToFirestoreMail(
+  adminInstance: any,
+  to: string,
+  subject: string,
+  html: string,
+  text: string,
+  logEntry?: EmailLogEntry
+) {
   if (!adminInstance) return;
   try {
     const db = firebaseConfig.firestoreDatabaseId
@@ -129,19 +484,52 @@ async function syncToFirestoreMail(adminInstance: any, to: string, subject: stri
         html,
         text
       },
-      status: 'pending',
-      dispatchedAt: new Date().toISOString(),
+      logId: logEntry?.id,
+      status: logEntry?.deliveryStatus || 'pending',
+      dispatchedAt: logEntry?.timestamp || new Date().toISOString(),
       source: 'vernunt-server-email-engine'
     });
 
-    await db.collection('email_notifications').add({
-      recipient: to,
-      subject,
-      timestamp: new Date().toISOString(),
-      status: 'dispatched'
-    });
+    if (logEntry) {
+      await db.collection('email_notifications').doc(logEntry.id).set({
+        id: logEntry.id,
+        recipient: to,
+        from: logEntry.from,
+        subject,
+        type: logEntry.type,
+        category: logEntry.category,
+        triggerSource: logEntry.triggerSource,
+        deliveryStatus: logEntry.deliveryStatus,
+        deliveryTransport: logEntry.deliveryTransport,
+        readStatus: logEntry.readStatus,
+        readAt: logEntry.readAt || null,
+        openCount: logEntry.openCount || 0,
+        timestamp: logEntry.timestamp,
+        updatedAt: logEntry.updatedAt,
+        status: logEntry.deliveryStatus
+      }, { merge: true });
+    }
   } catch (firestoreErr: any) {
     console.warn('[EmailService] Firestore Trigger Email sync notice:', firestoreErr?.message || firestoreErr);
+  }
+}
+
+async function syncReadStatusToFirestore(adminInstance: any, logEntry: EmailLogEntry) {
+  if (!adminInstance) return;
+  try {
+    const db = firebaseConfig.firestoreDatabaseId
+      ? adminInstance.firestore(firebaseConfig.firestoreDatabaseId)
+      : adminInstance.firestore();
+    await db.collection('email_notifications').doc(logEntry.id).set({
+      readStatus: logEntry.readStatus,
+      readAt: logEntry.readAt || null,
+      lastReadAt: logEntry.lastReadAt || null,
+      openCount: logEntry.openCount,
+      deliveryStatus: logEntry.deliveryStatus,
+      updatedAt: logEntry.updatedAt
+    }, { merge: true });
+  } catch (err: any) {
+    console.debug('[EmailService] Firestore read receipt sync note:', err?.message || err);
   }
 }
 
@@ -174,7 +562,7 @@ async function syncOtpToFirestore(adminInstance: any, email: string, otp: string
 /**
  * HTML Email Template Generator with Vernunt Branding
  */
-function buildVernuntEmailTemplate(options: {
+export function buildVernuntEmailTemplate(options: {
   title: string;
   preheader?: string;
   badgeText?: string;
@@ -534,7 +922,7 @@ export function buildProductCancelledHtml(order: any, reason?: string, refundDet
 }
 
 /**
- * Unified Email Dispatch Function
+ * Unified Email Dispatch Function with Real-Time Log Broadcast & Read-Receipt Pixel Injection
  */
 export async function sendEmailMessage(options: {
   to: string;
@@ -542,80 +930,707 @@ export async function sendEmailMessage(options: {
   type: EmailLogEntry['type'];
   htmlContent: string;
   textContent: string;
+  triggerSource?: string;
   otpCode?: string;
   attachments?: any[];
   adminInstance?: any;
-}): Promise<{ success: boolean; messageId?: string; previewUrl?: string; error?: string }> {
+}): Promise<{ success: boolean; logId?: string; deliveryStatus?: EmailDeliveryStatus; messageId?: string; previewUrl?: string; error?: string }> {
+  const cleanTo = String(options.to || '').trim().toLowerCase();
+  const runtimeInfo = getSmtpRuntimeInfo();
+  const fromAddress = process.env.SMTP_FROM || `"Vernunt Play Time" <${runtimeInfo.senderEmail}>`;
+  const logId = `mail-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const trackingToken = crypto.randomBytes(12).toString('hex');
+  const nowIso = new Date().toISOString();
+  const classification = classifyEmailType(options.type);
+
+  // Inject invisible 1x1 open/read tracking pixel into every HTML email
+  const trackedHtml = injectReadTrackingPixel(options.htmlContent, logId, trackingToken);
+  const textPreview = String(options.textContent || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 260);
+
   try {
-    const cleanTo = options.to.trim().toLowerCase();
     const mailTransporter = await getTransporter();
 
-    const fromAddress = process.env.SMTP_FROM || `"Vernunt Play Time" <noreply@${firebaseConfig.authDomain || 'app.vernunt.com'}>`;
-
-    const info = await mailTransporter.sendMail({
+    const info: any = await mailTransporter.sendMail({
       from: fromAddress,
       to: cleanTo,
       subject: options.subject,
       text: options.textContent,
-      html: options.htmlContent,
+      html: trackedHtml,
       attachments: options.attachments
     });
 
     const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
-    console.log(`[EmailService] ✓ Email dispatched successfully to ${cleanTo} (Type: ${options.type}) | MessageID: ${info.messageId}`);
-    if (previewUrl) {
-      console.log(`[EmailService] 🔗 Preview Delivered Email: ${previewUrl}`);
+    const acceptedList = Array.isArray(info?.accepted) ? info.accepted.map(String) : [];
+    const rejectedList = Array.isArray(info?.rejected) ? info.rejected.map(String) : [];
+    const smtpResponse = typeof info?.response === 'string' ? info.response : undefined;
+
+    let deliveryStatus: EmailDeliveryStatus;
+    let legacyStatus: EmailLogEntry['status'];
+
+    if (runtimeInfo.transportMode === 'firestore_queue') {
+      deliveryStatus = 'queued';
+      legacyStatus = 'queued';
+    } else if (rejectedList.length > 0 && acceptedList.length === 0) {
+      deliveryStatus = 'bounced';
+      legacyStatus = 'bounced';
+    } else if (acceptedList.length > 0 || (smtpResponse && /^250\b/.test(smtpResponse))) {
+      deliveryStatus = 'delivered';
+      legacyStatus = 'delivered';
+    } else {
+      deliveryStatus = 'sent';
+      legacyStatus = 'sent';
     }
 
-    // Record in Firestore Trigger Email queue
-    await syncToFirestoreMail(options.adminInstance, cleanTo, options.subject, options.htmlContent, options.textContent);
-
     const logEntry: EmailLogEntry = {
-      id: `mail-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      id: logId,
+      trackingToken,
       to: cleanTo,
+      from: fromAddress,
       subject: options.subject,
       type: options.type,
-      status: 'sent',
+      category: classification.category,
+      triggerSource: options.triggerSource || classification.triggerSource,
+      status: legacyStatus,
+      deliveryStatus,
+      deliveryTransport: runtimeInfo.transportMode,
+      messageId: info?.messageId,
+      smtpResponse: smtpResponse || (runtimeInfo.transportMode === 'firestore_queue' ? 'Queued via Firestore mail engine (set SMTP_PASS for live Gmail SMTP)' : 'Accepted by SMTP relay'),
+      accepted: acceptedList.length > 0 ? acceptedList : undefined,
+      rejected: rejectedList.length > 0 ? rejectedList : undefined,
+      readStatus: 'unread',
+      openCount: 0,
       previewUrl,
+      textPreview,
+      htmlContent: options.htmlContent.slice(0, 48000),
       otpCode: options.otpCode,
-      timestamp: new Date().toISOString()
+      timestamp: nowIso,
+      updatedAt: nowIso
     };
+
     emailLogs.unshift(logEntry);
-    if (emailLogs.length > 100) emailLogs.pop();
+    if (emailLogs.length > MAX_EMAIL_LOGS) emailLogs.length = MAX_EMAIL_LOGS;
+    saveEmailLogsToDisk(emailLogs);
+
+    // Broadcast real-time creation event to all connected Admin Email Log viewers
+    broadcastEmailLogEvent('email:created', {
+      log: serializeLogForStream(logEntry),
+      stats: getEmailLogStats()
+    });
+
+    console.log(`[EmailService] ✓ Email logged (${deliveryStatus}/${runtimeInfo.transportMode}) to ${cleanTo} [${options.type}] | ID: ${logId}`);
+
+    // Record in Firestore Trigger Email queue & email_notifications collection
+    await syncToFirestoreMail(options.adminInstance, cleanTo, options.subject, trackedHtml, options.textContent, logEntry);
 
     return {
-      success: true,
-      messageId: info.messageId,
+      success: deliveryStatus !== 'bounced',
+      logId,
+      deliveryStatus,
+      messageId: info?.messageId,
       previewUrl
     };
   } catch (err: any) {
-    console.error(`[EmailService] ❌ Delivery Error to ${options.to}:`, err.message || err);
-    // Fallback: still log and record so user is never blocked
+    const errMsg = err?.message || String(err);
+    console.error(`[EmailService] ❌ Delivery Error to ${cleanTo}:`, errMsg);
+
+    // Reset cached transporter if auth/connection failed so next attempt can recover if env updated
+    if (/auth|EAUTH|ECONN|ETIMEDOUT|greeting/i.test(errMsg)) {
+      transporter = null;
+    }
+
     const logEntry: EmailLogEntry = {
-      id: `mail-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      to: options.to,
+      id: logId,
+      trackingToken,
+      to: cleanTo,
+      from: fromAddress,
       subject: options.subject,
       type: options.type,
-      status: 'fallback_delivered',
+      category: classification.category,
+      triggerSource: options.triggerSource || classification.triggerSource,
+      status: 'failed',
+      deliveryStatus: 'failed',
+      deliveryTransport: runtimeInfo.transportMode,
+      smtpResponse: errMsg,
+      readStatus: 'unread',
+      openCount: 0,
+      textPreview,
+      htmlContent: options.htmlContent.slice(0, 48000),
       otpCode: options.otpCode,
-      timestamp: new Date().toISOString(),
-      error: err.message || String(err)
+      timestamp: nowIso,
+      updatedAt: nowIso,
+      error: errMsg
     };
+
     emailLogs.unshift(logEntry);
-    if (emailLogs.length > 100) emailLogs.pop();
+    if (emailLogs.length > MAX_EMAIL_LOGS) emailLogs.length = MAX_EMAIL_LOGS;
+    saveEmailLogsToDisk(emailLogs);
+
+    broadcastEmailLogEvent('email:created', {
+      log: serializeLogForStream(logEntry),
+      stats: getEmailLogStats()
+    });
+
+    // Still queue in Firestore fallback so delivery audit is preserved
+    await syncToFirestoreMail(options.adminInstance, cleanTo, options.subject, trackedHtml, options.textContent, logEntry);
 
     return {
-      success: true,
+      success: false,
+      logId,
+      deliveryStatus: 'failed',
       previewUrl: undefined,
-      error: err.message || String(err)
+      error: errMsg
     };
   }
+}
+
+/**
+ * Send Welcome Email to every newly registered user on Vernunt
+ */
+export async function sendWelcomeSignupEmail(options: {
+  user: Record<string, any>;
+  adminInstance?: any;
+}): Promise<{ success: boolean; logId?: string }> {
+  const u = options.user || {};
+  const toEmail = String(u.email || '').trim().toLowerCase();
+  if (!toEmail || !toEmail.includes('@')) return { success: false };
+
+  const userName = String(u.parentName || u.name || 'Vernunt Member').trim();
+  const userRole = String(u.userRole || 'Parent').trim();
+  const subject = `🎉 Welcome to Vernunt, ${userName}! Your ${userRole} Account is Ready`;
+
+  const mainHtml = `
+    <p>Hi <strong>${escapeHtml(userName)}</strong>,</p>
+    <p>Welcome to <strong>Vernunt Play Time Connect</strong>! Your <strong>${escapeHtml(userRole)}</strong> account has been created successfully.</p>
+    <div class="details-card">
+      <div class="details-row"><span class="details-label">Account Name</span><span class="details-value">${escapeHtml(userName)}</span></div>
+      <div class="details-row"><span class="details-label">Account Role</span><span class="details-value">${escapeHtml(userRole)}</span></div>
+      <div class="details-row"><span class="details-label">Registered Email</span><span class="details-value">${escapeHtml(toEmail)}</span></div>
+      <div class="details-row"><span class="details-label">Joined On</span><span class="details-value">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></div>
+    </div>
+    <p>You can now discover verified neighborhood playmates, book kids events &amp; workshops, consult pediatric specialists, and shop BIS-certified Montessori toys.</p>
+  `;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: '🎉 Welcome to Vernunt',
+    mainContentHtml: mainHtml,
+    callToAction: { label: 'Explore Vernunt Now', url: observedPublicOrigin },
+    footerNote: 'You received this welcome email because a new account was registered with your email on Vernunt.'
+  });
+
+  const res = await sendEmailMessage({
+    to: toEmail,
+    subject,
+    type: 'welcome_signup',
+    triggerSource: 'New Account Sign-Up',
+    htmlContent,
+    textContent: `Welcome to Vernunt, ${userName}!\nYour ${userRole} account is now active.\nExplore Vernunt: ${observedPublicOrigin}`,
+    adminInstance: options.adminInstance
+  });
+  return { success: res.success, logId: res.logId };
+}
+
+/**
+ * Send Instant Security Notification Email whenever an Admin or User changes/sets their password
+ */
+export async function sendPasswordChangedEmail(options: {
+  email: string;
+  userName?: string;
+  userRole?: string;
+  isFirstTimeSet?: boolean;
+  adminInstance?: any;
+}): Promise<{ success: boolean; logId?: string }> {
+  const cleanEmail = String(options.email || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) return { success: false };
+
+  const targetName = String(options.userName || 'Vernunt Member').trim();
+  const roleLabel = String(options.userRole || 'Account').trim();
+  const actionLabel = options.isFirstTimeSet ? 'Password Set' : 'Password Changed';
+  const changedAtIst = new Date().toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+  const subject = `🔐 Security Alert: Your Vernunt Account ${actionLabel}`;
+
+  const mainHtml = `
+    <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+    <p>This is a security confirmation that your Vernunt account password was <strong>${options.isFirstTimeSet ? 'newly set' : 'changed'}</strong>.</p>
+    <div class="details-card">
+      <div class="details-row"><span class="details-label">Account</span><span class="details-value">${escapeHtml(cleanEmail)}</span></div>
+      <div class="details-row"><span class="details-label">Role</span><span class="details-value">${escapeHtml(roleLabel)}</span></div>
+      <div class="details-row"><span class="details-label">Action</span><span class="details-value">${actionLabel}</span></div>
+      <div class="details-row"><span class="details-label">Time (IST)</span><span class="details-value">${escapeHtml(changedAtIst)}</span></div>
+    </div>
+    <div class="safety-callout">
+      🛡️ <strong>Didn&apos;t make this change?</strong> Immediately open your Vernunt Profile &rarr; Security &amp; Password to update your password or contact <a href="mailto:support@vernunt.com">support@vernunt.com</a>.
+    </div>
+  `;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: '🔐 Account Security Alert',
+    mainContentHtml: mainHtml,
+    callToAction: { label: 'Review Account Security', url: `${observedPublicOrigin}/?tab=profile` },
+    footerNote: 'Automated Vernunt Account Security Notification. Passwords are stored using salted scrypt hashing.'
+  });
+
+  const res = await sendEmailMessage({
+    to: cleanEmail,
+    subject,
+    type: 'password_changed',
+    triggerSource: actionLabel,
+    htmlContent,
+    textContent: `Security Alert: Your Vernunt account password was ${options.isFirstTimeSet ? 'set' : 'changed'} on ${changedAtIst}.\nAccount: ${cleanEmail}\nIf you did not make this change, contact support@vernunt.com immediately.`,
+    adminInstance: options.adminInstance
+  });
+  return { success: res.success, logId: res.logId };
+}
+
+/**
+ * Send Instant Admin Alert Email whenever a new user signs up on Vernunt
+ */
+export async function sendAdminNewSignupEmail(options: {
+  user: Record<string, any>;
+  adminInstance?: any;
+  recipientsOverride?: string[];
+  isTest?: boolean;
+}): Promise<{ success: boolean; skipped?: boolean; recipients: string[]; results: Array<{ to: string; success: boolean; previewUrl?: string; error?: string }> }> {
+  const settings = getAdminEmailTriggerSettings();
+  if (!options.isTest && !settings.newUserSignupEnabled) {
+    return { success: true, skipped: true, recipients: [], results: [] };
+  }
+
+  const recipients = options.recipientsOverride && options.recipientsOverride.length > 0
+    ? parseAdminEmailsList(options.recipientsOverride)
+    : settings.recipients;
+
+  if (recipients.length === 0) {
+    return { success: false, recipients: [], results: [] };
+  }
+
+  const u = options.user || {};
+  const userName = String(u.parentName || u.name || u.companyName || 'New Vernunt Member').trim();
+  const userRole = String(u.userRole || 'Parent').trim();
+  const userEmail = u.email ? String(u.email).trim() : 'Not provided';
+  const userPhone = u.phoneNumber ? String(u.phoneNumber).trim() : 'Not provided';
+  const userId = String(u.id || `user-${Date.now()}`);
+  const locationLabel =
+    (typeof u.currentAddress === 'string' && u.currentAddress) ||
+    (typeof u.location?.address === 'string' && u.location.address) ||
+    (typeof u.neighbourhood === 'string' && u.neighbourhood) ||
+    'Not specified';
+  const referralSource = String(u.affiliateReferredBy || u.referredByCode || 'Organic Sign-up');
+  const kycState = u.aadhaarVerified
+    ? 'Verified'
+    : u.kycSubmitted
+      ? 'Pending Admin KYC Review'
+      : u.kycSkipped
+        ? 'Skipped KYC at Sign-Up'
+        : String(u.verificationStatus || 'Standard');
+  const registeredAtIst = new Date(u.registeredAt || u.createdAt || Date.now()).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const subjectPrefix = options.isTest ? '[TEST] ' : '';
+  const subject = `${subjectPrefix}🆕 New User Sign-Up on Vernunt: ${userName} (${userRole})`;
+
+  const mainHtml = `
+    <p>Hello <strong>Vernunt Admin</strong>,</p>
+    <p>A new user account has just signed up on the Vernunt platform${options.isTest ? ' <em>(Sample Test Alert)</em>' : ''}.</p>
+    <div class="details-card">
+      <div class="details-row"><span class="details-label">Account Name</span><span class="details-value">${escapeHtml(userName)}</span></div>
+      <div class="details-row"><span class="details-label">Role</span><span class="details-value">${escapeHtml(userRole)}</span></div>
+      <div class="details-row"><span class="details-label">Email</span><span class="details-value">${escapeHtml(userEmail)}</span></div>
+      <div class="details-row"><span class="details-label">Mobile</span><span class="details-value">${escapeHtml(userPhone)}</span></div>
+      <div class="details-row"><span class="details-label">Locality / Address</span><span class="details-value">${escapeHtml(locationLabel)}</span></div>
+      <div class="details-row"><span class="details-label">KYC Status</span><span class="details-value">${escapeHtml(kycState)}</span></div>
+      <div class="details-row"><span class="details-label">Attribution</span><span class="details-value">${escapeHtml(referralSource)}</span></div>
+      <div class="details-row"><span class="details-label">Signed Up (IST)</span><span class="details-value">${escapeHtml(registeredAtIst)}</span></div>
+      <div class="details-row"><span class="details-label">User ID</span><span class="details-value" style="font-family:monospace;">${escapeHtml(userId)}</span></div>
+    </div>
+    <p style="font-size:13px;color:#475569;">
+      Open the Vernunt Admin Dashboard to inspect the new user profile, review verification documents if submitted, or manage role permissions.
+    </p>
+  `;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: options.isTest ? '🧪 Test Admin Sign-Up Trigger' : '🆕 New User Sign-Up',
+    mainContentHtml: mainHtml,
+    callToAction: { label: 'Open Admin Dashboard', url: 'https://app.vernunt.com/?tab=admin' },
+    footerNote: 'Automated Admin Sign-Up Notification • Configure recipients inside Admin Dashboard > Settings.'
+  });
+
+  const textContent = [
+    subject,
+    '',
+    `Account Name: ${userName}`,
+    `Role: ${userRole}`,
+    `Email: ${userEmail}`,
+    `Mobile: ${userPhone}`,
+    `Locality / Address: ${locationLabel}`,
+    `KYC Status: ${kycState}`,
+    `Attribution: ${referralSource}`,
+    `Signed Up (IST): ${registeredAtIst}`,
+    `User ID: ${userId}`,
+    '',
+    'Review in Admin Dashboard: https://app.vernunt.com/?tab=admin',
+    '- Vernunt Notification Engine'
+  ].join('\n');
+
+  const results: Array<{ to: string; success: boolean; previewUrl?: string; error?: string }> = [];
+  for (const recipient of recipients) {
+    const res = await sendEmailMessage({
+      to: recipient,
+      subject,
+      type: 'admin_new_signup',
+      htmlContent,
+      textContent,
+      adminInstance: options.adminInstance
+    });
+    results.push({
+      to: recipient,
+      success: res.success,
+      previewUrl: res.previewUrl,
+      error: res.error
+    });
+  }
+
+  console.log(`[EmailService] 🆕 New user signup alert triggered for "${userName}" (${userId}) -> ${recipients.join(', ')}`);
+  return {
+    success: results.some(r => r.success),
+    recipients,
+    results
+  };
+}
+
+// 30-second deduplication caches so submitting/approving from multiple sync hooks never double-emails
+const recentAdminKycAlertMap = new Map<string, number>();
+const recentUserKycApprovalMap = new Map<string, number>();
+const DEDUP_WINDOW_MS = 30 * 1000;
+
+/**
+ * Send Instant Admin Alert Email whenever any user submits their profile for KYC verification
+ */
+export async function sendAdminKycSubmittedEmail(options: {
+  applicant: Record<string, any>;
+  adminInstance?: any;
+  recipientsOverride?: string[];
+  force?: boolean;
+}): Promise<{ success: boolean; deduplicated?: boolean; recipients: string[]; results: Array<{ to: string; success: boolean; logId?: string; error?: string }> }> {
+  const a = options.applicant || {};
+  const dedupKey = String(a.id || a.userId || a.applicantId || a.email || a.applicantEmail || '').trim().toLowerCase();
+  const nowMs = Date.now();
+  if (!options.force && dedupKey) {
+    const lastSent = recentAdminKycAlertMap.get(dedupKey);
+    if (lastSent && nowMs - lastSent < DEDUP_WINDOW_MS) {
+      return { success: true, deduplicated: true, recipients: [], results: [] };
+    }
+    recentAdminKycAlertMap.set(dedupKey, nowMs);
+  }
+
+  const settings = getAdminEmailTriggerSettings();
+  const recipients = options.recipientsOverride && options.recipientsOverride.length > 0
+    ? parseAdminEmailsList(options.recipientsOverride)
+    : settings.recipients;
+
+  if (recipients.length === 0) {
+    return { success: false, recipients: [], results: [] };
+  }
+
+  const applicantName = String(a.parentName || a.applicantName || a.name || 'Vernunt Applicant').trim();
+  const applicantRole = String(a.userRole || a.applicantRole || 'Parent').trim();
+  const applicantEmail = String(a.email || a.applicantEmail || 'Not provided').trim();
+  const applicantPhone = String(a.phoneNumber || a.applicantPhone || 'Not provided').trim();
+  const applicantId = String(a.id || a.userId || a.applicantId || `user-${Date.now()}`);
+  const childInfo = a.childName ? `${a.childName}${a.childAge ? ` (${a.childAge} yrs)` : ''}` : 'Not specified';
+  const addressLabel = String(
+    a.currentAddress ||
+    (typeof a.location === 'string' ? a.location : a.location?.address) ||
+    a.apartmentCommunityName ||
+    'Not specified'
+  ).trim();
+  const idDocName = String(a.aadhaarDocName || a.idDocName || 'Uploaded Government ID / Aadhaar').trim();
+  const addrDocName = String(a.addressProofDocName || a.addressProofDocType || 'Included with submission').trim();
+  const submittedAtIst = new Date(a.submittedAt || a.kycSubmittedAt || Date.now()).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const subject = `🛡️ KYC Verification Submitted: ${applicantName} (${applicantRole}) — Action Required`;
+  const mainHtml = `
+    <p>Hello <strong>Vernunt Admin</strong>,</p>
+    <p>A user has submitted their profile and identity documents for <strong>KYC Verification</strong> and is awaiting your approval.</p>
+    <div class="details-card">
+      <div class="details-row"><span class="details-label">Applicant Name</span><span class="details-value">${escapeHtml(applicantName)}</span></div>
+      <div class="details-row"><span class="details-label">Role</span><span class="details-value">${escapeHtml(applicantRole)}</span></div>
+      <div class="details-row"><span class="details-label">Email</span><span class="details-value">${escapeHtml(applicantEmail)}</span></div>
+      <div class="details-row"><span class="details-label">Phone</span><span class="details-value">${escapeHtml(applicantPhone)}</span></div>
+      <div class="details-row"><span class="details-label">Child Profile</span><span class="details-value">${escapeHtml(childInfo)}</span></div>
+      <div class="details-row"><span class="details-label">Address / Community</span><span class="details-value">${escapeHtml(addressLabel)}</span></div>
+      <div class="details-row"><span class="details-label">Identity Proof</span><span class="details-value">${escapeHtml(idDocName)}</span></div>
+      <div class="details-row"><span class="details-label">Address Proof</span><span class="details-value">${escapeHtml(addrDocName)}</span></div>
+      <div class="details-row"><span class="details-label">Submitted At (IST)</span><span class="details-value">${escapeHtml(submittedAtIst)}</span></div>
+      <div class="details-row"><span class="details-label">Applicant ID</span><span class="details-value" style="font-family:monospace;">${escapeHtml(applicantId)}</span></div>
+    </div>
+    <p style="font-size:13px;color:#475569;">
+      Please inspect the uploaded KYC documents in the Vernunt Admin Dashboard and approve or update the account verification status. Once approved, the user will automatically receive an approval notification email.
+    </p>
+  `;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: '🛡️ Admin KYC Verification Alert',
+    mainContentHtml: mainHtml,
+    callToAction: { label: 'Review & Approve KYC in Admin Dashboard', url: `${observedPublicOrigin}/?tab=admin` },
+    footerNote: 'Automated Admin KYC Alert • Sent to configured Vernunt admin recipients.'
+  });
+
+  const textContent = [
+    subject,
+    '',
+    `Applicant Name: ${applicantName}`,
+    `Role: ${applicantRole}`,
+    `Email: ${applicantEmail}`,
+    `Phone: ${applicantPhone}`,
+    `Child Profile: ${childInfo}`,
+    `Address: ${addressLabel}`,
+    `Identity Proof: ${idDocName}`,
+    `Address Proof: ${addrDocName}`,
+    `Submitted At (IST): ${submittedAtIst}`,
+    `Applicant ID: ${applicantId}`,
+    '',
+    `Review in Admin Dashboard: ${observedPublicOrigin}/?tab=admin`,
+    '- Vernunt Safety & KYC Engine'
+  ].join('\n');
+
+  const results: Array<{ to: string; success: boolean; logId?: string; error?: string }> = [];
+  for (const recipient of recipients) {
+    const res = await sendEmailMessage({
+      to: recipient,
+      subject,
+      type: 'admin_kyc_alert',
+      triggerSource: 'User Submitted Profile for KYC',
+      htmlContent,
+      textContent,
+      adminInstance: options.adminInstance
+    });
+    results.push({
+      to: recipient,
+      success: res.success,
+      logId: res.logId,
+      error: res.error
+    });
+  }
+
+  console.log(`[EmailService] 🛡️ Admin KYC submission alert sent for "${applicantName}" (${applicantId}) -> ${recipients.join(', ')}`);
+  return {
+    success: results.some(r => r.success),
+    recipients,
+    results
+  };
+}
+
+/**
+ * Send Confirmation Email to User when Admin Approves their Profile & KYC Verification
+ */
+export async function sendUserKycApprovedEmail(options: {
+  user: Record<string, any>;
+  loginUrl?: string;
+  adminInstance?: any;
+  force?: boolean;
+}): Promise<{ success: boolean; deduplicated?: boolean; logId?: string; previewUrl?: string; error?: string }> {
+  const u = options.user || {};
+  const toEmail = String(u.email || '').trim().toLowerCase();
+  if (!toEmail || !toEmail.includes('@')) {
+    return { success: false, error: 'User email is missing or invalid.' };
+  }
+
+  const dedupKey = `${String(u.id || u.userId || '').trim().toLowerCase()}|${toEmail}`;
+  const nowMs = Date.now();
+  if (!options.force) {
+    const lastSent = recentUserKycApprovalMap.get(dedupKey);
+    if (lastSent && nowMs - lastSent < DEDUP_WINDOW_MS) {
+      return { success: true, deduplicated: true };
+    }
+    recentUserKycApprovalMap.set(dedupKey, nowMs);
+  }
+
+  const targetName = String(u.parentName || u.name || 'Verified Member').trim();
+  const targetRole = String(u.userRole || u.role || 'Parent').trim();
+  const loginLink = String(options.loginUrl || `${observedPublicOrigin}/?action=login&user=${encodeURIComponent(u.id || u.userId || 'member')}`);
+  const approvedAtIst = new Date().toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    dateStyle: 'medium',
+    timeStyle: 'short'
+  });
+
+  const subject = `✅ Your Vernunt Profile & KYC Verification Have Been Approved!`;
+  const mainHtml = `
+    <p>Hello <strong>${escapeHtml(targetName)}</strong>,</p>
+    <p>Congratulations! Your <strong>${escapeHtml(targetRole)}</strong> profile and KYC identity verification on <strong>Vernunt</strong> have been officially <strong>APPROVED</strong> by our verification team.</p>
+    <div class="details-card">
+      <div class="details-row"><span class="details-label">Account Name</span><span class="details-value">${escapeHtml(targetName)}</span></div>
+      <div class="details-row"><span class="details-label">Role</span><span class="details-value">${escapeHtml(targetRole)}</span></div>
+      <div class="details-row"><span class="details-label">KYC Status</span><span class="details-value"><span class="status-pill status-paid">VERIFIED &amp; APPROVED</span></span></div>
+      <div class="details-row"><span class="details-label">Approved On (IST)</span><span class="details-value">${escapeHtml(approvedAtIst)}</span></div>
+    </div>
+    <p><strong>What is now unlocked on your account:</strong></p>
+    <ul style="margin:8px 0 16px 18px;padding:0;font-size:13.5px;color:#334155;">
+      <li>Verified Child-Safety Badge displayed on your profile</li>
+      <li>Full access to connect with verified neighborhood playmates &amp; private parent chats</li>
+      <li>Instant booking for kids events, workshops, daycare, and pediatric specialists</li>
+    </ul>
+  `;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: '✅ KYC Approved & Verified',
+    mainContentHtml: mainHtml,
+    callToAction: { label: 'Log In to Your Verified Vernunt Account', url: loginLink },
+    footerNote: 'Welcome to our safe, verified neighborhood community!'
+  });
+
+  const textContent = [
+    `Hello ${targetName},`,
+    '',
+    `Congratulations! Your ${targetRole} profile and KYC identity verification on Vernunt have been officially APPROVED by our admin team (${approvedAtIst}).`,
+    '',
+    `Log in now to access verified playdates, community events, and family connections:`,
+    loginLink,
+    '',
+    '- The Vernunt Safety & Community Team'
+  ].join('\n');
+
+  const res = await sendEmailMessage({
+    to: toEmail,
+    subject,
+    type: 'profile_approved',
+    triggerSource: 'Admin Approved User KYC',
+    htmlContent,
+    textContent,
+    adminInstance: options.adminInstance
+  });
+
+  console.log(`[EmailService] ✅ KYC approval email sent to "${targetName}" <${toEmail}>`);
+  return {
+    success: res.success,
+    logId: res.logId,
+    previewUrl: res.previewUrl,
+    error: res.error
+  };
+}
+
+/**
+ * Send Review Update Email to User when Admin requests KYC re-submission or declines
+ */
+export async function sendUserKycRejectedEmail(options: {
+  user: Record<string, any>;
+  adminNotes?: string;
+  adminInstance?: any;
+}): Promise<{ success: boolean; logId?: string; error?: string }> {
+  const u = options.user || {};
+  const toEmail = String(u.email || '').trim().toLowerCase();
+  if (!toEmail || !toEmail.includes('@')) {
+    return { success: false, error: 'User email is missing or invalid.' };
+  }
+  const targetName = String(u.parentName || u.name || 'Member').trim();
+  const reason = String(options.adminNotes || 'Please upload a clear government-issued photo ID so our safety team can approve your profile.').trim();
+  const subject = `⚠️ Action Required: Update Your Vernunt KYC Verification`;
+
+  const htmlContent = buildVernuntEmailTemplate({
+    title: subject,
+    badgeText: '🛡️ KYC Review Update',
+    mainContentHtml: `
+      <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+      <p>Our verification team reviewed your recent KYC submission and needs an updated document before approving your account.</p>
+      <div class="details-card">
+        <div class="details-row"><span class="details-label">Review Status</span><span class="details-value"><span class="status-pill status-pending">ACTION NEEDED</span></span></div>
+        <div class="details-row"><span class="details-label">Reviewer Note</span><span class="details-value">${escapeHtml(reason)}</span></div>
+      </div>
+      <p>Please sign in to Vernunt and re-submit a clear Aadhaar or government ID photo for rapid approval.</p>
+    `,
+    callToAction: { label: 'Update KYC Documents', url: `${observedPublicOrigin}/?tab=profile` }
+  });
+
+  const res = await sendEmailMessage({
+    to: toEmail,
+    subject,
+    type: 'profile_rejected',
+    triggerSource: 'Admin KYC Review Update',
+    htmlContent,
+    textContent: `Hi ${targetName},\n\nOur verification team reviewed your KYC submission and needs an update: ${reason}\n\nPlease sign in to Vernunt to re-submit your KYC documents: ${observedPublicOrigin}/?tab=profile`,
+    adminInstance: options.adminInstance
+  });
+  return { success: res.success, logId: res.logId, error: res.error };
 }
 
 /**
  * Register Email and Notification Express Routes
  */
 export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) {
+
+  // Capture live public HTTPS origin automatically so read-tracking pixels always resolve externally
+  app.use((req, _res, next) => {
+    const rawHost = String(req.headers['x-forwarded-host'] || req.headers.host || '').split(',')[0].trim();
+    const rawProto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
+    if (rawHost && !rawHost.startsWith('localhost') && !rawHost.startsWith('127.0.0.1')) {
+      observedPublicOrigin = `${rawProto}://${rawHost}`;
+    }
+    next();
+  });
+
+  // =========================================================================
+  // 0. REAL-TIME EMAIL OPEN / READ TRACKING PIXEL (1x1 TRANSPARENT GIF)
+  // =========================================================================
+  app.get('/api/emails/track/open/:id/:token.gif', async (req: Request, res: Response) => {
+    const { id, token } = req.params;
+    const cleanToken = String(token || '').replace(/\.gif$/i, '');
+
+    try {
+      const entry = emailLogs.find(l => l.id === id && l.trackingToken === cleanToken);
+      if (entry) {
+        const nowIso = new Date().toISOString();
+        const ua = String(req.headers['user-agent'] || 'Email Client').slice(0, 180);
+        entry.readStatus = 'read';
+        if (!entry.readAt) entry.readAt = nowIso;
+        entry.lastReadAt = nowIso;
+        entry.openCount = (entry.openCount || 0) + 1;
+        entry.lastReadUserAgent = ua;
+        entry.updatedAt = nowIso;
+        if (entry.deliveryStatus === 'sent' || entry.deliveryStatus === 'queued') {
+          entry.deliveryStatus = 'delivered';
+          entry.status = 'delivered';
+        }
+        saveEmailLogsToDisk(emailLogs);
+
+        broadcastEmailLogEvent('email:updated', {
+          log: serializeLogForStream(entry),
+          stats: getEmailLogStats()
+        });
+
+        getAdmin()
+          .then(adminInstance => syncReadStatusToFirestore(adminInstance, entry))
+          .catch(() => {});
+      }
+    } catch (trackErr) {
+      console.debug('[EmailService] Open tracking pixel note:', trackErr);
+    }
+
+    res.setHeader('Content-Type', 'image/gif');
+    res.setHeader('Content-Length', String(TRANSPARENT_PIXEL_GIF.length));
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    return res.status(200).send(TRANSPARENT_PIXEL_GIF);
+  });
 
   // =========================================================================
   // 1. SEND EMAIL OTP (FIREBASE FIRESTORE + NODEMAILER EMAIL DISPATCH)
@@ -1023,9 +2038,189 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
           break;
         }
 
+        case 'playdate_accepted': {
+          badge = '🤝 Playtime Request Accepted';
+          emailSubject = subject || `🤝 Great News! ${details?.accepterName || 'A Parent'} Accepted Your Playtime Request`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p><strong>${escapeHtml(details?.accepterName || 'A verified parent')}</strong> (${escapeHtml(details?.childName || 'Playmate')}) has accepted your playmate connection / play time request on <strong>Vernunt</strong>!</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Connected Parent</span><span class="details-value">${escapeHtml(details?.accepterName || 'Vernunt Parent')}</span></div>
+              ${details?.childName ? `<div class="details-row"><span class="details-label">Child</span><span class="details-value">${escapeHtml(details.childName)}</span></div>` : ''}
+              ${details?.date ? `<div class="details-row"><span class="details-label">Scheduled Date</span><span class="details-value">${escapeHtml(details.date)} ${details?.time ? `• ${escapeHtml(details.time)}` : ''}</span></div>` : ''}
+              ${details?.location || details?.neighborhood ? `<div class="details-row"><span class="details-label">Location</span><span class="details-value">${escapeHtml(details?.location || details?.neighborhood)}</span></div>` : ''}
+            </div>
+            <p>Open Vernunt now to start chatting directly, share safe pickup details, and finalize your playdate.</p>
+          `;
+          break;
+        }
+
+        case 'playdate_declined': {
+          badge = '📅 Playtime Update';
+          emailSubject = subject || `📅 Playtime Request Update from ${details?.responderName || 'Parent'}`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p><strong>${escapeHtml(details?.responderName || 'The invited parent')}</strong> is unable to make this play time slot right now.</p>
+            ${details?.reason ? `<div class="details-card"><div class="details-row"><span class="details-label">Note</span><span class="details-value">${escapeHtml(details.reason)}</span></div></div>` : ''}
+            <p>No worries — you can suggest another time or explore nearby verified families on Playtime Radar.</p>
+          `;
+          break;
+        }
+
+        case 'playdate_session_joined': {
+          badge = '🎈 Group Playtime Confirmed';
+          emailSubject = subject || `🎈 You Joined "${details?.sessionTitle || 'Group Playtime Session'}"`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>${customMessage || `Your family is confirmed on the roster for <strong>${escapeHtml(details?.sessionTitle || 'Vernunt Group Playtime')}</strong>.`}</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Session</span><span class="details-value">${escapeHtml(details?.sessionTitle || 'Group Playtime')}</span></div>
+              ${details?.date ? `<div class="details-row"><span class="details-label">Date &amp; Time</span><span class="details-value">${escapeHtml(details.date)} ${details?.time ? `• ${escapeHtml(details.time)}` : ''}</span></div>` : ''}
+              ${details?.venue ? `<div class="details-row"><span class="details-label">Venue</span><span class="details-value">${escapeHtml(details.venue)}</span></div>` : ''}
+              ${details?.splitAmount !== undefined ? `<div class="details-row"><span class="details-label">Current Split Share</span><span class="details-value">₹${Number(details.splitAmount).toLocaleString('en-IN')}</span></div>` : ''}
+            </div>
+          `;
+          break;
+        }
+
+        case 'payment_paid': {
+          badge = '✅ Payment Confirmed';
+          const paidAmt = Number(details?.amount || details?.totalAmount || 0);
+          emailSubject = subject || `✅ Payment Paid: ₹${paidAmt.toLocaleString('en-IN')} Confirmed on Vernunt`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>We have received and verified your payment of <strong style="color:#15803d;">₹${paidAmt.toLocaleString('en-IN')}</strong>.</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Item / Purpose</span><span class="details-value">${escapeHtml(details?.itemTitle || details?.description || 'Vernunt Purchase')}</span></div>
+              <div class="details-row"><span class="details-label">Amount Paid</span><span class="details-value">₹${paidAmt.toLocaleString('en-IN')}</span></div>
+              <div class="details-row"><span class="details-label">Payment Method</span><span class="details-value">${escapeHtml(details?.paymentMethod || 'Online Payment')}</span></div>
+              ${details?.transactionId || details?.paymentId ? `<div class="details-row"><span class="details-label">Reference ID</span><span class="details-value" style="font-family:monospace;">${escapeHtml(details?.transactionId || details?.paymentId)}</span></div>` : ''}
+              <div class="details-row"><span class="details-label">Status</span><span class="details-value"><span class="status-pill status-paid">PAID</span></span></div>
+            </div>
+          `;
+          break;
+        }
+
+        case 'payment_pending': {
+          badge = '⏳ Payment Pending';
+          const dueAmt = Number(details?.amount || details?.totalAmount || 0);
+          emailSubject = subject || `⏳ Payment Pending: ₹${dueAmt.toLocaleString('en-IN')} for ${details?.itemTitle || details?.orderNumber || 'Your Order'}`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>${customMessage || `Your payment of <strong>₹${dueAmt.toLocaleString('en-IN')}</strong> is currently marked as <strong>PENDING</strong>.`}</p>
+            <div class="details-card">
+              ${details?.orderNumber ? `<div class="details-row"><span class="details-label">Order / Ref</span><span class="details-value" style="font-family:monospace;">#${escapeHtml(details.orderNumber)}</span></div>` : ''}
+              <div class="details-row"><span class="details-label">Item</span><span class="details-value">${escapeHtml(details?.itemTitle || 'Vernunt Order')}</span></div>
+              <div class="details-row"><span class="details-label">Amount Due</span><span class="details-value">₹${dueAmt.toLocaleString('en-IN')}</span></div>
+              <div class="details-row"><span class="details-label">Mode</span><span class="details-value">${escapeHtml(details?.paymentMethod || 'Cash on Delivery / Pending Online')}</span></div>
+              <div class="details-row"><span class="details-label">Payment Status</span><span class="details-value"><span class="status-pill status-pending">PENDING</span></span></div>
+            </div>
+            <p style="font-size:13px;color:#475569;">If this is a Cash on Delivery order, please keep the exact amount or UPI ready at doorstep delivery. If an online payment was interrupted, you can complete it anytime in your Vernunt account.</p>
+          `;
+          break;
+        }
+
+        case 'payment_failed': {
+          badge = '⚠️ Payment Unsuccessful';
+          const failAmt = Number(details?.amount || details?.totalAmount || 0);
+          emailSubject = subject || `⚠️ Payment Not Completed (₹${failAmt.toLocaleString('en-IN')}) — Retry on Vernunt`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>Your recent payment attempt of <strong>₹${failAmt.toLocaleString('en-IN')}</strong> for <strong>${escapeHtml(details?.itemTitle || 'your Vernunt checkout')}</strong> could not be completed.</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Item</span><span class="details-value">${escapeHtml(details?.itemTitle || 'Vernunt Checkout')}</span></div>
+              <div class="details-row"><span class="details-label">Amount</span><span class="details-value">₹${failAmt.toLocaleString('en-IN')}</span></div>
+              <div class="details-row"><span class="details-label">Reason</span><span class="details-value">${escapeHtml(details?.reason || 'Gateway declined or timed out')}</span></div>
+              <div class="details-row"><span class="details-label">Status</span><span class="details-value"><span class="status-pill status-cancelled">FAILED / PENDING</span></span></div>
+            </div>
+            <p style="font-size:13px;color:#475569;">If any amount was debited by your bank, it is automatically reversed within 3–5 business days. You can safely retry checkout inside Vernunt.</p>
+          `;
+          break;
+        }
+
+        case 'kyc_submitted': {
+          badge = '🪪 KYC Received';
+          emailSubject = subject || '🪪 Identity Verification Submitted — Under Admin Review';
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>Thank you for submitting your parent identity verification documents on Vernunt. Our Trust &amp; Safety team has received your submission and will review it shortly.</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Document Type</span><span class="details-value">${escapeHtml(details?.docType || 'Government ID / Aadhaar')}</span></div>
+              <div class="details-row"><span class="details-label">Current Status</span><span class="details-value"><span class="status-pill status-pending">UNDER REVIEW</span></span></div>
+              <div class="details-row"><span class="details-label">Submitted At</span><span class="details-value">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></div>
+            </div>
+            <p>You will receive an instant email as soon as your Verified Parent badge is approved.</p>
+          `;
+          break;
+        }
+
+        case 'profile_rejected': {
+          badge = '⚠️ Verification Action Needed';
+          emailSubject = subject || '⚠️ Action Needed on Your Vernunt Verification Submission';
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>We could not complete verification for your submitted documents. ${escapeHtml(details?.reason || 'Please re-upload a clear, unobstructed ID copy in your Profile settings.')}</p>
+          `;
+          break;
+        }
+
+        case 'subscription_activated': {
+          badge = '👑 Membership Active';
+          emailSubject = subject || `👑 ${details?.planName || 'Vernunt Club Plan'} Activated!`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>Your <strong>${escapeHtml(details?.planName || 'Vernunt Membership')}</strong> is now active!</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Plan</span><span class="details-value">${escapeHtml(details?.planName || 'Vernunt Club')}</span></div>
+              <div class="details-row"><span class="details-label">Amount</span><span class="details-value">₹${Number(details?.amount || 0).toLocaleString('en-IN')}</span></div>
+              <div class="details-row"><span class="details-label">Status</span><span class="details-value"><span class="status-pill status-paid">ACTIVE</span></span></div>
+            </div>
+          `;
+          break;
+        }
+
+        case 'password_changed': {
+          badge = '🔐 Account Security Alert';
+          emailSubject = subject || '🔐 Security Alert: Your Vernunt Password Was Updated';
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>${customMessage || 'Your Vernunt account password was updated successfully.'}</p>
+          `;
+          break;
+        }
+
+        case 'welcome_signup': {
+          badge = '🎉 Welcome to Vernunt';
+          emailSubject = subject || `🎉 Welcome to Vernunt, ${targetName}!`;
+          mainHtml = `
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
+            <p>${customMessage || 'Welcome to Vernunt Play Time Connect! Your account is ready.'}</p>
+          `;
+          break;
+        }
+
+        case 'admin_new_signup':
+        case 'admin_kyc_alert': {
+          badge = type === 'admin_kyc_alert' ? '🛡️ Admin KYC Alert' : '🆕 New User Sign-Up';
+          emailSubject = subject || `🆕 New User Sign-Up on Vernunt: ${details?.applicantName || targetName}`;
+          mainHtml = `
+            <p>Hello <strong>Vernunt Admin</strong>,</p>
+            <p>${customMessage || `A new ${escapeHtml(details?.applicantRole || 'Parent')} registration alert has been triggered.`}</p>
+            <div class="details-card">
+              <div class="details-row"><span class="details-label">Name</span><span class="details-value">${escapeHtml(details?.applicantName || targetName)}</span></div>
+              <div class="details-row"><span class="details-label">Role</span><span class="details-value">${escapeHtml(details?.applicantRole || 'Parent')}</span></div>
+              <div class="details-row"><span class="details-label">Email</span><span class="details-value">${escapeHtml(details?.applicantEmail || 'Not provided')}</span></div>
+              <div class="details-row"><span class="details-label">Mobile</span><span class="details-value">${escapeHtml(details?.applicantPhone || 'Not provided')}</span></div>
+              ${details?.currentAddress ? `<div class="details-row"><span class="details-label">Address</span><span class="details-value">${escapeHtml(details.currentAddress)}</span></div>` : ''}
+              ${details?.aadhaarDocName ? `<div class="details-row"><span class="details-label">ID Proof</span><span class="details-value">${escapeHtml(details.aadhaarDocName)}</span></div>` : ''}
+            </div>
+          `;
+          break;
+        }
+
         default: {
           mainHtml = `
-            <p>Hi <strong>${targetName}</strong>,</p>
+            <p>Hi <strong>${escapeHtml(targetName)}</strong>,</p>
             <p>${customMessage || 'You have an important update regarding your Vernunt account and community activities.'}</p>
           `;
           break;
@@ -1398,7 +2593,8 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
       const sendResult = await sendEmailMessage({
         to: targetEmail,
         subject,
-        type: 'general',
+        type: 'daycare_booking',
+        triggerSource: 'Daycare Slot Reserved',
         textContent: `Daycare Reservation Confirmed: ${providerName}\nChild: ${childName}\nDate: ${date} (${startTime}-${endTime})\nDrop PIN: ${dropOffPin}\nPick PIN: ${pickupPin}\n\n- Team Vernunt`,
         htmlContent,
         adminInstance
@@ -1448,7 +2644,8 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
       const sendResult = await sendEmailMessage({
         to: toEmail,
         subject,
-        type: 'general',
+        type: 'event_published',
+        triggerSource: 'Event Published Live',
         textContent: `Event Published: "${event?.title}" is live on Vernunt!\nDate: ${event?.date} at ${event?.time}\nVenue: ${event?.location}\n\n- Team Vernunt`,
         htmlContent,
         adminInstance
@@ -1466,13 +2663,282 @@ export function registerEmailRoutes(app: Express, getAdmin: () => Promise<any>) 
   });
 
   // =========================================================================
-  // 4. GET RECENT EMAIL AUDIT LOGS (ADMIN / DEBUGGING)
+  // 7. ADMIN EMAIL TRIGGER SETTINGS, TEST & LOGS
   // =========================================================================
+  app.get('/api/admin/email-triggers', (_req: Request, res: Response) => {
+    const settings = getAdminEmailTriggerSettings();
+    const senderEmail = (process.env.SMTP_USER || process.env.MAIL_USER || process.env.GMAIL_USER || DEFAULT_SMTP_SENDER_EMAIL).trim();
+    const smtpConfigured = Boolean(
+      (process.env.SMTP_PASS || process.env.MAIL_PASS || process.env.GMAIL_APP_PASSWORD || '').trim()
+    );
+    return res.json({
+      success: true,
+      enabled: settings.newUserSignupEnabled,
+      recipients: settings.recipients,
+      senderEmail,
+      updatedAt: settings.updatedAt,
+      smtpConfigured,
+      logs: emailLogs.slice(0, 50)
+    });
+  });
+
+  app.post('/api/admin/email-triggers', async (req: Request, res: Response) => {
+    try {
+      const { enabled, recipients } = req.body || {};
+      const updated = saveAdminEmailTriggerSettings({
+        newUserSignupEnabled: enabled,
+        recipients
+      });
+
+      // Mirror config to Firestore system_config if Admin SDK is available
+      try {
+        const adminInstance = await getAdmin();
+        if (adminInstance) {
+          const db = firebaseConfig.firestoreDatabaseId
+            ? adminInstance.firestore(firebaseConfig.firestoreDatabaseId)
+            : adminInstance.firestore();
+          await db.collection('system_config').doc('admin_email_triggers').set(updated, { merge: true });
+        }
+      } catch (fsErr) {
+        console.debug('[EmailService] Admin trigger Firestore mirror note:', fsErr);
+      }
+
+      return res.json({
+        success: true,
+        enabled: updated.newUserSignupEnabled,
+        recipients: updated.recipients,
+        updatedAt: updated.updatedAt
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
+  app.post('/api/admin/email-triggers/test', async (req: Request, res: Response) => {
+    try {
+      const { recipients } = req.body || {};
+      const adminInstance = await getAdmin();
+      const result = await sendAdminNewSignupEmail({
+        user: {
+          id: `test-signup-${Date.now()}`,
+          parentName: 'Sample Parent Verification',
+          userRole: 'Parent',
+          email: 'sample.parent@example.com',
+          phoneNumber: '+91 9876543210',
+          currentAddress: 'Koramangala 4th Block, Bengaluru',
+          kycSubmitted: false,
+          verificationStatus: 'PENDING',
+          registeredAt: new Date().toISOString()
+        },
+        adminInstance,
+        recipientsOverride: Array.isArray(recipients) ? recipients : parseAdminEmailsList(recipients),
+        isTest: true
+      });
+      return res.json({
+        ...result,
+        logs: emailLogs.slice(0, 20)
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
+  app.post('/api/admin/kyc-submitted-alert', async (req: Request, res: Response) => {
+    try {
+      const applicant = req.body || {};
+      const adminInstance = await getAdmin();
+      const result = await sendAdminKycSubmittedEmail({
+        applicant,
+        adminInstance
+      });
+      return res.json({
+        success: result.success,
+        deduplicated: result.deduplicated,
+        recipients: result.recipients,
+        results: result.results
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
+  // =========================================================================
+  // 8. REAL-TIME ADMIN EMAIL LOGS API, SSE STREAM, PREVIEW, RESEND & TEST
+  // =========================================================================
+  app.get('/api/admin/email-logs/stream', (req: Request, res: Response) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    if (typeof (res as any).flushHeaders === 'function') {
+      (res as any).flushHeaders();
+    }
+
+    emailLogSseClients.add(res);
+
+    // Send initial authoritative state snapshot immediately
+    const initPayload = {
+      logs: emailLogs.slice(0, 200).map(serializeLogForStream),
+      stats: getEmailLogStats(),
+      smtp: getSmtpRuntimeInfo(),
+      trackingOrigin: observedPublicOrigin
+    };
+    res.write(`event: init\ndata: ${JSON.stringify(initPayload)}\n\n`);
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: heartbeat ${Date.now()}\n\n`);
+      } catch {
+        clearInterval(heartbeat);
+        emailLogSseClients.delete(res);
+      }
+    }, 25000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      emailLogSseClients.delete(res);
+    });
+  });
+
+  app.get('/api/admin/email-logs', (req: Request, res: Response) => {
+    const statusFilter = String(req.query.status || 'all').toLowerCase();
+    const readFilter = String(req.query.readStatus || 'all').toLowerCase();
+    const typeFilter = String(req.query.type || 'all').toLowerCase();
+    const q = String(req.query.q || '').trim().toLowerCase();
+    const limit = Math.min(500, Math.max(10, parseInt(String(req.query.limit || '200'), 10) || 200));
+
+    let filtered = emailLogs;
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(l => l.deliveryStatus === statusFilter);
+    }
+    if (readFilter === 'read' || readFilter === 'unread') {
+      filtered = filtered.filter(l => l.readStatus === readFilter);
+    }
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(l => l.type.toLowerCase() === typeFilter || l.category.toLowerCase() === typeFilter);
+    }
+    if (q) {
+      filtered = filtered.filter(l =>
+        l.to.toLowerCase().includes(q) ||
+        l.subject.toLowerCase().includes(q) ||
+        l.triggerSource.toLowerCase().includes(q) ||
+        l.category.toLowerCase().includes(q) ||
+        (l.messageId || '').toLowerCase().includes(q)
+      );
+    }
+
+    return res.json({
+      success: true,
+      total: emailLogs.length,
+      filteredTotal: filtered.length,
+      stats: getEmailLogStats(),
+      smtp: getSmtpRuntimeInfo(),
+      trackingOrigin: observedPublicOrigin,
+      logs: filtered.slice(0, limit).map(serializeLogForStream)
+    });
+  });
+
+  app.get('/api/admin/email-logs/:id', (req: Request, res: Response) => {
+    const entry = emailLogs.find(l => l.id === req.params.id);
+    if (!entry) {
+      return res.status(404).json({ success: false, error: 'Email log record not found.' });
+    }
+    const pixelUrl = `${observedPublicOrigin}/api/emails/track/open/${encodeURIComponent(entry.id)}/${encodeURIComponent(entry.trackingToken)}.gif`;
+    return res.json({
+      success: true,
+      log: entry,
+      trackingPixelUrl: pixelUrl
+    });
+  });
+
+  app.post('/api/admin/email-logs/send-test', async (req: Request, res: Response) => {
+    try {
+      const { toEmail, subject, message } = req.body || {};
+      const cleanTo = String(toEmail || '').trim().toLowerCase();
+      if (!cleanTo || !cleanTo.includes('@')) {
+        return res.status(400).json({ success: false, error: 'Please provide a valid recipient email address.' });
+      }
+      const mailSubject = String(subject || '').trim() || `🧪 Vernunt Live Email Log & Read-Tracking Test`;
+      const bodyText = String(message || '').trim() || 'This is a live test email dispatched from the Vernunt Admin Email Logs desk to verify SMTP delivery status and real-time read-receipt tracking.';
+
+      const htmlContent = buildVernuntEmailTemplate({
+        title: mailSubject,
+        badgeText: '🧪 Live Delivery & Read Test',
+        mainContentHtml: `
+          <p>Hello,</p>
+          <p>${escapeHtml(bodyText)}</p>
+          <div class="details-card">
+            <div class="details-row"><span class="details-label">Recipient</span><span class="details-value">${escapeHtml(cleanTo)}</span></div>
+            <div class="details-row"><span class="details-label">Dispatched (IST)</span><span class="details-value">${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</span></div>
+            <div class="details-row"><span class="details-label">Read Receipt Pixel</span><span class="details-value">Embedded Automatically</span></div>
+          </div>
+          <p style="font-size:12.5px;color:#64748b;">When you open this email with images enabled, the Vernunt Admin Email Log updates to <strong>Read</strong> in real time.</p>
+        `,
+        callToAction: { label: 'Open Vernunt App', url: observedPublicOrigin },
+        footerNote: 'Sent from Vernunt Admin Email Logs Desk.'
+      });
+
+      const adminInstance = await getAdmin();
+      const result = await sendEmailMessage({
+        to: cleanTo,
+        subject: mailSubject,
+        type: 'test_email',
+        triggerSource: 'Admin Email Logs Test',
+        htmlContent,
+        textContent: `${mailSubject}\n\n${bodyText}`,
+        adminInstance
+      });
+
+      return res.json({
+        success: true,
+        logId: result.logId,
+        deliveryStatus: result.deliveryStatus,
+        error: result.error,
+        stats: getEmailLogStats()
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
+  app.post('/api/admin/email-logs/:id/resend', async (req: Request, res: Response) => {
+    try {
+      const original = emailLogs.find(l => l.id === req.params.id);
+      if (!original) {
+        return res.status(404).json({ success: false, error: 'Original email log not found.' });
+      }
+      const adminInstance = await getAdmin();
+      const result = await sendEmailMessage({
+        to: original.to,
+        subject: original.subject,
+        type: original.type,
+        triggerSource: `Resend: ${original.triggerSource}`,
+        htmlContent: original.htmlContent || buildVernuntEmailTemplate({
+          title: original.subject,
+          badgeText: '🔁 Resent Notification',
+          mainContentHtml: `<p>${escapeHtml(original.textPreview || original.subject)}</p>`
+        }),
+        textContent: original.textPreview || original.subject,
+        adminInstance
+      });
+      return res.json({
+        success: true,
+        logId: result.logId,
+        deliveryStatus: result.deliveryStatus,
+        error: result.error
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || String(err) });
+    }
+  });
+
   app.get('/api/notifications/email-logs', (_req: Request, res: Response) => {
     return res.json({
       success: true,
       total: emailLogs.length,
-      logs: emailLogs.slice(0, 50)
+      stats: getEmailLogStats(),
+      smtp: getSmtpRuntimeInfo(),
+      logs: emailLogs.slice(0, 100).map(serializeLogForStream)
     });
   });
 }

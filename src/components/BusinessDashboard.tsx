@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { CommunityEvent, SpecialistProfile, Booking, ChildProfile } from '../types.ts';
-import { Award, ShieldCheck, TrendingUp, DollarSign, Percent, Settings, Edit3, Save, Users, CreditCard, Layers, ArrowRight, Sparkles, Check, FileText, Trash2, ShieldAlert, CheckCircle, XCircle, QrCode, UserCheck, Clock } from 'lucide-react';
+import { Award, ShieldCheck, TrendingUp, DollarSign, Percent, Settings, Edit3, Save, Users, CreditCard, Layers, ArrowRight, Sparkles, Check, FileText, Trash2, ShieldAlert, CheckCircle, XCircle, QrCode, UserCheck, Clock, FileSpreadsheet } from 'lucide-react';
 import confettiDefault from 'canvas-confetti';
 import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase.ts';
 import { doc, updateDoc, deleteDoc, collection, onSnapshot, setDoc } from 'firebase/firestore';
 import EventOrganizerDynamicCheckInModal from './events/EventOrganizerDynamicCheckInModal.tsx';
 import EventOrganizerCheckInStation from './events/EventOrganizerCheckInStation.tsx';
+import EventWiseUsersManager from './events/EventWiseUsersManager.tsx';
 
 interface BusinessDashboardProps {
   userProfile: ChildProfile | null;
@@ -55,6 +56,7 @@ export default function BusinessDashboard({
   // Dynamic Check-In QR & Gate Desk state for Event Organizers
   const [dynamicCheckInModalEvent, setDynamicCheckInModalEvent] = useState<CommunityEvent | null>(null);
   const [organizerCameraStationEvent, setOrganizerCameraStationEvent] = useState<CommunityEvent | null>(null);
+  const [usersManagerEventId, setUsersManagerEventId] = useState<string | null>(null);
 
   // Success animations states
   const [successToast, setSuccessToast] = useState('');
@@ -329,10 +331,24 @@ export default function BusinessDashboard({
   const totalCommissionEarned = bookingsList.reduce((acc, curr) => acc + curr.commissionEarned, 0);
   const totalOrganizerPayout = totalAmountBooked - totalCommissionEarned;
 
-  // Filter lists based on role to only allow editing of own data
+  // Filter lists based on role to only allow viewing/editing/exporting of own hosted events
   const visibleEvents = userProfile?.userRole === 'Admin'
     ? eventsList
-    : eventsList.filter(evt => userProfile && (evt.hostName === userProfile.parentName || (userProfile.id && evt.id.includes(userProfile.id))));
+    : eventsList.filter((evt) => {
+        if (!userProfile) return false;
+        const userId = String(userProfile.id || '').trim();
+        const userEmail = String((userProfile as any).email || '').trim().toLowerCase();
+        const userName = String(userProfile.parentName || '').trim().toLowerCase();
+        const evtHostId = String((evt as any).hostId || '').trim();
+        const evtOrgEmail = String((evt as any).organizerEmail || '').trim().toLowerCase();
+        const evtHostName = String(evt.hostName || '').trim().toLowerCase();
+        return Boolean(
+          (userId && evtHostId && userId === evtHostId) ||
+          (userEmail && evtOrgEmail && userEmail === evtOrgEmail) ||
+          (userName && evtHostName && userName === evtHostName) ||
+          (userId && evt.id.includes(userId))
+        );
+      });
 
   const visibleSpecialists = userProfile?.userRole === 'Admin'
     ? specialistsList
@@ -490,6 +506,24 @@ export default function BusinessDashboard({
                 <UserCheck className="w-4 h-4 text-orange-400" />
                 <span>Open Gate Desk</span>
               </button>
+
+              <button
+                type="button"
+                id="btn-host-event-users-csv"
+                onClick={() => {
+                  const targetEvt = visibleEvents[0];
+                  if (targetEvt) {
+                    setUsersManagerEventId(targetEvt.id);
+                  } else {
+                    triggerToast('You have not organized or hosted any events yet. Only your hosted events can be exported or imported.');
+                  }
+                }}
+                className="py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl text-xs font-bold transition cursor-pointer flex items-center gap-1.5 shadow-md"
+                title="Export or import users list for your hosted events"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+                <span>Event Users CSV</span>
+              </button>
             </div>
 
             {/* Background design accent */}
@@ -612,6 +646,15 @@ export default function BusinessDashboard({
                               </div>
                             ) : (
                               <div className="flex items-center justify-end gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setUsersManagerEventId(evt.id)}
+                                  className="px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded border border-emerald-200 text-[10px] font-black uppercase transition flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  title="Export or import attendees list for this event"
+                                >
+                                  <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                                  <span>Users CSV</span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => setDynamicCheckInModalEvent(evt)}
@@ -1431,6 +1474,18 @@ export default function BusinessDashboard({
           onUpdateEvent={(updated) => {
             setEventsList(prev => prev.map(e => e.id === updated.id ? updated : e));
           }}
+        />
+      )}
+
+      {/* Event-Wise Users Export & Import Modal (Host sees ONLY own hosted events; Admin sees all) */}
+      {usersManagerEventId && (
+        <EventWiseUsersManager
+          isModal
+          eventsList={visibleEvents}
+          userProfile={userProfile}
+          isAdmin={userRole === 'Admin' || userProfile?.userRole === 'Admin'}
+          initialEventId={usersManagerEventId}
+          onClose={() => setUsersManagerEventId(null)}
         />
       )}
 

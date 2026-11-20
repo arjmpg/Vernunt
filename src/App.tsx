@@ -2706,6 +2706,18 @@ export default function App() {
       console.debug('Firestore KYC sync note:', _fsErr);
     }
 
+    // 5. Notify user that their KYC submission is under review
+    if (updatedProfile.email && updatedProfile.email.includes('@')) {
+      dispatchEmailNotification({
+        toEmail: updatedProfile.email,
+        recipientName: updatedProfile.parentName,
+        type: 'kyc_submitted',
+        details: {
+          docType: (updatedProfile as any).addressProofDocType || 'Aadhaar / Government ID'
+        }
+      }).catch(() => {});
+    }
+
     // Trigger the original pending callback if it exists
     if (aadhaarSuccessCallbackRef.current) {
       aadhaarSuccessCallbackRef.current();
@@ -2736,6 +2748,34 @@ export default function App() {
             eventType: 'CONNECTION_ACCEPTED',
             targetProfile: acceptedPartner
           });
+
+          // Dispatch automated Playtime / Connection Accepted email notification
+          const partnerEmail = (acceptedPartner as any)?.email;
+          if (acceptedPartner && partnerEmail && String(partnerEmail).includes('@')) {
+            dispatchEmailNotification({
+              toEmail: partnerEmail,
+              recipientName: acceptedPartner.parentName,
+              type: 'playdate_accepted',
+              details: {
+                accepterName: userProfile.parentName,
+                childName: userProfile.childName,
+                neighborhood: userProfile.neighbourhood || 'Bangalore'
+              }
+            }).catch(() => {});
+          }
+          if (userProfile.email && userProfile.email.includes('@') && acceptedPartner) {
+            dispatchEmailNotification({
+              toEmail: userProfile.email,
+              recipientName: userProfile.parentName,
+              type: 'playdate_accepted',
+              subject: `🤝 Connected with ${acceptedPartner.parentName} on Vernunt!`,
+              details: {
+                accepterName: acceptedPartner.parentName,
+                childName: acceptedPartner.childName,
+                neighborhood: acceptedPartner.neighbourhood || 'Bangalore'
+              }
+            }).catch(() => {});
+          }
         } catch (err) {
           console.debug('Sync outbox accept note:', err);
         }
@@ -4277,7 +4317,7 @@ export default function App() {
                 }}
                 onUpdateSpecialist={handleUpdateSpecialist}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
-                onContactSupport={() => setShowSupportChat(true)}
+                onContactSupport={() => setShowContactUsModal(true)}
                 onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
               />
             )}
@@ -4735,17 +4775,23 @@ export default function App() {
             {activeTab === 'profile' && effectiveProfile && (
               <FamilyProfileHub
                 userProfile={effectiveProfile}
+                isAdmin={isSuperAdmin}
+                isGuest={!userProfile}
                 connectedPlaymates={playmates.filter(p => connectedIds.includes(p.id))}
                 bookingsList={bookingsList}
                 walletBalance={wallet.balance}
                 onEditProfile={() => setShowEditProfileModal(true)}
-                onOpenAadhaarVerification={() => setShowAadhaarModal(true)}
+                onOpenAadhaarVerification={() => setShowAadhaarVerifyModal(true)}
                 onOpenWallet={() => setShowWalletModal(true)}
                 onOpenVIPBilling={() => setActiveTab('billing')}
                 onOpenReferrals={() => setActiveTab('referrals')}
                 onOpenChatWithPlaymate={(p) => handleOpenChatTrigger(p)}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
-                onOpenSupport={() => setShowSupportChat(true)}
+                onOpenSupport={() => setShowContactUsModal(true)}
+                onOpenSignIn={() => setShowParentAuthModal(true)}
+                onPasswordChanged={() => {
+                  triggerToast('Account password updated successfully.', 'Password Updated');
+                }}
                 onSignOut={handleSignOut}
               />
             )}
@@ -4841,7 +4887,7 @@ export default function App() {
                 initialAction={storeInitialAction}
                 onClearInitialAction={() => setStoreInitialAction(undefined)}
                 onNavigateToTab={(t) => setActiveTab(t as any)}
-                onContactSupport={() => setShowSupportChat(true)}
+                onContactSupport={() => setShowContactUsModal(true)}
                 onOpenGoogleMerchantModal={() => setShowGoogleSeoModal(true)}
               />
             )}
@@ -5503,7 +5549,7 @@ export default function App() {
           userProfile={userProfile}
           onClose={() => {
             setShowAadhaarVerifyModal(false);
-            setOnAadhaarVerifySuccessCallback(null);
+            aadhaarSuccessCallbackRef.current = null;
           }}
           onVerifySuccess={handleAadhaarVerifySuccess}
           actionMessage={aadhaarActionMessage}

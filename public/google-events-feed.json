@@ -1,0 +1,2635 @@
+{
+  "feedVersion": "1.0",
+  "program": "Google Events Ticketing Partner Program & Event Rich Results Feed",
+  "specReference": "https://developers.google.com/search/docs/appearance/structured-data/event",
+  "partnerName": "Vernunt Ventures Pvt. Ltd.",
+  "partnerDomain": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app",
+  "generatedAt": "2026-11-20T01:01:05.405Z",
+  "cronSchedule": "15 2 * * * (Asia/Kolkata)",
+  "currency": "INR",
+  "totalEvents": 21,
+  "inStockEvents": 17,
+  "feedUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/google-events-feed.json",
+  "events": [
+    {
+      "eventId": "class-bhagavad-geeta-online",
+      "name": "Free Online Bhagavad Gita Classes for Kids & Families (Geeta Pariwar)",
+      "description": "Learn pure Sanskrit recitation of the Bhagavad Gita with accurate pronunciation, meanings, and moral values. Conducted live on Zoom for 40 minutes daily (Mon–Fri). 100% Free classes with zero charges for study PDFs, audio resources, and official \"Gītā Guñjana\" E-Certificates. Features engaging storytelling, rhymes, and puzzles for children.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-15T10:00:00+05:30",
+      "endDate": "2027-12-31T12:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+      "image": [
+        "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/bhagavad-geeta-class.svg"
+      ],
+      "location": {
+        "@type": "VirtualLocation",
+        "url": "Live interactive 40-minute daily sessions on Zoom with qualified volunteer trainers."
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Geeta Pariwar (LearnGeeta) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Geeta Pariwar (LearnGeeta)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 492000,
+        "availableTickets": 0,
+        "availabilityStatus": "SoldOut",
+        "schemaAvailability": "https://schema.org/SoldOut",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/free-online-bhagavad-gita-classes-for-kids-families-geeta-pariwar",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-bhagavad-geeta-online&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 0,
+            "availability": "SoldOut",
+            "schemaAvailability": "https://schema.org/SoldOut",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-bhagavad-geeta-online&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/free-online-bhagavad-gita-classes-for-kids-families-geeta-pariwar#event",
+        "identifier": "class-bhagavad-geeta-online",
+        "name": "Free Online Bhagavad Gita Classes for Kids & Families (Geeta Pariwar)",
+        "description": "Learn pure Sanskrit recitation of the Bhagavad Gita with accurate pronunciation, meanings, and moral values. Conducted live on Zoom for 40 minutes daily (Mon–Fri). 100% Free classes with zero charges for study PDFs, audio resources, and official \"Gītā Guñjana\" E-Certificates. Features engaging storytelling, rhymes, and puzzles for children.",
+        "startDate": "2026-10-15T10:00:00+05:30",
+        "endDate": "2027-12-31T12:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OnlineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "VirtualLocation",
+          "url": "Live interactive 40-minute daily sessions on Zoom with qualified volunteer trainers."
+        },
+        "image": [
+          "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/bhagavad-geeta-class.svg"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/free-online-bhagavad-gita-classes-for-kids-families-geeta-pariwar",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-bhagavad-geeta-online&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/SoldOut",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 0
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Geeta Pariwar (LearnGeeta)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Geeta Pariwar (LearnGeeta) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "event-indoor-playtime-1",
+      "name": "Indoor Playtime (1–5 yrs)",
+      "description": "Safe soft-play area with sensory ball pits, padded climbing obstacles, and gentle developmental games for toddlers and parents.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-25T10:00:00+05:30",
+      "endDate": "2026-10-25T12:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Koramangala, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Koramangala, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9352,
+          "longitude": 77.6245
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Playtime Hub Koramangala via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Playtime Hub Koramangala"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 350,
+        "maxPrice": 350,
+        "totalCapacity": 50,
+        "bookedCount": 16,
+        "availableTickets": 34,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indoor-playtime-15-yrs",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-indoor-playtime-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 350,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 34,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-indoor-playtime-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indoor-playtime-15-yrs#event",
+        "identifier": "event-indoor-playtime-1",
+        "name": "Indoor Playtime (1–5 yrs)",
+        "description": "Safe soft-play area with sensory ball pits, padded climbing obstacles, and gentle developmental games for toddlers and parents.",
+        "startDate": "2026-10-25T10:00:00+05:30",
+        "endDate": "2026-10-25T12:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Koramangala, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Koramangala, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9352,
+            "longitude": 77.6245
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indoor-playtime-15-yrs",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-indoor-playtime-1&checkout=true&tier=general",
+          "price": 350,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 34
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Playtime Hub Koramangala"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Playtime Hub Koramangala via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "class-art-craft-1",
+      "name": "Art & Craft Class (3–8 yrs)",
+      "description": "Hands-on creative workshop exploring clay modeling, watercolor painting, paper origami, and non-toxic finger crafting.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-25T11:00:00+05:30",
+      "endDate": "2026-10-25T13:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "HSR Layout, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "HSR Layout, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9121,
+          "longitude": 77.6446
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Creative Sparks Studio via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Creative Sparks Studio"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 600,
+        "maxPrice": 600,
+        "totalCapacity": 50,
+        "bookedCount": 12,
+        "availableTickets": 38,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/art-craft-class-38-yrs",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-art-craft-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 600,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 38,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-art-craft-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/art-craft-class-38-yrs#event",
+        "identifier": "class-art-craft-1",
+        "name": "Art & Craft Class (3–8 yrs)",
+        "description": "Hands-on creative workshop exploring clay modeling, watercolor painting, paper origami, and non-toxic finger crafting.",
+        "startDate": "2026-10-25T11:00:00+05:30",
+        "endDate": "2026-10-25T13:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "HSR Layout, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "HSR Layout, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9121,
+            "longitude": 77.6446
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1513364776144-60967b0f800f?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/art-craft-class-38-yrs",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=class-art-craft-1&checkout=true&tier=general",
+          "price": 600,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 38
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Creative Sparks Studio"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Creative Sparks Studio via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "event-community-playdate-1",
+      "name": "Community Playdate",
+      "description": "Neighborhood family gathering for free unstructured playtime, lawn games, bubble play, and parent networking in Bannerghatta.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-26T16:00:00+05:30",
+      "endDate": "2026-10-26T18:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Bannerghatta, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Bannerghatta, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.8,
+          "longitude": 77.58
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Bannerghatta Parents Circle via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Bannerghatta Parents Circle"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 28,
+        "availableTickets": 22,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/community-playdate",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-community-playdate-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 22,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-community-playdate-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/community-playdate#event",
+        "identifier": "event-community-playdate-1",
+        "name": "Community Playdate",
+        "description": "Neighborhood family gathering for free unstructured playtime, lawn games, bubble play, and parent networking in Bannerghatta.",
+        "startDate": "2026-10-26T16:00:00+05:30",
+        "endDate": "2026-10-26T18:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Bannerghatta, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Bannerghatta, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.8,
+            "longitude": 77.58
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/community-playdate",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-community-playdate-1&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 22
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Bannerghatta Parents Circle"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Bannerghatta Parents Circle via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "playdate-park-btm",
+      "name": "Park Playdate",
+      "description": "Outdoor shaded park meetup for toddlers and preschoolers with frisbee toss, storytelling under the trees, and parent coffee.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-25T16:00:00+05:30",
+      "endDate": "2026-10-25T18:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "BTM Layout, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "BTM Layout, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9166,
+          "longitude": 77.6101
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "BTM Toddler Club via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "BTM Toddler Club"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 8,
+        "availableTickets": 42,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/park-playdate",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=playdate-park-btm&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 42,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=playdate-park-btm&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/park-playdate#event",
+        "identifier": "playdate-park-btm",
+        "name": "Park Playdate",
+        "description": "Outdoor shaded park meetup for toddlers and preschoolers with frisbee toss, storytelling under the trees, and parent coffee.",
+        "startDate": "2026-10-25T16:00:00+05:30",
+        "endDate": "2026-10-25T18:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "BTM Layout, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "BTM Layout, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9166,
+            "longitude": 77.6101
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/park-playdate",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=playdate-park-btm&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 42
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "BTM Toddler Club"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "BTM Toddler Club via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "group-parent-hsr",
+      "name": "Parent Group",
+      "description": "Warm local parent circle discussing early childhood milestones, healthy meal ideas, school recommendations, and fun playgroup scheduling.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-26T10:00:00+05:30",
+      "endDate": "2026-10-26T12:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1536640712-4d4c36ff0e4e?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "HSR Layout, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "HSR Layout, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9121,
+          "longitude": 77.6446
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "HSR Moms & Dads Network via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "HSR Moms & Dads Network"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 12,
+        "availableTickets": 38,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/parent-group",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=group-parent-hsr&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 38,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=group-parent-hsr&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/parent-group#event",
+        "identifier": "group-parent-hsr",
+        "name": "Parent Group",
+        "description": "Warm local parent circle discussing early childhood milestones, healthy meal ideas, school recommendations, and fun playgroup scheduling.",
+        "startDate": "2026-10-26T10:00:00+05:30",
+        "endDate": "2026-10-26T12:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "HSR Layout, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "HSR Layout, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9121,
+            "longitude": 77.6446
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1536640712-4d4c36ff0e4e?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/parent-group",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=group-parent-hsr&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 38
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "HSR Moms & Dads Network"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "HSR Moms & Dads Network via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "event-weekend-fun-jayanagar",
+      "name": "Weekend Fun & Music Circle",
+      "description": "Energetic rhythm circle, rhymes, shaker instruments, and movement games guided by an experienced child developmental educator.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-26T11:00:00+05:30",
+      "endDate": "2026-10-26T13:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=800&auto=format&fit=crop&q=80"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Jayanagar, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Jayanagar, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9308,
+          "longitude": 77.5838
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Jayanagar Kids Hub via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Jayanagar Kids Hub"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 350,
+        "maxPrice": 350,
+        "totalCapacity": 50,
+        "bookedCount": 14,
+        "availableTickets": 36,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/weekend-fun-music-circle",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-weekend-fun-jayanagar&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 350,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 36,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-weekend-fun-jayanagar&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/weekend-fun-music-circle#event",
+        "identifier": "event-weekend-fun-jayanagar",
+        "name": "Weekend Fun & Music Circle",
+        "description": "Energetic rhythm circle, rhymes, shaker instruments, and movement games guided by an experienced child developmental educator.",
+        "startDate": "2026-10-26T11:00:00+05:30",
+        "endDate": "2026-10-26T13:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Jayanagar, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Jayanagar, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9308,
+            "longitude": 77.5838
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1485546246426-74dc88dec4d9?w=800&auto=format&fit=crop&q=80"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/weekend-fun-music-circle",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=event-weekend-fun-jayanagar&checkout=true&tier=general",
+          "price": 350,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 36
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Jayanagar Kids Hub"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Jayanagar Kids Hub via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-1",
+      "name": "Cubbon Park Weekend Family Art & Nature Sketching",
+      "description": "Bring your watercolors, pastels, and sketchbooks! Parents and children gather on the bamboo grove lawn for guided nature sketching, leaf printing, and healthy picnic snacks. Short-term 2-day weekend event.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-09-26T09:00:00+05:30",
+      "endDate": "2026-09-27T11:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Cubbon Park Bamboo Grove Lawn, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Cubbon Park Bamboo Grove Lawn, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9763,
+          "longitude": 77.5929
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Karthik & Deepa Rao via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Karthik & Deepa Rao"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 38,
+        "availableTickets": 12,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/cubbon-park-weekend-family-art-nature-sketching",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 12,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/cubbon-park-weekend-family-art-nature-sketching#event",
+        "identifier": "blr-event-1",
+        "name": "Cubbon Park Weekend Family Art & Nature Sketching",
+        "description": "Bring your watercolors, pastels, and sketchbooks! Parents and children gather on the bamboo grove lawn for guided nature sketching, leaf printing, and healthy picnic snacks. Short-term 2-day weekend event.",
+        "startDate": "2026-09-26T09:00:00+05:30",
+        "endDate": "2026-09-27T11:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Cubbon Park Bamboo Grove Lawn, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Cubbon Park Bamboo Grove Lawn, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9763,
+            "longitude": 77.5929
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/cubbon-park-weekend-family-art-nature-sketching",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-1&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 12
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Karthik & Deepa Rao"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Karthik & Deepa Rao via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-2",
+      "name": "HSR Layout Junior Football & Agility Drills Camp",
+      "description": "An energetic sports activity session featuring fun dribbling obstacle courses, parent-child relay races, and beginner mini-matches for kids aged 4-9 at HSR Sector 2 park.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-09-27T07:30:00+05:30",
+      "endDate": "2026-10-04T09:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Sector 2 Play Arena Park, HSR Layout, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Sector 2 Play Arena Park, HSR Layout, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9121,
+          "longitude": 77.6446
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Coach Rakesh (Bangalore FC Academy) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Coach Rakesh (Bangalore FC Academy)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 26,
+        "availableTickets": 24,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/hsr-layout-junior-football-agility-drills-camp",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-2&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 24,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-2&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/hsr-layout-junior-football-agility-drills-camp#event",
+        "identifier": "blr-event-2",
+        "name": "HSR Layout Junior Football & Agility Drills Camp",
+        "description": "An energetic sports activity session featuring fun dribbling obstacle courses, parent-child relay races, and beginner mini-matches for kids aged 4-9 at HSR Sector 2 park.",
+        "startDate": "2026-09-27T07:30:00+05:30",
+        "endDate": "2026-10-04T09:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Sector 2 Play Arena Park, HSR Layout, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Sector 2 Play Arena Park, HSR Layout, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9121,
+            "longitude": 77.6446
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/hsr-layout-junior-football-agility-drills-camp",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-2&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 24
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Coach Rakesh (Bangalore FC Academy)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Coach Rakesh (Bangalore FC Academy) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-swim-1",
+      "name": "Sarjapur Kids Swimming & Water Polo Summer Camp",
+      "description": "Guided certified swimming instruction, stroke mechanics, water polo scrimmages and pool safety drills. Ideal for beginners and intermediate swimmers aged 4-12.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-01T08:30:00+05:30",
+      "endDate": "2026-10-10T10:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Decathlon Aqua Complex, Sarjapur Road, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Decathlon Aqua Complex, Sarjapur Road, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.915,
+          "longitude": 77.685
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Coach Pradeep (Karnataka Swimming Assoc.) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Coach Pradeep (Karnataka Swimming Assoc.)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 450,
+        "maxPrice": 450,
+        "totalCapacity": 50,
+        "bookedCount": 22,
+        "availableTickets": 28,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/sarjapur-kids-swimming-water-polo-summer-camp",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-swim-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 450,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 28,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-swim-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/sarjapur-kids-swimming-water-polo-summer-camp#event",
+        "identifier": "blr-event-swim-1",
+        "name": "Sarjapur Kids Swimming & Water Polo Summer Camp",
+        "description": "Guided certified swimming instruction, stroke mechanics, water polo scrimmages and pool safety drills. Ideal for beginners and intermediate swimmers aged 4-12.",
+        "startDate": "2026-10-01T08:30:00+05:30",
+        "endDate": "2026-10-10T10:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Decathlon Aqua Complex, Sarjapur Road, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Decathlon Aqua Complex, Sarjapur Road, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.915,
+            "longitude": 77.685
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/sarjapur-kids-swimming-water-polo-summer-camp",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-swim-1&checkout=true&tier=general",
+          "price": 450,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 28
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Coach Pradeep (Karnataka Swimming Assoc.)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Coach Pradeep (Karnataka Swimming Assoc.) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-chess-1",
+      "name": "Indiranagar Junior Chess Grandmaster Summer Camp",
+      "description": "Opening tactics, endgame strategies, puzzle solving and Swiss-league friendly matches guided by FIDE rated coaches. Trophies and participation kits for all kids!",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-02T16:00:00+05:30",
+      "endDate": "2026-10-07T18:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "100ft Road Chess Academy, Indiranagar, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "100ft Road Chess Academy, Indiranagar, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.978,
+          "longitude": 77.64
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Grandmaster Coach Arvind via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Grandmaster Coach Arvind"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 350,
+        "maxPrice": 350,
+        "totalCapacity": 50,
+        "bookedCount": 34,
+        "availableTickets": 16,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indiranagar-junior-chess-grandmaster-summer-camp",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-chess-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 350,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 16,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-chess-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indiranagar-junior-chess-grandmaster-summer-camp#event",
+        "identifier": "blr-event-chess-1",
+        "name": "Indiranagar Junior Chess Grandmaster Summer Camp",
+        "description": "Opening tactics, endgame strategies, puzzle solving and Swiss-league friendly matches guided by FIDE rated coaches. Trophies and participation kits for all kids!",
+        "startDate": "2026-10-02T16:00:00+05:30",
+        "endDate": "2026-10-07T18:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "100ft Road Chess Academy, Indiranagar, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "100ft Road Chess Academy, Indiranagar, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.978,
+            "longitude": 77.64
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1529699211952-734e80c4d42b?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/indiranagar-junior-chess-grandmaster-summer-camp",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-chess-1&checkout=true&tier=general",
+          "price": 350,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 16
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Grandmaster Coach Arvind"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Grandmaster Coach Arvind via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-3",
+      "name": "Whitefield Junior Lego Robotics & STEM Permanent Academy",
+      "description": "Permanent weekly classes for micro-controller assembly, Python/Scratch logic, and creative motorized brick builds. Meets every Saturday & Sunday throughout the year.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-03T10:30:00+05:30",
+      "endDate": "2026-10-03T12:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9698,
+          "longitude": 77.75
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Arjun & Nikita (STEM Parents Collective) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Arjun & Nikita (STEM Parents Collective)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 299,
+        "maxPrice": 299,
+        "totalCapacity": 50,
+        "bookedCount": 40,
+        "availableTickets": 10,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/whitefield-junior-lego-robotics-stem-permanent-academy",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-3&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 299,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 10,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-3&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/whitefield-junior-lego-robotics-stem-permanent-academy#event",
+        "identifier": "blr-event-3",
+        "name": "Whitefield Junior Lego Robotics & STEM Permanent Academy",
+        "description": "Permanent weekly classes for micro-controller assembly, Python/Scratch logic, and creative motorized brick builds. Meets every Saturday & Sunday throughout the year.",
+        "startDate": "2026-10-03T10:30:00+05:30",
+        "endDate": "2026-10-03T12:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Prestige Shantiniketan Club Amphitheatre, Whitefield, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9698,
+            "longitude": 77.75
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/whitefield-junior-lego-robotics-stem-permanent-academy",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-3&checkout=true&tier=general",
+          "price": 299,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 10
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Arjun & Nikita (STEM Parents Collective)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Arjun & Nikita (STEM Parents Collective) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-music-1",
+      "name": "Malleswaram Classical Carnatic Music & Vocal Classes",
+      "description": "Permanent traditional music training: Sarali Varisai, Geethams, voice culture and rhythm exercises for children. Regular ongoing batches every Tuesday & Thursday.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-05T17:00:00+05:30",
+      "endDate": "2026-10-05T18:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Sangeetha Bhavan, 8th Cross Malleswaram, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Sangeetha Bhavan, 8th Cross Malleswaram, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 13.0035,
+          "longitude": 77.568
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Vidushi Sharada Ramanathan via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Vidushi Sharada Ramanathan"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 399,
+        "maxPrice": 399,
+        "totalCapacity": 50,
+        "bookedCount": 18,
+        "availableTickets": 32,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/malleswaram-classical-carnatic-music-vocal-classes",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-music-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 399,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 32,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-music-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/malleswaram-classical-carnatic-music-vocal-classes#event",
+        "identifier": "blr-event-music-1",
+        "name": "Malleswaram Classical Carnatic Music & Vocal Classes",
+        "description": "Permanent traditional music training: Sarali Varisai, Geethams, voice culture and rhythm exercises for children. Regular ongoing batches every Tuesday & Thursday.",
+        "startDate": "2026-10-05T17:00:00+05:30",
+        "endDate": "2026-10-05T18:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Sangeetha Bhavan, 8th Cross Malleswaram, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Sangeetha Bhavan, 8th Cross Malleswaram, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 13.0035,
+            "longitude": 77.568
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/malleswaram-classical-carnatic-music-vocal-classes",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-music-1&checkout=true&tier=general",
+          "price": 399,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 32
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Vidushi Sharada Ramanathan"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Vidushi Sharada Ramanathan via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-tuition-1",
+      "name": "Jayanagar Mathematics & Science Foundation Tuition Classes",
+      "description": "Permanent academic tuition & concept-building classes for Grades 1 to 8. Small batches of 10 students, personalized homework guidance, and weekly practice tests.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-06T16:30:00+05:30",
+      "endDate": "2026-10-06T18:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "4th Block Learning Studio, Jayanagar, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "4th Block Learning Studio, Jayanagar, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.929,
+          "longitude": 77.583
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Sunita Venkatesh (M.Sc, B.Ed) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Sunita Venkatesh (M.Sc, B.Ed)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 499,
+        "maxPrice": 499,
+        "totalCapacity": 50,
+        "bookedCount": 15,
+        "availableTickets": 35,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/jayanagar-mathematics-science-foundation-tuition-classes",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-tuition-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 499,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 35,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-tuition-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/jayanagar-mathematics-science-foundation-tuition-classes#event",
+        "identifier": "blr-event-tuition-1",
+        "name": "Jayanagar Mathematics & Science Foundation Tuition Classes",
+        "description": "Permanent academic tuition & concept-building classes for Grades 1 to 8. Small batches of 10 students, personalized homework guidance, and weekly practice tests.",
+        "startDate": "2026-10-06T16:30:00+05:30",
+        "endDate": "2026-10-06T18:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "4th Block Learning Studio, Jayanagar, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "4th Block Learning Studio, Jayanagar, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.929,
+            "longitude": 77.583
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/jayanagar-mathematics-science-foundation-tuition-classes",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-tuition-1&checkout=true&tier=general",
+          "price": 499,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.406Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 35
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Sunita Venkatesh (M.Sc, B.Ed)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Sunita Venkatesh (M.Sc, B.Ed) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-4",
+      "name": "Indiranagar Clay Pottery & Terracotta Sculpting Permanent Studio",
+      "description": "Permanent weekly pottery studio. Learn the soothing art of sculpting miniature diyas, animal figurines, and clay pots on electric wheels. Ongoing batches for ages 3-12.",
+      "category": "Class",
+      "subCategory": "classes",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-04T16:00:00+05:30",
+      "endDate": "2026-10-04T18:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Defense Colony Enclave Art Studio, 100 Ft Rd, Indiranagar, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Defense Colony Enclave Art Studio, 100 Ft Rd, Indiranagar, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9784,
+          "longitude": 77.6408
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Meera Deshmukh (Creative Arts Guild) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Meera Deshmukh (Creative Arts Guild)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 350,
+        "maxPrice": 350,
+        "totalCapacity": 50,
+        "bookedCount": 20,
+        "availableTickets": 30,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/indiranagar-clay-pottery-terracotta-sculpting-permanent-studio",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-4&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 350,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 30,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-4&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/indiranagar-clay-pottery-terracotta-sculpting-permanent-studio#event",
+        "identifier": "blr-event-4",
+        "name": "Indiranagar Clay Pottery & Terracotta Sculpting Permanent Studio",
+        "description": "Permanent weekly pottery studio. Learn the soothing art of sculpting miniature diyas, animal figurines, and clay pots on electric wheels. Ongoing batches for ages 3-12.",
+        "startDate": "2026-10-04T16:00:00+05:30",
+        "endDate": "2026-10-04T18:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Defense Colony Enclave Art Studio, 100 Ft Rd, Indiranagar, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Defense Colony Enclave Art Studio, 100 Ft Rd, Indiranagar, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9784,
+            "longitude": 77.6408
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1565192647048-f997ded87958?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/class/indiranagar-clay-pottery-terracotta-sculpting-permanent-studio",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-4&checkout=true&tier=general",
+          "price": 350,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 30
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Meera Deshmukh (Creative Arts Guild)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Meera Deshmukh (Creative Arts Guild) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-5",
+      "name": "Lalbagh Botanical Seed Discovery & Butterfly Trail Walk",
+      "description": "Explore exotic trees, giant lotus ponds, and butterfly corridors. Includes printed treasure hunt maps, magnifying glasses, and botanical sticker albums for every child! Activity day camp.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-10T08:00:00+05:30",
+      "endDate": "2026-10-12T10:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Lalbagh Botanical Gardens West Gate, Jayanagar / Basavanagudi, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Lalbagh Botanical Gardens West Gate, Jayanagar / Basavanagudi, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9507,
+          "longitude": 77.5848
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Dr. Srinivas Holla (Ecologist) via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Dr. Srinivas Holla (Ecologist)"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 30,
+        "availableTickets": 20,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/lalbagh-botanical-seed-discovery-butterfly-trail-walk",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-5&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 20,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-5&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/lalbagh-botanical-seed-discovery-butterfly-trail-walk#event",
+        "identifier": "blr-event-5",
+        "name": "Lalbagh Botanical Seed Discovery & Butterfly Trail Walk",
+        "description": "Explore exotic trees, giant lotus ponds, and butterfly corridors. Includes printed treasure hunt maps, magnifying glasses, and botanical sticker albums for every child! Activity day camp.",
+        "startDate": "2026-10-10T08:00:00+05:30",
+        "endDate": "2026-10-12T10:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Lalbagh Botanical Gardens West Gate, Jayanagar / Basavanagudi, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Lalbagh Botanical Gardens West Gate, Jayanagar / Basavanagudi, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9507,
+            "longitude": 77.5848
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1502086223501-7ea6ecd79368?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/lalbagh-botanical-seed-discovery-butterfly-trail-walk",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-5&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 20
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Dr. Srinivas Holla (Ecologist)"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Dr. Srinivas Holla (Ecologist) via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-6",
+      "name": "Koramangala Toddler Music & Giant Bubble Play Circle",
+      "description": "Sensory 1-day weekend music circle with xylophones, shakers, acoustic rhymes, and giant iridescent bubbles on the lawn for infants & toddlers aged 0-3.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-11T10:00:00+05:30",
+      "endDate": "2026-10-11T12:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1472162072942-cd5147eb3902?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Koramangala 4th Block Park & Community Center, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Koramangala 4th Block Park & Community Center, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9352,
+          "longitude": 77.6245
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Sneha & Rohan Gowda via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Sneha & Rohan Gowda"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 35,
+        "availableTickets": 15,
+        "availabilityStatus": "InStock",
+        "schemaAvailability": "https://schema.org/InStock",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/koramangala-toddler-music-giant-bubble-play-circle",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-6&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 15,
+            "availability": "InStock",
+            "schemaAvailability": "https://schema.org/InStock",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-6&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/koramangala-toddler-music-giant-bubble-play-circle#event",
+        "identifier": "blr-event-6",
+        "name": "Koramangala Toddler Music & Giant Bubble Play Circle",
+        "description": "Sensory 1-day weekend music circle with xylophones, shakers, acoustic rhymes, and giant iridescent bubbles on the lawn for infants & toddlers aged 0-3.",
+        "startDate": "2026-10-11T10:00:00+05:30",
+        "endDate": "2026-10-11T12:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Koramangala 4th Block Park & Community Center, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Koramangala 4th Block Park & Community Center, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9352,
+            "longitude": 77.6245
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1472162072942-cd5147eb3902?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/koramangala-toddler-music-giant-bubble-play-circle",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-6&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/InStock",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 15
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Sneha & Rohan Gowda"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Sneha & Rohan Gowda via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-7",
+      "name": "Bangalore Junior Vedic Math & Chess Grand Prix Camp",
+      "description": "Friendly speed arithmetic challenges, pattern logic puzzles, and swiss-format chess rounds. Refreshments and trophies for participants! Sports & strategy camp.",
+      "category": "Activity",
+      "subCategory": "activity",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-17T14:30:00+05:30",
+      "endDate": "2026-10-19T16:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Malleshwaram 15th Cross Canara Union Hall, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Malleshwaram 15th Cross Canara Union Hall, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 13.0031,
+          "longitude": 77.5643
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Prof. Ananth Murthy via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Prof. Ananth Murthy"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 199,
+        "maxPrice": 199,
+        "totalCapacity": 50,
+        "bookedCount": 48,
+        "availableTickets": 2,
+        "availabilityStatus": "LimitedAvailability",
+        "schemaAvailability": "https://schema.org/LimitedAvailability",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/bangalore-junior-vedic-math-chess-grand-prix-camp",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-7&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 199,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 2,
+            "availability": "LimitedAvailability",
+            "schemaAvailability": "https://schema.org/LimitedAvailability",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-7&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/bangalore-junior-vedic-math-chess-grand-prix-camp#event",
+        "identifier": "blr-event-7",
+        "name": "Bangalore Junior Vedic Math & Chess Grand Prix Camp",
+        "description": "Friendly speed arithmetic challenges, pattern logic puzzles, and swiss-format chess rounds. Refreshments and trophies for participants! Sports & strategy camp.",
+        "startDate": "2026-10-17T14:30:00+05:30",
+        "endDate": "2026-10-19T16:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Malleshwaram 15th Cross Canara Union Hall, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Malleshwaram 15th Cross Canara Union Hall, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 13.0031,
+            "longitude": 77.5643
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/activity/bangalore-junior-vedic-math-chess-grand-prix-camp",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-7&checkout=true&tier=general",
+          "price": 199,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/LimitedAvailability",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 2
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Prof. Ananth Murthy"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Prof. Ananth Murthy via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-8",
+      "name": "Sarjapur 3-Day Kannada & English Storytelling Puppet Carnival",
+      "description": "Magical 3-day short-term carnival: dramatization of Tenali Rama and Panchatantra folk stories with giant shadow puppets, folk instruments, and costume dress-ups.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-24T16:30:00+05:30",
+      "endDate": "2026-10-26T18:30:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Rainbow Drive Amphitheatre, Sarjapur Road, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Rainbow Drive Amphitheatre, Sarjapur Road, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 12.9103,
+          "longitude": 77.6836
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Vernunt Bangalore Parents Collective via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Vernunt Bangalore Parents Collective"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 65,
+        "availableTickets": 0,
+        "availabilityStatus": "SoldOut",
+        "schemaAvailability": "https://schema.org/SoldOut",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/sarjapur-3-day-kannada-english-storytelling-puppet-carnival",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-8&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 0,
+            "availability": "SoldOut",
+            "schemaAvailability": "https://schema.org/SoldOut",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-8&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/sarjapur-3-day-kannada-english-storytelling-puppet-carnival#event",
+        "identifier": "blr-event-8",
+        "name": "Sarjapur 3-Day Kannada & English Storytelling Puppet Carnival",
+        "description": "Magical 3-day short-term carnival: dramatization of Tenali Rama and Panchatantra folk stories with giant shadow puppets, folk instruments, and costume dress-ups.",
+        "startDate": "2026-10-24T16:30:00+05:30",
+        "endDate": "2026-10-26T18:30:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Rainbow Drive Amphitheatre, Sarjapur Road, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Rainbow Drive Amphitheatre, Sarjapur Road, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 12.9103,
+            "longitude": 77.6836
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/sarjapur-3-day-kannada-english-storytelling-puppet-carnival",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-8&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/SoldOut",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 0
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Vernunt Bangalore Parents Collective"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Vernunt Bangalore Parents Collective via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-fest-1",
+      "name": "Bangalore 4-Day Autumn Science & Children Carnival",
+      "description": "A 4-day short-term carnival festival: live chemistry demonstrations, model rockets, planetarium dome popups, and food trucks for the whole family.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-10-28T10:00:00+05:30",
+      "endDate": "2026-10-31T19:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Palace Grounds Tripura Vasini, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Palace Grounds Tripura Vasini, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 13.0035,
+          "longitude": 77.589
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Science Heritage Trust Bangalore via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Science Heritage Trust Bangalore"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": false,
+        "minPrice": 150,
+        "maxPrice": 150,
+        "totalCapacity": 50,
+        "bookedCount": 110,
+        "availableTickets": 0,
+        "availabilityStatus": "SoldOut",
+        "schemaAvailability": "https://schema.org/SoldOut",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/bangalore-4-day-autumn-science-children-carnival",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-fest-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "General Admission Pass",
+            "price": 150,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 0,
+            "availability": "SoldOut",
+            "schemaAvailability": "https://schema.org/SoldOut",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-fest-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/bangalore-4-day-autumn-science-children-carnival#event",
+        "identifier": "blr-event-fest-1",
+        "name": "Bangalore 4-Day Autumn Science & Children Carnival",
+        "description": "A 4-day short-term carnival festival: live chemistry demonstrations, model rockets, planetarium dome popups, and food trucks for the whole family.",
+        "startDate": "2026-10-28T10:00:00+05:30",
+        "endDate": "2026-10-31T19:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": false,
+        "location": {
+          "@type": "Place",
+          "name": "Palace Grounds Tripura Vasini, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Palace Grounds Tripura Vasini, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 13.0035,
+            "longitude": 77.589
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/bangalore-4-day-autumn-science-children-carnival",
+        "offers": {
+          "@type": "Offer",
+          "name": "General Admission Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-fest-1&checkout=true&tier=general",
+          "price": 150,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/SoldOut",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 0
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Science Heritage Trust Bangalore"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Science Heritage Trust Bangalore via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    },
+    {
+      "eventId": "blr-event-past-1",
+      "name": "Past Bangalore Monsoon Kites Festival",
+      "description": "Historical kite crafting workshop that concluded in August 2026.",
+      "category": "Event",
+      "subCategory": "event",
+      "ageGroup": "All Ages",
+      "startDate": "2026-08-15T10:00:00+05:30",
+      "endDate": "2026-08-15T12:00:00+05:30",
+      "timezone": "Asia/Kolkata",
+      "eventStatus": "https://schema.org/EventScheduled",
+      "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+      "image": [
+        "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=600"
+      ],
+      "location": {
+        "@type": "Place",
+        "name": "Sankey Tank Lawns, Bangalore",
+        "address": {
+          "@type": "PostalAddress",
+          "streetAddress": "Sankey Tank Lawns, Bangalore",
+          "addressLocality": "Bengaluru",
+          "addressRegion": "Karnataka",
+          "postalCode": "560034",
+          "addressCountry": "IN"
+        },
+        "geo": {
+          "@type": "GeoCoordinates",
+          "latitude": 13.0088,
+          "longitude": 77.5724
+        }
+      },
+      "organizer": {
+        "@type": "Organization",
+        "name": "Bangalore Aero Club via Vernunt",
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+      },
+      "performer": {
+        "@type": "PerformingGroup",
+        "name": "Bangalore Aero Club"
+      },
+      "realTimeTicketing": {
+        "partnerId": "vernunt-events-in",
+        "currency": "INR",
+        "isFree": true,
+        "minPrice": 0,
+        "maxPrice": 0,
+        "totalCapacity": 50,
+        "bookedCount": 50,
+        "availableTickets": 0,
+        "availabilityStatus": "SoldOut",
+        "schemaAvailability": "https://schema.org/SoldOut",
+        "eventPageUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/past-bangalore-monsoon-kites-festival",
+        "directCheckoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-past-1&checkout=true",
+        "lastPriceSyncAt": "2026-11-20T01:01:05.405Z",
+        "ticketTiers": [
+          {
+            "id": "general",
+            "name": "Free Community Pass",
+            "price": 0,
+            "currency": "INR",
+            "capacity": 50,
+            "remainingStock": 0,
+            "availability": "SoldOut",
+            "schemaAvailability": "https://schema.org/SoldOut",
+            "checkoutUrl": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-past-1&checkout=true&tier=general"
+          }
+        ]
+      },
+      "structuredDataJsonLd": {
+        "@context": "https://schema.org",
+        "@type": "Event",
+        "@id": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/past-bangalore-monsoon-kites-festival#event",
+        "identifier": "blr-event-past-1",
+        "name": "Past Bangalore Monsoon Kites Festival",
+        "description": "Historical kite crafting workshop that concluded in August 2026.",
+        "startDate": "2026-08-15T10:00:00+05:30",
+        "endDate": "2026-08-15T12:00:00+05:30",
+        "eventStatus": "https://schema.org/EventScheduled",
+        "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
+        "isAccessibleForFree": true,
+        "location": {
+          "@type": "Place",
+          "name": "Sankey Tank Lawns, Bangalore",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Sankey Tank Lawns, Bangalore",
+            "addressLocality": "Bengaluru",
+            "addressRegion": "Karnataka",
+            "postalCode": "560034",
+            "addressCountry": "IN"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": 13.0088,
+            "longitude": 77.5724
+          }
+        },
+        "image": [
+          "https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&q=80&w=600"
+        ],
+        "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/events/event/past-bangalore-monsoon-kites-festival",
+        "offers": {
+          "@type": "Offer",
+          "name": "Free Community Pass",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/?tab=events&eventId=blr-event-past-1&checkout=true&tier=general",
+          "price": 0,
+          "priceCurrency": "INR",
+          "availability": "https://schema.org/SoldOut",
+          "validFrom": "2026-11-20T01:01:05.407Z",
+          "inventoryLevel": {
+            "@type": "QuantitativeValue",
+            "value": 0
+          }
+        },
+        "performer": {
+          "@type": "PerformingGroup",
+          "name": "Bangalore Aero Club"
+        },
+        "organizer": {
+          "@type": "Organization",
+          "name": "Bangalore Aero Club via Vernunt",
+          "url": "https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app"
+        }
+      }
+    }
+  ]
+}

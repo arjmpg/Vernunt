@@ -19,6 +19,7 @@ import { db, auth, handleFirestoreError, OperationType } from '../utils/firebase
 import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare, attributeAffiliateBooking } from '../utils/affiliate.ts';
 import { sendSpecialistBookingNotifications } from '../utils/notifications.ts';
+import { dispatchEmailNotification } from '../utils/firebaseEmailAuth.ts';
 import { formatVernuntReviewText, FALLBACK_DOCTOR_PHOTO, getSpecialistDirectUrl, slugifySpecialistName } from '../utils/specialistUrls.ts';
 import { INDIAN_CITIES } from '../data/panIndiaPediatricians.ts';
 import { 
@@ -831,7 +832,7 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
 
           onAddBooking(newBooking);
 
-          // Dispatch instant Email notification
+          // Dispatch instant Email notification + Payment Paid Receipt
           sendSpecialistBookingNotifications({
             toEmail: buyerEmail,
             parentName: buyerName,
@@ -843,6 +844,20 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
             paymentId: payId
           }).catch((e) => console.warn('Specialist alert note:', e));
 
+          if (buyerEmail && buyerEmail.includes('@') && totalAmount > 0) {
+            dispatchEmailNotification({
+              toEmail: buyerEmail,
+              recipientName: buyerName,
+              type: 'payment_paid',
+              details: {
+                itemTitle: `Specialist Consultation: ${selectedSpecialist.name}`,
+                amount: totalAmount,
+                paymentMethod: 'Online Payment (Razorpay)',
+                paymentId: payId
+              }
+            }).catch(() => {});
+          }
+
           confettiDefault({
             particleCount: 100,
             spread: 70,
@@ -851,7 +866,20 @@ ${affiliateCode ? `🎁 _Verified Vernunt Community Partner Referral Link._` : '
         },
         onError: (err: any) => {
           console.error('[Specialist Consultation Razorpay Error]:', err);
-          alert(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+          const errReason = String(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+          if (buyerEmail && buyerEmail.includes('@') && !errReason.toLowerCase().includes('cancel')) {
+            dispatchEmailNotification({
+              toEmail: buyerEmail,
+              recipientName: buyerName,
+              type: 'payment_failed',
+              details: {
+                itemTitle: `Specialist Consultation: ${selectedSpecialist?.name || 'Specialist'}`,
+                amount: totalAmount,
+                reason: errReason
+              }
+            }).catch(() => {});
+          }
+          alert(errReason);
           setPaymentStep('details');
         },
         onDismiss: () => {

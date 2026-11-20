@@ -5,6 +5,7 @@ import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../utils/firebase.ts';
 import confetti from 'canvas-confetti';
 import { openRazorpayCheckout } from '../utils/razorpay.ts';
+import { dispatchEmailNotification } from '../utils/firebaseEmailAuth.ts';
 
 interface BillingPortalProps {
   userProfile: ChildProfile | null;
@@ -169,6 +170,23 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
           colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
         });
 
+        const freeRecipient = updatedProfile.email || auth.currentUser?.email;
+        if (freeRecipient) {
+          dispatchEmailNotification({
+            toEmail: freeRecipient,
+            subject: `👑 Vernunt VIP Plan Activated: ${plan.title}`,
+            type: 'subscription_activated',
+            details: {
+              userName: updatedProfile.parentName || 'Parent Member',
+              planTitle: plan.title,
+              period: plan.period,
+              expiryDate: expiryDate.toLocaleDateString('en-IN'),
+              bonusCredits,
+              amount: 0
+            }
+          }).catch(() => {});
+        }
+
         setErrorMessage(null);
         setCouponSuccessMsg(`🎉 Free Subscription Activated! Welcome to Kids Connect Club. Your ${plan.title} (${plan.period}) is now ACTIVE until ${expiryDate.toLocaleDateString('en-IN')}.`);
         return;
@@ -208,6 +226,37 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
           colors: ['#f59e0b', '#10b981', '#3b82f6', '#ec4899']
         });
 
+        const paidRecipient = updatedProfile.email || auth.currentUser?.email;
+        if (paidRecipient) {
+          dispatchEmailNotification({
+            toEmail: paidRecipient,
+            subject: `👑 Vernunt VIP Subscription Activated: ${plan.title}`,
+            type: 'subscription_activated',
+            details: {
+              userName: updatedProfile.parentName || 'Parent Member',
+              planTitle: plan.title,
+              period: plan.period,
+              expiryDate: expiryDate.toLocaleDateString('en-IN'),
+              bonusCredits,
+              amount: Number(plan.price),
+              referenceId: orderRef
+            }
+          }).catch(() => {});
+
+          dispatchEmailNotification({
+            toEmail: paidRecipient,
+            subject: `✅ Payment Received (₹${Number(plan.price).toLocaleString('en-IN')}) — ${plan.title}`,
+            type: 'payment_paid',
+            details: {
+              userName: updatedProfile.parentName || 'Parent Member',
+              itemTitle: `${plan.title} (${plan.period})`,
+              amount: Number(plan.price),
+              paymentMethod: 'Razorpay Online Checkout',
+              transactionId: orderRef
+            }
+          }).catch(() => {});
+        }
+
         setCouponSuccessMsg(`🎉 Subscription Activated! Welcome to VIP Kids Connect Club (Ref: ${orderRef}). Active until ${expiryDate.toLocaleDateString('en-IN')}.`);
       };
 
@@ -236,7 +285,22 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         },
         onError: (err: any) => {
           console.error('[BillingPortal Razorpay Error]:', err);
-          setErrorMessage(err?.description || err?.message || 'Payment cancelled or unsuccessful.');
+          const errMsg = err?.description || err?.message || 'Payment cancelled or unsuccessful.';
+          setErrorMessage(errMsg);
+          const failRecipient = userProfile?.email || auth.currentUser?.email;
+          if (failRecipient && !String(errMsg).toLowerCase().includes('cancel')) {
+            dispatchEmailNotification({
+              toEmail: failRecipient,
+              subject: `⚠️ Subscription Payment Unsuccessful — ${plan.title}`,
+              type: 'payment_failed',
+              details: {
+                userName: userProfile?.parentName || 'Parent Member',
+                itemTitle: `${plan.title} (${plan.period})`,
+                amount: Number(plan.price),
+                reason: errMsg
+              }
+            }).catch(() => {});
+          }
           setLoadingPlan(null);
         },
         onDismiss: () => {
@@ -391,6 +455,24 @@ export default function BillingPortal({ userProfile, onUpdateUserProfile, onNavi
         });
       } catch (confettiErr) {
         console.debug('Confetti animation bypassed', confettiErr);
+      }
+
+      const couponRecipient = updatedProfile.email || auth.currentUser?.email;
+      if (couponRecipient) {
+        dispatchEmailNotification({
+          toEmail: couponRecipient,
+          subject: `🎟️ VIP Pass Activated via Coupon ${cleanCode}`,
+          type: 'subscription_activated',
+          details: {
+            userName: updatedProfile.parentName || 'Parent Member',
+            planTitle: matchedCoupon.description || `VIP Pass (${cleanCode})`,
+            period: `${freeDays} Days`,
+            expiryDate: expiryDate.toLocaleDateString('en-IN'),
+            bonusCredits,
+            amount: 0,
+            referenceId: cleanCode
+          }
+        }).catch(() => {});
       }
 
       setCouponSuccessMsg(`🎉 Success! Coupon "${cleanCode}" applied! You now have ${freeDays} Days of VIP Access for all app features!`);

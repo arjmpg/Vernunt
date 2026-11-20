@@ -11,6 +11,7 @@ import { onSnapshot, collection, query, where, or, setDoc, doc, deleteDoc, updat
 import { PlaydateActivitySuggestions } from './PlaydateActivitySuggestions.tsx';
 import { sendPlaydateRequestPush, sendPlaydateConfirmedPush } from '../utils/fcmMessaging.ts';
 import { recordParentMlFeedback, getParentMlState } from '../utils/parentMlEngine.ts';
+import { dispatchEmailNotification } from '../utils/firebaseEmailAuth.ts';
 
 export interface PlayLocation {
   id: string;
@@ -557,6 +558,21 @@ export default function PlaydatePlanner({
       confetti({ particleCount: 50, spread: 45 });
       const splitAmount = Math.round(session.totalCost / updatedAttendees.length);
       setNotification(`🤝 You are joined! Current split with ${updatedAttendees.length} families: ₹${splitAmount} each.`);
+
+      if (userProfile?.email && userProfile.email.includes('@')) {
+        dispatchEmailNotification({
+          toEmail: userProfile.email,
+          recipientName: userProfile.parentName,
+          type: 'playdate_session_joined',
+          details: {
+            sessionTitle: session.title,
+            date: session.date,
+            time: session.time,
+            venue: `${session.locationName}, ${session.locality}`,
+            splitAmount
+          }
+        }).catch(() => {});
+      }
     } else {
       setNotification(`Left session roster.`);
     }
@@ -565,6 +581,7 @@ export default function PlaydatePlanner({
 
   // Simulate paying split fee
   const handlePaySplitShare = (sessionId: string, amount: number) => {
+    const targetSession = groupSessions.find(s => s.id === sessionId);
     confetti({ particleCount: 100, spread: 70 });
     setGroupSessions(prev => prev.map(s => {
       if (s.id === sessionId) {
@@ -580,6 +597,19 @@ export default function PlaydatePlanner({
       }
       return s;
     }));
+    if (userProfile?.email && userProfile.email.includes('@')) {
+      dispatchEmailNotification({
+        toEmail: userProfile.email,
+        recipientName: userProfile.parentName,
+        type: 'payment_paid',
+        details: {
+          itemTitle: `Playtime Split Share — ${targetSession?.title || 'Group Session'}`,
+          amount,
+          paymentMethod: 'Online Split Payment',
+          paymentId: `SPLIT-${Date.now().toString().slice(-6)}`
+        }
+      }).catch(() => {});
+    }
     setNotification(`💳 Payment of ₹${amount} confirmed! Your split share is paid.`);
     setTimeout(() => setNotification(null), 4000);
   };
@@ -632,6 +662,24 @@ export default function PlaydatePlanner({
       location: directLocation.trim(),
       playdateId: newRequest.id
     }).catch(() => {});
+
+    // Dispatch instant Playtime Request Received email to invited parent
+    const guestEmail = (matchedCompanion as any)?.email;
+    if (guestEmail && String(guestEmail).includes('@')) {
+      dispatchEmailNotification({
+        toEmail: guestEmail,
+        recipientName: matchedCompanion?.parentName || 'Parent',
+        type: 'playdate_request',
+        subject: `🎈 Play Time Invite from ${userProfile?.parentName || 'a Vernunt Parent'} (${directDate} @ ${directTime})`,
+        details: {
+          requesterName: userProfile?.parentName || 'Vernunt Parent',
+          childName: userProfile?.childName || 'Playmate',
+          childAge: userProfile?.childAge,
+          neighborhood: directLocation.trim(),
+          message: meetingNotes.trim() || `${newRequest.title} on ${directDate} at ${directTime}`
+        }
+      }).catch(() => {});
+    }
 
     setNotification(`Successfully sent play time invitation to ${guestChildName}'s parent!`);
     setTimeout(() => setNotification(null), 4000);

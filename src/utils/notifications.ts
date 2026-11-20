@@ -232,49 +232,32 @@ export interface AdminKycNotificationPayload {
 }
 
 /**
- * Sends immediate email alert to Admins (ardha@vernunt.com & arjunmpgupta@gmail.com) when a user registers and is awaiting KYC document verification
+ * Sends immediate email alert to all configured Admins whenever a user submits their profile for KYC verification
  */
 export async function sendAdminKycPendingNotification(payload: AdminKycNotificationPayload): Promise<{ success: boolean; alertSentTo: string[]; timestamp: string }> {
-  const adminEmails = ['ardha@vernunt.com', 'arjunmpgupta@gmail.com'];
   const timestamp = new Date().toISOString();
+  let alertSentTo: string[] = ['arjunmpgupta@gmail.com', 'ardha@vernunt.com'];
 
-  const emailSubject = `[VERNUNT KYC ALERT] New ${payload.applicantRole} Registration Pending Review: ${payload.applicantName}`;
-  
-  const emailContent = `
-=====================================================
-🛡️ VERNUNT ADMIN KYC VERIFICATION DISPATCH
-=====================================================
-Status: PENDING ADMIN REVIEW
-Recipients: ${adminEmails.join(', ')}
-Date/Time: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+  try {
+    const resp = await fetch('/api/admin/kyc-submitted-alert', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json().catch(() => null);
+    if (resp.ok && data && Array.isArray(data.recipients) && data.recipients.length > 0) {
+      alertSentTo = data.recipients;
+    }
+  } catch (dispatchErr) {
+    console.debug('[Admin Alert System] Non-blocking KYC email dispatch note:', dispatchErr);
+  }
 
-APPLICANT DETAILS:
-- Name: ${payload.applicantName}
-- Role: ${payload.applicantRole}
-- Phone: +91 ${payload.applicantPhone}
-- Email: ${payload.applicantEmail || 'Not provided'}
-- Society / Apartment: ${payload.apartmentCommunityName || 'N/A'}
-- Current Address: ${payload.currentAddress || 'N/A'}
-- Permanent Address: ${payload.permanentAddress || 'Same as Current'}
-${payload.childName ? `- Child: ${payload.childName} (${payload.childAge || 'N/A'} yrs)` : ''}
-
-UPLOADED VERIFICATION DOCUMENTS:
-- Identity / Aadhaar Proof: ${payload.aadhaarDocName || 'Attached / Verified Online'}
-- Address Proof (${payload.addressProofDocType || 'Govt Document'}): ${payload.addressProofDocName || 'Attached'}
-
-ACTION REQUIRED:
-Please review the uploaded KYC credentials in the Vernunt Admin Portal (https://app.vernunt.com?tab=admin) to verify the applicant's account.
-=====================================================
-`;
-
-  console.log(`[Admin Alert System] Dispatched Instant KYC Alert Email to ${adminEmails.join(', ')}:\n${emailContent}`);
-
-  // In cloud environment, persist notification log in localStorage/Firestore
+  // Persist local audit log in browser storage
   try {
     const existingLogs = JSON.parse(localStorage.getItem('vernunt_admin_kyc_alerts') || '[]');
     existingLogs.unshift({
       ...payload,
-      sentTo: adminEmails,
+      sentTo: alertSentTo,
       timestamp
     });
     localStorage.setItem('vernunt_admin_kyc_alerts', JSON.stringify(existingLogs.slice(0, 50)));
@@ -284,7 +267,7 @@ Please review the uploaded KYC credentials in the Vernunt Admin Portal (https://
 
   return {
     success: true,
-    alertSentTo: adminEmails,
+    alertSentTo,
     timestamp
   };
 }

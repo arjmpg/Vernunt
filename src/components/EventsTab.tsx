@@ -6,7 +6,7 @@ import {
   Sparkles, AlertCircle, CreditCard, Share2, Copy, ExternalLink,
   Ticket, QrCode, UserCheck, Wallet, Clock, ArrowRight, ShieldCheck,
   Navigation, Flame, CheckCircle2, ArrowUpDown, Globe, BellRing, Users,
-  ChevronDown, SlidersHorizontal, RotateCcw, Filter, Layers, BookOpen, Trophy, BarChart3
+  ChevronDown, SlidersHorizontal, RotateCcw, Filter, Layers, BookOpen, Trophy, BarChart3, FileSpreadsheet
 } from 'lucide-react';
 import { GatheringSubCategory, GATHERING_SUBCATEGORIES, getGatheringSubCategory } from '../utils/gatheringCategories.ts';
 import confetti from 'canvas-confetti';
@@ -27,9 +27,11 @@ import EventHostQrShareModal from './events/EventHostQrShareModal.tsx';
 import EventQrScannerModal from './events/EventQrScannerModal.tsx';
 import EventSocialShareModal from './events/EventSocialShareModal.tsx';
 import EventDetailCardModal from './events/EventDetailCardModal.tsx';
-import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle } from '../utils/eventUrls.ts';
-import { downloadTicketPass } from '../data/eventPurchases.ts';
+import EventWiseUsersManager from './events/EventWiseUsersManager.tsx';
+import { getEventCanonicalPath, getEventDirectUrl, normalizeEventType, slugifyEventTitle, generateEventJsonLd } from '../utils/eventUrls.ts';
+import { downloadTicketPass, saveEventPurchase } from '../data/eventPurchases.ts';
 import { sendEventBookingNotifications } from '../utils/notifications.ts';
+import { dispatchEmailNotification } from '../utils/firebaseEmailAuth.ts';
 import { sendEventReminderPush } from '../utils/fcmMessaging.ts';
 import { generateAffiliateShareUrl, generateWhatsAppShareText, openWhatsAppShare } from '../utils/affiliate.ts';
 import { MOCK_EVENTS } from '../data/mockData.ts';
@@ -113,6 +115,7 @@ export default function EventsTab({
   const [myTickets, setMyTickets] = useState<Booking[]>([]);
   const [showMyTicketsDrawer, setShowMyTicketsDrawer] = useState<boolean>(false);
   const [organizerRoleAlertEvent, setOrganizerRoleAlertEvent] = useState<CommunityEvent | null>(null);
+  const [showEventUsersManagerModal, setShowEventUsersManagerModal] = useState<boolean>(false);
 
   // Helper properties for unified filter and sort
   const isAnyFilterActive = categoryFilter !== 'All' || sortMode !== 'nearby_only' || onlyNearbyFilter || searchQuery.trim() !== '';
@@ -185,51 +188,21 @@ export default function EventsTab({
     }
   }, [initialOpenCreateWizard]);
 
-  // Dynamic Schema.org Event, SportsEvent, and Course Structured Data for Googlebot & Google Search Console
+  // Dynamic Schema.org Event Structured Data for Google Event Rich Results & Google Events Ticketing
   useEffect(() => {
     try {
-      const topEvents = (eventsList || []).slice(0, 12);
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://app.vernunt.com';
+      const topEvents = (eventsList || []).slice(0, 25);
       const jsonLd = {
         "@context": "https://schema.org",
         "@type": "ItemList",
-        "itemListElement": topEvents.map((evt, idx) => {
-          const subCat = getGatheringSubCategory(evt);
-          const schemaType = subCat === 'classes' ? 'Course' : subCat === 'activity' ? 'SportsEvent' : 'Event';
-          return {
-            "@type": "ListItem",
-            "position": idx + 1,
-            "item": {
-              "@type": schemaType,
-              "name": evt.title,
-              "description": evt.description,
-              "startDate": evt.date,
-              "endDate": evt.endDate || evt.date,
-              "eventStatus": "https://schema.org/EventScheduled",
-              "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
-              "location": {
-                "@type": "Place",
-                "name": evt.location,
-                "address": {
-                  "@type": "PostalAddress",
-                  "addressLocality": "Bengaluru",
-                  "addressRegion": "Karnataka",
-                  "addressCountry": "IN"
-                }
-              },
-              "image": evt.imageUrl ? [evt.imageUrl] : undefined,
-              "offers": {
-                "@type": "Offer",
-                "price": evt.price || 0,
-                "priceCurrency": "INR",
-                "availability": evt.currentAttendees < evt.maxAttendees ? "https://schema.org/InStock" : "https://schema.org/SoldOut"
-              },
-              "organizer": {
-                "@type": "Person",
-                "name": evt.hostName
-              }
-            }
-          };
-        })
+        "name": "Vernunt Kids Events, Activities & Classes",
+        "numberOfItems": topEvents.length,
+        "itemListElement": topEvents.map((evt, idx) => ({
+          "@type": "ListItem",
+          "position": idx + 1,
+          "item": generateEventJsonLd(evt, origin)
+        }))
       };
 
       let scriptTag = document.getElementById('vernunt-events-jsonld') as HTMLScriptElement | null;
@@ -261,6 +234,32 @@ export default function EventsTab({
   const userLocationDisplay = typeof userProfile?.location === 'object' && userProfile?.location?.address
     ? userProfile.location.address
     : (typeof userProfile?.location === 'string' ? userProfile.location : 'Bangalore Central (12.97, 77.59)');
+
+  // Events strictly organized/hosted by the current user
+  const hostedEventsByUser = useMemo(() => {
+    if (!userProfile) return [];
+    const userName = (userProfile?.parentName || '').toLowerCase().trim();
+    const userEmail = (userProfile?.email || '').toLowerCase().trim();
+    const userId = userProfile?.id;
+    if (!userName && !userEmail && !userId) return [];
+    return eventsList.filter((evt) => {
+      const hostName = (evt.hostName || '').toLowerCase().trim();
+      const organizerEmail = ((evt as any).organizerEmail || '').toLowerCase().trim();
+      const hostId = (evt as any).hostId;
+      return Boolean(
+        (userId && hostId && hostId === userId) ||
+        (userName && hostName && hostName === userName) ||
+        (userEmail && organizerEmail && organizerEmail === userEmail)
+      );
+    });
+  }, [userProfile, eventsList]);
+
+  // Check if current user is an Event Host (Organizer, Admin, or host of any listed event)
+  const isEventHost = useMemo(() => {
+    const role = userProfile?.userRole;
+    if (role === 'Event Organizer' || role === 'Admin') return true;
+    return hostedEventsByUser.length > 0;
+  }, [userProfile, hostedEventsByUser]);
 
   // Check if current user is authorized to operate the Gate Desk & QR Scanner
   const isAuthorizedOrganizer = (evt?: CommunityEvent) => {
@@ -319,6 +318,35 @@ export default function EventsTab({
     setMyTickets(updated);
     localStorage.setItem('vernunt_user_event_tickets', JSON.stringify(updated));
 
+    // Also persist in unified My Passes & Check-in QR ledger with matching ticket number
+    const matchedEvt = eventsList.find((e) => e.id === booking.itemId || e.title === booking.itemTitle);
+    const passCode = booking.ticketNumber || `VERN-EVT-${Date.now().toString().slice(-6)}`;
+    try {
+      saveEventPurchase({
+        eventId: booking.itemId,
+        eventTitle: booking.itemTitle,
+        eventType: (matchedEvt?.category as any) || 'event',
+        eventDate: booking.dateStr || matchedEvt?.date || new Date().toISOString().split('T')[0],
+        eventTime: booking.timeSelected || matchedEvt?.time || '10:00 AM',
+        eventLocation: booking.eventVenue || matchedEvt?.location || 'Bangalore, Karnataka',
+        ticketTierName: booking.ticketTierName || 'General Pass',
+        ticketQuantity: booking.quantity || 1,
+        ticketPrice: booking.amountPaid || 0,
+        totalPaid: booking.amountPaid || 0,
+        buyerName: booking.buyerName || userProfile?.parentName || 'Event Attendee',
+        buyerPhone: booking.buyerPhone || userProfile?.phoneNumber || '',
+        buyerEmail: booking.buyerEmail || userProfile?.email || '',
+        buyerRole: userProfile?.userRole || 'eventbuyers',
+        qrPassCode: passCode,
+        bookingReference: passCode,
+        childName: booking.childName || booking.buyerName || userProfile?.childName,
+        childAge: booking.childAge,
+        organizerName: matchedEvt?.hostName || 'Vernunt Event Host'
+      });
+    } catch {
+      // Non-blocking persistence fallback
+    }
+
     // Also call global app onAddBooking
     onAddBooking(booking);
 
@@ -329,10 +357,16 @@ export default function EventsTab({
       console.debug('Share conversion attribution note:', shareConvErr);
     }
 
-    // Update event attended status
+    // Update event attended status & sync real-time ticket availability to Google Events Ticketing feed
     setEventsList(prev => prev.map(e => {
       if (e.id === booking.itemId) {
-        return { ...e, joined: true, attendeesCount: e.attendeesCount + (booking.quantity || 1) };
+        const updatedEvt = { ...e, joined: true, attendeesCount: e.attendeesCount + (booking.quantity || 1) };
+        fetch('/api/google/events/sync-event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ event: updatedEvt, action: 'ticket_booked' })
+        }).catch(() => {});
+        return updatedEvt;
       }
       return e;
     }));
@@ -537,13 +571,15 @@ export default function EventsTab({
       const commissionEarned = Math.round((price * rate) / 100);
       const hostEarned = price - commissionEarned;
 
-      onAddBooking({
+      const ticketCode = `VERN-EVT-${Date.now().toString().slice(-6)}`;
+      const completedBooking: Booking = {
         id: `booking-${Date.now()}`,
         itemId: checkoutEvent.id,
         itemTitle: checkoutEvent.title,
         type: 'EventTicket',
         buyerName: buyerName,
         buyerEmail: buyerEmail,
+        buyerPhone: userProfile?.phoneNumber,
         amountPaid: price,
         commissionPercentage: rate,
         commissionEarned: commissionEarned,
@@ -553,8 +589,62 @@ export default function EventsTab({
         paymentId: payId,
         paymentGateway: isFree ? 'Free' : 'OnlineGateway',
         paymentStatus: isFree ? 'NOT_REQUIRED' : 'PAID',
-        status: 'Paid'
+        status: 'Paid',
+        ticketNumber: ticketCode,
+        eventVenue: checkoutEvent.location,
+        quantity: 1,
+        createdAt: new Date().toISOString()
+      };
+      const updatedList = [completedBooking, ...myTickets];
+      setMyTickets(updatedList);
+      localStorage.setItem('vernunt_user_event_tickets', JSON.stringify(updatedList));
+      saveEventPurchase({
+        eventId: checkoutEvent.id,
+        eventTitle: checkoutEvent.title,
+        eventType: (checkoutEvent.category as any) || 'event',
+        eventDate: checkoutEvent.date,
+        eventTime: checkoutEvent.time,
+        eventLocation: checkoutEvent.location,
+        ticketTierName: 'General Pass',
+        ticketQuantity: 1,
+        ticketPrice: price,
+        totalPaid: price,
+        buyerName: buyerName || userProfile?.parentName || 'Event Attendee',
+        buyerPhone: userProfile?.phoneNumber || '',
+        buyerEmail: buyerEmail || userProfile?.email || '',
+        buyerRole: userProfile?.userRole || 'eventbuyers',
+        qrPassCode: ticketCode,
+        bookingReference: ticketCode,
+        childName: userProfile?.childName || buyerName,
+        organizerName: checkoutEvent.hostName
       });
+      onAddBooking(completedBooking);
+
+      // Dispatch instant Event Booking Confirmation + Payment Paid Receipt emails
+      if (buyerEmail && buyerEmail.includes('@')) {
+        sendEventBookingNotifications({
+          toEmail: buyerEmail,
+          toPhone: userProfile?.phoneNumber,
+          recipientName: buyerName,
+          booking: completedBooking,
+          event: checkoutEvent,
+          type: 'booking_confirmed'
+        }).catch(() => {});
+
+        if (!isFree && price > 0) {
+          dispatchEmailNotification({
+            toEmail: buyerEmail,
+            recipientName: buyerName,
+            type: 'payment_paid',
+            details: {
+              itemTitle: `Event Pass: ${checkoutEvent.title}`,
+              amount: price,
+              paymentMethod: 'Online Payment (Razorpay)',
+              paymentId: payId
+            }
+          }).catch(() => {});
+        }
+      }
 
       setEventsList(prev => prev.map(e => {
         if (e.id === checkoutEvent.id) {
@@ -604,7 +694,20 @@ export default function EventsTab({
         },
         onError: (err: any) => {
           console.error('[Event Ticket Payment Error]:', err);
-          alert(err?.description || err?.message || 'Payment was unsuccessful or cancelled.');
+          const errReason = String(err?.description || err?.message || 'Payment was unsuccessful or cancelled.');
+          if (buyerEmail && buyerEmail.includes('@') && !errReason.toLowerCase().includes('cancel')) {
+            dispatchEmailNotification({
+              toEmail: buyerEmail,
+              recipientName: buyerName,
+              type: 'payment_failed',
+              details: {
+                itemTitle: `Event Ticket: ${checkoutEvent.title}`,
+                amount: price,
+                reason: errReason
+              }
+            }).catch(() => {});
+          }
+          alert(errReason);
           setCheckoutStep('details');
         },
         onDismiss: () => {
@@ -842,6 +945,13 @@ export default function EventsTab({
     } catch (e) {
       console.warn('Local storage save event note:', e);
     }
+
+    // Sync newly published event to Google Events Ticketing Partner JSON feed
+    fetch('/api/google/events/sync-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: newlyCreated, action: 'publish' })
+    }).catch(() => {});
 
     // Present official Host QR Code Pass & Share Station immediately
     setHostQrModalEvent(newlyCreated);
@@ -1281,69 +1391,45 @@ ${deepLink}`;
           </p>
         </div>
 
-        {/* Top Header Actions: Publish Vernunt Event, My Passes, and Search Input */}
+        {/* Top Header Actions: Host Scan Event QR (Hosts only), Merged My Passes & Check-in QR, and Search Input */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-          {/* Event Organizer Gate Check-in QR button */}
-          {(userProfile?.userRole === 'Event Organizer' || userProfile?.userRole === 'Admin') && (
-            <button
-              id="btn-events-tab-generate-checkin-qr"
-              type="button"
-              onClick={() => {
-                const myEvent = eventsList.find(e => e.hostName && userProfile?.parentName && e.hostName.toLowerCase().includes(userProfile.parentName.toLowerCase())) || eventsList[0];
-                if (myEvent) {
-                  setDynamicCheckInEvent(myEvent);
-                }
-              }}
-              className="flex items-center justify-center gap-1.5 px-3 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-              title="Generate temporary, single-use dynamic QR code for attendees to scan at gate"
-            >
-              <QrCode className="w-3.5 h-3.5 text-white" />
-              <span>Generate Check-in QR</span>
-            </button>
+          {/* Scan Event QR Code Button — visible ONLY to Event Hosts */}
+          {isEventHost && (
+            <>
+              <button
+                id="btn-scan-event-qr-code"
+                type="button"
+                onClick={() => setShowScannerModal(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-slate-200"
+                title="Event Host: Scan an event or attendee QR code"
+              >
+                <QrCode className="w-3.5 h-3.5 text-orange-600" />
+                <span>Scan Event QR</span>
+              </button>
+
+              <button
+                id="btn-host-event-users-export-import"
+                type="button"
+                onClick={() => setShowEventUsersManagerModal(true)}
+                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-emerald-200"
+                title="Export or import event-wise users list (Name, Email ID, Mobile Number)"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Event Users CSV</span>
+              </button>
+            </>
           )}
 
-          {/* Host/Publish button */}
-          <button
-            id="btn-trigger-propose-event"
-            type="button"
-            onClick={() => {
-              setWizardInitialSubCat(activeSubCategory !== 'all' ? activeSubCategory : 'event');
-              setShowCreateWizard(true);
-            }}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs py-2 px-3.5 rounded-xl shadow-xs transition flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>
-              {activeSubCategory === 'classes' 
-                ? 'Publish Vernunt Class' 
-                : activeSubCategory === 'activity' 
-                ? 'Publish Activity / Camp' 
-                : 'Publish Vernunt Event'}
-            </span>
-          </button>
-
-          {/* Scan Event QR Code Button */}
-          <button
-            id="btn-scan-event-qr-code"
-            type="button"
-            onClick={() => setShowScannerModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 border border-slate-200"
-            title="Scan an event QR code to open event page and book directly"
-          >
-            <QrCode className="w-3.5 h-3.5 text-orange-600" />
-            <span>Scan Event QR</span>
-          </button>
-
-          {/* My Passes & Tickets Wallet Button */}
+          {/* Merged My Passes & Check-in QR Button */}
           <button
             id="btn-my-event-passes"
             type="button"
             onClick={() => setShowUserPurchasesModal(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
-            title="View your booked event tickets & passes"
+            className="flex items-center justify-center gap-1.5 px-3.5 py-2 bg-gradient-to-r from-slate-900 to-rose-700 hover:from-slate-800 hover:to-rose-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0"
+            title="View your booked event QR codes, details, and check-in passes"
           >
-            <Wallet className="w-3.5 h-3.5 text-orange-400" />
-            <span>My Passes</span>
+            <QrCode className="w-3.5 h-3.5 text-rose-300" />
+            <span>My Passes &amp; Check-in QR</span>
             {myTickets.length > 0 && (
               <span className="bg-orange-500 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
                 {myTickets.length}
@@ -2507,6 +2593,37 @@ ${deepLink}`;
         </div>
       )}
 
+      {/* End-of-Page Host Event CTA: Post your event in Vernunt */}
+      <div
+        id="events-end-post-event-cta"
+        className="mt-8 bg-gradient-to-r from-orange-50 via-amber-50/80 to-rose-50 border border-orange-200/80 rounded-3xl p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xs"
+      >
+        <div className="space-y-1">
+          <span className="text-[10px] font-black uppercase tracking-wider text-orange-600">
+            Organize &amp; Host with Vernunt
+          </span>
+          <h4 className="text-base sm:text-lg font-bold text-slate-900 font-serif">
+            Hosting a workshop, kids class, tournament, or neighborhood meetup?
+          </h4>
+          <p className="text-xs text-slate-600 max-w-xl">
+            Reach verified parents nearby, manage online ticketing, and get built-in QR gate check-ins automatically.
+          </p>
+        </div>
+
+        <button
+          id="btn-trigger-propose-event"
+          type="button"
+          onClick={() => {
+            setWizardInitialSubCat(activeSubCategory !== 'all' ? activeSubCategory : 'event');
+            setShowCreateWizard(true);
+          }}
+          className="w-full sm:w-auto bg-orange-500 hover:bg-orange-600 text-white font-bold text-xs sm:text-sm py-3 px-5 rounded-xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Post your event in Vernunt</span>
+        </button>
+      </div>
+
       {/* Host New Event/Activity Modal */}
       {showAddModal && (
         <div id="modal-host-gathering" className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4 z-[9999] overflow-y-auto animate-fade-in">
@@ -2949,6 +3066,29 @@ ${deepLink}`;
                         createdAt: new Date().toISOString()
                       };
 
+                      const updatedTicketsList = [newBookingRecord, ...myTickets];
+                      setMyTickets(updatedTicketsList);
+                      localStorage.setItem('vernunt_user_event_tickets', JSON.stringify(updatedTicketsList));
+                      saveEventPurchase({
+                        eventId: checkoutEvent.id,
+                        eventTitle: checkoutEvent.title,
+                        eventType: (checkoutEvent.category as any) || 'event',
+                        eventDate: checkoutEvent.date,
+                        eventTime: checkoutEvent.time,
+                        eventLocation: checkoutEvent.location,
+                        ticketTierName: 'General Pass',
+                        ticketQuantity: 1,
+                        ticketPrice: price,
+                        totalPaid: price,
+                        buyerName: buyerName || userProfile?.parentName || 'Event Attendee',
+                        buyerPhone: userProfile?.phoneNumber || '',
+                        buyerEmail: buyerEmail || userProfile?.email || '',
+                        buyerRole: userProfile?.userRole || 'eventbuyers',
+                        qrPassCode: newBookingRecord.ticketNumber,
+                        bookingReference: newBookingRecord.ticketNumber,
+                        childName: userProfile?.childName || buyerName,
+                        organizerName: checkoutEvent.hostName
+                      });
                       onAddBooking(newBookingRecord);
 
                       // Dispatch instant Email & SMS notifications
@@ -3035,17 +3175,30 @@ ${deepLink}`;
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowCheckoutModal(false);
-                    // Automatically load the detailed confirmation view in list
-                    setSelectedEventId(checkoutEvent.id);
-                  }}
-                  className="px-6 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition"
-                >
-                  Close Receipt & Back
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCheckoutModal(false);
+                      setShowUserPurchasesModal(true);
+                    }}
+                    className="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    <QrCode className="w-3.5 h-3.5" />
+                    <span>View My Pass &amp; QR Code</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCheckoutModal(false);
+                      // Automatically load the detailed confirmation view in list
+                      setSelectedEventId(checkoutEvent.id);
+                    }}
+                    className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition cursor-pointer"
+                  >
+                    Close Receipt &amp; Back
+                  </button>
+                </div>
               </div>
             )}
 
@@ -3082,7 +3235,10 @@ ${deepLink}`;
           isOpen={Boolean(dynamicCheckInEvent)}
           onClose={() => setDynamicCheckInEvent(null)}
           event={dynamicCheckInEvent}
-          allEvents={eventsList}
+          allEvents={eventsList.filter((e) =>
+            e.id === dynamicCheckInEvent.id ||
+            myTickets.some((t) => t.itemId === e.id || t.itemTitle === e.title)
+          )}
           onSelectEvent={(evt) => setDynamicCheckInEvent(evt)}
           userProfile={userProfile}
           onOpenScanner={() => {
@@ -3179,6 +3335,11 @@ ${deepLink}`;
           onAddEvent={(newEvent) => {
             setEventsList(prev => [newEvent, ...prev]);
             setSelectedEventId(newEvent.id);
+            fetch('/api/google/events/sync-event', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ event: newEvent, action: 'publish' })
+            }).catch(() => {});
           }}
           onDirectBook={(evt) => {
             setShowCreateWizard(false);
@@ -3444,11 +3605,32 @@ ${deepLink}`;
         />
       )}
 
-      {/* User Event Purchases & Verified Digital Passes Ledger Modal */}
+      {/* Merged My Passes & Check-in QR Modal */}
       {showUserPurchasesModal && (
         <UserPurchasesModal
           userProfile={userProfile}
+          liveBookings={myTickets}
+          eventsList={eventsList}
+          isEventHost={isEventHost}
+          onOpenHostDynamicQr={(evt) => setDynamicCheckInEvent(evt)}
+          onOpenGateDesk={(evt) => handleOpenGateDesk(evt)}
           onClose={() => setShowUserPurchasesModal(false)}
+        />
+      )}
+
+      {/* Event-Wise Users Export / Import & Admin Bulk Upload Modal */}
+      {showEventUsersManagerModal && isEventHost && (
+        <EventWiseUsersManager
+          isModal
+          eventsList={userProfile?.userRole === 'Admin' ? eventsList : hostedEventsByUser}
+          userProfile={userProfile}
+          isAdmin={userProfile?.userRole === 'Admin'}
+          initialEventId={
+            userProfile?.userRole === 'Admin'
+              ? (selectedEventId || eventsList[0]?.id)
+              : hostedEventsByUser[0]?.id
+          }
+          onClose={() => setShowEventUsersManagerModal(false)}
         />
       )}
     </div>

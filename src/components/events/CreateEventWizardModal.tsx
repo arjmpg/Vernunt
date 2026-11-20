@@ -327,6 +327,8 @@ export default function CreateEventWizardModal({
         time: time.trim(),
         location: deliveryMode === 'virtual' ? 'Virtual (Online via Google Meet & Chat)' : location.trim(),
         hostName: userProfile?.parentName || 'Community Organizer',
+        ...(userProfile?.id ? { hostId: userProfile.id } : {}),
+        ...(userProfile?.email ? { organizerEmail: userProfile.email } : {}),
         attendeesCount: 0,
         joined: false,
         photoUrl: photoUrl.trim() || fallbackImage,

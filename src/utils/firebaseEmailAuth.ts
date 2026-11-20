@@ -22,18 +22,33 @@ export interface NotificationEmailPayload {
   toEmail: string;
   recipientName?: string;
   type:
+    | 'welcome_signup'
+    | 'password_changed'
     | 'playdate_request'
+    | 'playdate_accepted'
+    | 'playdate_declined'
+    | 'playdate_session_joined'
     | 'event_ticket'
+    | 'event_published'
     | 'shop_order'
     | 'product_purchase'
     | 'payment_receipt'
+    | 'payment_paid'
+    | 'payment_pending'
+    | 'payment_failed'
     | 'product_shipped'
     | 'product_out_for_delivery'
     | 'product_delivered'
     | 'product_cancelled'
     | 'profile_approved'
+    | 'profile_rejected'
+    | 'kyc_submitted'
     | 'specialist_booking'
+    | 'daycare_booking'
+    | 'vendor_agreement'
+    | 'subscription_activated'
     | 'emergency_sos'
+    | 'admin_kyc_alert'
     | 'general';
   subject?: string;
   details?: Record<string, any>;

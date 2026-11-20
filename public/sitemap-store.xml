@@ -1,39 +1,459 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
-  <url><loc>https://app.vernunt.com/store</loc><lastmod>2026-10-26</lastmod><changefreq>daily</changefreq><priority>0.95</priority></url>
   <url>
-    <loc>https://app.vernunt.com/store/organic-sprouted-ragi-almond-baby-porridge</loc>
-    <lastmod>2026-10-26</lastmod>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store</loc>
+    <lastmod>2026-11-20</lastmod>
     <changefreq>daily</changefreq>
-    <priority>0.85</priority>
-    <image:image><image:loc>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Organic Sprouted Ragi & Almond Baby Porridge Mix</image:title></image:image>
+    <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://app.vernunt.com/store/organic-cotton-infant-romper-set</loc>
-    <lastmod>2026-10-26</lastmod>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/natural-wooden-teether-ring</loc>
+    <lastmod>2026-11-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
-    <image:image><image:loc>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&auto=format&fit=crop&q=80</image:loc><image:title>100% Organic Bamboo Cotton Infant Romper & Jumpsuit Set</image:title></image:image>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Wooden Teether</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://app.vernunt.com/store/montessori-wooden-sensory-activity-board</loc>
-    <lastmod>2026-10-26</lastmod>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-organic-cotton-baby-clothing-set</loc>
+    <lastmod>2026-11-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
-    <image:image><image:loc>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Montessori Wooden Sensory Busy Board & Motor Agility Board</image:title></image:image>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Baby Clothing Set</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://app.vernunt.com/store/hallmarked-925-silver-baby-nazariya-bangles</loc>
-    <lastmod>2026-10-26</lastmod>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/rainbow-developmental-stacking-rings</loc>
+    <lastmod>2026-11-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
-    <image:image><image:loc>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Hallmarked 925 Pure Silver Baby Nazariya Evil Eye Bangles</image:title></image:image>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Learning Stacking Toy</image:title>
+    </image:image>
   </url>
   <url>
-    <loc>https://app.vernunt.com/store/chemical-free-bamboo-baby-diapers-tape-style</loc>
-    <lastmod>2026-10-26</lastmod>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/gentle-calendula-baby-wash-lotion-duo</loc>
+    <lastmod>2026-11-20</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.85</priority>
-    <image:image><image:loc>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&auto=format&fit=crop&q=80</image:loc><image:title>Ultra-Soft Chemical-Free Bamboo Diapers with Wetness Indicator</image:title></image:image>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Organic Baby Wash &amp; Lotion</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/ergonomic-convertible-baby-high-chair</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Baby High Chair</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/lightweight-compact-fold-travel-stroller</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1591088398332-8a7791972843?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Stroller</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/montessori-auditory-wooden-rattle-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Rattle Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-organic-bamboo-muslin-swaddle</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Muslin Swaddle</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/ergonomic-lumbar-support-baby-carrier</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Baby Carrier</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/stay-on-sensory-silicone-teething-mitten</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Teething Mitts</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-cotton-cable-knit-baby-blanket</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1505253716362-afaea1d3d1af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Baby Blanket</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/solid-hardwood-geometric-building-blocks</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Wooden Blocks</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-cotton-printed-infant-romper</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Cotton Romper</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-sprouted-ragi-almond-baby-porridge</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1590080875515-8a3a8dc5735e?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Organic Sprouted Ragi &amp; Almond Baby Porridge Mix (Stage 1 &amp; 2)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/freeze-dried-strawberry-mango-melts</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1589733955941-5eeaf752f6dd?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Freeze-Dried 100% Real Strawberry &amp; Alphonso Mango Toddler Melts</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/foxtail-millet-teething-rusks</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Organic Foxtail Millet &amp; Palm Jaggery Teething Rusks with Cardamom</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/sprouted-nut-seed-cacao-brain-superfood</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Sprouted Nut, Seed &amp; Raw Cacao Brain Growth Superfood Powder (1y - 10y)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/crispy-little-millet-star-puffs</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1563729784474-d77dbb933a9e?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Crispy Little Millet &amp; Beetroot Star Puffs (Creamy Tomato &amp; Herb)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/natural-pectin-real-fruit-jellies-immunity</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1582058091505-f87a2e55a40f?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Natural Pectin Real Fruit Jellies with Vitamin C &amp; Zinc (Berry Burst)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/stem-explorer-solar-robotics-kit</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Vernunt STEM Explorer: 6-in-1 Solar Robotics &amp; Logic Kit</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-wooden-sensory-balancing-stones</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Organic Neem Wood Sensory Balancing Stones &amp; Rainbow Blocks (18 Pcs)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/mess-free-modeling-clay-sculpting-studio</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1513364776144-60967b0f800f?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Mess-Free Sensory Modeling Clay &amp; Pottery Sculpting Studio</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/indian-wildlife-moral-tales-bilingual-library</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Indian Wildlife &amp; Moral Tales Bilingual Hardcover Library (Set of 6 Books)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/complete-toddler-childproofing-corner-safety-suite</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Complete Toddler Home Childproofing &amp; Corner Safety Suite (36 Pcs)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/junior-agility-playmate-sports-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1516567727-459e4558f8cf?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Vernunt Junior Agility &amp; Playmate Sports Cone &amp; Goal Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/screen-free-developmental-play-sensory-activity-bundle</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>1000+ Screen-Free Developmental Play &amp; Sensory Activity Mega Bundle (Digital Download)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-bamboo-silicone-baby-weaning-bowl-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596464716127-f2a82984de30?auto=format&amp;fit=crop&amp;q=80&amp;w=800</image:loc>
+      <image:title>Organic Bamboo &amp; Food-Grade Silicone Baby Weaning Suction Bowl &amp; Cutlery Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-organic-cotton-dino-tshirt-shorts-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1519238263530-99bdd11df2ea?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Boys 100% Organic Cotton Dino Adventure T-Shirt &amp; Shorts Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-handwoven-linen-festive-kurta-dhoti</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Boys Handwoven Linen Festive Kurta &amp; Dhoti Pants Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-polar-fleece-zip-hoodie-joggers-tracksuit</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1503944583220-79d8926ad5e2?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Boys Polar-Fleece Zip Hoodie &amp; Joggers Winter Tracksuit</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/boys-active-play-cotton-polo-cargo-shorts</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1471286174890-9c112ffca564?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Boys Active Play Pique Cotton Polo &amp; Cargo Shorts Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-botanical-floral-organic-cotton-twirl-dress</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Girls Botanical Floral Pure Organic Cotton Twirl Dress with Ribbon Sash</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-festive-chanderi-anarkali-dupatta-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1518831959646-742c3a14ebf7?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Girls Festive Handloom Chanderi Anarkali &amp; Dupatta Set (Soft Cotton Lining)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-pastel-butterfly-romper-dungarees-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1596870230751-ebdfce98ec42?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Girls Pastel Butterfly Knit Romper Dungarees &amp; Striped Tee 2-Piece Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/girls-ruffled-peplum-culottes-coord-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1543332164-6e82f355badc?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Girls Ruffled Peplum Top &amp; Wide-Leg Culottes Co-ord Set</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/925-pure-sterling-silver-baby-nazariya-set</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>925 Pure Sterling Silver Baby Nazariya Anklet &amp; Bracelet Set (Black Beads)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/hypoallergenic-925-silver-butterfly-safety-studs</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1630019852942-f89202989a59?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Hypoallergenic 925 Silver Enamel Butterfly Safety Screw-Back Baby Studs</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/pure-silver-melodic-ghungroo-baby-payal-pair</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1611591475880-92815124b426?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Pure Silver Melodic Ghungroo Baby Payal with Soft Tinkling Bells (Pair)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/18k-gold-plated-star-moon-baby-charm-bracelet</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>18K Gold Plated Little Star &amp; Moon Adjustable Baby Charm Bracelet</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-bamboo-plant-based-baby-diaper-pants</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Organic Bamboo Plant-Based Baby Diaper Pants (Zero Chlorine, 48 Pcs)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/99-percent-pure-water-biodegradable-baby-wipes</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>99% Pure Water Biodegradable Baby Wipes with Organic Aloe (72 Wipes x 3 Packs)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/cold-pressed-virgin-coconut-shea-butter-baby-lotion</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1556228720-195a672e8a03?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Deep Nourishing Cold-Pressed Virgin Coconut &amp; Shea Butter Baby Lotion (300ml)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/organic-goat-milk-oatmeal-baby-soap-pack</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1607006411601-775c8cc632dc?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Calming Organic Goat Milk &amp; Oatmeal Baby Bath Bar (Pack of 3 x 100g, Tear-Free)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/fast-acting-zinc-oxide-calendula-diaper-rash-cream</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1584515979956-d9f6e5d09982?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Fast-Acting 15% Zinc Oxide &amp; Organic Calendula Diaper Rash Relief Cream (100g)</image:title>
+    </image:image>
+  </url>
+  <url>
+    <loc>https://ais-dev-4clczmui7ahhbseqcspodh-548716619253.asia-east1.run.app/store/tear-free-avocado-sweet-almond-baby-wash-shampoo</loc>
+    <lastmod>2026-11-20</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.85</priority>
+    <image:image>
+      <image:loc>https://images.unsplash.com/photo-1555252333-9f8e92e65df9?w=800&amp;auto=format&amp;fit=crop&amp;q=80</image:loc>
+      <image:title>Tear-Free Avocado &amp; Sweet Almond Head-to-Toe Baby Wash &amp; Shampoo (400ml Pump)</image:title>
+    </image:image>
   </url>
 </urlset>

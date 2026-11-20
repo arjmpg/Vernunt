@@ -1,16 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, ShieldCheck, ShieldAlert, Award, Sparkles, Heart, 
   MapPin, Phone, Mail, Edit3, Plus, Calendar, ShoppingBag, 
   Lock, MessageSquare, AlertCircle, LogOut, CheckCircle2, 
   ChevronRight, ExternalLink, Gift, Wallet, HelpCircle, FileText,
-  CreditCard
+  CreditCard, KeyRound, Eye, EyeOff, Shield
 } from 'lucide-react';
+import { updatePassword } from 'firebase/auth';
+import { auth } from '../../utils/firebase.ts';
 import type { ChildProfile, Booking } from '../../types.ts';
 import { PaymentHistorySection } from './PaymentHistorySection.tsx';
 
 export interface FamilyProfileHubProps {
   userProfile: ChildProfile;
+  isAdmin?: boolean;
+  isGuest?: boolean;
   connectedPlaymates: ChildProfile[];
   bookingsList: Booking[];
   walletBalance: number;
@@ -22,11 +26,15 @@ export interface FamilyProfileHubProps {
   onOpenChatWithPlaymate: (playmate: ChildProfile) => void;
   onNavigateToTab: (tabId: string) => void;
   onOpenSupport: () => void;
+  onOpenSignIn?: () => void;
+  onPasswordChanged?: (updatedAt: string) => void;
   onSignOut: () => void;
 }
 
 export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
   userProfile,
+  isAdmin = false,
+  isGuest = false,
   connectedPlaymates,
   bookingsList,
   walletBalance,
@@ -38,10 +46,139 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
   onOpenChatWithPlaymate,
   onNavigateToTab,
   onOpenSupport,
+  onOpenSignIn,
+  onPasswordChanged,
   onSignOut
 }) => {
   const [activeSubSection, setActiveSubSection] = useState<'overview' | 'safety' | 'activity' | 'payments'>('overview');
   const isAadhaarVerified = userProfile.verificationStatus === 'VERIFIED';
+
+  // Change / Set Password State (for Admin & All Users)
+  const passwordSectionRef = useRef<HTMLDivElement | null>(null);
+  const [hasExistingPassword, setHasExistingPassword] = useState<boolean>(false);
+  const [passwordLastUpdatedAt, setPasswordLastUpdatedAt] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState<string>('');
+  const [newPassword, setNewPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState<boolean>(false);
+  const [showNewPassword, setShowNewPassword] = useState<boolean>(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState<boolean>(false);
+  const [passwordError, setPasswordError] = useState<string>('');
+  const [passwordSuccess, setPasswordSuccess] = useState<string>('');
+
+  const isGuestAccount = isGuest || userProfile.id === 'guest-explorer';
+
+  useEffect(() => {
+    if (isGuestAccount) return;
+    const params = new URLSearchParams();
+    if (userProfile.id) params.set('userId', userProfile.id);
+    if (userProfile.email) params.set('email', userProfile.email);
+    if (userProfile.phoneNumber) params.set('phone', userProfile.phoneNumber);
+
+    fetch(`/api/users/password-status?${params.toString()}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success) {
+          setHasExistingPassword(Boolean(data.hasPassword));
+          setPasswordLastUpdatedAt(data.updatedAt || null);
+        }
+      })
+      .catch(() => {
+        // Non-blocking status lookup
+      });
+  }, [isGuestAccount, userProfile.id, userProfile.email, userProfile.phoneNumber]);
+
+  const handleJumpToPassword = () => {
+    setActiveSubSection('safety');
+    setTimeout(() => {
+      passwordSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  };
+
+  const getPasswordStrength = (pw: string): { label: string; color: string; width: string } => {
+    if (!pw) return { label: '', color: 'bg-slate-200', width: 'w-0' };
+    let score = 0;
+    if (pw.length >= 6) score += 1;
+    if (pw.length >= 10) score += 1;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) score += 1;
+    if (/\d/.test(pw)) score += 1;
+    if (/[^A-Za-z0-9]/.test(pw)) score += 1;
+    if (score <= 2) return { label: 'Weak', color: 'bg-rose-500', width: 'w-1/3' };
+    if (score === 3) return { label: 'Good', color: 'bg-amber-500', width: 'w-2/3' };
+    return { label: 'Strong', color: 'bg-emerald-500', width: 'w-full' };
+  };
+
+  const passwordStrength = getPasswordStrength(newPassword);
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (isGuestAccount) {
+      setPasswordError('Please sign in first to set or change your account password.');
+      return;
+    }
+    if (hasExistingPassword && !currentPassword.trim()) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
+    if (newPassword.trim().length < 6) {
+      setPasswordError('New password must be at least 6 characters long.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation password do not match.');
+      return;
+    }
+    if (hasExistingPassword && currentPassword === newPassword) {
+      setPasswordError('New password must be different from your current password.');
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+    try {
+      const resp = await fetch('/api/users/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userProfile.id,
+          email: userProfile.email,
+          phoneNumber: userProfile.phoneNumber,
+          currentPassword: hasExistingPassword ? currentPassword : undefined,
+          newPassword
+        })
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.success) {
+        setPasswordError(data?.error || 'Could not update password. Please check your details and try again.');
+        return;
+      }
+
+      // If signed into Firebase Auth via Email/Password provider, mirror update cleanly (non-blocking)
+      try {
+        const fbUser = auth.currentUser;
+        const hasPasswordProvider = fbUser?.providerData?.some((p) => p.providerId === 'password');
+        if (fbUser && hasPasswordProvider) {
+          await updatePassword(fbUser, newPassword);
+        }
+      } catch (fbErr) {
+        console.debug('Firebase Auth password sync note:', fbErr);
+      }
+
+      setHasExistingPassword(true);
+      setPasswordLastUpdatedAt(data.updatedAt || new Date().toISOString());
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess(data.message || 'Password updated successfully.');
+      onPasswordChanged?.(data.updatedAt || new Date().toISOString());
+    } catch (err: any) {
+      setPasswordError(err?.message || 'Network error updating password. Please try again.');
+    } finally {
+      setIsUpdatingPassword(false);
+    }
+  };
 
   return (
     <div id="family-profile-hub" className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in pb-16">
@@ -99,7 +236,27 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-stretch sm:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto">
+            {isAdmin && (
+              <button
+                type="button"
+                id="profile-btn-open-admin"
+                onClick={() => onNavigateToTab('admin')}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl bg-purple-700 hover:bg-purple-800 text-white text-xs font-bold transition cursor-pointer shadow-xs"
+              >
+                <Shield className="w-3.5 h-3.5 text-amber-300" />
+                <span>Admin Dashboard</span>
+              </button>
+            )}
+            <button
+              type="button"
+              id="profile-btn-change-password"
+              onClick={handleJumpToPassword}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-800 text-xs font-bold transition cursor-pointer shadow-2xs"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-indigo-600" />
+              <span>{hasExistingPassword ? 'Change Password' : 'Set Password'}</span>
+            </button>
             <button
               type="button"
               onClick={onEditProfile}
@@ -182,13 +339,14 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
         <button
           type="button"
           onClick={() => setActiveSubSection('safety')}
-          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${
             activeSubSection === 'safety'
               ? 'bg-indigo-600 text-white shadow-xs'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
           }`}
         >
-          Safety Vault &amp; Records
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Security &amp; Password</span>
         </button>
         <button
           type="button"
@@ -338,6 +496,174 @@ export const FamilyProfileHub: React.FC<FamilyProfileHubProps> = ({
                 </p>
               </div>
             </div>
+          </div>
+
+          {/* Account Password Management Card (Admin & All Users) */}
+          <div
+            ref={passwordSectionRef}
+            id="profile-change-password-card"
+            className="bg-white rounded-2xl border border-slate-200/90 p-5 sm:p-6 shadow-xs space-y-4"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-indigo-600" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    {hasExistingPassword ? 'Change Account Password' : 'Set Account Password'}
+                  </h2>
+                  {isAdmin && (
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-purple-100 text-purple-800 border border-purple-200">
+                      Admin Account
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {hasExistingPassword
+                    ? 'Update the password used to sign in with your email or mobile number.'
+                    : 'Create a password for your account so you can sign in anytime using Password or OTP.'}
+                </p>
+              </div>
+              {passwordLastUpdatedAt && (
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-lg">
+                  Updated {new Date(passwordLastUpdatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                </span>
+              )}
+            </div>
+
+            {isGuestAccount ? (
+              <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-xs font-medium text-amber-900">
+                  You are browsing as a guest. Sign in to your Vernunt account to set or change your password.
+                </p>
+                {onOpenSignIn && (
+                  <button
+                    type="button"
+                    onClick={onOpenSignIn}
+                    className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition cursor-pointer shrink-0"
+                  >
+                    Sign In
+                  </button>
+                )}
+              </div>
+            ) : (
+              <form onSubmit={handlePasswordChangeSubmit} className="space-y-3.5 max-w-lg">
+                <div className="text-[11px] text-slate-500 bg-slate-50 border border-slate-200/80 rounded-xl px-3.5 py-2 flex flex-wrap gap-x-4 gap-y-1">
+                  {userProfile.email && (
+                    <span>Email: <strong className="text-slate-800 font-mono">{userProfile.email}</strong></span>
+                  )}
+                  {userProfile.phoneNumber && (
+                    <span>Phone: <strong className="text-slate-800 font-mono">{userProfile.phoneNumber}</strong></span>
+                  )}
+                </div>
+
+                {hasExistingPassword && (
+                  <div className="space-y-1">
+                    <label htmlFor="input-current-password" className="block text-xs font-bold text-slate-700">
+                      Current Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="input-current-password"
+                        type={showCurrentPassword ? 'text' : 'password'}
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Enter your current password"
+                        autoComplete="current-password"
+                        className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-xs sm:text-sm text-slate-900 transition"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowCurrentPassword((v) => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                        title={showCurrentPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label htmlFor="input-new-password" className="block text-xs font-bold text-slate-700">
+                    New Password
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="input-new-password"
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      autoComplete="new-password"
+                      className="w-full px-3.5 py-2.5 pr-10 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-xs sm:text-sm text-slate-900 transition"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 cursor-pointer"
+                      title={showNewPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {newPassword && (
+                    <div className="flex items-center gap-2 pt-1">
+                      <div className="flex-1 h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className={`h-full transition-all duration-200 ${passwordStrength.color} ${passwordStrength.width}`} />
+                      </div>
+                      <span className="text-[10px] font-bold text-slate-600">{passwordStrength.label}</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <label htmlFor="input-confirm-password" className="block text-xs font-bold text-slate-700">
+                    Confirm New Password
+                  </label>
+                  <input
+                    id="input-confirm-password"
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter new password"
+                    autoComplete="new-password"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none text-xs sm:text-sm text-slate-900 transition"
+                  />
+                </div>
+
+                {passwordError && (
+                  <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{passwordSuccess}</span>
+                  </div>
+                )}
+
+                <div className="pt-1">
+                  <button
+                    type="submit"
+                    id="btn-submit-change-password"
+                    disabled={isUpdatingPassword}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs sm:text-sm font-bold transition cursor-pointer shadow-xs"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>
+                      {isUpdatingPassword
+                        ? 'Updating Password...'
+                        : hasExistingPassword
+                          ? 'Update Password'
+                          : 'Save New Password'}
+                    </span>
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}

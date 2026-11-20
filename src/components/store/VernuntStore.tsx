@@ -68,7 +68,8 @@ import {
   sendProductShippedEmail,
   sendProductOutForDeliveryEmail,
   sendProductDeliveredEmail,
-  sendProductCancelledEmail
+  sendProductCancelledEmail,
+  dispatchEmailNotification
 } from '../../utils/firebaseEmailAuth.ts';
 import OtpVerificationFallbackCard from '../auth/OtpVerificationFallbackCard.tsx';
 import { triggerGoogleSignIn } from '../../utils/firebase.ts';
@@ -1484,13 +1485,25 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
       }
     }).catch(console.warn);
 
-    // 2. If paid online, also dispatch official Payment Receipt & Tax Invoice Email
+    // 2. If paid online, dispatch official Payment Receipt & Tax Invoice Email; if pending/COD, send Payment Pending Email
     if (status === 'paid' && method !== 'COD') {
       sendProductPaymentReceiptEmail(newOrder).then(res => {
         if (res.success) {
           console.log(`[VernuntStore] ✓ Payment receipt email sent to ${newOrder.customerEmail}`);
         }
       }).catch(console.warn);
+    } else if (status === 'pending' && newOrder.customerEmail && newOrder.customerEmail.includes('@')) {
+      dispatchEmailNotification({
+        toEmail: newOrder.customerEmail,
+        recipientName: newOrder.customerName,
+        type: 'payment_pending',
+        details: {
+          orderNumber: newOrder.orderNumber,
+          itemTitle: `Store Order #${newOrder.orderNumber} (${newOrder.itemCount} item${newOrder.itemCount === 1 ? '' : 's'})`,
+          amount: newOrder.totalAmount,
+          paymentMethod: method === 'COD' ? 'Cash on Delivery (Pay at Doorstep)' : method
+        }
+      }).catch(() => {});
     }
 
     setCompletedOrder(newOrder);
@@ -1584,12 +1597,25 @@ export const VernuntStore: React.FC<VernuntStoreProps> = ({
             // User manually cancelled: DO NOT show COD modal
             showToast('Online payment was cancelled. You can retry paying online when ready.');
           } else {
-            // Technical or gateway failure during transaction: offer COD fallback
+            // Technical or gateway failure during transaction: offer COD fallback + notify buyer by email
             setIsCodOffered(true);
+            const failureReason = err?.description || err?.message || 'Technical or network issue with payment gateway. Order amount was not debited.';
             setPaymentFailureModal({
               show: true,
-              reason: err?.description || err?.message || 'Technical or network issue with payment gateway. Order amount was not debited.'
+              reason: failureReason
             });
+            if (customerEmail && customerEmail.includes('@')) {
+              dispatchEmailNotification({
+                toEmail: customerEmail,
+                recipientName: customerName,
+                type: 'payment_failed',
+                details: {
+                  itemTitle: `Vernunt Store Checkout (${cart.length} item${cart.length === 1 ? '' : 's'})`,
+                  amount: cartGrandTotal,
+                  reason: failureReason
+                }
+              }).catch(() => {});
+            }
           }
         },
         onDismiss: () => {

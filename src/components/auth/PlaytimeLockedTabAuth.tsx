@@ -238,6 +238,26 @@ export const PlaytimeLockedTabAuth: React.FC<PlaytimeLockedTabAuthProps> = ({
           }
 
           if (registered && profile) {
+            try {
+              const verifyResp = await fetch('/api/users/verify-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  userId: profile.id,
+                  email: profile.email || (method === 'email' ? cleanEmail : undefined),
+                  phoneNumber: profile.phoneNumber || (method === 'phone' ? cleanPhone : undefined),
+                  password
+                })
+              });
+              const verifyData = await verifyResp.json().catch(() => null);
+              if (verifyResp.status === 401 || (verifyData && verifyData.verified === false)) {
+                setErrorMessage(verifyData?.error || 'Incorrect password. Please try again or sign in with OTP.');
+                setLoading(false);
+                return;
+              }
+            } catch (verifyErr) {
+              console.debug('Locked tab password verify note:', verifyErr);
+            }
             onSuccessLogin(profile);
             return;
           } else {

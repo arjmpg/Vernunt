@@ -153,12 +153,33 @@ export function getStoredEventPurchases(): EventTicketPurchase[] {
   }
 }
 
-export function saveEventPurchase(purchase: Omit<EventTicketPurchase, 'id' | 'purchasedAt' | 'qrPassCode' | 'bookingReference'>): EventTicketPurchase {
+export function saveEventPurchase(
+  purchase: Omit<EventTicketPurchase, 'id' | 'purchasedAt' | 'qrPassCode' | 'bookingReference'> & {
+    qrPassCode?: string;
+    bookingReference?: string;
+  }
+): EventTicketPurchase {
   const all = getStoredEventPurchases();
+  const qrPassCode =
+    purchase.qrPassCode ||
+    `PASS-${(purchase.eventId || 'EVT').slice(-4).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
+  const bookingReference =
+    purchase.bookingReference ||
+    purchase.qrPassCode ||
+    `VERN-${Math.floor(10000 + Math.random() * 90000)}`;
+
+  // Avoid duplicate entries if both modal and parent handler persist the same booking
+  const existing = all.find(
+    (item) =>
+      (item.qrPassCode && item.qrPassCode === qrPassCode) ||
+      (item.bookingReference && item.bookingReference === bookingReference)
+  );
+  if (existing) {
+    return existing;
+  }
+
   const id = `tkt-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-  const qrPassCode = `PASS-${(purchase.eventId || 'EVT').slice(-4).toUpperCase()}-${Math.floor(100000 + Math.random() * 900000)}`;
-  const bookingReference = `VERN-${Math.floor(10000 + Math.random() * 90000)}`;
-  
+
   const record: EventTicketPurchase = {
     ...purchase,
     id,
@@ -170,7 +191,7 @@ export function saveEventPurchase(purchase: Omit<EventTicketPurchase, 'id' | 'pu
     checkInStatus: purchase.checkInStatus || 'Upcoming',
     isPastEvent: false
   };
-  
+
   const updated = [record, ...all];
   if (typeof window !== 'undefined') {
     try {

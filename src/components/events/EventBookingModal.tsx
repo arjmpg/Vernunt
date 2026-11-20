@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendEventBookingNotifications, NotificationStatus } from '../../utils/notifications.ts';
+import { dispatchEmailNotification } from '../../utils/firebaseEmailAuth.ts';
 import { attributeAffiliateBooking } from '../../utils/affiliate.ts';
 import { saveEventPurchase } from '../../data/eventPurchases.ts';
 import EventMenuComponent from './EventMenuComponent.tsx';
@@ -320,7 +321,12 @@ export default function EventBookingModal({
       buyerName: buyerName || userProfile?.parentName || 'Event Attendee',
       buyerPhone: buyerPhone || userProfile?.phoneNumber || '+91 9876543210',
       buyerEmail: buyerEmail || userProfile?.email || 'attendee@vernunt.com',
-      buyerRole: userProfile?.userRole || 'eventbuyers'
+      buyerRole: userProfile?.userRole || 'eventbuyers',
+      qrPassCode: ticketNum,
+      bookingReference: ticketNum,
+      childName: childName || buyerName || userProfile?.childName,
+      childAge: childAge,
+      organizerName: event.hostName
     });
 
     setStep('confirmed');
@@ -338,6 +344,20 @@ export default function EventBookingModal({
     }).catch((err) => {
       console.warn('Notification dispatch error:', err);
     });
+
+    if (buyerEmail && buyerEmail.includes('@') && finalTotal > 0) {
+      dispatchEmailNotification({
+        toEmail: buyerEmail,
+        recipientName: buyerName,
+        type: 'payment_paid',
+        details: {
+          itemTitle: `Event Ticket: ${event.title} (${selectedTier.name} × ${quantity})`,
+          amount: finalTotal,
+          paymentMethod: methodUsed || 'Online Payment',
+          paymentId
+        }
+      }).catch(() => {});
+    }
 
     // Automatically attribute affiliate referral commission if buyer came via an affiliate partner link
     attributeAffiliateBooking(newBooking, event.title).then((affTx) => {

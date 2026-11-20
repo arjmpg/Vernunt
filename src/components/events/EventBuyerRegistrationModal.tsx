@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { ChildProfile, VerificationStatus, LocationSharing, Booking, CommunityEvent, UserWallet } from '../../types.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { saveEventPurchase } from '../../data/eventPurchases.ts';
+import { sendEventBookingNotifications } from '../../utils/notifications.ts';
 
 export type RegistrationStatus = 'Upcoming' | 'Checking In' | 'Completed';
 
@@ -302,9 +303,11 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
         buyerEmail: finalEmail,
         buyerRole: 'eventbuyers',
         status: 'confirmed',
-        registrationStatus: 'Completed',
-        checkInStatus: 'Completed',
+        registrationStatus: 'Upcoming',
+        checkInStatus: 'Upcoming',
         isPastEvent: false,
+        qrPassCode: ticketCode,
+        bookingReference: ticketCode,
         childName: userProfile?.childName || finalName,
         childAge: userProfile?.childAge || 6,
         organizerName: event?.organizerName || 'Vernunt Community Host',
@@ -313,6 +316,18 @@ export const EventBuyerRegistrationModal: React.FC<EventBuyerRegistrationModalPr
       });
     } catch (saveErr) {
       console.warn('saveEventPurchase note:', saveErr);
+    }
+
+    // Send Event Details + QR Code PDF pass via Email
+    if (finalEmail && finalEmail.includes('@')) {
+      sendEventBookingNotifications({
+        toEmail: finalEmail,
+        toPhone: finalPhone,
+        recipientName: finalName,
+        booking: quickBooking,
+        event: event || null,
+        type: 'booking_confirmed'
+      }).catch(() => {});
     }
 
     // Set UI states
