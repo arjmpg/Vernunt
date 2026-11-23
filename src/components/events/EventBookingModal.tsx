@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { CommunityEvent, Booking, TicketTier, EventCoupon, EventSelectedMenuItem, UserWallet } from '../../types.ts';
+import React, { useState, useEffect, useMemo } from 'react';
+import { CommunityEvent, Booking, TicketTier, EventCoupon, EventSelectedMenuItem, UserWallet, EventAddOn, SelectedEventAddOn } from '../../types.ts';
 import { 
   X, Ticket, Calendar, Clock, MapPin, Check, Sparkles, 
   CreditCard, ShieldCheck, Tag, AlertCircle, Plus, Minus, 
-  User, Phone, ChevronRight, CheckCircle2, Mail, Send, Wallet, Utensils, Share2
+  User, Phone, ChevronRight, CheckCircle2, Mail, Send, Wallet, Utensils, Share2,
+  Bus, Users
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sendEventBookingNotifications, NotificationStatus } from '../../utils/notifications.ts';
@@ -11,10 +12,16 @@ import { dispatchEmailNotification } from '../../utils/firebaseEmailAuth.ts';
 import { attributeAffiliateBooking } from '../../utils/affiliate.ts';
 import { saveEventPurchase } from '../../data/eventPurchases.ts';
 import EventMenuComponent from './EventMenuComponent.tsx';
+import AdminEventAddOnsManager from './AdminEventAddOnsManager.tsx';
 import { getStoredEventCart, saveStoredEventCart, clearStoredEventCart, syncEventCartOrderToOutbox } from '../../utils/eventCartStorage.ts';
 import { getStoredWallet, debitFromWallet } from '../../utils/walletStorage.ts';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
 import { openRazorpayCheckout } from '../../utils/razorpay.ts';
+import {
+  getCachedCustomAddOns,
+  fetchCustomEventAddOns,
+  mergeEventAddOns
+} from '../../utils/eventAddOnsStorage.ts';
 
 interface EventBookingModalProps {
   event: CommunityEvent;
@@ -65,10 +72,38 @@ export default function EventBookingModal({
         }
       ];
 
+  const initialMinQty = Math.max(1, defaultTiers[0]?.minPerOrder ?? event.minBatchSize ?? 1);
   const [selectedTierId, setSelectedTierId] = useState<string>(defaultTiers[0]?.id || 'tier-general');
-  const [quantity, setQuantity] = useState<number>(1);
+  const [quantity, setQuantity] = useState<number>(initialMinQty);
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>(
     event.recurringSlots && event.recurringSlots.length > 0 ? event.recurringSlots[0] : event.time
+  );
+
+  // Transport Opt-Out Discount & Event Add-Ons (Built-in + Admin Custom)
+  const [transportOptedOut, setTransportOptedOut] = useState<boolean>(false);
+  const [customAddOns, setCustomAddOns] = useState<EventAddOn[]>(() => getCachedCustomAddOns(event.id));
+  const [addOnQuantities, setAddOnQuantities] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let active = true;
+    fetchCustomEventAddOns(event.id).then((list) => {
+      if (active) setCustomAddOns(list);
+    });
+    const handleAddOnsSync = (e: any) => {
+      if (e?.detail?.eventId === event.id && Array.isArray(e.detail.addons)) {
+        setCustomAddOns(e.detail.addons);
+      }
+    };
+    window.addEventListener('vernunt_event_addons_updated', handleAddOnsSync);
+    return () => {
+      active = false;
+      window.removeEventListener('vernunt_event_addons_updated', handleAddOnsSync);
+    };
+  }, [event.id]);
+
+  const allEventAddOns = useMemo(
+    () => mergeEventAddOns(event.eventAddOns, customAddOns),
+    [event.eventAddOns, customAddOns]
   );
 
   // Attendee Form
@@ -114,10 +149,56 @@ export default function EventBookingModal({
   }, []);
 
   const selectedTier = defaultTiers.find(t => t.id === selectedTierId) || defaultTiers[0];
+  const minBatchQuantity = Math.max(
+    1,
+    selectedTier?.minPerOrder !== undefined ? selectedTier.minPerOrder : (event.minBatchSize || 1)
+  );
+  const maxOrderQuantity = Math.max(
+    minBatchQuantity,
+    selectedTier?.maxPerOrder || (minBatchQuantity > 1 ? 300 : 5)
+  );
+
+  // Sync quantity automatically when switching between Single (min 1) and Group Batch (min 30) tiers
+  useEffect(() => {
+    setQuantity((prev) => {
+      if (prev < minBatchQuantity) return minBatchQuantity;
+      if (prev > maxOrderQuantity) return minBatchQuantity;
+      return prev;
+    });
+  }, [selectedTierId, minBatchQuantity, maxOrderQuantity]);
+
   const unitPrice = selectedTier ? selectedTier.price : (event.ticketPrice || 0);
+  const effectiveUnitPrice = transportOptedOut && event.transportOptOutDiscount
+    ? Math.max(0, unitPrice - event.transportOptOutDiscount)
+    : unitPrice;
   const ticketsSubtotal = unitPrice * quantity;
+  const transportDiscountAmount = transportOptedOut && event.transportOptOutDiscount
+    ? event.transportOptOutDiscount * quantity
+    : 0;
+
+  const selectedAddOns: SelectedEventAddOn[] = useMemo(() => {
+    const list: SelectedEventAddOn[] = [];
+    allEventAddOns.forEach((addon) => {
+      const count = addOnQuantities[addon.id] || 0;
+      if (count <= 0) return;
+      const effectiveQty = addon.chargeType === 'per_student' ? quantity : addon.chargeType === 'flat' ? 1 : count;
+      const lineTotal = addon.price * effectiveQty;
+      list.push({
+        id: addon.id,
+        name: addon.name,
+        price: addon.price,
+        chargeType: addon.chargeType,
+        quantity: effectiveQty,
+        unitLabel: addon.unitLabel,
+        lineTotal
+      });
+    });
+    return list;
+  }, [allEventAddOns, addOnQuantities, quantity]);
+
+  const addOnsSubtotal = selectedAddOns.reduce((acc, item) => acc + item.lineTotal, 0);
   const menuSubtotal = selectedMenuItems.reduce((acc, curr) => acc + (curr.price * curr.quantity), 0);
-  const subtotal = ticketsSubtotal + menuSubtotal;
+  const subtotal = Math.max(0, ticketsSubtotal - transportDiscountAmount + addOnsSubtotal + menuSubtotal);
 
   // Calculate Discounts
   let discountAmount = 0;
@@ -130,9 +211,17 @@ export default function EventBookingModal({
   }
 
   const discountedSubtotal = Math.max(0, subtotal - discountAmount);
-  // Zero App Charges: No convenience fees or platform processing charges
-  const convenienceFee = 0;
-  const finalTotal = discountedSubtotal;
+  // Platform & Payment Gateway Fee: Applied & displayed ONLY at checkout for qualifying group batches (e.g. 2% for 30+ students)
+  const platformGatewayFeePercent =
+    event.groupPlatformFeePercent &&
+    quantity >= (event.groupPlatformFeeMinQty || 30)
+      ? event.groupPlatformFeePercent
+      : 0;
+  const convenienceFee =
+    platformGatewayFeePercent > 0
+      ? Math.round((discountedSubtotal * platformGatewayFeePercent) / 100)
+      : 0;
+  const finalTotal = discountedSubtotal + convenienceFee;
 
   // Real-time wallet balance lookup and prioritized deduction
   const latestWallet = getStoredWallet();
@@ -297,6 +386,10 @@ export default function EventBookingModal({
       quantity: quantity,
       selectedMenuItems: selectedMenuItems.length > 0 ? selectedMenuItems : undefined,
       menuSubtotal: menuSubtotal > 0 ? menuSubtotal : undefined,
+      selectedAddOns: selectedAddOns.length > 0 ? selectedAddOns : undefined,
+      addOnsSubtotal: addOnsSubtotal !== 0 ? addOnsSubtotal : undefined,
+      transportOptedOut: transportOptedOut || undefined,
+      transportDiscountAmount: transportDiscountAmount > 0 ? transportDiscountAmount : undefined,
       walletAmountUsed: walletUsed > 0 ? walletUsed : undefined,
       onlineAmountPaid: onlinePaid > 0 ? onlinePaid : undefined,
       paymentMethodUsed: methodUsed,
@@ -617,6 +710,16 @@ export default function EventBookingModal({
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             <h4 className="text-sm font-bold text-slate-900">{tier.name}</h4>
+                            {tier.minPerOrder === 1 && (
+                              <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                                Single Booking Allowed
+                              </span>
+                            )}
+                            {tier.minPerOrder && tier.minPerOrder > 1 && (
+                              <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                                Min. {tier.minPerOrder} Students
+                              </span>
+                            )}
                             {tier.includesKit && (
                               <span className="text-[10px] font-extrabold bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">
                                 Includes Kit
@@ -645,10 +748,10 @@ export default function EventBookingModal({
                             {tier.price === 0 ? (
                               <span className="text-emerald-600">FREE</span>
                             ) : (
-                              `₹${tier.price}`
+                              `₹${tier.price.toLocaleString('en-IN')}`
                             )}
                           </div>
-                          <span className="text-[10px] text-slate-400">per ticket</span>
+                          <span className="text-[10px] text-slate-400">per student</span>
                         </div>
                       </div>
                     </div>
@@ -656,32 +759,298 @@ export default function EventBookingModal({
                 })}
               </div>
 
-              {/* Quantity Counter */}
-              <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-200">
-                <div>
-                  <span className="text-xs font-bold text-slate-800 block">Number of Attendees</span>
-                  <span className="text-[11px] text-slate-500">Max {selectedTier?.maxPerOrder || 5} passes per order</span>
+              {/* Student Eligibility Requirement Notice */}
+              {event.prerequisites && (
+                <div className="flex items-start gap-2.5 px-3.5 py-2.5 rounded-2xl bg-purple-50 border border-purple-200 text-xs">
+                  <ShieldCheck className="w-4 h-4 text-purple-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-800 block">
+                      Eligibility Requirement
+                    </span>
+                    <span className="font-bold text-slate-900">{event.prerequisites}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 bg-white p-1 rounded-xl border border-slate-300">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
-                    className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-30"
+              )}
+
+              {/* Booking Help Phone Banner */}
+              {event.bookingHelpPhone && (
+                <div className="flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
+                      <Phone className="w-3.5 h-3.5" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-blue-700 block">
+                        Need Help in Booking?
+                      </span>
+                      <span className="font-black text-slate-900 text-xs">
+                        Call / WhatsApp {event.bookingHelpPhone}
+                      </span>
+                    </div>
+                  </div>
+                  <a
+                    href={`tel:${event.bookingHelpPhone.replace(/[^+\d]/g, '')}`}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shrink-0 transition"
                   >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="w-6 text-center font-bold text-sm text-slate-900">{quantity}</span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity(Math.min(selectedTier?.maxPerOrder || 5, quantity + 1))}
-                    disabled={quantity >= (selectedTier?.maxPerOrder || 5)}
-                    className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-30"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
+                    Call Now
+                  </a>
                 </div>
+              )}
+
+              {/* Quantity Counter (Respects selected tier's minPerOrder e.g. 1 for Single or 30 for Group Batch) */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-bold text-slate-800">
+                        {event.minBatchSize || selectedTier?.minPerOrder ? 'Number of Students' : 'Number of Attendees'}
+                      </span>
+                      {minBatchQuantity > 1 ? (
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
+                          Min. Batch: {minBatchQuantity} Students
+                        </span>
+                      ) : selectedTier?.minPerOrder === 1 ? (
+                        <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-md">
+                          Single Booking (1–{maxOrderQuantity})
+                        </span>
+                      ) : null}
+                    </div>
+                    <span className="text-[11px] text-slate-500 block mt-0.5">
+                      {`₹${effectiveUnitPrice.toLocaleString('en-IN')}/student • Min ${minBatchQuantity}, Max ${maxOrderQuantity} ${event.minBatchSize ? 'students' : 'passes'}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-slate-300 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.max(minBatchQuantity, quantity - 1))}
+                      disabled={quantity <= minBatchQuantity}
+                      className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-30 cursor-pointer"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <input
+                      type="number"
+                      min={minBatchQuantity}
+                      max={maxOrderQuantity}
+                      value={quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!Number.isNaN(val)) {
+                          setQuantity(Math.min(maxOrderQuantity, Math.max(minBatchQuantity, val)));
+                        }
+                      }}
+                      className="w-12 text-center font-bold text-sm text-slate-900 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(Math.min(maxOrderQuantity, quantity + 1))}
+                      disabled={quantity >= maxOrderQuantity}
+                      className="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center disabled:opacity-30 cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                {event.refreshmentsIncluded && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-amber-900 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl">
+                    <Utensils className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>{event.refreshmentsIncluded}</span>
+                  </div>
+                )}
+
+                {event.includedGuideRatio && (
+                  <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl">
+                    <Users className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{event.includedGuideRatio}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Transport Opt-Out Discount Option (-₹400/student if transport not required) */}
+              {event.transportOptOutDiscount && event.transportOptOutDiscount > 0 && (
+                <div className={`p-3.5 rounded-2xl border-2 transition ${
+                  transportOptedOut
+                    ? 'border-emerald-500 bg-emerald-50/70'
+                    : 'border-slate-200 bg-white'
+                }`}>
+                  <label className="flex items-start justify-between gap-3 cursor-pointer select-none">
+                    <div className="flex items-start gap-2.5">
+                      <input
+                        type="checkbox"
+                        checked={transportOptedOut}
+                        onChange={(e) => setTransportOptedOut(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Bus className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                          <span className="text-xs font-extrabold text-slate-900">
+                            Transport Not Required (Reduce ₹{event.transportOptOutDiscount}/student)
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 mt-0.5">
+                          Base price ₹{unitPrice}/student includes Bangalore transport. Check this if your school/group arranges its own transport — reduces rate to <strong>₹{Math.max(0, unitPrice - event.transportOptOutDiscount)}/student</strong>.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-black text-emerald-700 shrink-0 whitespace-nowrap">
+                      {transportOptedOut
+                        ? `-₹${(event.transportOptOutDiscount * quantity).toLocaleString('en-IN')}`
+                        : `-₹${event.transportOptOutDiscount}/kid`}
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* Event Add-Ons Section (ISO Food, Extra Tour Guides, Admin Custom Add-Ons) */}
+              {allEventAddOns.length > 0 && (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                      Optional Add-Ons &amp; Upgrades
+                    </span>
+                    {addOnsSubtotal !== 0 && (
+                      <span className="text-xs font-black text-orange-700">
+                        {addOnsSubtotal >= 0 ? `+₹${addOnsSubtotal.toLocaleString('en-IN')}` : `-₹${Math.abs(addOnsSubtotal).toLocaleString('en-IN')}`}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {allEventAddOns.map((addon) => {
+                      const count = addOnQuantities[addon.id] || 0;
+                      const isSelected = count > 0;
+                      const isPerUnit = addon.chargeType === 'per_unit';
+                      const lineTotal = addon.chargeType === 'per_student'
+                        ? addon.price * quantity
+                        : addon.chargeType === 'flat'
+                        ? addon.price
+                        : addon.price * Math.max(1, count);
+
+                      return (
+                        <div
+                          key={addon.id}
+                          className={`p-3.5 rounded-2xl border-2 transition ${
+                            isSelected
+                              ? 'border-orange-400 bg-orange-50/50'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              {!isPerUnit && (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    setAddOnQuantities(prev => ({
+                                      ...prev,
+                                      [addon.id]: e.target.checked ? 1 : 0
+                                    }));
+                                  }}
+                                  className="mt-0.5 w-4 h-4 rounded text-orange-600 focus:ring-orange-500 cursor-pointer shrink-0"
+                                />
+                              )}
+                              <div className="min-w-0 space-y-0.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-xs font-extrabold text-slate-900">
+                                    {addon.name}
+                                  </span>
+                                  {addon.badge && (
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-200">
+                                      {addon.badge}
+                                    </span>
+                                  )}
+                                  {addon.isAdminCustom && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-indigo-100 text-indigo-800">
+                                      Custom
+                                    </span>
+                                  )}
+                                </div>
+                                {addon.description && (
+                                  <p className="text-[11px] text-slate-600 leading-relaxed">
+                                    {addon.description}
+                                  </p>
+                                )}
+                                {addon.recommendedNote && (
+                                  <p className="text-[10px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2 py-1 rounded-lg inline-block mt-1">
+                                    {addon.recommendedNote}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
+                              <div className={`text-xs font-black whitespace-nowrap ${addon.price < 0 ? 'text-emerald-700' : 'text-slate-900'}`}>
+                                {addon.price >= 0 ? `+₹${addon.price}` : `-₹${Math.abs(addon.price)}`}
+                                <span className="text-[10px] font-semibold text-slate-500 block">
+                                  {addon.chargeType === 'per_student'
+                                    ? 'per student'
+                                    : addon.chargeType === 'flat'
+                                    ? 'flat charge'
+                                    : `per ${addon.unitLabel || 'unit'}`}
+                                </span>
+                              </div>
+
+                              {isPerUnit ? (
+                                count === 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setAddOnQuantities(prev => ({ ...prev, [addon.id]: 1 }))}
+                                    className="px-2.5 py-1 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-[11px] font-bold transition cursor-pointer"
+                                  >
+                                    + Add
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-1.5 bg-white p-0.5 rounded-lg border border-orange-300">
+                                    <button
+                                      type="button"
+                                      onClick={() => setAddOnQuantities(prev => ({ ...prev, [addon.id]: Math.max(0, count - 1) }))}
+                                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer"
+                                    >
+                                      <Minus className="w-3 h-3" />
+                                    </button>
+                                    <span className="w-6 text-center text-xs font-black text-slate-900">{count}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => setAddOnQuantities(prev => ({ ...prev, [addon.id]: count + 1 }))}
+                                      className="w-6 h-6 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center cursor-pointer"
+                                    >
+                                      <Plus className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )
+                              ) : isSelected ? (
+                                <span className="text-[11px] font-extrabold text-orange-700 whitespace-nowrap">
+                                  {lineTotal >= 0 ? `+₹${lineTotal.toLocaleString('en-IN')}` : `-₹${Math.abs(lineTotal).toLocaleString('en-IN')}`}
+                                </span>
+                              ) : null}
+
+                              {isPerUnit && isSelected && (
+                                <span className="text-[10px] font-extrabold text-orange-700 whitespace-nowrap">
+                                  Total: {lineTotal >= 0 ? `+₹${lineTotal.toLocaleString('en-IN')}` : `-₹${Math.abs(lineTotal).toLocaleString('en-IN')}`}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Admin-Only Custom Add-Ons Creator & Manager */}
+              <AdminEventAddOnsManager
+                eventId={event.id}
+                eventTitle={event.title}
+                userProfile={userProfile}
+                customAddOns={customAddOns}
+                onAddOnsUpdated={(updated) => setCustomAddOns(updated)}
+                compact
+              />
 
               {/* Event Host Refreshments & Menu Pre-order List View (Offline-First) */}
               <EventMenuComponent
@@ -739,7 +1108,7 @@ export default function EventBookingModal({
                 onClick={() => setStep('attendee_info')}
                 className="w-full py-3.5 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-sm shadow-md shadow-orange-600/20 flex items-center justify-center gap-2 transition-colors"
               >
-                <span>Continue to Attendee Info (₹{finalTotal})</span>
+                <span>Continue to Checkout (₹{discountedSubtotal.toLocaleString('en-IN')})</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </div>
@@ -841,8 +1210,42 @@ export default function EventBookingModal({
                 </span>
                 <div className="flex justify-between text-slate-600">
                   <span>{selectedTier.name} × {quantity}</span>
-                  <span className="font-semibold text-slate-800">₹{ticketsSubtotal}</span>
+                  <span className="font-semibold text-slate-800">₹{ticketsSubtotal.toLocaleString('en-IN')}</span>
                 </div>
+
+                {transportOptedOut && transportDiscountAmount > 0 && (
+                  <div className="flex justify-between text-emerald-700 bg-emerald-50/80 px-2 py-1 rounded-lg border border-emerald-200/70">
+                    <span className="font-semibold">
+                      Transport Not Required (-₹{event.transportOptOutDiscount} × {quantity})
+                    </span>
+                    <span className="font-bold">-₹{transportDiscountAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+
+                {selectedAddOns.length > 0 && (
+                  <div className="space-y-1 bg-orange-50/70 px-2.5 py-2 rounded-xl border border-orange-200/70">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-orange-900 block">
+                      Selected Add-Ons
+                    </span>
+                    {selectedAddOns.map((a) => (
+                      <div key={a.id} className="flex justify-between text-orange-950">
+                        <span>
+                          {a.name}{' '}
+                          {a.chargeType === 'per_student'
+                            ? `(₹${a.price} × ${a.quantity})`
+                            : a.chargeType === 'per_unit'
+                            ? `(× ${a.quantity} ${a.unitLabel || 'unit'})`
+                            : '(Flat)'}
+                        </span>
+                        <span className="font-bold">
+                          {a.lineTotal >= 0
+                            ? `+₹${a.lineTotal.toLocaleString('en-IN')}`
+                            : `-₹${Math.abs(a.lineTotal).toLocaleString('en-IN')}`}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {menuSubtotal > 0 && (
                   <div className="flex justify-between text-amber-800 bg-amber-50/80 px-2 py-1 rounded-lg border border-amber-200/60">
@@ -860,13 +1263,20 @@ export default function EventBookingModal({
                     <span className="font-bold">-₹{discountAmount}</span>
                   </div>
                 )}
-                <div className="flex justify-between text-emerald-700 text-[11px] font-semibold">
-                  <span>App Charges / Convenience Fee</span>
-                  <span className="font-bold">FREE (₹0)</span>
-                </div>
+                {convenienceFee > 0 ? (
+                  <div className="flex justify-between text-slate-700 text-[11px] font-semibold bg-slate-100/90 px-2 py-1.5 rounded-lg border border-slate-200">
+                    <span>Platform &amp; Payment Gateway Charges ({platformGatewayFeePercent}%)</span>
+                    <span className="font-bold text-slate-900">+₹{convenienceFee.toLocaleString('en-IN')}</span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between text-emerald-700 text-[11px] font-semibold">
+                    <span>App Charges / Convenience Fee</span>
+                    <span className="font-bold">FREE (₹0)</span>
+                  </div>
+                )}
                 <div className="border-t border-slate-200 pt-2 flex justify-between items-center text-sm">
                   <span className="font-bold text-slate-900">Total Order Amount:</span>
-                  <span className="font-black text-slate-900 text-base">₹{finalTotal}</span>
+                  <span className="font-black text-slate-900 text-base">₹{finalTotal.toLocaleString('en-IN')}</span>
                 </div>
 
                 {/* Prioritized Vernunt In-App Wallet Deduction */}
@@ -1061,6 +1471,23 @@ export default function EventBookingModal({
                 <div><strong>Date & Time:</strong> {createdBooking.dateStr} at {createdBooking.timeSelected}</div>
                 <div><strong>Attendee:</strong> {createdBooking.childName || createdBooking.buyerName}</div>
                 <div><strong>Pass Tier:</strong> {createdBooking.ticketTierName} (Qty: {createdBooking.quantity})</div>
+                {createdBooking.transportOptedOut && createdBooking.transportDiscountAmount ? (
+                  <div className="text-emerald-800">
+                    <strong>Transport:</strong> Own Transport Selected (-₹{createdBooking.transportDiscountAmount.toLocaleString('en-IN')})
+                  </div>
+                ) : null}
+                {createdBooking.selectedAddOns && createdBooking.selectedAddOns.length > 0 && (
+                  <div className="pt-1 border-t border-slate-200 text-orange-950">
+                    <strong>Selected Add-Ons:</strong>
+                    <ul className="list-disc list-inside mt-0.5 space-y-0.5 text-[11px] text-slate-700">
+                      {createdBooking.selectedAddOns.map(a => (
+                        <li key={a.id}>
+                          {a.name} ({a.chargeType === 'flat' ? 'Flat' : `× ${a.quantity}`}) — {a.lineTotal >= 0 ? `+₹${a.lineTotal.toLocaleString('en-IN')}` : `-₹${Math.abs(a.lineTotal).toLocaleString('en-IN')}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 {createdBooking.selectedMenuItems && createdBooking.selectedMenuItems.length > 0 && (
                   <div className="pt-1 border-t border-slate-200 text-amber-900">
                     <strong>Pre-ordered Refreshments:</strong>

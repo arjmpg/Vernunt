@@ -442,6 +442,7 @@ export interface TicketTier {
   capacity: number;
   remainingStock: number;
   description?: string;
+  minPerOrder?: number;
   maxPerOrder?: number;
   includesKit?: boolean;
   ageGroup?: string; // e.g. "3-6 years", "All Ages"
@@ -560,6 +561,30 @@ export interface EventAttendee {
 
 export type GatheringSubCategory = 'all' | 'event' | 'activity' | 'classes';
 
+export interface EventAddOn {
+  id: string;
+  name: string;
+  description?: string;
+  price: number; // Positive for extra charge (+₹), negative for discount (-₹)
+  chargeType: 'per_student' | 'flat' | 'per_unit';
+  unitLabel?: string; // e.g. 'extra guide', 'kit', 'meal'
+  badge?: string; // e.g. 'ISO Certified', 'Admin Custom'
+  recommendedNote?: string;
+  isAdminCustom?: boolean;
+  createdBy?: string;
+  createdAt?: string;
+}
+
+export interface SelectedEventAddOn {
+  id: string;
+  name: string;
+  price: number;
+  chargeType: 'per_student' | 'flat' | 'per_unit';
+  quantity: number; // Number of students (for per_student), 1 (for flat), or unit count (for per_unit)
+  unitLabel?: string;
+  lineTotal: number;
+}
+
 export interface CommunityEvent {
   id: string;
   title: string;
@@ -636,6 +661,18 @@ export interface CommunityEvent {
     askEmergencyPhone?: boolean;
     customNotePrompt?: string;
   };
+  // Group / Educational Tour Pricing, Brochure & Add-Ons
+  minBatchSize?: number; // Minimum students/attendees per booking (e.g. 30)
+  brochurePdfUrl?: string; // Direct URL to official event brochure PDF
+  transportIncluded?: boolean;
+  transportOptOutDiscount?: number; // Discount per student if transport not required (e.g. 400)
+  includedGuideRatio?: string; // e.g. "1 Guide per 30 Students (Included)"
+  bookingHelpPhone?: string; // Contact phone number for booking assistance
+  groupPlatformFeePercent?: number; // Optional platform & payment gateway % charged at checkout for group batches (e.g. 2)
+  groupPlatformFeeMinQty?: number; // Minimum quantity threshold to apply groupPlatformFeePercent (e.g. 30)
+  eventAddOns?: EventAddOn[];
+  tourHighlights?: string[];
+  learningOutcomes?: string[];
 }
 
 export interface SpecialistProfile {
@@ -745,9 +782,13 @@ export interface Booking {
   quantity?: number;
   selectedMenuItems?: EventSelectedMenuItem[]; // Menu pre-orders with quantities
   menuSubtotal?: number; // Total spent on event menu items
+  selectedAddOns?: SelectedEventAddOn[]; // Selected event add-ons (food, extra guides, admin custom add-ons)
+  addOnsSubtotal?: number; // Net total of selected event add-ons
+  transportOptedOut?: boolean; // Whether buyer opted out of included transport
+  transportDiscountAmount?: number; // Total discount applied for opting out of transport
   walletAmountUsed?: number; // Amount debited from wallet
   onlineAmountPaid?: number; // Remainder paid online through payment gateway
-  paymentMethodUsed?: 'OnlineGateway' | 'VernuntWallet' | 'Hybrid';
+  paymentMethodUsed?: 'OnlineGateway' | 'VernuntWallet' | 'Hybrid' | 'Free';
   createdAt?: string;
 }
 

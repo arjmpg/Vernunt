@@ -5,6 +5,134 @@ export const INITIAL_PLAYMATES: ChildProfile[] = BANGALORE_PLAYMATES;
 
 export const MOCK_EVENTS: CommunityEvent[] = [
   {
+    id: 'event-agri-eco-tour-uas-gkvk',
+    title: 'Agri–Eco Educational Tour — UAS GKVK, Bengaluru',
+    description:
+      'Give students a hands-on, curriculum-linked outdoor discovery day at the University of Agricultural Sciences (UAS), GKVK Campus, Bengaluru.\n\nEligibility: Minimum requirement to book is 6th STD to maximum 12th STD students.\n\nExplore 10 live scientific and agricultural divisions including the Agricultural Sciences Museum, Soil Science Museum (Pedonarium), Insect Museum, Institute of Baking Technology & Value Addition Centre (IBTAVA), Hydroponics Unit, Apiculture (Beekeeping) Unit, Botanical Garden, Agroforestry, Integrated Farming Systems (IFS), and University Nursery & Sales Counter.\n\nBatches start from Dec 5, 2026. Single/Individual student booking is available at ₹1,600/student (no minimum batch), and Group/School Batch booking starts from ₹1,500/student (minimum batch size: 30 students) — both include Bangalore transport, lunch & snacks, and 1 tour guide per 30 students. Opt out of transport to reduce ₹400/student at checkout. Optional ISO-certified food upgrade (+₹400/student) and upgraded 1-guide-per-10-kids supervision (+₹600) are available as add-ons.',
+    date: 'Starts from Dec 5, 2026',
+    startDate: '2026-12-05',
+    endDate: '2027-06-30',
+    time: '08:30 AM – 04:30 PM (Full-Day Guided Tour)',
+    location: 'University of Agricultural Sciences (UAS), GKVK Campus, Bellary Road, Bengaluru',
+    venueAddressDetails: 'UAS–GKVK Main Campus, Bellary Road, Yelahanka, Bengaluru, Karnataka 560065',
+    googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=University+of+Agricultural+Sciences+GKVK+Bengaluru',
+    hostName: 'Golden Age Tours and Travels Pvt. Ltd.',
+    attendeesCount: 90,
+    maxCapacity: 300,
+    minBatchSize: 30,
+    batchSize: 30,
+    joined: false,
+    category: 'Event',
+    itemCategoryType: 'event',
+    eventType: 'event',
+    deliveryMode: 'physical',
+    targetAgeRange: '6th STD to 12th STD Students',
+    prerequisites: 'Minimum requirement to book: 6th STD to maximum 12th STD students.',
+    batchSchedule: 'Starts from Dec 5, 2026 • 6th STD to 12th STD • Lunch & Snacks Included • Single (₹1,600) & Group Min. 30 (₹1,500)',
+    refreshmentsIncluded: 'Lunch & Snacks Included in ₹1,500 & ₹1,600 Pass',
+    recurringSlots: [
+      '08:30 AM – 04:30 PM (Weekday School Batch — Starts Dec 5, 2026)',
+      '08:30 AM – 04:30 PM (Saturday Educational Batch — Starts Dec 5, 2026)'
+    ],
+    ticketPrice: 1500,
+    transportIncluded: true,
+    transportOptOutDiscount: 400,
+    includedGuideRatio: '1 Tour Guide per 30 Students (Included Free)',
+    bookingHelpPhone: '+91-8073749074',
+    groupPlatformFeePercent: 2,
+    groupPlatformFeeMinQty: 30,
+    ticketTiers: [
+      {
+        id: 'tier-gkvk-single-student',
+        name: 'Single Student Booking (Incl. Transport, Lunch & Snacks)',
+        price: 1600,
+        capacity: 120,
+        remainingStock: 95,
+        description:
+          'For 6th STD to 12th STD students. Book for 1 or more students individually — ₹1,600/student including Bangalore transport, lunch & snacks, entry to all 10 UAS–GKVK divisions, and guided tour. Opt out of transport below to reduce ₹400/student (₹1,200/student).',
+        ageGroup: '6th STD – 12th STD',
+        minPerOrder: 1,
+        maxPerOrder: 29
+      },
+      {
+        id: 'tier-gkvk-student-transport',
+        name: 'Group / School Batch Pass — Min. 30 Students (Incl. Transport, Lunch & Snacks)',
+        price: 1500,
+        capacity: 300,
+        remainingStock: 210,
+        description:
+          'For 6th STD to 12th STD students. Starts from ₹1,500/student for batches of 30+ students including Bangalore transport, lunch & snacks, campus entry to 10 UAS–GKVK divisions, and 1 tour guide per 30 students. Opt out of transport below to reduce ₹400/student (₹1,100/student).',
+        ageGroup: '6th STD – 12th STD',
+        minPerOrder: 30,
+        maxPerOrder: 300
+      }
+    ],
+    eventAddOns: [
+      {
+        id: 'addon-iso-certified-food',
+        name: 'ISO Certified Food Option',
+        description: 'Hygienic ISO-certified nutritious vegetarian meal & refreshments pack per student.',
+        price: 400,
+        chargeType: 'per_student',
+        badge: 'ISO Certified'
+      },
+      {
+        id: 'addon-extra-guide-10-kids',
+        name: 'Dedicated Tour Guide Upgrade (1 Guide for 10 Kids)',
+        description:
+          'Base package includes 1 tour guide per 30 kids. Add dedicated guide support for smaller 10-kid supervision groups (+₹600 per additional guide).',
+        price: 600,
+        chargeType: 'per_unit',
+        unitLabel: 'extra guide',
+        badge: '1:10 Ratio Upgrade',
+        recommendedNote: '1 guide per 30 kids is already included free. Add +₹600 per extra guide for 1 guide per 10 kids.'
+      }
+    ],
+    tourHighlights: [
+      '1. Agricultural Sciences Museum — Heritage of Indian & Karnataka agriculture, farm tools & crop evolution',
+      '2. Soil Science Museum (Pedonarium) — Minerals, rocks, soil profiles & soil conservation science',
+      '3. Insect Museum & Dept. of Entomology — Beneficial vs. pest insects, pollination & biodiversity',
+      '4. Institute of Baking Technology & Value Addition Centre (IBTAVA) — Millet baking & food processing',
+      '5. Hydroponics Unit — Future of soilless, water-efficient urban & protected farming',
+      '6. Apiculture (Beekeeping) Unit — Live honey bee colonies, pollination ecology & honey extraction',
+      '7. Botanical Garden & Plant Biodiversity Sections — Medicinal, rare & native flora walk',
+      '8. Agroforestry Demonstration Units — Tree-crop integration & climate-resilient ecosystems',
+      '9. Integrated Farming Systems (IFS) & Agri-Tourism Unit — Zero-waste sustainable farm models',
+      '10. Nursery, Plant Sales Centre & University Sales Counter — Pure honey, millet bakery & vermicompost'
+    ],
+    learningOutcomes: [
+      'Hands-on STEM & Environmental Science connection outside the classroom',
+      'Understanding sustainable agriculture, hydroponics, soil profiles & pollination',
+      'Exposure to food technology, value-added millet nutrition & eco-careers',
+      'Structured group supervision with 1 guide per 30 kids (upgradeable to 1 per 10 kids)'
+    ],
+    scheduleAgenda: [
+      { time: '08:30 AM', title: 'Bangalore Pickup & Arrival at UAS–GKVK Campus', description: 'Board Bangalore transport (or direct campus reporting if transport opted out).' },
+      { time: '09:45 AM', title: 'Museums Circuit: Agri Sciences, Soil Pedonarium & Insect Museum', description: 'Guided exploration of minerals, soil horizons, insect biodiversity & farming evolution.' },
+      { time: '11:30 AM', title: 'IBTAVA Food Tech, Hydroponics & Apiculture Units', description: 'Live demos on millet value addition, soilless hydroponics & honeybee pollination.' },
+      { time: '01:00 PM', title: 'Lunch & Snacks Break (Included in ₹1,500 & ₹1,600 Pass)', description: 'Supervised lunch & snacks included for all students (optional ISO-certified food upgrade available as an add-on).' },
+      { time: '02:00 PM', title: 'Botanical Garden, Agroforestry & Integrated Farming Systems (IFS)', description: 'Field walk across plant biodiversity zones and zero-waste eco-farming models.' },
+      { time: '03:30 PM', title: 'Nursery, University Sales Counter & Return Journey', description: 'Visit plant nursery & university counter (honey, bakery, vermicompost) before drop-off.' }
+    ],
+    tags: [
+      'Agri-Eco Tour',
+      'UAS GKVK',
+      '6th to 12th STD',
+      'Educational Field Trip',
+      'Hydroponics',
+      'Apiculture',
+      'Bangalore Schools',
+      'Min 30 Students',
+      'ISO Food Add-On'
+    ],
+    iconEmoji: '🌿',
+    photoUrl: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=1200&auto=format&fit=crop&q=80',
+    featured: true,
+    isSponsored: false,
+    lat: 13.0785,
+    lng: 77.5794
+  },
+  {
     id: 'class-bhagavad-geeta-online',
     title: 'Free Online Bhagavad Gita Classes for Kids & Families (Geeta Pariwar)',
     description: 'Learn pure Sanskrit recitation of the Bhagavad Gita with accurate pronunciation, meanings, and moral values. Conducted live on Zoom for 40 minutes daily (Mon–Fri). 100% Free classes with zero charges for study PDFs, audio resources, and official "Gītā Guñjana" E-Certificates. Features engaging storytelling, rhymes, and puzzles for children.',

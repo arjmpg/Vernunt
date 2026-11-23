@@ -200,7 +200,11 @@ export default function EventCarouselSection({
                 <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between text-white text-[11px] font-extrabold z-10">
                   <div className="bg-slate-950/80 backdrop-blur-xs px-2 py-0.5 rounded-lg border border-white/20 flex items-center gap-1">
                     <Ticket className="w-3 h-3 text-orange-400" />
-                    <span>{evt.ticketPrice && evt.ticketPrice > 0 ? `₹${evt.ticketPrice}` : 'FREE'}</span>
+                    <span>
+                      {evt.ticketPrice && evt.ticketPrice > 0
+                        ? `${evt.minBatchSize || (evt.eventAddOns && evt.eventAddOns.length > 0) ? 'Starts ' : ''}₹${evt.ticketPrice.toLocaleString('en-IN')}`
+                        : 'FREE'}
+                    </span>
                   </div>
 
                   {evt.distance !== undefined && (

@@ -1,13 +1,19 @@
-import React, { useEffect } from 'react';
-import { CommunityEvent, ChildProfile } from '../../types.ts';
+import React, { useEffect, useState, useMemo } from 'react';
+import { CommunityEvent, ChildProfile, EventAddOn } from '../../types.ts';
 import { 
   X, Calendar, Clock, MapPin, Ticket, Share2, 
   UserCheck, ExternalLink, Sparkles, Navigation, 
   CheckCircle2, ShieldCheck, Tag, Users, ArrowRight,
-  Layers, Info, Award
+  Layers, Info, Award, Bus, Compass, Phone, Utensils
 } from 'lucide-react';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
 import { generateEventJsonLd } from '../../utils/eventUrls.ts';
+import AdminEventAddOnsManager from './AdminEventAddOnsManager.tsx';
+import {
+  getCachedCustomAddOns,
+  fetchCustomEventAddOns,
+  mergeEventAddOns
+} from '../../utils/eventAddOnsStorage.ts';
 
 interface EventDetailCardModalProps {
   event: CommunityEvent | null;
@@ -56,14 +62,45 @@ export default function EventDetailCardModal({
     };
   }, [event]);
 
+  const [customAddOns, setCustomAddOns] = useState<EventAddOn[]>(() =>
+    event ? getCachedCustomAddOns(event.id) : []
+  );
+
+  useEffect(() => {
+    if (!event) return;
+    let active = true;
+    fetchCustomEventAddOns(event.id).then((list) => {
+      if (active) setCustomAddOns(list);
+    });
+    const handleSync = (e: any) => {
+      if (e?.detail?.eventId === event.id && Array.isArray(e.detail.addons)) {
+        setCustomAddOns(e.detail.addons);
+      }
+    };
+    window.addEventListener('vernunt_event_addons_updated', handleSync);
+    return () => {
+      active = false;
+      window.removeEventListener('vernunt_event_addons_updated', handleSync);
+    };
+  }, [event]);
+
+  const allAddOns = useMemo(
+    () => mergeEventAddOns(event?.eventAddOns, customAddOns),
+    [event?.eventAddOns, customAddOns]
+  );
+
   if (!event) return null;
 
   const subCategoryKey = getGatheringSubCategory(event);
   const subCategoryMeta = GATHERING_SUBCATEGORIES[subCategoryKey];
 
   const isFree = !event.ticketPrice || event.ticketPrice === 0;
-  const priceDisplay = isFree ? 'FREE Entry' : `₹${event.ticketPrice}`;
-  const isFull = event.status === 'Full';
+  const priceDisplay = isFree
+    ? 'FREE Entry'
+    : event.minBatchSize
+    ? `Starts ₹${event.ticketPrice.toLocaleString('en-IN')}`
+    : `₹${event.ticketPrice.toLocaleString('en-IN')}`;
+  const isFull = (event as any).status === 'Full';
 
   const defaultTiers = event.ticketTiers && event.ticketTiers.length > 0 
     ? event.ticketTiers 
@@ -229,6 +266,23 @@ export default function EventDetailCardModal({
             </div>
           </div>
 
+          {/* Student Grade / Eligibility Requirement Banner */}
+          {event.prerequisites && (
+            <div className="p-3.5 rounded-2xl bg-purple-50/80 border border-purple-200 flex items-start gap-2.5 text-xs">
+              <div className="w-8 h-8 rounded-xl bg-purple-600 text-white flex items-center justify-center shrink-0">
+                <Award className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-purple-800 block">
+                  Student Eligibility Requirement
+                </span>
+                <p className="font-bold text-slate-900 mt-0.5">
+                  {event.prerequisites}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Venue & Location Strip */}
           <div className="p-3.5 sm:p-4 rounded-2xl bg-amber-50/60 border border-amber-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-3">
@@ -312,6 +366,45 @@ export default function EventDetailCardModal({
             </div>
           </div>
 
+          {/* Tour Campus Highlights / 10 Divisions */}
+          {event.tourHighlights && event.tourHighlights.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Compass className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Campus Divisions &amp; Key Stops Included</span>
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {event.tourHighlights.map((stop, idx) => (
+                  <div
+                    key={idx}
+                    className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200/80 text-xs text-slate-800 font-medium leading-snug flex items-start gap-2"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span>{stop}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Learning Outcomes */}
+          {event.learningOutcomes && event.learningOutcomes.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <Award className="w-3.5 h-3.5 text-amber-600" />
+                <span>Student Learning Outcomes</span>
+              </h3>
+              <div className="p-3.5 rounded-2xl bg-amber-50/50 border border-amber-200/80 space-y-1.5">
+                {event.learningOutcomes.map((item, idx) => (
+                  <div key={idx} className="text-xs text-slate-700 flex items-start gap-2">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Recurring Schedule / Sessions (if available) */}
           {event.recurringSlots && event.recurringSlots.length > 0 && (
             <div className="space-y-2">
@@ -330,6 +423,35 @@ export default function EventDetailCardModal({
             </div>
           )}
 
+          {/* Booking Help Support Strip */}
+          {event.bookingHelpPhone && (
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-blue-50/80 border border-blue-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-blue-800 block">
+                    Help in Booking
+                  </span>
+                  <p className="text-xs sm:text-sm font-black text-slate-900 mt-0.5">
+                    Contact {event.bookingHelpPhone}
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Call or WhatsApp for single student or school group booking assistance.
+                  </p>
+                </div>
+              </div>
+              <a
+                href={`tel:${event.bookingHelpPhone.replace(/[^+\d]/g, '')}`}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-xs transition flex items-center justify-center gap-1.5 shrink-0"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>Call {event.bookingHelpPhone}</span>
+              </a>
+            </div>
+          )}
+
           {/* Available Ticket Tiers Preview */}
           <div className="space-y-2.5">
             <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
@@ -345,6 +467,16 @@ export default function EventDetailCardModal({
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xs font-extrabold text-slate-900">{tier.name}</span>
+                      {(tier as any).minPerOrder === 1 && (
+                        <span className="text-[10px] font-black bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md">
+                          Single Booking (1+)
+                        </span>
+                      )}
+                      {(tier as any).minPerOrder > 1 && (
+                        <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-2 py-0.5 rounded-md">
+                          Min. {(tier as any).minPerOrder} Students
+                        </span>
+                      )}
                       {tier.includesKit && (
                         <span className="text-[10px] font-black bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">
                           Includes Kit 🎨
@@ -366,6 +498,96 @@ export default function EventDetailCardModal({
                 </div>
               ))}
             </div>
+
+            {/* Pricing Rules, Transport Opt-Out & Available Add-Ons Breakdown */}
+            {(event.minBatchSize || event.transportOptOutDiscount || event.includedGuideRatio || allAddOns.length > 0) && (
+              <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200/80 space-y-3">
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-xs font-extrabold text-orange-950 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-orange-600" />
+                    <span>Group Pricing, Transport Option &amp; Add-Ons</span>
+                  </span>
+                  {event.minBatchSize && (
+                    <span className="text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md">
+                      Min. Batch Size: {event.minBatchSize} Students
+                    </span>
+                  )}
+                </div>
+
+                <div className="space-y-1.5 text-xs">
+                  {event.refreshmentsIncluded && (
+                    <div className="flex items-center gap-2 text-amber-950 bg-white/90 px-3 py-2 rounded-xl border border-amber-200">
+                      <Utensils className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span className="font-bold">{event.refreshmentsIncluded}</span>
+                    </div>
+                  )}
+
+                  {event.includedGuideRatio && (
+                    <div className="flex items-center gap-2 text-emerald-900 bg-white/80 px-3 py-2 rounded-xl border border-emerald-200">
+                      <Users className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      <span className="font-semibold">{event.includedGuideRatio}</span>
+                    </div>
+                  )}
+
+                  {event.transportOptOutDiscount && event.transportOptOutDiscount > 0 && (
+                    <div className="flex items-center justify-between gap-2 text-emerald-900 bg-white/80 px-3 py-2 rounded-xl border border-emerald-200">
+                      <span className="flex items-center gap-2 font-semibold">
+                        <Bus className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Own Transport Opt-Out Option (If Bangalore transport not required)</span>
+                      </span>
+                      <span className="font-black text-emerald-700 shrink-0">
+                        -₹{event.transportOptOutDiscount}/student
+                      </span>
+                    </div>
+                  )}
+
+                  {allAddOns.map((addon) => (
+                    <div
+                      key={addon.id}
+                      className="flex items-start justify-between gap-2 bg-white px-3 py-2 rounded-xl border border-orange-100"
+                    >
+                      <div>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900">{addon.name}</span>
+                          {addon.badge && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900">
+                              {addon.badge}
+                            </span>
+                          )}
+                          {addon.isAdminCustom && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">
+                              Admin Custom
+                            </span>
+                          )}
+                        </div>
+                        {addon.description && (
+                          <p className="text-[11px] text-slate-500 mt-0.5">{addon.description}</p>
+                        )}
+                      </div>
+                      <span className={`font-black shrink-0 whitespace-nowrap ${addon.price < 0 ? 'text-emerald-700' : 'text-orange-700'}`}>
+                        {addon.price >= 0 ? `+₹${addon.price}` : `-₹${Math.abs(addon.price)}`}
+                        <span className="text-[10px] font-semibold text-slate-500 block text-right">
+                          {addon.chargeType === 'per_student'
+                            ? 'per student'
+                            : addon.chargeType === 'flat'
+                            ? 'flat'
+                            : `per ${addon.unitLabel || 'unit'}`}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Admin-Only Custom Add-Ons Creator & Manager */}
+            <AdminEventAddOnsManager
+              eventId={event.id}
+              eventTitle={event.title}
+              userProfile={userProfile}
+              customAddOns={customAddOns}
+              onAddOnsUpdated={(updated) => setCustomAddOns(updated)}
+            />
           </div>
 
           {/* Tags & Sub-categories */}

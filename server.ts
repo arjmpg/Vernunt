@@ -21,6 +21,7 @@ import {
 } from "./server/emailService.ts";
 import { generateEventTicketPdfAndQr } from "./server/ticketPdfService.ts";
 import { registerEventAttendeeRoutes, upsertEventAttendee } from "./server/eventAttendeesService.ts";
+import { registerEventAddOnRoutes } from "./server/eventAddOnsService.ts";
 import { registerBackupRoutes } from "./server/backupService.ts";
 import { registerRazorpayRoutes } from "./server/razorpayService.ts";
 import { registerWordPressRoutes } from "./server/wordpressService.ts";
@@ -796,6 +797,9 @@ async function startServer() {
     persistUserToFirestore,
     getFirebaseAdmin
   });
+
+  // Register Admin Custom Event Add-Ons Routes
+  registerEventAddOnRoutes(app);
 
   // =========================================================================
   // SECURE ACCOUNT PASSWORD MANAGEMENT (ADMIN & ALL USERS)
