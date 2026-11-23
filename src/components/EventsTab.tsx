@@ -43,14 +43,11 @@ import {
   fetchAiSemanticSearch,
   trackParentAccountAction
 } from '../utils/marketplaceAiEngine.ts';
+import { isEventExpired, filterActiveEvents } from '../utils/eventExpiry.ts';
 
 // Calculate status: 'Upcoming' | 'Full' | 'Past'
 export const getEventStatus = (evt: CommunityEvent): 'Upcoming' | 'Full' | 'Past' => {
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  
-  const eventDate = evt.endDate || evt.date;
-  if (eventDate && eventDate < todayStr) {
+  if (isEventExpired(evt)) {
     return 'Past';
   }
   
@@ -1001,7 +998,8 @@ export default function EventsTab({
   // 2. Calculate proximity distance from current user coordinates
   // 3. Filter by category, query keywords, and optional radius
   // 4. Hierarchical sort: Featured & Sponsored events at the TOP, then sorted by proximity distance
-  const effectiveEvents = eventsList;
+  // Filter out all expired events completely so post-event-date events are never shown
+  const effectiveEvents = useMemo(() => filterActiveEvents(eventsList), [eventsList]);
 
   const semanticEventEvaluation = useMemo(() => {
     if (!searchQuery.trim()) return null;
@@ -1228,7 +1226,7 @@ export default function EventsTab({
     return defaultPositions[index % defaultPositions.length];
   };
 
-  const selectedEvent = eventsList.find(e => e.id === selectedEventId) || filteredEvents[0];
+  const selectedEvent = effectiveEvents.find(e => e.id === selectedEventId) || filteredEvents[0];
 
   const getCategoryBadgeStyles = (category: string) => {
     switch (category) {
@@ -1767,8 +1765,8 @@ ${deepLink}`;
                 ].map((cat) => {
                   const isSelected = categoryFilter === cat.key;
                   const count = cat.key === 'All' 
-                    ? eventsList.length 
-                    : eventsList.filter(e => e.category === cat.key).length;
+                    ? effectiveEvents.length 
+                    : effectiveEvents.filter(e => e.category === cat.key).length;
                   const CatIcon = cat.icon;
 
                   return (

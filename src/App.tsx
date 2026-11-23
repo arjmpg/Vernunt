@@ -20,6 +20,7 @@ import ChatPanel from './components/ChatPanel.tsx';
 import EditProfileModal from './components/EditProfileModal.tsx';
 import { recordParentMlFeedback, getParentMlState } from './utils/parentMlEngine.ts';
 import { deduplicatePlaymates } from './utils/deduplicatePlaymates.ts';
+import { filterActiveEvents } from './utils/eventExpiry.ts';
 
 // Code-split heavy tab views for instant initial load and high performance
 const TabLoadingFallback = () => (
@@ -1784,6 +1785,7 @@ export default function App() {
   }, [specialistsList]);
 
   const [eventsList, setEventsList] = useState<CommunityEvent[]>(MOCK_EVENTS);
+  const activeEventsList = useMemo(() => filterActiveEvents(eventsList), [eventsList]);
   const [storeInitialAction, setStoreInitialAction] = useState<string | undefined>(undefined);
   const [selectedGuideSlug, setSelectedGuideSlug] = useState<string | undefined>(undefined);
 
@@ -3907,7 +3909,7 @@ export default function App() {
               userProfile={userProfile}
               playmates={playmates}
               specialists={specialistsList}
-              events={eventsList}
+              events={activeEventsList}
               daycares={daycarePlayhomes}
               storeProducts={MOCK_MARKETPLACE}
               onSelectResult={(type, tabId, item) => {
@@ -4222,7 +4224,7 @@ export default function App() {
                 userProfile={userProfile}
                 selectedLocality={selectedLocality}
                 playmates={playmates}
-                events={eventsList}
+                events={activeEventsList}
                 banners={banners}
                 onStartSignUp={handleStartSignUp}
                 onQuickStart={() => handleStartSignUp('Parent')}
@@ -4669,7 +4671,7 @@ export default function App() {
             {activeTab === 'events' && (
               <EventsTab 
                 userProfile={userProfile} 
-                eventsList={eventsList}
+                eventsList={activeEventsList}
                 setEventsList={setEventsList}
                 initialOpenCreateWizard={openEventWizardOnMount}
                 onOpenPushModal={() => setShowPushNotificationModal(true)}
@@ -4832,7 +4834,7 @@ export default function App() {
               <AffiliateDashboard 
                 userProfile={effectiveProfile}
                 onUpdateUserProfile={(updated) => setUserProfile(updated)}
-                eventsList={eventsList}
+                eventsList={activeEventsList}
                 specialistsList={specialistsList}
               />
             )}

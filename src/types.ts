@@ -594,6 +594,7 @@ export interface CommunityEvent {
   location: string;
   hostName: string;
   attendeesCount: number;
+  attendeesUnitLabel?: string; // e.g. 'Kids' | 'Students' | 'Families' (defaults to 'Families')
   joined: boolean;
   category: string;
   photoUrl: string;

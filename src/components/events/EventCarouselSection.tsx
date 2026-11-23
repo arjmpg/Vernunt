@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { getEventStatus } from '../EventsTab.tsx';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
+import { filterActiveEvents } from '../../utils/eventExpiry.ts';
 
 interface EventCarouselSectionProps {
   title: string;
@@ -35,8 +36,9 @@ export default function EventCarouselSection({
   defaultBadge
 }: EventCarouselSectionProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const activeEvents = filterActiveEvents(events || []);
 
-  if (!events || events.length === 0) return null;
+  if (activeEvents.length === 0) return null;
 
   const scrollLeft = () => {
     if (scrollRef.current) {
@@ -122,7 +124,7 @@ export default function EventCarouselSection({
         ref={scrollRef}
         className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar scroll-smooth pb-3 pt-1 px-1 snap-x snap-mandatory"
       >
-        {events.map((evt) => {
+        {activeEvents.map((evt) => {
           const userTicket = myTickets.find(t => t.itemId === evt.id);
           const isEventJoined = evt.joined || !!userTicket;
           const status = getEventStatus(evt);

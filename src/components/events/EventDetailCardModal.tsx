@@ -4,10 +4,11 @@ import {
   X, Calendar, Clock, MapPin, Ticket, Share2, 
   UserCheck, ExternalLink, Sparkles, Navigation, 
   CheckCircle2, ShieldCheck, Tag, Users, ArrowRight,
-  Layers, Info, Award, Bus, Compass, Phone, Utensils
+  Layers, Info, Award, Bus, Compass, Phone, Utensils, CalendarPlus, ChevronDown, Download
 } from 'lucide-react';
 import { getGatheringSubCategory, GATHERING_SUBCATEGORIES } from '../../utils/gatheringCategories.ts';
 import { generateEventJsonLd } from '../../utils/eventUrls.ts';
+import { buildGoogleCalendarUrl, downloadAppleCalendarIcs } from '../../utils/calendarExport.ts';
 import AdminEventAddOnsManager from './AdminEventAddOnsManager.tsx';
 import {
   getCachedCustomAddOns,
@@ -65,6 +66,13 @@ export default function EventDetailCardModal({
   const [customAddOns, setCustomAddOns] = useState<EventAddOn[]>(() =>
     event ? getCachedCustomAddOns(event.id) : []
   );
+  const [showCalendarOptions, setShowCalendarOptions] = useState(false);
+  const [icsDownloaded, setIcsDownloaded] = useState(false);
+
+  useEffect(() => {
+    setShowCalendarOptions(false);
+    setIcsDownloaded(false);
+  }, [event?.id]);
 
   useEffect(() => {
     if (!event) return;
@@ -222,48 +230,121 @@ export default function EventDetailCardModal({
           {/* Quick Key Highlights Grid */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
             {/* Date Box */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+            <div className="col-span-2 sm:col-span-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center shrink-0">
                 <Calendar className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block">Date</span>
-                <span className="text-xs font-black text-slate-800 block truncate">{event.date}</span>
+                <span className="text-xs font-black text-slate-800 block leading-snug break-words">{event.date}</span>
               </div>
             </div>
 
             {/* Time Box */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+            <div className="col-span-2 sm:col-span-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
                 <Clock className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block">Timing</span>
-                <span className="text-xs font-black text-slate-800 block truncate">{event.time || 'Schedule in info'}</span>
+                <span className="text-xs font-black text-slate-800 block leading-snug break-words">{event.time || 'Schedule in info'}</span>
               </div>
             </div>
 
             {/* Price Box */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+            <div className="col-span-1 sm:col-span-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
                 <Ticket className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block">Entry Fee</span>
-                <span className="text-xs font-black text-emerald-700 block truncate">{priceDisplay}</span>
+                <span className="text-xs font-black text-emerald-700 block leading-snug break-words">{priceDisplay}</span>
               </div>
             </div>
 
             {/* RSVP Box */}
-            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+            <div className="col-span-1 sm:col-span-2 p-3 rounded-2xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center shrink-0">
                 <Users className="w-4 h-4" />
               </div>
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase block">Attending</span>
-                <span className="text-xs font-black text-purple-700 block truncate">{event.attendeesCount || 0} Families</span>
+                <span className="text-xs font-black text-purple-700 block leading-snug break-words">
+                  {event.attendeesCount || 0} {event.attendeesUnitLabel || 'Families'}
+                </span>
               </div>
             </div>
+          </div>
+
+          {/* Sync to Google / Apple Calendar Control */}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 space-y-2.5">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shrink-0">
+                  <CalendarPlus className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-extrabold text-slate-900 block">
+                    Save to Your Personal Calendar
+                  </span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Add date, timing, venue &amp; 1-hour reminder automatically
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="btn-sync-google-apple-calendar"
+                onClick={() => setShowCalendarOptions((prev) => !prev)}
+                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition flex items-center gap-1.5 shrink-0 cursor-pointer shadow-xs"
+              >
+                <CalendarPlus className="w-3.5 h-3.5 text-orange-400" />
+                <span>Sync to Google/Apple Calendar</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform ${showCalendarOptions ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+
+            {showCalendarOptions && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-200/80">
+                <a
+                  id="btn-add-google-calendar"
+                  href={buildGoogleCalendarUrl(event)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-blue-50 text-slate-900 border border-slate-200 hover:border-blue-300 font-bold text-xs transition flex items-center justify-center gap-2 shadow-2xs"
+                >
+                  <Calendar className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>Add to Google Calendar</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                </a>
+
+                <button
+                  type="button"
+                  id="btn-add-apple-calendar"
+                  onClick={() => {
+                    downloadAppleCalendarIcs(event);
+                    setIcsDownloaded(true);
+                    setTimeout(() => setIcsDownloaded(false), 3500);
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl bg-white hover:bg-emerald-50 text-slate-900 border border-slate-200 hover:border-emerald-300 font-bold text-xs transition flex items-center justify-center gap-2 shadow-2xs cursor-pointer"
+                >
+                  {icsDownloaded ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="text-emerald-700">Apple Calendar (.ics) Saved!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 text-slate-700 shrink-0" />
+                      <span>Apple Calendar / Outlook (.ics)</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Student Grade / Eligibility Requirement Banner */}
